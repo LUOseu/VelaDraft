@@ -33,6 +33,8 @@ correctly and testably.
   target greedy, per token, including EOS handling) plus AL / per-slot
   acceptance / tokens-per-target-forward, and a random-init-drafter acceptance
   baseline (target-only greedy is reported only as an output/speed reference).
+  `eval.verification` selects `sequential` (the parity gate) / `parallel` /
+  `strict_parallel`; see the runtime probe below.
 
 ## Unified CLI (v0.2)
 
@@ -212,9 +214,11 @@ Reading:
   control run re-verifies every round and lands exactly on 32/32 with the same
   AL, which pins the residual divergence on numerics rather than bookkeeping.
 - At the current drafter quality (AL 1.33 on this 512-sample run) there is no
-  wall-clock win: a block verify costs about what the ~1.3 tokens it commits
-  save. Crossover for this harness is around AL ~1.6-1.9, which is what the
-  scaling runs (`scripts/run_scaling_suite.sh`) are testing.
+  wall-clock win: one block verify costs about what the ~1.3 tokens it commits
+  save. In this harness the parallel path breaks even at AL ~1.3 and reaches
+  ~1.5x only around AL ~2.0, while the sequential gate needs AL ~1.6 just to
+  break even - which is what the scaling runs
+  (`scripts/run_scaling_suite.sh`) are testing.
 - `sequential` therefore remains the correctness gate; parallel modes are
   throughput experiments whose agreement rate is reported per run.
 

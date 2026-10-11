@@ -128,8 +128,9 @@ Consequences:
 * `parallel` / `strict_parallel` are throughput experiments. At the current
   drafter quality (AL ~1.33) they are also *not* faster: one block verify costs
   about what the ~1.3 tokens it commits save, and every fallback round adds one
-  or more sequential target forwards. Crossover in this harness is around
-  AL ~1.6-1.9.
+  or more sequential target forwards. In this harness the parallel path breaks
+  even at AL ~1.3 and reaches ~1.5x around AL ~2.0; the sequential gate needs
+  AL ~1.6 to break even.
 * The reference SDPA backend narrowing (`.verify_sdpa_backend: reference`) is a
   second, smaller near-tie source; `parity` disables it. The numbers above are
   `parity`.
