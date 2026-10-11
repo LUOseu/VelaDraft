@@ -21,9 +21,20 @@ Updated: 2026-10-11 (v0.2 in development; nothing pushed yet).
 ## Latest measured results
 - 3B / 512-corpus rerun: AL 1.198, 64/64 exact (earlier v0.1 run: 1.220).
 - 3B / 2K-corpus: AL 1.630, 128/128 exact, slots `[.413,.149,.048,.015,.004,.001,0]`.
-- 3B / 5K-corpus: **running** (scaling suite; will be appended to BENCHMARKS.md).
+- 3B / 5K-corpus: trained (1974 steps, final loss 2.34); eval running.
 - 8B / 512-corpus: AL 1.322; 8B / 2K: queued behind the 5K job.
 - Runtime probe (32 prompts, bf16): see BENCHMARKS.md.
+
+## Registry refactor verification (2026-10-11, no DFlash regression)
+- 61/61 CPU tests green after the refactor.
+- `vlm-dflash doctor --algorithm dflash` reports the registry + metadata.
+- Real eval through the registry path (`--tag registry_check`, 8 prompts,
+  sequential): AL 1.610, token-exact, algorithm tag recorded in the result -
+  consistent with the 128-prompt 1.630 protocol run.
+- First benchmark-harness run (`caption_general`, 8 prompts): AL 1.610, exact,
+  report written to `benchmarks/reports/` (smoke only - 8 prompts).
+- Packaging: `vlm_dflash-0.2.0` wheel + sdist build; wheel contains the
+  algorithms/benchmark subpackages and the `vlm-dflash` console script.
 
 ## Known bugs / caveats
 - bf16 capture/training: protocol-reproducible, not bit-identical.
