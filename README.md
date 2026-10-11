@@ -168,16 +168,17 @@ exactly 1.000. The numbers above are a head-consistent retrain; see
 `docs/REFERENCE.md` (Training semantics).
 
 CLI smoke (`vlm-dflash train --preset smoke --target .../Qwen3-VL-8B-Instruct
---limit 8 --steps 4`, COCO captions) proves the family adapter path end to end:
-capture visual-path check passed, drafter logits move when the image is swapped
-(`logits_diff=0.1562`), and `vlm-dflash eval` reports `token_exact: true` on 8/8
-prompts for both the trained and the random-init checkpoint.
+--run-dir runs/cli_smoke_8b --limit 8 --steps 3`, COCO captions) proves the CLI
+path end to end against an untied target: capture visual-path check passed,
+`vlm-dflash eval` reports `token_exact: true` on 8/8 prompts for both
+checkpoints (trained AL 1.076 vs random-init 1.000), and `vlm-dflash export`
+writes the portable HF-style checkpoint.
 
 Resume was verified on the same run: re-running with a different `--steps`
-fails loudly ("Resume plan mismatch"), and re-running with the matching plan
-resumes from `train/ckpt_last.pt` and reproduces the interrupted run's final
-loss exactly (`14.5625`), i.e. model + optimizer + scheduler + RNG state restore
-bit-identically.
+fails loudly ("Resume plan mismatch: checkpoint planned 3 total steps, this
+config computes 5"), and re-running with the matching plan restores model +
+optimizer + scheduler + RNG state so the resumed step is bit-identical (the two
+step-3 rows in `train/train_log.jsonl` are equal).
 
 Hardware note: all numbers above are from a single 48 GB card. 24 GB cards were
 **not** tested with these defaults; if you are memory-constrained, lower
