@@ -1,4 +1,4 @@
-"""Load the Qwen2.5-VL target and its processor from the frozen contract."""
+"""Load the target model/processor via the family adapter from the frozen contract."""
 
 from __future__ import annotations
 
@@ -15,15 +15,19 @@ def _dtype(name: str) -> torch.dtype:
 def load_target(cfg: dict, contract: dict, device: str | None = None):
     """Return ``(model, processor)`` for the contract's target checkpoint.
 
-    The processor is pinned to the contract's effective pixel bounds so regen,
+    The adapter is selected from the contract's resolved ``model_type``; the
+    processor is pinned to the contract's effective pixel bounds so regen,
     capture and eval all preprocess images identically.
     """
-    from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
+    from transformers import AutoProcessor
 
+    from ..adapters import adapter_for_contract
+
+    adapter = adapter_for_contract(contract)
     target_cfg = cfg.get("target", {})
     model_path = contract["target"]["model_path"]
     local_only = bool(target_cfg.get("local_files_only", True))
-    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+    model = adapter.load_model(
         model_path,
         dtype=_dtype(target_cfg.get("dtype", "bfloat16")),
         attn_implementation=target_cfg.get("attn_implementation", "sdpa"),
@@ -31,11 +35,10 @@ def load_target(cfg: dict, contract: dict, device: str | None = None):
     )
     processor = AutoProcessor.from_pretrained(
         model_path,
-        min_pixels=contract["image"]["min_pixels"],
-        max_pixels=contract["image"]["max_pixels"],
+        **adapter.processor_kwargs(contract),
         local_files_only=local_only,
     )
-    processor.tokenizer.padding_side = "left"
+    adapter.finalize_processor(processor, contract)
     model.to(device or target_cfg.get("device", "cuda:0"))
     model.eval()
     model.requires_grad_(False)

@@ -180,8 +180,22 @@ def _merge_multiaxis_rotary_embeddings(
     hidden_states: torch.Tensor,
     position_ids: torch.Tensor,
     sections: tuple[int, int, int],
+    interleaved: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Build one MRoPE table from temporal, height, and width positions.
+
+    Two layouts are supported, matching the two Qwen-VL generations:
+
+    * chunked (Qwen2.5-VL): the half-head channels are split into three
+      contiguous runs ``[t, h, w]`` of ``sections`` each;
+    * interleaved (Qwen3-VL, ``mrope_interleaved=true``): the first
+      ``3*max(sections[1:])`` half-head channels cycle ``t, h, w`` and any
+      remaining channels stay temporal. Because cosine/sine are elementwise in
+      the frequencies, the interleave is applied directly on the per-axis
+      cosine/sine tables (each half-head channel ``j`` above ``head_dim/2``
+      duplicates channel ``j``), which reproduces
+      ``Qwen3VLTextRotaryEmbedding.apply_interleaved_mrope`` exactly without
+      reconstructing angles.
 
     Args:
         rotary_emb: Rotary module producing tables for flattened position rows.
@@ -189,6 +203,8 @@ def _merge_multiaxis_rotary_embeddings(
         position_ids: Long tensor of shape [3, batch, sequence], with axes ordered as
             temporal, height, and width.
         sections: Number of half-head channels assigned to the three position axes.
+        interleaved: Select the Qwen3-VL interleaved layout instead of the
+            Qwen2.5-VL chunked layout.
 
     Returns:
         Cosine and sine tensors, each of shape [batch, sequence, head_dim].
@@ -202,11 +218,35 @@ def _merge_multiaxis_rotary_embeddings(
     axis_cos, axis_sin = rotary_emb(hidden_states, flat_position_ids)
     axis_cos = axis_cos.reshape(axes, batch_size, sequence_length, -1)
     axis_sin = axis_sin.reshape(axes, batch_size, sequence_length, -1)
+    head_dim = axis_cos.shape[-1]
+    half = head_dim // 2
+    if interleaved:
+        if 2 * sum(sections) != head_dim:
+            raise ValueError(
+                "Twice the sum of spatial_rope_sections must equal the attention head dimension, "
+                f"got sections={sections} and head_dim={head_dim}."
+            )
+        for axis in (1, 2):
+            if 3 * sections[axis] > half:
+                raise ValueError(
+                    f"Interleaved MRoPE needs 3*sections[axis] <= head_dim/2; axis {axis} has "
+                    f"3*{sections[axis]} > {half}."
+                )
+        cos = axis_cos[0].clone()
+        sin = axis_sin[0].clone()
+        for axis, offset in ((1, 1), (2, 2)):
+            indices = torch.arange(offset, 3 * sections[axis], 3, device=cos.device)
+            duplicated = indices + half
+            cos[..., indices] = axis_cos[axis][..., indices]
+            cos[..., duplicated] = axis_cos[axis][..., duplicated]
+            sin[..., indices] = axis_sin[axis][..., indices]
+            sin[..., duplicated] = axis_sin[axis][..., duplicated]
+        return cos, sin
     split_sizes = sections * 2
-    if sum(split_sizes) != axis_cos.shape[-1]:
+    if sum(split_sizes) != head_dim:
         raise ValueError(
             "Twice the sum of spatial_rope_sections must equal the attention head dimension, "
-            f"got sections={sections} and head_dim={axis_cos.shape[-1]}."
+            f"got sections={sections} and head_dim={head_dim}."
         )
     cos = torch.cat([chunk[index % 3] for index, chunk in enumerate(axis_cos.split(split_sizes, dim=-1))], dim=-1)
     sin = torch.cat([chunk[index % 3] for index, chunk in enumerate(axis_sin.split(split_sizes, dim=-1))], dim=-1)
@@ -736,6 +776,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         self.hidden_norm = Qwen3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.spatial_rope_enabled = bool(dflash_config.get("spatial_rope_enabled", False))
         self.spatial_rope_mode = str(dflash_config.get("spatial_rope_mode", "gated"))
+        self.spatial_rope_interleaved = bool(dflash_config.get("spatial_rope_interleaved", False))
         spatial_rope_sections = dflash_config.get("spatial_rope_sections", None)
         self.spatial_rope_sections = (
             tuple(int(section) for section in spatial_rope_sections) if spatial_rope_sections is not None else ()
@@ -749,6 +790,13 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                     "Spatial-rope DFlash requires three spatial_rope_sections whose doubled sum equals head_dim, "
                     f"got sections={self.spatial_rope_sections} and head_dim={head_dim}."
                 )
+            if self.spatial_rope_interleaved:
+                for axis in (1, 2):
+                    if 3 * self.spatial_rope_sections[axis] > head_dim // 2:
+                        raise ValueError(
+                            "Interleaved spatial rope needs 3*sections[axis] <= head_dim/2; "
+                            f"axis {axis} has 3*{self.spatial_rope_sections[axis]} > {head_dim // 2}."
+                        )
             if self.spatial_rope_mode == "gated":
                 self.spatial_rope_gates = nn.Parameter(torch.zeros(len(self.layers)))
             else:
@@ -1060,6 +1108,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                 hidden_states,
                 multimodal_position_ids,
                 self.spatial_rope_sections,
+                interleaved=self.spatial_rope_interleaved,
             )
         for layer_idx, layer in enumerate(self.layers):
             hidden_states = layer(
@@ -1191,6 +1240,12 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         # model forward. Passing the text-only 2-D arange used by Qwen3 would
         # silently disable multimodal RoPE, so let the VLM compute positions.
         target_is_vlm = callable(getattr(getattr(target, "model", None), "compute_3d_position_ids", None))
+        if target_is_vlm:
+            from ..adapters import adapter_for_model
+
+            adapter = adapter_for_model(target)
+        else:
+            adapter = None
         target_forward_params = inspect.signature(target.forward).parameters
         target_embeddings = target.get_input_embeddings()
         past_key_values_target = DynamicCache()
@@ -1268,7 +1323,8 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         if self.spatial_rope_enabled:
             if not target_is_vlm:
                 raise ValueError("Spatial-rope DFlash requires a target that exposes 3D position construction.")
-            prompt_multimodal_position_ids = target.model.compute_3d_position_ids(
+            prompt_multimodal_position_ids = adapter.call_position_builder(
+                target,
                 input_ids=input_ids,
                 image_grid_thw=target_kwargs.get("image_grid_thw"),
                 video_grid_thw=target_kwargs.get("video_grid_thw"),
@@ -1382,7 +1438,8 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                         )
                         verify_input_ids = verify_kwargs.pop("input_ids")
                         verify_kwargs["attention_mask"] = full_attention_mask
-                        multimodal_position_ids = target.model.compute_3d_position_ids(
+                        multimodal_position_ids = adapter.call_position_builder(
+                            target,
                             input_ids=token_ids,
                             image_grid_thw=None,
                             video_grid_thw=None,
@@ -1467,7 +1524,8 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                 # ``compute_3d_position_ids`` returns the three MRoPE axes for
                 # the full mask. The fourth text-position axis is required by
                 # the current Transformers causal-mask path.
-                multimodal_position_ids = target.model.compute_3d_position_ids(
+                multimodal_position_ids = adapter.call_position_builder(
+                    target,
                     input_ids=block_output_ids,
                     image_grid_thw=None,
                     video_grid_thw=None,

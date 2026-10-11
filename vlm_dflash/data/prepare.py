@@ -8,8 +8,11 @@ v0.1 sources:
   ``min_answer_chars`` are filtered out to form the long-answer training set.
 * ``coco_caption`` — COCO ``captions_train2017.json`` + images; short caption
   answers, used for pipeline smoke runs only.
+* ``jsonl`` — any JSONL of multimodal rows (messages / ShareGPT / flat
+  question-answer-image shapes; see :mod:`vlm_dflash.data.schema`), with
+  optional ``dataset.jsonl_images_dir`` for relative image paths.
 * ``hf`` — a HuggingFace ``datasets`` source exposing question/answer/image
-  columns (see ``dataset.hf`` config keys).
+  columns or a messages column (see ``dataset.hf`` config keys).
 
 Outputs (under ``<run>/data``): ``data.jsonl``, ``val.jsonl``, copied images,
 ``meta.json`` (media_dir) and ``manifest.json`` with per-row image hashes and a
@@ -95,18 +98,64 @@ def _iter_coco_caption(cfg: dict) -> list[dict]:
     return pool
 
 
+def _iter_jsonl(cfg: dict) -> list[dict]:
+    from .schema import iter_jsonl
+
+    dataset = cfg["dataset"]
+    images_dir = dataset.get("jsonl_images_dir") or dataset.get("images_dir")
+    examples = iter_jsonl(dataset["path"], images_dir=images_dir)
+    return [
+        {
+            "src_index": example.src_index,
+            "sample_id": example.id,
+            "question": example.question,
+            "answer": example.answer,
+            "image_path": example.image_path,
+        }
+        for example in examples
+    ]
+
+
 def _iter_hf(cfg: dict) -> list[dict]:
     import datasets  # imported lazily; only the ``hf`` source needs it
 
     dataset = cfg["dataset"]
     hf = dataset["hf"]
     ds = datasets.load_dataset(hf["path"], hf.get("config"), split=hf.get("split", "train"))
-    question_col = hf.get("question_col", "question")
-    answer_col = hf.get("answer_col", "answer")
     image_col = hf.get("image_col", "image")
     min_chars = int(dataset.get("min_answer_chars", 0))
     image_root = ensure_dir(Path(dataset.get("hf_image_cache", "hf_images")))
     pool = []
+
+    if hf.get("messages_col"):
+        from .schema import normalize_row
+
+        messages_col = hf["messages_col"]
+        for src_index, row in enumerate(ds):
+            image = row[image_col]
+            if not hasattr(image, "save"):
+                continue
+            image_path = image_root / f"hf_{src_index:07d}.jpg"
+            image.convert("RGB").save(image_path)
+            raw = dict(row)
+            raw["images"] = [str(image_path)]
+            raw.pop(image_col, None)
+            example = normalize_row(raw, index=src_index, row_dir=image_root)
+            if len(example.answer) < min_chars:
+                continue
+            pool.append(
+                {
+                    "src_index": src_index,
+                    "sample_id": example.id,
+                    "question": example.question,
+                    "answer": example.answer,
+                    "image_path": example.image_path,
+                }
+            )
+        return pool
+
+    question_col = hf.get("question_col", "question")
+    answer_col = hf.get("answer_col", "answer")
     for src_index, row in enumerate(ds):
         question, answer = str(row[question_col]), str(row[answer_col])
         if "<image>" not in question:
@@ -132,6 +181,7 @@ def _iter_hf(cfg: dict) -> list[dict]:
 _SOURCES = {
     "llava_instruct": _iter_llava_instruct,
     "coco_caption": _iter_coco_caption,
+    "jsonl": _iter_jsonl,
     "hf": _iter_hf,
 }
 

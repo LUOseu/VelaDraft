@@ -1,4 +1,4 @@
-"""Runtime model contract resolution for the Qwen2.5-VL target.
+"""Runtime model contract resolution for Qwen-VL-family targets.
 
 Every value the DFlash pipeline depends on (mask token id, MRoPE sections,
 draft layer routing, image pixel bounds, special tokens) is resolved from the
@@ -9,7 +9,6 @@ resolved model contract raises :class:`ContractError`.
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from typing import Any
@@ -27,6 +26,7 @@ def contract_defaults_from_config(cfg: dict) -> dict:
     return {
         "mask_token_id": drafter.get("mask_token_id"),
         "spatial_rope_sections": drafter.get("spatial_rope_sections"),
+        "spatial_rope_interleaved": drafter.get("spatial_rope_interleaved"),
         "draft_num_hidden_layers": drafter.get("num_hidden_layers"),
         "block_size": drafter.get("block_size"),
         "image_min_pixels": target.get("image_min_pixels"),
@@ -116,11 +116,11 @@ def resolve_contract(
     """Resolve and validate the runtime contract for a local target model.
 
     Args:
-        model_path: Local directory of a Qwen2.5-VL-style checkpoint.
+        model_path: Local directory of a supported Qwen-VL-family checkpoint.
         defaults: YAML defaults to validate against. Supported keys:
             ``mask_token_id``, ``spatial_rope_sections``,
-            ``draft_num_hidden_layers``, ``block_size``,
-            ``image_min_pixels``, ``image_max_pixels``.
+            ``spatial_rope_interleaved``, ``draft_num_hidden_layers``,
+            ``block_size``, ``image_min_pixels``, ``image_max_pixels``.
         out_path: When given, the contract JSON is written there.
 
     Returns:
@@ -135,6 +135,11 @@ def resolve_contract(
     from transformers import AutoConfig, AutoProcessor, AutoTokenizer
 
     config = AutoConfig.from_pretrained(str(model_dir), local_files_only=True)
+
+    from .adapters import get_adapter
+
+    adapter = get_adapter(str(getattr(config, "model_type", "")))  # fail loud on unsupported families
+    model_type = str(config.model_type)
     tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
     processor = AutoProcessor.from_pretrained(str(model_dir), local_files_only=True)
 
@@ -159,11 +164,10 @@ def resolve_contract(
         "im_end_token_id": tid("<|im_end|>"),
         "endoftext_token_id": tid("<|endoftext|>"),
     }
-    for cfg_key, cfg_value in (
-        ("image_token_id", getattr(text_config, "image_token_id", None)),
-        ("vision_start_token_id", getattr(text_config, "vision_start_token_id", None)),
-        ("vision_end_token_id", getattr(text_config, "vision_end_token_id", None)),
-    ):
+    for cfg_key in ("image_token_id", "vision_start_token_id", "vision_end_token_id"):
+        cfg_value = getattr(text_config, cfg_key, None)
+        if cfg_value is None and text_config is not config:
+            cfg_value = getattr(config, cfg_key, None)
         if cfg_value is not None and int(cfg_value) != tokens[cfg_key]:
             raise ContractError(
                 f"Token config disagrees with tokenizer for {cfg_key}: config={cfg_value} tokenizer={tokens[cfg_key]}"
@@ -217,6 +221,21 @@ def resolve_contract(
         raise ContractError(
             f"mrope_section {sections} doubled sum must equal head_dim {head_dim} for spatial-rope DFlash."
         )
+    interleaved = bool(rope.get("mrope_interleaved", False))
+    default_interleaved = defaults.get("spatial_rope_interleaved")
+    if default_interleaved is not None and bool(default_interleaved) != interleaved:
+        raise ContractError(
+            f"YAML spatial_rope_interleaved {bool(default_interleaved)} disagrees with target "
+            f"mrope_interleaved {interleaved}."
+        )
+    if interleaved:
+        half = head_dim // 2
+        for axis in (1, 2):
+            if 3 * sections[axis] > half:
+                raise ContractError(
+                    f"Interleaved MRoPE needs 3*mrope_section[axis] <= head_dim/2; axis {axis} has "
+                    f"3*{sections[axis]} > {half}."
+                )
 
     # ---- draft layer routing -------------------------------------------
     draft_layers = int(defaults.get("draft_num_hidden_layers", 3))
@@ -226,20 +245,16 @@ def resolve_contract(
         raise ContractError(f"block_size must be >= 2, got {block_size}.")
 
     # ---- image pixel bounds --------------------------------------------
-    image_processor = getattr(processor, "image_processor", None)
-    proc_min = getattr(image_processor, "min_pixels", None)
-    proc_max = getattr(image_processor, "max_pixels", None)
-    if proc_min is None or proc_max is None:
-        pre = json.loads((model_dir / "preprocessor_config.json").read_text())
-        proc_min = proc_min if proc_min is not None else pre.get("min_pixels")
-        proc_max = proc_max if proc_max is not None else pre.get("max_pixels")
-    if proc_min is None or proc_max is None:
-        raise ContractError("Could not resolve processor min_pixels/max_pixels.")
-    proc_min, proc_max = int(proc_min), int(proc_max)
+    try:
+        bounds = adapter.processor_pixel_bounds(processor, model_dir)
+    except RuntimeError as error:
+        raise ContractError(str(error)) from error
+    proc_min, proc_max = int(bounds["min_pixels"]), int(bounds["max_pixels"])
     min_pixels = int(defaults.get("image_min_pixels") or proc_min)
     max_pixels = int(defaults.get("image_max_pixels") or proc_max)
     if not 0 < min_pixels <= max_pixels:
         raise ContractError(f"Invalid image pixel bounds: min={min_pixels} max={max_pixels}.")
+    image_processor = getattr(processor, "image_processor", None)
     patch_size = int(getattr(image_processor, "patch_size", 14))
     merge_size = int(getattr(image_processor, "merge_size", 2))
     if min_pixels % (patch_size * patch_size) != 0 or max_pixels % (patch_size * patch_size) != 0:
@@ -265,7 +280,7 @@ def resolve_contract(
         "resolved_at": now_iso(),
         "target": {
             "model_path": str(model_dir.resolve()),
-            "model_type": str(getattr(config, "model_type", "unknown")),
+            "model_type": model_type,
             "model_fingerprint": model_fingerprint,
             "processor_fingerprint": processor_fingerprint,
             "fingerprint_source": "sha256 of config/generation/index + weight shard sizes; processor files",
@@ -290,7 +305,8 @@ def resolve_contract(
         "rope": {
             "type": rope.get("type") or rope.get("rope_type"),
             "sections": sections,
-            "source": f"target {rope_source}.mrope_section",
+            "interleaved": interleaved,
+            "source": f"target {rope_source}.mrope_section + mrope_interleaved (absent = False)",
         },
         "layers": {
             "num_target_layers": num_target_layers,
@@ -304,6 +320,7 @@ def resolve_contract(
             "max_pixels": max_pixels,
             "processor_min_pixels": proc_min,
             "processor_max_pixels": proc_max,
+            "processor_bounds_source": bounds["source"],
             "patch_size": patch_size,
             "merge_size": merge_size,
             "tokens_per_patch": tokens_per_patch,
@@ -344,6 +361,12 @@ def validate_yaml_against_contract(cfg: dict, contract: dict, where: str = "conf
     if sections and sections != [int(s) for s in contract["rope"]["sections"]]:
         raise ContractError(
             f"{where}: drafter.spatial_rope_sections {sections} disagree with contract {contract['rope']['sections']}."
+        )
+    interleaved = cfg.get("drafter", {}).get("spatial_rope_interleaved")
+    if interleaved is not None and bool(interleaved) != bool(contract["rope"].get("interleaved", False)):
+        raise ContractError(
+            f"{where}: drafter.spatial_rope_interleaved {bool(interleaved)} disagrees with contract "
+            f"{bool(contract['rope'].get('interleaved', False))}."
         )
     for key in ("image_min_pixels", "image_max_pixels"):
         value = cfg.get("target", {}).get(key)

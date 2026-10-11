@@ -1,0 +1,14 @@
+# Tested version combination (cluster, 2026-10-11) - mirrors docs/env-preflight.md.
+# `vlm-dflash doctor` compares installed versions against these pins.
+torch==2.10.0
+torchvision==0.25.0
+transformers==5.12.1
+tokenizers==0.22.2
+datasets==4.2.0
+accelerate==1.15.0
+huggingface-hub==1.33.0
+safetensors==0.8.0
+pillow==12.3.0
+numpy==2.4.6
+pyyaml==6.0.3
+modelscope==1.40.2

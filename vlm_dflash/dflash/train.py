@@ -41,6 +41,51 @@ def _make_optimizer_and_scheduler(parameters, train_cfg: dict, total_steps: int)
     return optimizer, torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
 
+def compute_total_steps(dataset_len: int, train_cfg: dict, steps: int | None = None) -> int:
+    """Planned optimizer steps (mirrors the loop's own loader arithmetic)."""
+    micro_batch = int(train_cfg.get("micro_batch_size", 8))
+    accumulation = max(1, int(train_cfg.get("grad_accumulation_steps", 1)))
+    epochs = int(train_cfg.get("num_epochs", 6))
+    steps_per_epoch = max(1, math.ceil(math.ceil(dataset_len / micro_batch) / accumulation))
+    return steps if steps is not None else steps_per_epoch * epochs
+
+
+def _clone_tree(value):
+    """Recursively detach/clone tensors so a saved state never aliases live buffers."""
+    if torch.is_tensor(value):
+        return value.detach().cpu().clone()
+    if isinstance(value, dict):
+        return {key: _clone_tree(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return type(value)(_clone_tree(item) for item in value)
+    return value
+
+
+def gather_train_state(module, master_parameters, optimizer, scheduler, *, step, micro_step, skipped_batches, history, steps_total_planned) -> dict:
+    """Self-contained resume payload: weights, fp32 masters, optimizer, schedule.
+
+    All tensors are cloned (``.cpu()`` alone does not copy on CPU devices), so
+    the returned payload stays valid while training continues past the save.
+    """
+    return {
+        "format": "vlm-dflash-train-state-v1",
+        "step": int(step),
+        "micro_step": int(micro_step),
+        "skipped_no_anchor_batches": int(skipped_batches),
+        "steps_total_planned": int(steps_total_planned),
+        "model": _clone_tree(module.draft_model.state_dict()),
+        "master": _clone_tree(master_parameters),
+        "optimizer": _clone_tree(optimizer.state_dict()),
+        "scheduler": _clone_tree(scheduler.state_dict()),
+        "history": _clone_tree(list(history)),
+        # RNG states: anchor sampling consumes the torch RNG, so an exact
+        # resume must restore it (otherwise resumed steps diverge from the
+        # uninterrupted run even with identical weights).
+        "torch_rng_state": torch.get_rng_state(),
+        "cuda_rng_states": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
+    }
+
+
 def run_training_loop(
     module,
     dataset,
@@ -51,6 +96,9 @@ def run_training_loop(
     seed: int,
     shuffle: bool,
     log_path: Path | None = None,
+    resume_state: dict | None = None,
+    on_checkpoint=None,
+    save_every: int | None = None,
 ) -> dict:
     train_cfg = cfg.get("train", {})
     micro_batch = int(train_cfg.get("micro_batch_size", 8))
@@ -81,8 +129,12 @@ def run_training_loop(
     module.embed_tokens.to(device)
     # Train the draft in bf16 like the reference run (the draft's rope buffers
     # must share the compute dtype to keep attention inputs consistent); keep
-    # fp32 master copies for the optimizer updates.
-    module.draft_model.to(torch.bfloat16)
+    # fp32 master copies for the optimizer updates. ``train.draft_dtype`` can
+    # be set to float32 for debugging on CPU.
+    draft_dtype_name = str(train_cfg.get("draft_dtype", "bfloat16"))
+    if draft_dtype_name not in ("bfloat16", "float32"):
+        raise ValueError(f"train.draft_dtype must be bfloat16 or float32, got {draft_dtype_name!r}.")
+    module.draft_model.to(torch.bfloat16 if draft_dtype_name == "bfloat16" else torch.float32)
     master_parameters = {
         name: parameter.detach().float().clone().requires_grad_(True)
         for name, parameter in module.draft_model.named_parameters()
@@ -92,14 +144,47 @@ def run_training_loop(
     history, nan_seen, skipped_batches = [], False, 0
     step = 0
     micro_step = 0
+    consumed = 0
+    if resume_state is not None:
+        if resume_state.get("format") != "vlm-dflash-train-state-v1":
+            raise ValueError(f"Unrecognized resume state format: {resume_state.get('format')!r}")
+        module.draft_model.load_state_dict(resume_state["model"])
+        for name, parameter in master_parameters.items():
+            parameter.data.copy_(resume_state["master"][name].float())
+        optimizer.load_state_dict(resume_state["optimizer"])
+        scheduler.load_state_dict(resume_state["scheduler"])
+        step = int(resume_state["step"])
+        micro_step = int(resume_state.get("micro_step", 0))
+        skipped_batches = int(resume_state.get("skipped_no_anchor_batches", 0))
+        consumed = micro_step + skipped_batches
+        history = list(resume_state.get("history", []))
+        if resume_state.get("torch_rng_state") is not None:
+            torch.set_rng_state(resume_state["torch_rng_state"])
+        if torch.cuda.is_available() and resume_state.get("cuda_rng_states"):
+            torch.cuda.set_rng_state_all(resume_state["cuda_rng_states"])
+        log(
+            f"train: resumed from step {step} "
+            f"(micro_step={micro_step}, skipped={skipped_batches}, history_rows={len(history)})"
+        )
     stall_epochs = 0
     started = time.time()
     from .trainer_core import NoValidAnchorsError
 
     optimizer.zero_grad(set_to_none=True)
+    iterator = iter(loader)
+    # Fast-forward a resumed run to the same micro-batch position the original
+    # uninterrupted run had reached (the shuffle order is reproducible from the
+    # seed, so skipping consumed items restores the exact data order).
+    while consumed > 0:
+        try:
+            next(iterator)
+        except StopIteration:
+            iterator = iter(loader)
+        else:
+            consumed -= 1
     while step < total_steps:
         progressed = False
-        for batch in loader:
+        for batch in iterator:
             batch = {key: value for key, value in batch.items() if key != "lengths"}
             batch = {key: value.to(device) if torch.is_tensor(value) else value for key, value in batch.items()}
             try:
@@ -154,8 +239,23 @@ def run_training_loop(
                 if log_every and step % log_every == 0:
                     log(f"step {step}/{total_steps} loss={row['loss']:.4f} acc={row['accuracy']:.3f} "
                         f"al={row['accept_len']:.2f}")
+                if on_checkpoint is not None and save_every and step % save_every == 0 and step < total_steps:
+                    on_checkpoint(
+                        gather_train_state(
+                            module,
+                            master_parameters,
+                            optimizer,
+                            scheduler,
+                            step=step,
+                            micro_step=micro_step,
+                            skipped_batches=skipped_batches,
+                            history=history,
+                            steps_total_planned=total_steps,
+                        )
+                    )
                 if step >= total_steps:
                     break
+        iterator = iter(loader)
         if not progressed:
             stall_epochs += 1
             if stall_epochs >= 3:
@@ -176,6 +276,7 @@ def run_training_loop(
         "loss_decreased": bool(losses and (sum(losses[-window:]) / window) < (sum(losses[:window]) / window)),
         "nan_seen": nan_seen,
         "skipped_no_anchor_batches": skipped_batches,
+        "resumed_from_step": int(resume_state["step"]) if resume_state is not None else 0,
         "wall_seconds": time.time() - started,
         "peak_gpu_mem_gb": (
             torch.cuda.max_memory_allocated(device) / 1e9 if device.type == "cuda" else None
@@ -236,7 +337,7 @@ def run_overfit_sanity(cfg: dict, contract: dict, features_dir: Path, run_dir: P
     return result
 
 
-def train_dflash(cfg: dict, run_dir: str | Path, contract: dict, steps: int | None = None, limit: int | None = None) -> dict:
+def train_dflash(cfg: dict, run_dir: str | Path, contract: dict, steps: int | None = None, limit: int | None = None, resume: bool = False) -> dict:
     run_dir = Path(run_dir)
     features_dir = run_dir / "features"
     dataset = FeatureDataset(features_dir)
@@ -271,13 +372,53 @@ def train_dflash(cfg: dict, run_dir: str | Path, contract: dict, steps: int | No
     }
     torch.save({**checkpoint_common, "step": 0, "model": init_state}, train_dir / "ckpt_init.pt")
 
-    overfit = run_overfit_sanity(cfg, contract, features_dir, run_dir, device, module, init_state)
-    module.draft_model.load_state_dict(init_state)
+    total_steps = compute_total_steps(len(dataset), train_cfg, steps)
+    resume_state = None
+    if resume:
+        resume_path = train_dir / "ckpt_last.pt"
+        if not resume_path.exists():
+            raise FileNotFoundError(f"--resume requested but no resume checkpoint at {resume_path}.")
+        resume_state = torch.load(resume_path, map_location="cpu", weights_only=False)
+        if resume_state.get("format") != "vlm-dflash-train-state-v1":
+            raise ValueError(f"Unrecognized resume state format: {resume_state.get('format')!r}")
+        planned = int(resume_state.get("steps_total_planned", -1))
+        if planned != total_steps:
+            raise ValueError(
+                f"Resume plan mismatch: checkpoint planned {planned} total steps, this config computes "
+                f"{total_steps}. Re-run with the same --steps / epochs / dataset slice."
+            )
+        if resume_state.get("identity") is not None:
+            assert_identity(identity_from_contract(contract), resume_state["identity"], "resume vs contract")
+        overfit = {"enabled": True, "resumed": True}
+    else:
+        overfit = run_overfit_sanity(cfg, contract, features_dir, run_dir, device, module, init_state)
+        module.draft_model.load_state_dict(init_state)
 
     log_path = train_dir / "train_log.jsonl"
-    if log_path.exists():
+    if log_path.exists() and resume_state is None:
         log_path.unlink()
-    output = run_training_loop(module, dataset, cfg, contract, device, total_steps=steps, seed=seed, shuffle=True, log_path=log_path)
+    save_every = int(train_cfg.get("save_every_steps", max(1, total_steps // 4)))
+
+    def write_train_state(state: dict) -> None:
+        tmp_path = train_dir / "ckpt_last.pt.tmp"
+        torch.save({**checkpoint_common, **state}, tmp_path)
+        tmp_path.replace(train_dir / "ckpt_last.pt")
+        log(f"train: wrote resumable checkpoint (step {state['step']}) -> {train_dir / 'ckpt_last.pt'}")
+
+    output = run_training_loop(
+        module,
+        dataset,
+        cfg,
+        contract,
+        device,
+        total_steps=total_steps,
+        seed=seed,
+        shuffle=True,
+        log_path=log_path,
+        resume_state=resume_state,
+        on_checkpoint=write_train_state,
+        save_every=save_every,
+    )
     torch.save({**checkpoint_common, "step": output["summary"]["steps"], "model": module.draft_model.state_dict()},
                train_dir / "ckpt_final.pt")
 

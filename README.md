@@ -2,10 +2,13 @@
 
 **The simplest reproducible path to train a multimodal DFlash block drafter for Qwen-VL from image-text data.**
 
-v0.1 supports exactly one vertical slice: a local **Qwen2.5-VL-3B-Instruct**
-target, single-image + text samples, a staged DFlash-style block drafter
-(block size 8), and a minimal acceptance evaluation that checks speculative
-greedy decoding is **token-exact** against the target's own greedy output.
+v0.2 supports two target families through one adapter interface: a local
+**Qwen2.5-VL-3B-Instruct** or **Qwen3-VL-8B-Instruct** checkpoint, single-image
++ text samples, a staged DFlash-style block drafter (block size 8), and a
+minimal acceptance evaluation that checks speculative greedy decoding is
+**token-exact** against the target's own greedy output. Everything family
+specific (MRoPE layout, mask token, pixel bounds, layer routing) is resolved
+from the target at runtime and validated against the config.
 
 ```
 image-text data -> target-native regen -> fused hidden-state capture
@@ -30,6 +33,25 @@ correctly and testably.
   target greedy, per token, including EOS handling) plus AL / per-slot
   acceptance / tokens-per-target-forward, and a random-init-drafter acceptance
   baseline (target-only greedy is reported only as an output/speed reference).
+
+## Unified CLI (v0.2)
+
+```bash
+vlm-dflash doctor --target /path/to/Qwen3-VL-8B-Instruct
+vlm-dflash train  --target /path/to/Qwen3-VL-8B-Instruct \
+                  --config configs/qwen3_vl_8b.yaml --preset single-gpu-48g
+vlm-dflash eval   runs/<run>                          # token-exact gate + acceptance
+vlm-dflash export runs/<run>                          # self-describing HF-style checkpoint
+vlm-dflash train  --config ... --resume               # continue from train/ckpt_last.pt
+```
+
+`train` runs the whole staged pipeline (prepare -> target-native regen ->
+capture -> train); `--limit/--steps` shrink any stage for smoke runs, `--force`
+rebuilds finished stages, `--resume` restores model, optimizer, scheduler and
+RNG state (a plan mismatch fails loudly). The five stage scripts below remain
+the advanced interface. Presets: `smoke` (COCO captions, tiny), `single-gpu-48g`
+(measured reference recipe), `single-gpu-24g` (starting point, **not**
+hardware-tested).
 
 ## Quickstart (4 steps)
 
@@ -69,9 +91,10 @@ This repo pins the whole loop around those details, keeps training staged
 (no co-resident target), and ships the exact provenance/equivalence checks that
 catch teacher-target mismatches and silent text-only regressions.
 
-## Known limitations (v0.1)
+## Known limitations
 
-- One target family: Qwen2.5-VL-3B; one drafter family: DFlash block drafter.
+- Two target families (Qwen2.5-VL, Qwen3-VL); one drafter family: DFlash block
+  drafter. Other families need a small adapter (`vlm_dflash/adapters/`).
 - Single image per sample; no video; no visual adaptor stages.
 - Acceptance eval is small-scale (64 prompts) and greedy-only; the token-exact
   gate runs in parity mode (sequential verification + generate()-equivalent

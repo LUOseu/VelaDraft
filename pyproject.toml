@@ -11,7 +11,8 @@ license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
     "torch>=2.6",
-    "transformers>=4.53",
+    "torchvision>=0.20",
+    "transformers>=5.12",
     "datasets>=3.0",
     "pillow",
     "pyyaml",
@@ -19,6 +20,20 @@ dependencies = [
     "safetensors",
     "accelerate",
 ]
+
+[project.optional-dependencies]
+# Exact combination validated on the reference cluster; see constraints-tested.txt.
+tested = [
+    "torch==2.10.0",
+    "torchvision==0.25.0",
+    "transformers==5.12.1",
+    "datasets==4.2.0",
+    "accelerate==1.15.0",
+    "safetensors==0.8.0",
+]
+
+[project.scripts]
+vlm-dflash = "vlm_dflash.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["vlm_dflash*"]

@@ -9,7 +9,6 @@ the target model in memory afterwards.
 
 from __future__ import annotations
 
-import inspect
 import math
 from pathlib import Path
 
@@ -31,33 +30,16 @@ def storage_dtype(name: str) -> torch.dtype:
 
 
 def compute_multimodal_positions(model, input_ids, attention_mask, image_grid_thw, mm_token_type_ids=None):
-    """Call the target's own MRoPE position builder, passing only supported kwargs."""
-    builder = getattr(getattr(model, "model", None), "compute_3d_position_ids", None)
-    if not callable(builder):
-        raise RuntimeError("Target does not expose compute_3d_position_ids; v0.1 requires Qwen2.5-VL.")
-    signature = inspect.signature(builder)
-    candidate = {
-        "input_ids": input_ids,
-        "image_grid_thw": image_grid_thw,
-        "video_grid_thw": None,
-        "inputs_embeds": None,
-        "attention_mask": attention_mask,
-        "past_key_values": None,
-        "second_per_grid_ts": None,
-        "mm_token_type_ids": mm_token_type_ids,
-    }
-    accepts_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in signature.parameters.values())
-    kwargs = {
-        key: value for key, value in candidate.items() if accepts_var_kw or key in signature.parameters
-    }
-    positions = builder(**kwargs)
-    if positions is None:
-        raise RuntimeError("compute_3d_position_ids returned None; image/token-type inputs missing.")
-    if positions.dim() == 4:
-        positions = positions[..., 0, :]
-    if positions.dim() == 3:
-        positions = positions[:, 0, :]
-    return positions
+    """Delegate to the target family adapter's MRoPE position builder."""
+    from ..adapters import adapter_for_model
+
+    return adapter_for_model(model).compute_multimodal_positions(
+        model,
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        image_grid_thw=image_grid_thw,
+        mm_token_type_ids=mm_token_type_ids,
+    )
 
 
 def extend_mm_token_type_ids(mm_token_type_ids: torch.Tensor, full_length: int) -> torch.Tensor:
@@ -108,12 +90,17 @@ def forward_and_capture(
     for key in ("pixel_values", "image_grid_thw", "pixel_values_videos", "video_grid_thw"):
         if key in inputs:
             forward_kwargs[key] = inputs[key].to(device)
-    output = model(**forward_kwargs)
-    hidden_states = output.hidden_states
-    fused = torch.cat([hidden_states[layer_id + 1][0] for layer_id in layer_ids], dim=-1)
+    # The target's own multimodal forward *must* see the same token-type map
+    # the processor emitted (extended over the regen answer with text=0):
+    # Qwen3-VL raises without it, and Qwen2.5-VL would otherwise fall back to
+    # plain 1-D positions here while eval/prefill use MRoPE positions.
     mm_token_type_ids = inputs.get("mm_token_type_ids")
     if mm_token_type_ids is not None:
         mm_token_type_ids = extend_mm_token_type_ids(mm_token_type_ids.to(device), input_ids.shape[1])
+        forward_kwargs["mm_token_type_ids"] = mm_token_type_ids
+    output = model(**forward_kwargs)
+    hidden_states = output.hidden_states
+    fused = torch.cat([hidden_states[layer_id + 1][0] for layer_id in layer_ids], dim=-1)
     positions = compute_multimodal_positions(
         model, input_ids, attention_mask, inputs.get("image_grid_thw"), mm_token_type_ids=mm_token_type_ids
     )

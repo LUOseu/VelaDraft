@@ -1,0 +1,67 @@
+# 48 GB single-GPU preset: the measured reference recipe (see README).
+# Family-specific values (MRoPE sections, mask id, pixel bounds) are resolved
+# and validated against the target at runtime via the model contract.
+target:
+  dtype: bfloat16
+  attn_implementation: sdpa
+  device: cuda:0
+  local_files_only: true
+  image_min_pixels: 200704
+  image_max_pixels: 1003520
+
+dataset:
+  slice: 512
+  val_size: 64
+  seed: 42
+  min_answer_chars: 600
+
+regen:
+  max_new_tokens: 160
+  min_response_tokens: 128
+  batch_size: 8
+  temperature: 0.0
+
+capture:
+  seq_length: 2048
+  shard_size: 32
+  dtype: bfloat16
+  visual_path_check: true
+  visual_check_samples: 2
+
+drafter:
+  num_hidden_layers: 3
+  block_size: 8
+  num_anchors: 256
+  loss_decay_gamma: 7.0
+  mask_token_id: 151669
+  attention_backend: flex_attention
+  spatial_rope_enabled: true
+  spatial_rope_mode: replace
+
+train:
+  micro_batch_size: 8
+  grad_accumulation_steps: 1
+  num_epochs: 6
+  lr: 6.0e-4
+  betas: [0.9, 0.95]
+  weight_decay: 0.0
+  warmup_ratio: 0.04
+  min_lr_ratio: 0.1
+  max_grad_norm: 1.0
+  log_every_steps: 10
+  seed: 42
+  device: cuda:0
+  overfit_sanity:
+    enabled: true
+    num_samples: 16
+    steps: 200
+    ce_drop: 0.6
+    slot0_acc: 0.9
+
+eval:
+  num_prompts: 64
+  max_new_tokens: 128
+  sequential_target_verification: true
+  verify_sdpa_backend: parity
+  parallel_diagnostic_prompts: 16
+  checkpoints: [ckpt_final.pt, ckpt_init.pt]

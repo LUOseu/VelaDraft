@@ -56,6 +56,28 @@ block size 8, 256 anchors, loss gamma 7, lr 6e-4, warmup 0.04).
   `mm_token_type_ids` (`0` = text, `1` = image) for multimodal forwards;
   the processor emits them and capture/eval append `0` for answer tokens.
 
+## MRoPE layouts (Qwen2.5-VL chunked vs Qwen3-VL interleaved)
+
+Both layouts are resolved from the target config by the contract and are
+reproduced by the draft's `_merge_multiaxis_rotary_embeddings`; unit tests
+(`tests/test_mrope_layouts.py`) compare the constructed tables and the rotated
+q/k tensors against the installed transformers implementation.
+
+- Chunked (Qwen2.5-VL, `mrope_section: [16, 24, 24]`): HF's
+  `apply_multimodal_rotary_pos_emb` does `mrope_section * 2` on a *list*, so the
+  doubled table is split into `[16, 24, 24, 16, 24, 24]` and the six chunks are
+  assigned to axes `t, h, w, t, h, w`. The draft merge mirrors that exactly.
+- Interleaved (Qwen3-VL, `mrope_interleaved: true`, `mrope_section: [24, 20, 20]`):
+  the first `3*max(sections[1:])` half-head channels cycle `t, h, w` and the
+  remaining channels stay temporal, reproducing
+  `Qwen3VLTextRotaryEmbedding.apply_interleaved_mrope`. The draft selects this
+  layout with `drafter.spatial_rope_interleaved: true`, which the contract
+  validates against the target (`rope.interleaved` in `contract.json`).
+- Qwen3-VL also requires `mm_token_type_ids` in multimodal forwards (it raises
+  otherwise), and the capture stage now feeds it the processor map extended with
+  text (`0`) rows for the regenerated answer; Qwen2.5-VL uses the same path so
+  capture and eval build identical MRoPE positions.
+
 ## Token-exact parity mode (important)
 
 The reference narrows the SDPA backend during verify forwards

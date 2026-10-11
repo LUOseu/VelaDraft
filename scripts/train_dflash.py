@@ -22,6 +22,7 @@ def main() -> None:
     parser.add_argument("--steps", type=int, default=None, help="override total optimizer steps")
     parser.add_argument("--limit", type=int, default=None, help="cap training samples")
     parser.add_argument("--skip-sanity", action="store_true")
+    parser.add_argument("--resume", action="store_true", help="continue from train/ckpt_last.pt")
     parser.add_argument("--set", action="append", default=[])
     args = parser.parse_args()
 
@@ -31,7 +32,7 @@ def main() -> None:
     run_dir = resolve_run_dir(cfg, args.run_dir)
     dump_effective_config(cfg, run_dir / "config.json")
     contract = ensure_contract(cfg, run_dir)
-    summary = train_dflash(cfg, run_dir, contract, steps=args.steps, limit=args.limit)
+    summary = train_dflash(cfg, run_dir, contract, steps=args.steps, limit=args.limit, resume=args.resume)
     log(f"train_dflash done: steps={summary['steps']} final_loss={summary['final_loss']}")
 
 
