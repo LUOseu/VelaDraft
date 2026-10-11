@@ -171,6 +171,10 @@ _DFLASH_LOSS_TYPES = ("dflash", "variable_prefix")
 class DFlashTrainerModule(nn.Module):
     """DFlash online training wrapper with block-wise CE loss."""
 
+    # Which batch-level errors the training loop may skip (algorithms can
+    # override this; the loop falls back to NoValidAnchorsError when unset).
+    skippable_errors = (NoValidAnchorsError,)
+
     def __init__(
         self,
         draft_model: Qwen3DFlashDraftModel,

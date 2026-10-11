@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 
 import torch
 from PIL import Image
 
+from ..algorithms import get_algorithm
 from ..data.sharegpt import load_sharegpt, row_image_path, row_question
-from ..dflash import draft_model as draft_model_module
-from ..dflash.factory import load_checkpoint
 from ..provenance import assert_identity, identity_from_contract, record_stage
 from ..target.load import load_target
 from ..target.prompts import encode_prompt
@@ -66,7 +66,29 @@ def assert_all_checkpoints_evaluated(equivalence_runs: dict, checkpoint_names: l
         )
 
 
-def preflight_checkpoints(run_dir: Path, checkpoint_names: list[str], contract: dict, target_tied_head: bool) -> None:
+def check_checkpoint_algorithm(checkpoint_name: str, meta: dict, algorithm) -> None:
+    """Refuse a checkpoint trained by a different drafter algorithm.
+
+    Scoring DFlash weights through a DSpark decoder (or vice versa) is
+    meaningless; the recorded algorithm tag makes that a hard error instead of
+    a silent acceptance collapse. Checkpoints written before the algorithm tag
+    existed default to ``dflash``.
+    """
+    recorded = str(meta.get("algorithm", "dflash"))
+    if recorded != algorithm.name:
+        raise RuntimeError(
+            f"{checkpoint_name} was trained with algorithm={recorded!r}, but this eval resolves "
+            f"algorithm={algorithm.name!r}. Re-run eval with the matching algorithm or retrain."
+        )
+
+
+def preflight_checkpoints(
+    run_dir: Path,
+    checkpoint_names: list[str],
+    contract: dict,
+    target_tied_head: bool,
+    algorithm,
+) -> None:
     """Validate every checkpoint's provenance before the expensive generation pass."""
     for checkpoint_name in checkpoint_names:
         checkpoint_path = run_dir / "train" / checkpoint_name
@@ -76,61 +98,46 @@ def preflight_checkpoints(run_dir: Path, checkpoint_names: list[str], contract: 
         if meta.get("identity") is not None:
             assert_identity(identity_from_contract(contract), meta["identity"], f"eval vs {checkpoint_name}")
         check_checkpoint_head(checkpoint_name, meta, target_tied_head)
+        check_checkpoint_algorithm(checkpoint_name, meta, algorithm)
 
 
-def evaluate(
-    cfg: dict,
-    run_dir: str | Path,
-    contract: dict,
-    num_prompts: int | None = None,
-    max_new_tokens: int | None = None,
-    tag: str | None = None,
-) -> dict:
-    run_dir = Path(run_dir)
-    eval_cfg = cfg.get("eval", {})
-    num_prompts = int(num_prompts if num_prompts is not None else eval_cfg.get("num_prompts", 64))
-    max_new_tokens = int(max_new_tokens if max_new_tokens is not None else eval_cfg.get("max_new_tokens", 128))
-    checkpoint_names = checkpoint_names_from_config(eval_cfg)
-    verification = str(eval_cfg.get("verification") or "").strip().lower()
-    if not verification:
-        verification = "sequential" if bool(eval_cfg.get("sequential_target_verification", True)) else "parallel"
-    if verification not in {"sequential", "parallel", "strict_parallel"}:
-        raise ValueError(
-            "eval.verification must be one of 'sequential', 'parallel' or 'strict_parallel', "
-            f"got {verification!r}"
-        )
-    sequential_verification = verification == "sequential"
-    strict_parallel_margin = (
-        float(eval_cfg.get("strict_parallel_margin", 2.0)) if verification == "strict_parallel" else None
-    )
-    verify_backend = str(eval_cfg.get("verify_sdpa_backend", "parity"))
-    if verify_backend not in {"parity", "reference"}:
-        raise ValueError(f"eval.verify_sdpa_backend must be 'parity' or 'reference', got {verify_backend!r}")
-    # "parity" disables the reference verify-time SDPA backend narrowing so the
-    # verification logits are computed with the same backend as generate()
-    # (see docs/REFERENCE.md; bf16 near-ties otherwise flip argmax).
-    draft_model_module.set_verify_sdpa_backend_switch(verify_backend == "reference")
-    parallel_diagnostic_prompts = int(eval_cfg.get("parallel_diagnostic_prompts", 0))
+def load_eval_rows(prompt_source: dict | None, run_dir: Path, default_split: str = "val.jsonl"):
+    """Rows + media dir for eval: the run's held-out split by default.
 
-    rows, media_dir = load_sharegpt(run_dir / "data" / "val.jsonl")
-    rows = rows[:num_prompts]
-    model, processor = load_target(cfg, contract)
-    device = next(model.parameters()).device
-    target_tied_head = _target_head_is_tied(model)
-    contract_tied = contract.get("head", {}).get("tie_word_embeddings")
-    if contract_tied is not None and bool(contract_tied) != target_tied_head:
-        raise RuntimeError(
-            "Loaded target head disagrees with the resolved contract: "
-            f"runtime tie_word_embeddings={target_tied_head}, contract={bool(contract_tied)}."
-        )
-    stop_ids = set(_stops(model))
-    block_size = int(cfg["drafter"]["block_size"])
-    dtype_name = str(cfg.get("target", {}).get("dtype", "bfloat16"))
-    attn_name = str(cfg.get("target", {}).get("attn_implementation", "sdpa"))
-    draft_dtype = getattr(torch, dtype_name, torch.bfloat16)
-    preflight_checkpoints(run_dir, checkpoint_names, contract, target_tied_head)
+    ``prompt_source`` points the evaluation at a fixed prompt set instead of
+    the run's own split (used by the benchmark harness):
 
-    log(f"eval: target-only greedy on {len(rows)} prompts")
+    - ``{"type": "run_val", "split": "val.jsonl"}`` - the run's own split;
+    - ``{"type": "sharegpt_jsonl", "path": ..., "meta": ...}`` - an external
+      ShareGPT-style file (paths resolve against the run dir when relative;
+      environment variables are expanded).
+    """
+    if not prompt_source:
+        return load_sharegpt(run_dir / "data" / default_split)
+    source = dict(prompt_source)
+    kind = str(source.get("type", "sharegpt_jsonl"))
+    if kind == "run_val":
+        split = str(source.get("split") or default_split)
+        return load_sharegpt(run_dir / "data" / split)
+    if kind == "sharegpt_jsonl":
+        path_text = source.get("path")
+        if not path_text:
+            raise ValueError("prompt_source type=sharegpt_jsonl requires a 'path'.")
+        path = Path(os.path.expandvars(str(path_text))).expanduser()
+        if not path.is_absolute():
+            path = (run_dir / path).resolve()
+        meta_path = None
+        if source.get("meta"):
+            meta_path = Path(os.path.expandvars(str(source["meta"]))).expanduser()
+            if not meta_path.is_absolute():
+                meta_path = (run_dir / meta_path).resolve()
+        return load_sharegpt(path, meta_path=meta_path)
+    raise ValueError(f"Unknown prompt_source type {kind!r} (expected 'run_val' or 'sharegpt_jsonl').")
+
+
+def prepare_prompts(model, processor, rows, media_dir, *, max_new_tokens: int, device, label: str = "eval") -> list[dict]:
+    """Target-only greedy anchors: the equivalence reference for each row."""
+    log(f"{label}: target-only greedy on {len(rows)} prompts")
     prompts = []
     for row in rows:
         image = Image.open(row_image_path(row, media_dir)).convert("RGB")
@@ -152,18 +159,53 @@ def evaluate(
                 "inputs": inputs,
             }
         )
+    return prompts
 
+
+def run_checkpoints(
+    model,
+    run_dir: Path,
+    cfg: dict,
+    contract: dict,
+    prompts: list[dict],
+    *,
+    algorithm,
+    checkpoint_names: list[str],
+    verification: str,
+    strict_parallel_margin: float | None,
+    verify_backend: str,
+    block_size: int,
+    draft_dtype,
+    max_new_tokens: int,
+    parallel_diagnostic_prompts: int = 0,
+    stop_ids: set | None = None,
+    label: str = "eval",
+) -> tuple[dict, dict, list, dict | None]:
+    """Speculative-decode every checkpoint against the prepared target anchors.
+
+    Shared by ``evaluate`` and the benchmark harness so both measure through
+    the same verification path (sequential by default; parallel/strict are
+    opt-in and never mixed into correctness tables).
+    """
+    device = next(model.parameters()).device
+    if stop_ids is None:
+        stop_ids = set(_stops(model))
+    sequential_verification = verification == "sequential"
     target_only_wall = sum(entry["wall_seconds"] for entry in prompts) / max(1, len(prompts))
+    # "parity" disables the reference verify-time SDPA backend narrowing so the
+    # verification logits are computed with the same backend as generate()
+    # (see docs/REFERENCE.md; bf16 near-ties otherwise flip argmax).
+    algorithm.configure_verify_backend(verify_backend == "reference")
     all_results, equivalence_runs, per_sample_rows = {}, {}, []
     for checkpoint_name in checkpoint_names:
-        draft, _ = load_checkpoint(run_dir / "train" / checkpoint_name)
+        draft, _ = algorithm.load_decoder(run_dir / "train" / checkpoint_name)
         draft.to(device=device, dtype=draft_dtype)
         draft.eval()
         samples, equivalent_flags = [], []
         strict_rounds = 0.0
         strict_fallbacks = 0.0
         strict_min_margin = None
-        log(f"eval: speculative greedy with {checkpoint_name} ({verification})")
+        log(f"{label}: speculative greedy with {checkpoint_name} ({verification})")
         for entry in prompts:
             inputs = entry["inputs"]
             target_kwargs = {
@@ -249,18 +291,97 @@ def evaluate(
     parallel_diagnostic = None
     if parallel_diagnostic_prompts > 0:
         parallel_diagnostic = _run_parallel_diagnostic(
-            model, draft_model_module, run_dir, contract, cfg, prompts, stop_ids,
+            model, algorithm, run_dir, contract, cfg, prompts, stop_ids,
             max_new_tokens, block_size, parallel_diagnostic_prompts,
         )
+    return all_results, equivalence_runs, per_sample_rows, parallel_diagnostic
+
+
+def evaluate(
+    cfg: dict,
+    run_dir: str | Path,
+    contract: dict,
+    num_prompts: int | None = None,
+    max_new_tokens: int | None = None,
+    tag: str | None = None,
+    prompt_source: dict | None = None,
+    workload: str | None = None,
+) -> dict:
+    run_dir = Path(run_dir)
+    eval_cfg = cfg.get("eval", {})
+    num_prompts = int(num_prompts if num_prompts is not None else eval_cfg.get("num_prompts", 64))
+    max_new_tokens = int(max_new_tokens if max_new_tokens is not None else eval_cfg.get("max_new_tokens", 128))
+    checkpoint_names = checkpoint_names_from_config(eval_cfg)
+    verification = str(eval_cfg.get("verification") or "").strip().lower()
+    if not verification:
+        verification = "sequential" if bool(eval_cfg.get("sequential_target_verification", True)) else "parallel"
+    if verification not in {"sequential", "parallel", "strict_parallel"}:
+        raise ValueError(
+            "eval.verification must be one of 'sequential', 'parallel' or 'strict_parallel', "
+            f"got {verification!r}"
+        )
+    sequential_verification = verification == "sequential"
+    strict_parallel_margin = (
+        float(eval_cfg.get("strict_parallel_margin", 2.0)) if verification == "strict_parallel" else None
+    )
+    verify_backend = str(eval_cfg.get("verify_sdpa_backend", "parity"))
+    if verify_backend not in {"parity", "reference"}:
+        raise ValueError(f"eval.verify_sdpa_backend must be 'parity' or 'reference', got {verify_backend!r}")
+    parallel_diagnostic_prompts = int(eval_cfg.get("parallel_diagnostic_prompts", 0))
+
+    algorithm = get_algorithm(cfg.get("algorithm"))
+    rows, media_dir = load_eval_rows(prompt_source, run_dir)
+    rows = rows[:num_prompts]
+    model, processor = load_target(cfg, contract)
+    device = next(model.parameters()).device
+    target_tied_head = _target_head_is_tied(model)
+    contract_tied = contract.get("head", {}).get("tie_word_embeddings")
+    if contract_tied is not None and bool(contract_tied) != target_tied_head:
+        raise RuntimeError(
+            "Loaded target head disagrees with the resolved contract: "
+            f"runtime tie_word_embeddings={target_tied_head}, contract={bool(contract_tied)}."
+        )
+    stop_ids = set(_stops(model))
+    block_size = int(cfg["drafter"]["block_size"])
+    dtype_name = str(cfg.get("target", {}).get("dtype", "bfloat16"))
+    attn_name = str(cfg.get("target", {}).get("attn_implementation", "sdpa"))
+    draft_dtype = getattr(torch, dtype_name, torch.bfloat16)
+    preflight_checkpoints(run_dir, checkpoint_names, contract, target_tied_head, algorithm)
+
+    prompts = prepare_prompts(
+        model, processor, rows, media_dir, max_new_tokens=max_new_tokens, device=device, label="eval"
+    )
+    target_only_wall = sum(entry["wall_seconds"] for entry in prompts) / max(1, len(prompts))
+
+    all_results, equivalence_runs, per_sample_rows, parallel_diagnostic = run_checkpoints(
+        model,
+        run_dir,
+        cfg,
+        contract,
+        prompts,
+        algorithm=algorithm,
+        checkpoint_names=checkpoint_names,
+        verification=verification,
+        strict_parallel_margin=strict_parallel_margin,
+        verify_backend=verify_backend,
+        block_size=block_size,
+        draft_dtype=draft_dtype,
+        max_new_tokens=max_new_tokens,
+        parallel_diagnostic_prompts=parallel_diagnostic_prompts,
+        stop_ids=stop_ids,
+        label="eval",
+    )
 
     assert_all_checkpoints_evaluated(equivalence_runs, checkpoint_names)
 
     result = {
         "format": "vlm-dflash-eval-v1",
         "identity": identity_from_contract(contract),
+        "algorithm": algorithm.name,
         "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)",
         "settings": {
             "num_prompts": len(rows),
+            "workload": workload,
             "max_new_tokens": max_new_tokens,
             "temperature": 0.0,
             "dtype": dtype_name,
@@ -318,7 +439,7 @@ def evaluate(
 
 def _run_parallel_diagnostic(
     model,
-    draft_model_module,
+    algorithm,
     run_dir,
     contract,
     cfg,
@@ -331,12 +452,12 @@ def _run_parallel_diagnostic(
     """Measure parallel-verify equivalence plus the target-logit margin at mismatches."""
     from .equivalence import cut_at_first_stop
 
-    draft, _ = load_checkpoint(run_dir / "train" / eval_cfg_checkpoint(cfg))
+    draft, _ = algorithm.load_decoder(run_dir / "train" / eval_cfg_checkpoint(cfg))
     draft.to(model.device, dtype=torch.bfloat16)
     draft.eval()
     mismatches = []
     exact = 0
-    draft_model_module.set_verify_sdpa_backend_switch(True)
+    algorithm.configure_verify_backend(True)
     try:
         for entry in prompts[:num_prompts]:
             inputs = entry["inputs"]
@@ -377,7 +498,7 @@ def _run_parallel_diagnostic(
                 {"id": entry["id"], "first_divergence": divergence, "target_top2_margin": margin}
             )
     finally:
-        draft_model_module.set_verify_sdpa_backend_switch(False)
+        algorithm.configure_verify_backend(False)
     return {
         "num_prompts": min(num_prompts, len(prompts)),
         "token_exact": exact,

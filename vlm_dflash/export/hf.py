@@ -52,7 +52,9 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
     return {
         "format": EXPORT_FORMAT,
         "created": now_iso(),
-        "method": "dflash",
+        # Which drafter algorithm produced these weights (checkpoints written
+        # before the tag default to dflash).
+        "method": str(checkpoint.get("algorithm", "dflash")),
         "checkpoint": checkpoint_name,
         "code_commit": _git_commit(),
         "adapter": contract["target"]["model_type"],
@@ -203,6 +205,12 @@ def load_export(export_dir: str | Path):
     export_config = read_json(export_dir / "config.json")
     if export_config.get("format") != EXPORT_FORMAT:
         raise ValueError(f"Unrecognized export format in {export_dir}: {export_config.get('format')!r}")
+    method = str(export_config.get("method", "dflash"))
+    if method != "dflash":
+        raise NotImplementedError(
+            f"export was produced by algorithm={method!r}; loading non-dflash exports needs the "
+            "algorithm's own decoder loader (see docs/adding_an_algorithm.md). Refusing to guess."
+        )
     qwen3_config = Qwen3Config.from_dict(export_config["drafter"]["draft_config"])
     qwen3_config._attn_implementation = export_config["drafter"].get("attention_backend", "flex_attention")
     model = Qwen3DFlashDraftModel(qwen3_config)

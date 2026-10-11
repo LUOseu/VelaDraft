@@ -101,7 +101,13 @@ def _package_version(name: str) -> str | None:
         return None
 
 
-def collect_doctor_report(target: str | None, mask_token_id: int | None, samples: int, seq_length: int) -> dict:
+def collect_doctor_report(
+    target: str | None,
+    mask_token_id: int | None,
+    samples: int,
+    seq_length: int,
+    algorithm: str | None = None,
+) -> dict:
     report: dict = {"ok": True, "checks": [], "warnings": [], "errors": []}
 
     def check(name: str, ok: bool, detail: str) -> None:
@@ -110,8 +116,19 @@ def collect_doctor_report(target: str | None, mask_token_id: int | None, samples
             report["ok"] = False
             report["errors"].append(f"{name}: {detail}")
 
+    from .algorithms import UnknownAlgorithmError, available_algorithms, get_algorithm
+
     report["python"] = sys.version.split()[0]
     check("python>=3.10", sys.version_info >= (3, 10), report["python"])
+
+    report["algorithms"] = {"available": available_algorithms()}
+    if algorithm:
+        try:
+            selected = get_algorithm(algorithm)
+            report["algorithms"]["selected"] = selected.metadata.as_dict()
+            check(f"algorithm {algorithm!r} registered", True, selected.metadata.description)
+        except UnknownAlgorithmError as error:
+            check(f"algorithm {algorithm!r} registered", False, str(error))
 
     pins = _parse_constraints()
     for package in ("torch", "transformers", "tokenizers", "torchvision", "safetensors"):
@@ -187,7 +204,9 @@ def collect_doctor_report(target: str | None, mask_token_id: int | None, samples
 
 
 def cmd_doctor(args) -> int:
-    report = collect_doctor_report(args.target, args.mask_token_id, args.samples, args.seq_length)
+    report = collect_doctor_report(
+        args.target, args.mask_token_id, args.samples, args.seq_length, algorithm=args.algorithm
+    )
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False, default=str))
     else:
@@ -198,6 +217,10 @@ def cmd_doctor(args) -> int:
             print(f"  [warn] {warning}")
         for error in report["errors"]:
             print(f"  [error] {error}")
+        print(f"  algorithms: available={report['algorithms']['available']}")
+        selected = report["algorithms"].get("selected")
+        if selected:
+            print(f"  algorithm selected: {selected['name']} — maturity={selected['maturity']}")
         if "adapter" in report:
             print(f"  adapter: {report['adapter']['name']} ({report['adapter']['family']})")
         if "contract" in report:
@@ -249,9 +272,15 @@ def build_train_config(args) -> dict:
             "train: pass --dataset <file.jsonl>, --hf-dataset <id> or --config with a dataset block "
             "(the smoke preset ships its own COCO slice)."
         )
+    if getattr(args, "algorithm", None):
+        cfg["algorithm"] = str(args.algorithm)
+    from .algorithms import get_algorithm
+
+    algorithm = get_algorithm(cfg.get("algorithm"))
+    algorithm.validate_config(cfg)
     run = cfg.setdefault("run", {})
     if not run.get("dir"):
-        name = f"{_slug(cfg['target']['model'])}-dflash"
+        name = f"{_slug(cfg['target']['model'])}-{algorithm.name}"
         run.update({"name": name, "dir": f"runs/{name}"})
     return apply_overrides(cfg, args.set_list)
 
@@ -310,6 +339,9 @@ def cmd_train(args) -> int:
 def cmd_eval(args) -> int:
     run_dir = Path(args.run_dir).resolve()
     cfg = _load_run_config(run_dir, args.config)
+    from .algorithms import get_algorithm
+
+    get_algorithm(cfg.get("algorithm"))
     eval_cfg = cfg.setdefault("eval", {})
     if args.num_prompts is not None:
         eval_cfg["num_prompts"] = int(args.num_prompts)
@@ -366,6 +398,7 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor", help="preflight environment + target model contract")
     doctor.add_argument("--target", default=None, help="local target model directory")
     doctor.add_argument("--mask-token-id", type=int, default=151669)
+    doctor.add_argument("--algorithm", default=None, help="check a drafter algorithm name against the registry")
     doctor.add_argument("--samples", type=int, default=1000, help="feature-disk estimate sample count")
     doctor.add_argument("--seq-length", type=int, default=2048)
     doctor.add_argument("--json", action="store_true")
@@ -380,6 +413,11 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--hf-split", default=None)
     train.add_argument("--images-dir", default=None)
     train.add_argument("--preset", default="single-gpu-48g", choices=list(_PRESET_NAMES))
+    train.add_argument(
+        "--algorithm",
+        default=None,
+        help="drafter algorithm name (registered; default: config value or dflash)",
+    )
     train.add_argument("--config", default=None, help="advanced: YAML config (merged over the preset)")
     train.add_argument("--run-dir", default=None)
     train.add_argument("--limit", type=int, default=None)

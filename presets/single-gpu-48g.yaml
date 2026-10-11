@@ -1,3 +1,4 @@
+algorithm: dflash  # drafter plugin; see vlm_dflash/algorithms/
 # 48 GB single-GPU preset: the measured reference recipe (see README).
 # Family-specific values (MRoPE sections, mask id, pixel bounds) are resolved
 # and validated against the target at runtime via the model contract.

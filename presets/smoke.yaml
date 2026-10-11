@@ -1,3 +1,4 @@
+algorithm: dflash  # drafter plugin; see vlm_dflash/algorithms/
 # Pipeline smoke preset: COCO captions (short answers), tiny slice, short
 # training. Proves the full chain runs; not a quality benchmark.
 run:

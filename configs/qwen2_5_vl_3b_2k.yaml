@@ -1,3 +1,4 @@
+algorithm: dflash  # drafter plugin; see vlm_dflash/algorithms/
 # Phase-2 scaling point: same recipe as configs/qwen2_5_vl_3b.yaml with a
 # 2000-row training slice (and 128 held-out val prompts). The run dir is new so
 # the 512-row reference run stays intact for comparison.

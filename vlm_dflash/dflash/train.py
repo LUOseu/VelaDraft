@@ -15,9 +15,9 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader, Subset
 
+from ..algorithms import get_algorithm
 from ..provenance import assert_identity, identity_from_contract, record_stage
 from ..utils import ensure_dir, log, set_seed, write_json
-from .factory import build_draft_config, build_trainer_module
 from .features import FeatureDataset, collate_features
 
 
@@ -107,7 +107,7 @@ def run_training_loop(
     max_grad_norm = float(train_cfg.get("max_grad_norm", 1.0))
     epochs = int(train_cfg.get("num_epochs", 6))
     image_token_id = int(contract["tokens"]["image_token_id"])
-    spatial = bool(module.draft_model.spatial_rope_enabled)
+    spatial = bool(getattr(module, "uses_multimodal_position_ids", getattr(module.draft_model, "spatial_rope_enabled", False)))
 
     generator = torch.Generator().manual_seed(seed)
     loader = DataLoader(
@@ -170,6 +170,7 @@ def run_training_loop(
     started = time.time()
     from .trainer_core import NoValidAnchorsError
 
+    skippable_errors = tuple(getattr(module, "skippable_errors", ()) or ()) or (NoValidAnchorsError,)
     optimizer.zero_grad(set_to_none=True)
     iterator = iter(loader)
     # Fast-forward a resumed run to the same micro-batch position the original
@@ -195,7 +196,7 @@ def run_training_loop(
                     image_mask=batch["image_mask"],
                     multimodal_position_ids=batch["position3"] if spatial else None,
                 )
-            except NoValidAnchorsError:
+            except skippable_errors:
                 skipped_batches += 1
                 continue
             loss = metrics.loss
@@ -346,12 +347,15 @@ def train_dflash(cfg: dict, run_dir: str | Path, contract: dict, steps: int | No
     manifest = FeatureDataset(features_dir).store.manifest
     assert_identity(identity_from_contract(contract), manifest["identity"], "train vs features")
 
+    algorithm = get_algorithm(cfg.get("algorithm"))
+    algorithm.validate_config(cfg)
+
     train_cfg = cfg.get("train", {})
     seed = int(train_cfg.get("seed", 42))
     device = torch.device(train_cfg.get("device", "cuda:0"))
     set_seed(seed)
 
-    draft_config = build_draft_config(contract, cfg)
+    draft_config = algorithm.build_draft_config(contract, cfg)
     target_head = torch.load(features_dir / "target_head.pt", map_location="cpu", weights_only=False)
     if target_head["model_fingerprint"] != contract["target"]["model_fingerprint"]:
         raise RuntimeError("features/target_head.pt was produced from a different target fingerprint.")
@@ -364,7 +368,7 @@ def train_dflash(cfg: dict, run_dir: str | Path, contract: dict, steps: int | No
         )
     if tied_head and lm_head_weight is not None:
         raise RuntimeError("features/target_head.pt records a tied target but also stores a separate lm_head.")
-    module = build_trainer_module(
+    module = algorithm.build_trainer_module(
         draft_config, contract, cfg, target_head["embed_tokens"], lm_head_weight=lm_head_weight
     )
     init_state = {key: value.clone() for key, value in module.draft_model.state_dict().items()}
@@ -372,13 +376,11 @@ def train_dflash(cfg: dict, run_dir: str | Path, contract: dict, steps: int | No
     train_dir = ensure_dir(run_dir / "train")
     checkpoint_common = {
         "format": "vlm-dflash-ckpt-v1",
-        "draft_config": draft_config.to_dict(),
-        "attention_backend": str(cfg["drafter"].get("attention_backend", "flex_attention")),
-        "mask_token_id": int(cfg["drafter"]["mask_token_id"]),
-        "block_size": int(cfg["drafter"]["block_size"]),
-        "num_anchors": int(cfg["drafter"].get("num_anchors", 256)),
-        "loss_decay_gamma": float(cfg["drafter"].get("loss_decay_gamma", 7.0)),
-        "target_layer_ids": [int(x) for x in contract["layers"]["draft_layer_ids"]],
+        # Which drafter algorithm trained these weights: eval/export hard-fail
+        # when a checkpoint is scored with a different algorithm than it was
+        # trained with (same idea as the head/identity tags below).
+        "algorithm": algorithm.name,
+        **algorithm.checkpoint_metadata(contract, cfg, draft_config),
         # Which frozen output head the draft logits were trained against. Eval
         # refuses checkpoints whose head does not match the target's tie state.
         "head": "tied_embedding" if tied_head else "target_lm_head",
