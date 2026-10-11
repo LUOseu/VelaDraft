@@ -1,0 +1,9 @@
+{
+  "name": "textvqa",
+  "description": "TextVQA: short grounded answers over OCR-heavy natural images.",
+  "status": "planned",
+  "prompt_source": null,
+  "num_prompts": 128,
+  "max_new_tokens": 32,
+  "note": "Protocol pinned: lmms-lab/textvqa validation split, question rendered with the dataset's own question field, images exported to a sharegpt_jsonl + meta.json under benchmarks/data/. Adapter not landed yet."
+}

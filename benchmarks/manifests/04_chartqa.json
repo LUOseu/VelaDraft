@@ -1,0 +1,9 @@
+{
+  "name": "chartqa",
+  "description": "ChartQA: structured visual reasoning over charts.",
+  "status": "planned",
+  "prompt_source": null,
+  "num_prompts": 128,
+  "max_new_tokens": 64,
+  "note": "Protocol pinned: lmms-lab/ChartQA test split, sharegpt_jsonl export. Adapter not landed yet."
+}

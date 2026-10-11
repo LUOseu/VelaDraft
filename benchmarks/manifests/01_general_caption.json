@@ -1,0 +1,9 @@
+{
+  "name": "caption_general",
+  "description": "General / caption: long free-form answers on the run's own held-out split (provisional prompt set; fixed once a public caption benchmark adapter lands).",
+  "status": "scaffold",
+  "prompt_source": {"type": "run_val", "split": "val.jsonl"},
+  "num_prompts": 64,
+  "max_new_tokens": 128,
+  "note": "Provisional: uses the run's own val split so numbers are only comparable between runs over the same dataset protocol; a fixed public prompt file will replace it."
+}
