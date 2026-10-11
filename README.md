@@ -145,9 +145,9 @@ bf16, 512 long-answer LLaVA-Instruct samples, seq 2048, 6 epochs, block 8,
 | stage | wall | outcome |
 | --- | --- | --- |
 | prepare (512 train + 64 val) | < 1 min | `rows_sha256` recorded |
-| target-native regen (max 160 new tokens) | ~4 min | 512/512 kept (>= 128 tokens) |
+| target-native regen (max 160 new tokens) | ~14 min | 512/512 kept (>= 128 tokens) |
 | feature capture (512 samples, seq 2048) | ~2.5 min | visual-path check passed |
-| drafter training (384 steps) | 13.7 min | block CE 10.29 (first 10%) -> 4.78 (last 10%); no NaN/Inf; overfit sanity passed; peak GPU memory 42.9 GB |
+| drafter training (384 steps, incl. the 16-sample overfit sanity) | ~20 min | block CE 10.29 (first 10%) -> 4.78 (last 10%); no NaN/Inf; overfit sanity passed; peak GPU memory 42.9 GB |
 | acceptance eval (64 held-out prompts, <= 128 new tokens) | ~19 min | token-exact gate: 64/64 (trained and random-init) |
 
 Results (numbers only, no thresholding):
