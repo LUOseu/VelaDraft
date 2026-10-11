@@ -136,6 +136,20 @@ configs/smoke_coco.yaml --limit 16 --steps 30 --eval-prompts 4` runs all five
 stages end to end in ~3.5 min on the same card and finishes with
 `token_exact=True` (trained AL 1.113 vs random-init 1.000).
 
+## Measured v0.2 run (Qwen3-VL-8B, same card)
+
+CLI smoke (`vlm-dflash train --preset smoke --target .../Qwen3-VL-8B-Instruct
+--limit 8 --steps 4`, COCO captions) proves the family adapter path end to end:
+capture visual-path check passed, drafter logits move when the image is swapped
+(`logits_diff=0.1562`), and `vlm-dflash eval` reports `token_exact: true` on 8/8
+prompts for both the trained and the random-init checkpoint.
+
+Resume was verified on the same run: re-running with a different `--steps`
+fails loudly ("Resume plan mismatch"), and re-running with the matching plan
+resumes from `train/ckpt_last.pt` and reproduces the interrupted run's final
+loss exactly (`14.5625`), i.e. model + optimizer + scheduler + RNG state restore
+bit-identically.
+
 Hardware note: all numbers above are from a single 48 GB card. 24 GB cards were
 **not** tested with these defaults; if you are memory-constrained, lower
 `train.micro_batch_size`, `capture.seq_length`, or run a smaller slice.
