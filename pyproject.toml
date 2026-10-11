@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vlm-dflash"
-version = "0.1.0"
+version = "0.2.0"
 description = "Minimal reproducible path to train a multimodal DFlash drafter for Qwen-VL"
 readme = "README.md"
 license = "Apache-2.0"

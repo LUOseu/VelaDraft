@@ -6,3 +6,4 @@ assets/
 *.log
 .pytest_cache/
 logs/
+benchmarks/reports/
