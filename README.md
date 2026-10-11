@@ -223,9 +223,10 @@ Reading:
   throughput experiments whose agreement rate is reported per run.
 
 Same-seed reruns: data, regen and the protocol reproduce (`rows_sha256`
-identical, 274/512 regen keeps identical), but bf16 training is not bitwise
-deterministic (step-1 loss and grad norm differ slightly between runs, and AL
-moved 1.220 -> 1.198 on the identical 3B config). Treat sub-2% AL differences
+identical, 274/512 regen keeps identical), but the bf16 capture and training
+passes are not bitwise deterministic across runs (feature shard hashes and
+step-1 loss differ between identical reruns; AL moved 1.220 -> 1.198 on the
+3B config). Reproduce the protocol, not the bits; treat sub-2% AL differences
 as run-to-run noise.
 
 Hardware note: all numbers above are from a single 48 GB card. 24 GB cards were

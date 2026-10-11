@@ -134,6 +134,9 @@ Consequences:
 * The reference SDPA backend narrowing (`.verify_sdpa_backend: reference`) is a
   second, smaller near-tie source; `parity` disables it. The numbers above are
   `parity`.
+* Reruns reproduce the protocol (`rows_sha256` identical, identical regen keeps),
+  not the bits: captured feature shards and training step-1 loss differ between
+  same-seed runs on this bf16 stack.
 
 ## Visual-path checks (our addition)
 
