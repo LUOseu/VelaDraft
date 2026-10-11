@@ -21,8 +21,11 @@ Updated: 2026-10-11 (v0.2 in development; nothing pushed yet).
 ## Latest measured results
 - 3B / 512-corpus rerun: AL 1.198, 64/64 exact (earlier v0.1 run: 1.220).
 - 3B / 2K-corpus: AL 1.630, 128/128 exact, slots `[.413,.149,.048,.015,.004,.001,0]`.
-- 3B / 5K-corpus: trained (1974 steps, final loss 2.34); eval running.
-- 8B / 512-corpus: AL 1.322; 8B / 2K: queued behind the 5K job.
+- 3B / 5K-corpus: AL 1.817, 128/128 exact, slots
+  `[.482,.210,.080,.030,.011,.005,.001]` (1974 steps, CE 6.84 -> 2.58, peak
+  30.0 GB).
+- 8B / 512-corpus: AL 1.322; 8B / 2K: running (suite, started 23:31; ETA
+  ~03:00).
 - Runtime probe (32 prompts, bf16): see BENCHMARKS.md.
 
 ## Registry refactor verification (2026-10-11, no DFlash regression)
@@ -43,12 +46,14 @@ Updated: 2026-10-11 (v0.2 in development; nothing pushed yet).
   lossless.
 
 ## Blocked / waiting
-- 5K and 8B-2K scaling jobs on the cluster; `/home` disk pressure can skip
-  jobs (the suite pre-checks and skips instead of failing).
+- 8B-2K scaling job on the cluster (started 23:31 after pruning the completed
+  8B-512 / 3B-refresh features to pass the disk pre-check); `/home` stays
+  near-full, the suite pre-checks and skips rather than failing.
 - Hugging Face / PyPI publishing: pending release audit.
 
 ## Next highest-value tasks
-1. Finish + record 5K (and 8B-2K) scaling numbers; update README/BENCHMARKS.
+1. Record the 8B-2K scaling numbers when the suite finishes; update
+   README/BENCHMARKS (5K already recorded).
 2. Deterministic benchmark prompt file for `caption_general`; land one public
    dataset adapter (TextVQA first) to move a workload from planned -> validated.
 3. Model cards for released checkpoints (export already emits most fields).

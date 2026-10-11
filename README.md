@@ -36,6 +36,20 @@ correctly and testably.
   `eval.verification` selects `sequential` (the parity gate) / `parallel` /
   `strict_parallel`; see the runtime probe below.
 
+## Algorithm registry + benchmark harness (v0.2-dev)
+
+Drafter algorithms are plugins behind a small interface
+(`vlm_dflash/algorithms/`); DFlash is the first (and currently only) entry and
+is frozen as the reference. Every checkpoint records its algorithm and
+`eval`/`export` refuse mismatched checkpoints. `vlm-dflash doctor --algorithm
+dflash` reports the registry status and metadata; `docs/adding_an_algorithm.md`
+documents what a new algorithm must implement.
+
+The benchmark harness runs fixed workload manifests and writes a report with
+its protocol attached: `python scripts/benchmark.py --run-dir runs/<run>
+--workload caption_general` (see `docs/benchmark.md`; TextVQA/DocVQA/ChartQA
+manifests are pinned as `planned` until their dataset adapters land).
+
 ## Unified CLI (v0.2)
 
 ```bash
@@ -229,7 +243,7 @@ Reading:
 - `sequential` therefore remains the correctness gate; parallel modes are
   throughput experiments whose agreement rate is reported per run.
 
-### Scaling (Phase 2, in progress)
+### Scaling (Phase 2)
 
 Same recipe, larger LLaVA-Instruct slices, Qwen2.5-VL-3B target,
 `verification: sequential` (128 val prompts; the 512 point keeps the original
@@ -239,15 +253,16 @@ Same recipe, larger LLaVA-Instruct slices, Qwen2.5-VL-3B target,
 | --- | --- | --- | --- | --- | --- | --- |
 | 512 | 274 | 210 | 1.198 | 1.003 | [0.184, 0.011, 0, 0, 0, 0, 0] | 64/64 |
 | 2000 | 1050 | 792 | **1.630** | 1.003 | [0.413, 0.149, 0.048, 0.015, 0.004, 0.001, 0] | 128/128 |
-| 5000 | running | | | | | |
+| 5000 | 2629 | 1974 | **1.817** | 1.003 | [0.482, 0.210, 0.080, 0.030, 0.011, 0.005, 0.001] | 128/128 |
 
 (512 row is the post-v0.2 rerun; the original v0.1 run measured 1.220 - see the
-non-determinism note below. 2000-slice training: block CE 7.50 -> 3.79
-first/last-10% means, overfit sanity passed, peak 29.5 GB, ~10 min on one
-A6000.) Slots 2-5 become non-zero between the 512 and 2K points, and the
-runtime probe above shows the parallel verification path crossing 1x on the
-same checkpoint; the 5K and 8B-2K points are produced by
-`scripts/run_scaling_suite.sh`.
+non-determinism note below. 2000-slice: block CE 7.50 -> 3.79, peak 29.5 GB,
+~10 min. 5000-slice: block CE 6.84 -> 2.58, peak 30.0 GB, ~40 min.) AL keeps
+climbing 1.198 -> 1.630 -> 1.817 with slots 2-5 non-zero from the 2K point on
+(slot 6 first turns non-zero at 5K); acceptance is still length-limited by the
+128-prompt / 128-token eval budget, so treat the curve as "more data still
+helps", not as a plateau. The Qwen3-VL-8B 2K point is produced by
+`scripts/run_scaling_suite.sh` (running as of 2026-10-11).
 
 Same-seed reruns: data, regen and the protocol reproduce (`rows_sha256`
 identical, 274/512 regen keeps identical), but the bf16 capture and training

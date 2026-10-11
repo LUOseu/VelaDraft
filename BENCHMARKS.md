@@ -11,13 +11,15 @@ reference. Do not mix experimental parallel-runtime numbers into these tables.
 | Qwen2.5-VL-3B | 512 | 278 kept | 64 | 1.198 | 1.003 | 64/64 | see eval_result.json |
 | Qwen2.5-VL-3B | 2K | 1050 kept | 128 | 1.630 | 1.003 | 128/128 | .413, .149, .048, .015, .004, .001, 0 |
 | Qwen3-VL-8B | 512 | 274 kept | 32 | 1.322 | 1.003 | 32/32 | see eval_result.json |
-| Qwen2.5-VL-3B | 5K | running | 128 | (pending) | - | - | - |
+| Qwen2.5-VL-3B | 5K | 2629 kept | 128 | 1.817 | 1.003 | 128/128 | .482, .210, .080, .030, .011, .005, .001 |
 
 Notes
 - The 512-corpus 3B row is the 2026-10-11 rerun (original v0.1: AL 1.220);
   bf16 runs reproduce the protocol, not the bits (< ~2% AL noise).
-- Slot-0/1 acceptance dominates; the 2K run is the first with stable non-zero
-  acceptance through slot 5.
+- Slot-0/1 acceptance dominates; 2K is the first point with stable non-zero
+  acceptance through slot 5, 5K extends it through slot 6.
+- 5K training: block CE 6.84 -> 2.58 (first/last-10% means), 1974 steps,
+  peak 30.0 GB, ~40 min on one A6000; overfit sanity passed.
 - `AL = new_tokens / target_verification_steps` (bonus-token-inclusive);
   random-init drafter AL ~1.003 means proposals are almost never accepted.
 
