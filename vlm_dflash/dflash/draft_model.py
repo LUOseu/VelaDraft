@@ -30,7 +30,7 @@ mask that enforces this is built by the trainer wrapper in
 from __future__ import annotations
 
 import inspect
-from contextlib import AbstractContextManager, nullcontext
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from typing import Callable, Optional, Tuple, TypedDict
 
 import torch
@@ -71,6 +71,23 @@ def verify_sdpa_backend_switch_enabled() -> bool:
     return _VERIFY_SDPA_BACKEND_SWITCH
 
 
+@contextmanager
+def verify_sdpa_backend_parity():
+    """Force generate()-parity verify numerics for the duration of the block.
+
+    Used by the strict-parallel fallback: when a near-tie decision is detected,
+    the round is re-verified with sequential target steps *and* the parity
+    backend, which is the configuration the token-exact gate validates.
+    """
+    global _VERIFY_SDPA_BACKEND_SWITCH
+    saved = _VERIFY_SDPA_BACKEND_SWITCH
+    _VERIFY_SDPA_BACKEND_SWITCH = False
+    try:
+        yield
+    finally:
+        _VERIFY_SDPA_BACKEND_SWITCH = saved
+
+
 class _DFlashAcceptanceEvent(TypedDict):
     """Acceptance counters for one verification round."""
 
@@ -89,6 +106,23 @@ class _DFlashGenerationStats(TypedDict):
     target_prefill_seconds: float
     draft_seconds: float
     target_verify_seconds: float
+    strict_parallel_rounds: float
+    strict_fallback_rounds: float
+    strict_min_decision_margin: Optional[float]
+
+
+def _min_decision_margin(logits: torch.Tensor, num_positions: int) -> float:
+    """Smallest top-1/top-2 logit gap over the first ``num_positions`` positions.
+
+    The strict-parallel guard uses the raw difference between the two highest
+    logits as a cheap near-tie detector: bf16 verification rounds that move a
+    decision by a fraction of a logit unit are exactly the ones where parallel
+    and sequential kernels can disagree, so they are routed to the parity path.
+    """
+    if num_positions <= 0:
+        return float("inf")
+    top2 = torch.topk(logits[0, :num_positions].float(), k=2, dim=-1).values
+    return float((top2[:, 0] - top2[:, 1]).min())
 
 
 def _bounded_acceptance_counts(
@@ -1196,6 +1230,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         target_kwargs: Optional[dict[str, torch.Tensor]] = None,
         return_stats: bool = False,
         sequential_target_verification: bool = False,
+        strict_parallel_margin: float | None = None,
         draft_image_context_mode: str = "keep",
         draft_image_token_id: int | None = None,
     ) -> torch.LongTensor | tuple[torch.LongTensor, _DFlashGenerationStats]:
@@ -1216,6 +1251,13 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             sequential_target_verification: Whether the target verifies draft
                 candidates one token at a time. This preserves parity with
                 ``generate()`` at the cost of target-side acceleration.
+            strict_parallel_margin: Greedy-only guard for parallel block
+                verification. When set, every verification round that would
+                emit a token whose top-1/top-2 logit gap is below this margin
+                is re-verified with the sequential generate()-parity path, so
+                bf16 near-ties cannot flip the output away from target-only
+                greedy decoding. Rounds handled by the fallback are counted in
+                the returned stats.
             draft_image_context_mode: Diagnostic transformation applied only
                 to image-token rows entering the draft prompt cache.
             draft_image_token_id: Image token id required when the diagnostic
@@ -1228,6 +1270,19 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             statistics.
         """
         self.eval()
+        if strict_parallel_margin is not None:
+            if sequential_target_verification:
+                raise ValueError(
+                    "strict_parallel_margin requires parallel target verification "
+                    "(sequential_target_verification=False)."
+                )
+            if float(strict_parallel_margin) <= 0.0:
+                raise ValueError(f"strict_parallel_margin must be positive, got {strict_parallel_margin!r}.")
+            if float(temperature) > 1e-5:
+                raise ValueError(
+                    "strict_parallel_margin guards argmax decisions and is only defined for greedy "
+                    f"decoding (temperature={temperature!r})."
+                )
         num_input_tokens = input_ids.shape[1]
         max_length = num_input_tokens + max_new_tokens
         block_size = self.block_size
@@ -1254,6 +1309,9 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         draft_tokens = 0
         accepted_tokens = 0
         verify_steps = 0
+        strict_parallel_rounds = 0
+        strict_fallback_rounds = 0
+        strict_min_decision_margin = float("inf")
         acceptance_events: list[_DFlashAcceptanceEvent] = []
         timing_events: dict[str, list[tuple[torch.cuda.Event, torch.cuda.Event]]] = {
             "target_prefill": [],
@@ -1370,6 +1428,192 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             visual_context = self.build_visual_context(target_hidden, image_mask)
 
         start = num_input_tokens
+
+        def _sequential_round(
+            round_start: int,
+            round_block_ids: torch.LongTensor,
+        ) -> tuple[torch.Tensor, int, torch.Tensor]:
+            """Verify the drafted block one target step at a time (generate()-parity path)."""
+            posterior_tokens: list[torch.Tensor] = []
+            verified_hidden_states: list[torch.Tensor] = []
+            acceptance_length = 0
+            for block_index in range(round_block_ids.shape[1]):
+                token_ids = round_block_ids[:, block_index : block_index + 1]
+                if target_is_vlm:
+                    prompt_attention_mask = target_kwargs.get("attention_mask")
+                    if prompt_attention_mask is None:
+                        prompt_attention_mask = torch.ones_like(input_ids)
+                    active_length = round_start + block_index + 1
+                    full_attention_mask = torch.cat(
+                        (
+                            prompt_attention_mask,
+                            torch.ones(
+                                (1, active_length - num_input_tokens),
+                                dtype=prompt_attention_mask.dtype,
+                                device=target.device,
+                            ),
+                        ),
+                        dim=1,
+                    )
+                    full_input_ids = torch.cat(
+                        (output_ids[:, : round_start + block_index], token_ids),
+                        dim=1,
+                    )
+                    generation_kwargs = {
+                        key: value
+                        for key, value in target_kwargs.items()
+                        if key not in {"attention_mask", "mm_token_type_ids", "pixel_values", "pixel_values_videos"}
+                    }
+                    verify_kwargs = target.prepare_inputs_for_generation(
+                        full_input_ids,
+                        next_sequence_length=1,
+                        past_key_values=past_key_values_target,
+                        attention_mask=full_attention_mask,
+                        is_first_iteration=False,
+                        use_cache=True,
+                        **generation_kwargs,
+                    )
+                    verify_input_ids = verify_kwargs.pop("input_ids")
+                    verify_kwargs["attention_mask"] = full_attention_mask
+                    multimodal_position_ids = adapter.call_position_builder(
+                        target,
+                        input_ids=token_ids,
+                        image_grid_thw=None,
+                        video_grid_thw=None,
+                        inputs_embeds=target_embeddings(token_ids),
+                        attention_mask=full_attention_mask,
+                        past_key_values=past_key_values_target,
+                        mm_token_type_ids=None,
+                    )
+                    if multimodal_position_ids is not None:
+                        verify_kwargs["position_ids"] = _prepend_text_position_ids(
+                            multimodal_position_ids,
+                            full_attention_mask,
+                        )[:, :, -1:]
+                    else:
+                        verify_kwargs.pop("position_ids", None)
+                    if "cache_position" in target_forward_params:
+                        verify_kwargs["cache_position"] = torch.tensor(
+                            [round_start + block_index],
+                            dtype=torch.long,
+                            device=target.device,
+                        )
+                else:
+                    verify_input_ids = token_ids
+                    verify_kwargs = {
+                        "position_ids": position_ids[:, round_start + block_index : round_start + block_index + 1],
+                        "past_key_values": past_key_values_target,
+                        "use_cache": True,
+                    }
+                verify_kwargs["output_hidden_states"] = True
+                phase_start = start_timing()
+                with target_verify_backend():
+                    step_output = target(verify_input_ids, **verify_kwargs)
+                end_timing("target_verify", phase_start)
+                step_posterior = sample(step_output.logits[:, -1:], temperature)
+                posterior_tokens.append(step_posterior)
+                verified_hidden_states.append(
+                    extract_context_feature(step_output.hidden_states, self.target_layer_ids)
+                )
+                if block_index == round_block_ids.shape[1] - 1:
+                    break
+                if round_block_ids[0, block_index + 1] != step_posterior[0, 0]:
+                    break
+                acceptance_length += 1
+            posterior = torch.cat(posterior_tokens, dim=1)
+            verified_target_hidden = torch.cat(verified_hidden_states, dim=1)
+            return posterior, acceptance_length, verified_target_hidden
+
+        def _parallel_round(
+            round_start: int,
+            round_block_ids: torch.LongTensor,
+        ) -> tuple[torch.Tensor, int, torch.Tensor, float]:
+            """Verify the whole drafted block in one target forward (fast path)."""
+            if target_is_vlm:
+                prompt_attention_mask = target_kwargs.get("attention_mask")
+                if prompt_attention_mask is None:
+                    prompt_attention_mask = torch.ones_like(input_ids)
+                full_attention_mask = torch.cat(
+                    (
+                        prompt_attention_mask,
+                        torch.ones(
+                            (1, round_start + round_block_ids.shape[1] - num_input_tokens),
+                            dtype=prompt_attention_mask.dtype,
+                            device=target.device,
+                        ),
+                    ),
+                    dim=1,
+                )
+                full_input_ids = torch.cat((output_ids[:, :round_start], round_block_ids), dim=1)
+                generation_kwargs = {
+                    key: value
+                    for key, value in target_kwargs.items()
+                    if key not in {"attention_mask", "mm_token_type_ids", "pixel_values", "pixel_values_videos"}
+                }
+                verify_kwargs = target.prepare_inputs_for_generation(
+                    full_input_ids,
+                    next_sequence_length=round_block_ids.shape[1],
+                    past_key_values=past_key_values_target,
+                    attention_mask=full_attention_mask,
+                    is_first_iteration=False,
+                    use_cache=True,
+                    **generation_kwargs,
+                )
+                verify_input_ids = verify_kwargs.pop("input_ids")
+                verify_kwargs["output_hidden_states"] = True
+                # Qwen2.5-VL uses the full mask when deriving incremental
+                # MRoPE positions. Omitting it makes the cache path fall back
+                # to plain arange positions and diverge from generate().
+                verify_kwargs["attention_mask"] = full_attention_mask
+                # ``compute_3d_position_ids`` returns the three MRoPE axes for
+                # the full mask. The fourth text-position axis is required by
+                # the current Transformers causal-mask path.
+                multimodal_position_ids = adapter.call_position_builder(
+                    target,
+                    input_ids=round_block_ids,
+                    image_grid_thw=None,
+                    video_grid_thw=None,
+                    inputs_embeds=target_embeddings(round_block_ids),
+                    attention_mask=full_attention_mask,
+                    past_key_values=past_key_values_target,
+                    mm_token_type_ids=None,
+                )
+                if multimodal_position_ids is not None:
+                    verify_kwargs["position_ids"] = _prepend_text_position_ids(
+                        multimodal_position_ids,
+                        full_attention_mask,
+                    )[:, :, -round_block_ids.shape[1] :]
+                else:
+                    verify_kwargs.pop("position_ids", None)
+                if "cache_position" in target_forward_params:
+                    verify_kwargs["cache_position"] = torch.arange(
+                        round_start,
+                        round_start + round_block_ids.shape[1],
+                        dtype=torch.long,
+                        device=target.device,
+                    )
+            else:
+                verify_input_ids = round_block_ids
+                verify_kwargs = {
+                    "past_key_values": past_key_values_target,
+                    "use_cache": True,
+                    "output_hidden_states": True,
+                }
+                verify_kwargs["position_ids"] = position_ids[:, round_start : round_start + round_block_ids.shape[1]]
+            phase_start = start_timing()
+            with target_verify_backend():
+                output = target(verify_input_ids, **verify_kwargs)
+            end_timing("target_verify", phase_start)
+            posterior = sample(output.logits, temperature)
+            acceptance_length = (round_block_ids[:, 1:] == posterior[:, :-1]).cumprod(dim=1).sum(dim=1)[0].item()
+            verified_target_hidden = extract_context_feature(output.hidden_states, self.target_layer_ids)
+
+            min_decision_margin = float("inf")
+            if strict_parallel_margin is not None:
+                used = min(int(acceptance_length) + 1, posterior.shape[1])
+                min_decision_margin = _min_decision_margin(output.logits, used)
+            return posterior, acceptance_length, verified_target_hidden, min_decision_margin
+
         while start < max_length:
             block_output_ids = output_ids[:, start : start + block_size].clone()
             block_position_ids = position_ids[:, start : start + block_size]
@@ -1397,173 +1641,26 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             past_key_values_draft.crop(start)
 
             if sequential_target_verification:
-                posterior_tokens: list[torch.Tensor] = []
-                verified_hidden_states: list[torch.Tensor] = []
-                acceptance_length = 0
-                for block_index in range(block_output_ids.shape[1]):
-                    token_ids = block_output_ids[:, block_index : block_index + 1]
-                    if target_is_vlm:
-                        prompt_attention_mask = target_kwargs.get("attention_mask")
-                        if prompt_attention_mask is None:
-                            prompt_attention_mask = torch.ones_like(input_ids)
-                        active_length = start + block_index + 1
-                        full_attention_mask = torch.cat(
-                            (
-                                prompt_attention_mask,
-                                torch.ones(
-                                    (1, active_length - num_input_tokens),
-                                    dtype=prompt_attention_mask.dtype,
-                                    device=target.device,
-                                ),
-                            ),
-                            dim=1,
-                        )
-                        full_input_ids = torch.cat(
-                            (output_ids[:, : start + block_index], token_ids),
-                            dim=1,
-                        )
-                        generation_kwargs = {
-                            key: value
-                            for key, value in target_kwargs.items()
-                            if key not in {"attention_mask", "mm_token_type_ids", "pixel_values", "pixel_values_videos"}
-                        }
-                        verify_kwargs = target.prepare_inputs_for_generation(
-                            full_input_ids,
-                            next_sequence_length=1,
-                            past_key_values=past_key_values_target,
-                            attention_mask=full_attention_mask,
-                            is_first_iteration=False,
-                            use_cache=True,
-                            **generation_kwargs,
-                        )
-                        verify_input_ids = verify_kwargs.pop("input_ids")
-                        verify_kwargs["attention_mask"] = full_attention_mask
-                        multimodal_position_ids = adapter.call_position_builder(
-                            target,
-                            input_ids=token_ids,
-                            image_grid_thw=None,
-                            video_grid_thw=None,
-                            inputs_embeds=target_embeddings(token_ids),
-                            attention_mask=full_attention_mask,
-                            past_key_values=past_key_values_target,
-                            mm_token_type_ids=None,
-                        )
-                        if multimodal_position_ids is not None:
-                            verify_kwargs["position_ids"] = _prepend_text_position_ids(
-                                multimodal_position_ids,
-                                full_attention_mask,
-                            )[:, :, -1:]
-                        else:
-                            verify_kwargs.pop("position_ids", None)
-                        if "cache_position" in target_forward_params:
-                            verify_kwargs["cache_position"] = torch.tensor(
-                                [start + block_index],
-                                dtype=torch.long,
-                                device=target.device,
-                            )
-                    else:
-                        verify_input_ids = token_ids
-                        verify_kwargs = {
-                            "position_ids": block_position_ids[:, block_index : block_index + 1],
-                            "past_key_values": past_key_values_target,
-                            "use_cache": True,
-                        }
-                    verify_kwargs["output_hidden_states"] = True
-                    phase_start = start_timing()
-                    with target_verify_backend():
-                        step_output = target(verify_input_ids, **verify_kwargs)
-                    end_timing("target_verify", phase_start)
-                    step_posterior = sample(step_output.logits[:, -1:], temperature)
-                    posterior_tokens.append(step_posterior)
-                    verified_hidden_states.append(
-                        extract_context_feature(step_output.hidden_states, self.target_layer_ids)
-                    )
-                    if block_index == block_output_ids.shape[1] - 1:
-                        break
-                    if block_output_ids[0, block_index + 1] != step_posterior[0, 0]:
-                        break
-                    acceptance_length += 1
-                posterior = torch.cat(posterior_tokens, dim=1)
-                verified_target_hidden = torch.cat(verified_hidden_states, dim=1)
-            elif target_is_vlm:
-                prompt_attention_mask = target_kwargs.get("attention_mask")
-                if prompt_attention_mask is None:
-                    prompt_attention_mask = torch.ones_like(input_ids)
-                full_attention_mask = torch.cat(
-                    (
-                        prompt_attention_mask,
-                        torch.ones(
-                            (1, start + block_output_ids.shape[1] - num_input_tokens),
-                            dtype=prompt_attention_mask.dtype,
-                            device=target.device,
-                        ),
-                    ),
-                    dim=1,
-                )
-                full_input_ids = torch.cat((output_ids[:, :start], block_output_ids), dim=1)
-                generation_kwargs = {
-                    key: value
-                    for key, value in target_kwargs.items()
-                    if key not in {"attention_mask", "mm_token_type_ids", "pixel_values", "pixel_values_videos"}
-                }
-                verify_kwargs = target.prepare_inputs_for_generation(
-                    full_input_ids,
-                    next_sequence_length=block_output_ids.shape[1],
-                    past_key_values=past_key_values_target,
-                    attention_mask=full_attention_mask,
-                    is_first_iteration=False,
-                    use_cache=True,
-                    **generation_kwargs,
-                )
-                verify_input_ids = verify_kwargs.pop("input_ids")
-                verify_kwargs["output_hidden_states"] = True
-                # Qwen2.5-VL uses the full mask when deriving incremental
-                # MRoPE positions. Omitting it makes the cache path fall back
-                # to plain arange positions and diverge from generate().
-                verify_kwargs["attention_mask"] = full_attention_mask
-                # ``compute_3d_position_ids`` returns the three MRoPE axes for
-                # the full mask. The fourth text-position axis is required by
-                # the current Transformers causal-mask path.
-                multimodal_position_ids = adapter.call_position_builder(
-                    target,
-                    input_ids=block_output_ids,
-                    image_grid_thw=None,
-                    video_grid_thw=None,
-                    inputs_embeds=target_embeddings(block_output_ids),
-                    attention_mask=full_attention_mask,
-                    past_key_values=past_key_values_target,
-                    mm_token_type_ids=None,
-                )
-                if multimodal_position_ids is not None:
-                    verify_kwargs["position_ids"] = _prepend_text_position_ids(
-                        multimodal_position_ids,
-                        full_attention_mask,
-                    )[:, :, -block_output_ids.shape[1] :]
-                else:
-                    verify_kwargs.pop("position_ids", None)
-                if "cache_position" in target_forward_params:
-                    verify_kwargs["cache_position"] = torch.arange(
-                        start,
-                        start + block_output_ids.shape[1],
-                        dtype=torch.long,
-                        device=target.device,
-                    )
+                posterior, acceptance_length, verified_target_hidden = _sequential_round(start, block_output_ids)
             else:
-                verify_input_ids = block_output_ids
-                verify_kwargs = {
-                    "past_key_values": past_key_values_target,
-                    "use_cache": True,
-                    "output_hidden_states": True,
-                }
-                verify_kwargs["position_ids"] = block_position_ids
-            if not sequential_target_verification:
-                phase_start = start_timing()
-                with target_verify_backend():
-                    output = target(verify_input_ids, **verify_kwargs)
-                end_timing("target_verify", phase_start)
-                posterior = sample(output.logits, temperature)
-                acceptance_length = (block_output_ids[:, 1:] == posterior[:, :-1]).cumprod(dim=1).sum(dim=1)[0].item()
-                verified_target_hidden = extract_context_feature(output.hidden_states, self.target_layer_ids)
+                posterior, acceptance_length, verified_target_hidden, min_decision_margin = _parallel_round(
+                    start, block_output_ids
+                )
+                if strict_parallel_margin is not None:
+                    strict_parallel_rounds += 1
+                    strict_min_decision_margin = min(strict_min_decision_margin, min_decision_margin)
+                    if min_decision_margin < float(strict_parallel_margin):
+                        strict_fallback_rounds += 1
+                        # The parallel attempt already extended the target KV
+                        # cache with the unverified block; drop it and verify
+                        # the same draft again with the parity path before any
+                        # token is emitted.
+                        past_key_values_target.crop(start)
+                        with verify_sdpa_backend_parity():
+                            posterior, acceptance_length, verified_target_hidden = _sequential_round(
+                                start, block_output_ids
+                            )
+
             round_draft_tokens, round_accepted_tokens = _bounded_acceptance_counts(
                 start=start,
                 max_length=max_length,
@@ -1611,5 +1708,11 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             "accepted_tokens": float(accepted_tokens),
             "verify_steps": float(verify_steps),
             "acceptance_events": acceptance_events,
+            "strict_parallel_rounds": float(strict_parallel_rounds),
+            "strict_fallback_rounds": float(strict_fallback_rounds),
+            "strict_min_decision_margin": (
+                None if strict_parallel_rounds == 0 or strict_min_decision_margin == float("inf")
+                else float(strict_min_decision_margin)
+            ),
             **timing_seconds,
         }

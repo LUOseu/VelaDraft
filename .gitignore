@@ -5,3 +5,4 @@ __pycache__/
 assets/
 *.log
 .pytest_cache/
+logs/

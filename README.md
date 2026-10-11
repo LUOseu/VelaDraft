@@ -97,10 +97,13 @@ catch teacher-target mismatches and silent text-only regressions.
   drafter. Other families need a small adapter (`vlm_dflash/adapters/`).
 - Single image per sample; no video; no visual adaptor stages.
 - Acceptance eval is small-scale (64 prompts) and greedy-only; the token-exact
-  gate runs in parity mode (sequential verification + generate()-equivalent
-  SDPA numerics - see `docs/REFERENCE.md`).
+  gate runs in `verification: sequential` (generate()-equivalent numerics -
+  see `docs/REFERENCE.md`). Parallel / strict-parallel verification is
+  available but is not bitwise-exact in bf16 and was not faster at the
+  drafter quality measured so far.
 - Not a serving runtime: this repo trains and evaluates a drafter; serving
-  integration is roadmap.
+  integration is roadmap. `sequential` verification is correctness-first, not
+  a speed path.
 
 ## Measured reference run (v0.1, one RTX A6000 48GB)
 
@@ -123,10 +126,13 @@ Results (numbers only, no thresholding):
 - Per-slot acceptance (trained): `[0.203, 0.013, 0.001, 0, 0, 0, 0]`; draft
   acceptance rate 3.2%.
 - Equivalence: speculative greedy == target-only greedy token-exact on all 64
-  prompts for both checkpoints in parity mode (`sequential_target_verification:
-  true`, `verify_sdpa_backend: parity`). Parallel block verification with the
-  reference SDPA narrowing flips bf16 near-tie argmax decisions on longer
-  generations (diagnostic: 3/16 token-exact); see `docs/REFERENCE.md`.
+  prompts for both checkpoints in parity mode (`verification: sequential`,
+  `verify_sdpa_backend: parity`). Parallel block verification flips bf16
+  near-tie argmax decisions on longer generations; see the runtime probe below
+  and `docs/REFERENCE.md`.
+- Rerun on the current code (`runs/qwen25vl3b_refresh`, same config and seed):
+  token-exact 64/64 again, AL 1.198 (vs 1.220 first run) - see the
+  non-determinism note in the runtime-probe section.
 - The eval is correctness-first: sequential verification makes wall-clock
   comparable to (not faster than) plain target greedy. Speed is a serving-time
   concern and out of scope for v0.1.
@@ -179,6 +185,44 @@ fails loudly ("Resume plan mismatch: checkpoint planned 3 total steps, this
 config computes 5"), and re-running with the matching plan restores model +
 optimizer + scheduler + RNG state so the resumed step is bit-identical (the two
 step-3 rows in `train/train_log.jsonl` are equal).
+
+### Verification modes and a runtime probe (v0.2, Qwen3-VL-8B)
+
+`eval.verification` selects how the target verifies drafted blocks (see
+`docs/REFERENCE.md` for the mechanism):
+
+| mode | token-exact vs target-only greedy | wall / sample | speed vs target-only |
+| --- | --- | --- | --- |
+| `sequential` (default; the gate) | **32/32 prompts** | 5.25 s | 0.84x |
+| `parallel` (one forward per block) | 6/32 | 4.31 s | 1.02x |
+| `strict_parallel`, margin 0.25 | 11/32 (4.6% of rounds re-verified) | 4.71 s | 0.97x |
+| `strict_parallel`, margin 2.0 | 10/32 (45.8% re-verified) | 6.61 s | 0.67x |
+| `strict_parallel`, margin 1e9 (control) | **32/32** | 8.66 s | 0.51x |
+
+Protocol: `runs/qwen3vl8b_dflash`, `ckpt_final.pt`, 32 held-out prompts, greedy,
+bf16, one A6000, `verify_sdpa_backend: parity`; raw numbers in
+`eval/eval_result_*.json`, drift probe in `scripts/diag_verify_drift.py`.
+
+Reading:
+
+- Block-parallel verification is not bitwise-equivalent to step mode in bf16:
+  the same position with identical inputs moves by up to ~0.31 logits (prefill
+  deltas are 0). Accepted tokens carry that drift into the KV cache, so a
+  per-round near-tie guard reduces but cannot eliminate divergence - the
+  control run re-verifies every round and lands exactly on 32/32 with the same
+  AL, which pins the residual divergence on numerics rather than bookkeeping.
+- At the current drafter quality (AL 1.33 on this 512-sample run) there is no
+  wall-clock win: a block verify costs about what the ~1.3 tokens it commits
+  save. Crossover for this harness is around AL ~1.6-1.9, which is what the
+  scaling runs (`scripts/run_scaling_suite.sh`) are testing.
+- `sequential` therefore remains the correctness gate; parallel modes are
+  throughput experiments whose agreement rate is reported per run.
+
+Same-seed reruns: data, regen and the protocol reproduce (`rows_sha256`
+identical, 274/512 regen keeps identical), but bf16 training is not bitwise
+deterministic (step-1 loss and grad norm differ slightly between runs, and AL
+moved 1.220 -> 1.198 on the identical 3B config). Treat sub-2% AL differences
+as run-to-run noise.
 
 Hardware note: all numbers above are from a single 48 GB card. 24 GB cards were
 **not** tested with these defaults; if you are memory-constrained, lower

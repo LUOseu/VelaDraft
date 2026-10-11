@@ -319,12 +319,28 @@ def cmd_eval(args) -> int:
         eval_cfg["checkpoints"] = [item for item in args.checkpoints.split(",") if item]
     if args.parallel_diagnostic is not None:
         eval_cfg["parallel_diagnostic_prompts"] = int(args.parallel_diagnostic)
+    if args.verification is not None:
+        eval_cfg["verification"] = args.verification
+    if args.strict_margin is not None:
+        eval_cfg["strict_parallel_margin"] = float(args.strict_margin)
 
     from .contract import ensure_contract
     from .eval.run import evaluate
 
     contract = ensure_contract(cfg, run_dir)
-    evaluate(cfg, run_dir, contract, num_prompts=eval_cfg.get("num_prompts"), max_new_tokens=eval_cfg.get("max_new_tokens"))
+    result = evaluate(
+        cfg,
+        run_dir,
+        contract,
+        num_prompts=eval_cfg.get("num_prompts"),
+        max_new_tokens=eval_cfg.get("max_new_tokens"),
+        tag=args.tag,
+    )
+    for name, run in result["runs"].items():
+        print(
+            f"{name}: AL={run['mean_al']:.3f} speedup_vs_target_only="
+            f"{run.get('speedup_vs_target_only')} token_exact={result['equivalence_check']['runs'][name]['token_exact']}"
+        )
     return 0
 
 
@@ -380,6 +396,19 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--max-new-tokens", type=int, default=None)
     evaluate.add_argument("--checkpoints", default=None, help="comma-separated checkpoint file names")
     evaluate.add_argument("--parallel-diagnostic", type=int, default=None)
+    evaluate.add_argument(
+        "--verification",
+        default=None,
+        choices=["sequential", "parallel", "strict_parallel"],
+        help="target verification mode: parity sequential (default), raw parallel, or margin-guarded parallel",
+    )
+    evaluate.add_argument(
+        "--strict-margin",
+        type=float,
+        default=None,
+        help="top-1/top-2 logit gap below which strict_parallel re-verifies a round sequentially",
+    )
+    evaluate.add_argument("--tag", default=None, help="write eval_result_<tag>.json instead of overwriting")
     evaluate.set_defaults(func=cmd_eval)
 
     export = sub.add_parser("export", help="write the self-describing portable checkpoint")

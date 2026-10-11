@@ -88,19 +88,40 @@ def test_cmd_eval_passes_run_dir_positionally(monkeypatch, tmp_path):
 
     captured = {}
 
-    def fake_evaluate(cfg, run_dir, contract, num_prompts=None, max_new_tokens=None):
+    def fake_evaluate(cfg, run_dir, contract, num_prompts=None, max_new_tokens=None, tag=None):
         captured["run_dir"] = run_dir
         captured["contract"] = contract
         captured["num_prompts"] = num_prompts
-        return {}
+        captured["verification"] = cfg["eval"]["verification"]
+        captured["strict_margin"] = cfg["eval"]["strict_parallel_margin"]
+        captured["tag"] = tag
+        return {"runs": {}}
 
     monkeypatch.setattr(eval_module, "evaluate", fake_evaluate)
     monkeypatch.setattr(contract_module, "ensure_contract", lambda cfg, run_dir: {"frozen": True})
     (tmp_path / "config.json").write_text("{}", encoding="utf-8")
     parser = build_parser()
-    args = parser.parse_args(["eval", str(tmp_path), "--num-prompts", "4", "--max-new-tokens", "8"])
+    args = parser.parse_args(
+        [
+            "eval",
+            str(tmp_path),
+            "--num-prompts",
+            "4",
+            "--max-new-tokens",
+            "8",
+            "--verification",
+            "strict_parallel",
+            "--strict-margin",
+            "1.5",
+            "--tag",
+            "bench",
+        ]
+    )
     code = cli.cmd_eval(args)
     assert code == 0
     assert captured["run_dir"] == tmp_path.resolve()
     assert captured["contract"] == {"frozen": True}
     assert captured["num_prompts"] == 4
+    assert captured["verification"] == "strict_parallel"
+    assert captured["strict_margin"] == 1.5
+    assert captured["tag"] == "bench"

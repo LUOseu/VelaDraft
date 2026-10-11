@@ -84,13 +84,25 @@ def evaluate(
     contract: dict,
     num_prompts: int | None = None,
     max_new_tokens: int | None = None,
+    tag: str | None = None,
 ) -> dict:
     run_dir = Path(run_dir)
     eval_cfg = cfg.get("eval", {})
     num_prompts = int(num_prompts if num_prompts is not None else eval_cfg.get("num_prompts", 64))
     max_new_tokens = int(max_new_tokens if max_new_tokens is not None else eval_cfg.get("max_new_tokens", 128))
     checkpoint_names = checkpoint_names_from_config(eval_cfg)
-    sequential_verification = bool(eval_cfg.get("sequential_target_verification", True))
+    verification = str(eval_cfg.get("verification") or "").strip().lower()
+    if not verification:
+        verification = "sequential" if bool(eval_cfg.get("sequential_target_verification", True)) else "parallel"
+    if verification not in {"sequential", "parallel", "strict_parallel"}:
+        raise ValueError(
+            "eval.verification must be one of 'sequential', 'parallel' or 'strict_parallel', "
+            f"got {verification!r}"
+        )
+    sequential_verification = verification == "sequential"
+    strict_parallel_margin = (
+        float(eval_cfg.get("strict_parallel_margin", 2.0)) if verification == "strict_parallel" else None
+    )
     verify_backend = str(eval_cfg.get("verify_sdpa_backend", "parity"))
     if verify_backend not in {"parity", "reference"}:
         raise ValueError(f"eval.verify_sdpa_backend must be 'parity' or 'reference', got {verify_backend!r}")
@@ -141,13 +153,17 @@ def evaluate(
             }
         )
 
+    target_only_wall = sum(entry["wall_seconds"] for entry in prompts) / max(1, len(prompts))
     all_results, equivalence_runs, per_sample_rows = {}, {}, []
     for checkpoint_name in checkpoint_names:
         draft, _ = load_checkpoint(run_dir / "train" / checkpoint_name)
         draft.to(device=device, dtype=draft_dtype)
         draft.eval()
         samples, equivalent_flags = [], []
-        log(f"eval: speculative greedy with {checkpoint_name}")
+        strict_rounds = 0.0
+        strict_fallbacks = 0.0
+        strict_min_margin = None
+        log(f"eval: speculative greedy with {checkpoint_name} ({verification})")
         for entry in prompts:
             inputs = entry["inputs"]
             target_kwargs = {
@@ -168,8 +184,16 @@ def evaluate(
                     target_kwargs=target_kwargs,
                     return_stats=True,
                     sequential_target_verification=sequential_verification,
+                    strict_parallel_margin=strict_parallel_margin,
                 )
             wall = time.perf_counter() - started
+            strict_rounds += float(stats.get("strict_parallel_rounds", 0.0) or 0.0)
+            strict_fallbacks += float(stats.get("strict_fallback_rounds", 0.0) or 0.0)
+            round_min_margin = stats.get("strict_min_decision_margin")
+            if round_min_margin is not None:
+                strict_min_margin = (
+                    round_min_margin if strict_min_margin is None else min(strict_min_margin, round_min_margin)
+                )
             prompt_len = entry["prompt_len"]
             spec_tokens = output_ids[0, prompt_len:].tolist()
             equivalent = sequences_equal(spec_tokens, entry["tokens"], stop_ids)
@@ -203,6 +227,16 @@ def evaluate(
         summary["role"] = (
             "acceptance baseline (random-init drafter)" if "init" in checkpoint_name else "trained drafter"
         )
+        sample_wall = summary.get("wall_seconds_per_sample") or 0.0
+        summary["speedup_vs_target_only"] = (target_only_wall / sample_wall) if sample_wall > 0 else None
+        if strict_parallel_margin is not None:
+            summary["strict_parallel"] = {
+                "margin": strict_parallel_margin,
+                "rounds": strict_rounds,
+                "fallbacks": strict_fallbacks,
+                "fallback_rate": (strict_fallbacks / strict_rounds) if strict_rounds else None,
+                "min_decision_margin": strict_min_margin,
+            }
         all_results[checkpoint_name] = summary
         equivalence_runs[checkpoint_name] = {
             "num_prompts": len(equivalent_flags),
@@ -241,7 +275,9 @@ def evaluate(
             "dtype": dtype_name,
             "attn_impl": attn_name,
             "max_new_tokens": max_new_tokens,
+            "verification": verification,
             "sequential_target_verification": sequential_verification,
+            "strict_parallel_margin": strict_parallel_margin,
             "verify_sdpa_backend": verify_backend,
             "note": (
                 "Parity mode (sequential verification + generate()-backend logits) reproduces "
@@ -254,17 +290,30 @@ def evaluate(
         "target_only": {
             "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
             "mean_new_tokens": sum(len(entry["tokens"]) for entry in prompts) / len(prompts),
-            "wall_seconds_per_sample": sum(entry["wall_seconds"] for entry in prompts) / len(prompts),
+            "wall_seconds_per_sample": target_only_wall,
+            "decode_tokens_per_second": (
+                sum(len(entry["tokens"]) for entry in prompts) / sum(entry["wall_seconds"] for entry in prompts)
+                if sum(entry["wall_seconds"] for entry in prompts) > 0
+                else None
+            ),
         },
     }
     eval_dir = ensure_dir(run_dir / "eval")
-    write_json(eval_dir / "eval_result.json", result)
-    write_jsonl(eval_dir / "eval_samples.jsonl", per_sample_rows)
+    suffix = f"_{tag}" if tag else ""
+    write_json(eval_dir / f"eval_result{suffix}.json", result)
+    write_jsonl(eval_dir / f"eval_samples{suffix}.jsonl", per_sample_rows)
     record_stage(
         run_dir,
         "eval",
         {"identity": identity_from_contract(contract), "result": result, "code": "vlm_dflash.eval.run.evaluate"},
     )
+    if strict_parallel_margin is not None and not result["equivalence_check"]["token_exact"]:
+        failed = {name: run["failed_ids"] for name, run in equivalence_runs.items() if not run["token_exact"]}
+        raise RuntimeError(
+            "strict_parallel verification was expected to reproduce target-only greedy exactly, but "
+            f"these prompts diverged: {failed}. Raise eval.strict_parallel_margin (current "
+            f"{strict_parallel_margin}) or inspect eval/eval_result.json (written)."
+        )
     return result
 
 def _run_parallel_diagnostic(

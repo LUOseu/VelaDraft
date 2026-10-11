@@ -73,7 +73,12 @@ train:
     ce_drop: 0.6
     slot0_acc: 0.9
 
+# verification: sequential (generate()-parity, default) | parallel (raw fast
+# path) | strict_parallel (fast path + near-tie guard + parity fallback);
+# eval.strict_parallel_margin is the top-1/top-2 logit gap threshold.
 eval:
+  verification: sequential
+  strict_parallel_margin: 2.0
   num_prompts: 64
   max_new_tokens: 128
   sequential_target_verification: true

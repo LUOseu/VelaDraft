@@ -88,22 +88,51 @@ q/k tensors against the installed transformers implementation.
   text (`0`) rows for the regenerated answer; Qwen2.5-VL uses the same path so
   capture and eval build identical MRoPE positions.
 
-## Token-exact parity mode (important)
+## Verification modes and token-exactness (important)
 
-The reference narrows the SDPA backend during verify forwards
-(`EFFICIENT_ATTENTION+MATH`) to avoid cuDNN plan construction on short dynamic
-shapes. That switch changes bf16 numerics relative to the plain `generate()`
-path used for the target-only baseline, which can flip argmax at near-tie
-logits. Verified on the smoke run (8 prompts, bf16, greedy):
+`eval.verification` selects how the target verifies drafted blocks
+(`spec_generate(..., sequential_target_verification=..., strict_parallel_margin=...)`):
 
-- sequential verify + reference backend narrowing: 8/8 token-exact
-- parallel verify + backend narrowing: 6/8 (two disagreements)
-- disagreement points: target top-2 logit margin 0.0 and 0.125 (bf16 near tie)
+| mode | mechanism | token-exact vs target-only greedy | wall / sample | speed vs target-only |
+| --- | --- | --- | --- | --- |
+| `sequential` (default, the gate) | one target step per draft token, `generate()`-backend numerics | **32/32 prompts** | 5.25 s | 0.84x |
+| `parallel` | one target forward over the whole drafted block | 6/32 | 4.31 s | 1.02x |
+| `strict_parallel`, margin 0.25 | parallel + sequential parity re-verify of rounds whose emitted token had a top-1/top-2 logit gap below the margin | 11/32 (4.6% of rounds re-verified) | 4.71 s | 0.97x |
+| `strict_parallel`, margin 2.0 | as above with an aggressive threshold | 10/32 (45.8% re-verified) | 6.61 s | 0.67x |
+| `strict_parallel`, margin 1e9 (control) | every round re-verified sequentially | **32/32** | 8.66 s | 0.51x |
 
-The token-exact gate therefore runs with `sequential_target_verification: true`
-and `verify_sdpa_backend: parity` (backend switch disabled). The parallel path
-and the reference backend remain available and are reported as diagnostics
-(`parallel_diagnostic`) in `eval_result.json`; they are not used for the gate.
+Measured on the Qwen3-VL-8B 512-sample run (`runs/qwen3vl8b_dflash`,
+`ckpt_final.pt`, 32 held-out prompts, greedy, bf16, one A6000,
+`verify_sdpa_backend: parity`; raw numbers in `eval/eval_result_*.json`).
+
+Why a block-parallel verify cannot be bitwise-exact on this stack: a forward
+over the whole block and a forward over one token evaluate the same function
+with different kernel shapes, so their logits differ by up to ~0.3 at the *same
+position with identical inputs* (`scripts/diag_verify_drift.py`: prefill max
+|delta| = 0, first verify position max |delta| = 0.31, mean 0.07). Those deltas
+flip the target argmax whenever the top-1/top-2 gap is smaller than the
+drift. Accepted draft tokens then enter the target KV cache *as computed by the
+block forward*, so the drift propagates through the cache: a per-round margin
+guard can refuse a round's own near-tie, but cannot repair drift already in the
+cache. The control run (margin 1e9, i.e. no parallel-computed KV ever
+survives) reproduces sequential mode exactly - 32/32 prompts *and* the same AL
+(1.329) - which shows the fallback mechanics are correct and the residual
+divergence is numerics, not bookkeeping.
+
+Consequences:
+
+* `sequential` is the only mode that is bitwise equivalent to
+  `model.generate()` greedy; keep it as the correctness gate (the token-exact
+  results above the table, e.g. 64/64 on the 64-prompt gate, are all
+  `sequential`).
+* `parallel` / `strict_parallel` are throughput experiments. At the current
+  drafter quality (AL ~1.33) they are also *not* faster: one block verify costs
+  about what the ~1.3 tokens it commits save, and every fallback round adds one
+  or more sequential target forwards. Crossover in this harness is around
+  AL ~1.6-1.9.
+* The reference SDPA backend narrowing (`.verify_sdpa_backend: reference`) is a
+  second, smaller near-tie source; `parity` disables it. The numbers above are
+  `parity`.
 
 ## Visual-path checks (our addition)
 
