@@ -329,6 +329,10 @@ def resolve_contract(
             "source": "config override validated against processor; processor defaults recorded",
         },
         "tokens": {**tokens, "source": "tokenizer, cross-checked against target config"},
+        "head": {
+            "tie_word_embeddings": bool(getattr(config, "tie_word_embeddings", True)),
+            "source": "target config.json (tie_word_embeddings; absent = True)",
+        },
     }
     if out_path is not None:
         write_json(out_path, contract)

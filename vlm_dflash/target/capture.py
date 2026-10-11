@@ -66,6 +66,42 @@ def locate_image_span(input_ids: torch.Tensor, image_token_id: int) -> tuple[int
     return start, end, int(matches.numel())
 
 
+def save_target_head(model, features_dir: str | Path, dtype: torch.dtype, contract: dict) -> bool:
+    """Persist the frozen embed/head pair the draft trainer must consume.
+
+    Inference samples draft logits through ``target.lm_head``, so training has to
+    use the same head: tied targets share the embedding matrix, untied targets
+    (e.g. Qwen3-VL-8B) store their own output projection under ``"lm_head"``.
+
+    Returns:
+        True when the target head is untied and its weight was stored.
+    """
+    embedding_weight = model.get_input_embeddings().weight.detach()
+    lm_head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
+    tied = lm_head_weight is not None and lm_head_weight.data_ptr() == embedding_weight.data_ptr()
+    expected_tied = bool(contract.get("head", {}).get("tie_word_embeddings", tied))
+    if tied != expected_tied:
+        raise RuntimeError(
+            "Loaded target head disagrees with the resolved contract: "
+            f"runtime tie_word_embeddings={tied}, contract={expected_tied}."
+        )
+    if not tied and lm_head_weight is None:
+        raise RuntimeError(
+            "The target exposes no lm_head weight; the draft's training head cannot be reconstructed "
+            "and training would silently diverge from the eval path (which samples through target.lm_head)."
+        )
+    head_payload = {
+        "format": "vlm-dflash-target-head-v1",
+        "embed_tokens": embedding_weight.to(dtype).cpu(),
+        "tie_word_embeddings": bool(tied),
+        "model_fingerprint": contract["target"]["model_fingerprint"],
+    }
+    if not tied:
+        head_payload["lm_head"] = lm_head_weight.detach().to(dtype).cpu()
+    torch.save(head_payload, Path(features_dir) / "target_head.pt")
+    return not tied
+
+
 @torch.inference_mode()
 def forward_and_capture(
     model,
@@ -208,18 +244,7 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
     flush_shard()
     write_jsonl(features_dir / "index.jsonl", index_rows)
 
-    embedding_weight = model.get_input_embeddings().weight.detach()
-    lm_head_weight = getattr(model, "lm_head", None)
-    tied = lm_head_weight is not None and lm_head_weight.weight.data_ptr() == embedding_weight.data_ptr()
-    torch.save(
-        {
-            "format": "vlm-dflash-target-head-v1",
-            "embed_tokens": embedding_weight.to(dtype).cpu(),
-            "tie_word_embeddings": bool(tied),
-            "model_fingerprint": contract["target"]["model_fingerprint"],
-        },
-        features_dir / "target_head.pt",
-    )
+    lm_head_saved = save_target_head(model, features_dir, dtype, contract)
 
     manifest = {
         "format": "vlm-dflash-features-v1",
@@ -229,7 +254,8 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
         "num_samples": len(index_rows),
         "num_truncated": truncated,
         "draft_layer_ids": layer_ids,
-        "tie_word_embeddings": bool(tied),
+        "tie_word_embeddings": not lm_head_saved,
+        "lm_head_saved": lm_head_saved,
         "seq_len_stats": {
             "min": min((r["seq_len"] for r in index_rows), default=None),
             "max": max((r["seq_len"] for r in index_rows), default=None),

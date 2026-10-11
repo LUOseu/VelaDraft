@@ -26,6 +26,46 @@ def _stops(model) -> list[int]:
     return list(eos) if isinstance(eos, (list, tuple)) else [int(eos)]
 
 
+def _target_head_is_tied(model) -> bool:
+    """Whether the target's output head is the input embedding matrix."""
+    embeddings = model.get_input_embeddings()
+    weight = getattr(getattr(model, "lm_head", None), "weight", None)
+    return weight is not None and embeddings is not None and weight.data_ptr() == embeddings.weight.data_ptr()
+
+
+def check_checkpoint_head(checkpoint_name: str, meta: dict, target_tied_head: bool) -> None:
+    """Refuse a checkpoint whose training head does not match the target's head.
+
+    A draft trained against the embedding-tied head on an untied target samples
+    its logits through a different projection at eval time, which silently
+    zeroes acceptance instead of reporting an error.
+    """
+    head_mode = meta.get("head", "tied_embedding")
+    if not target_tied_head and head_mode != "target_lm_head":
+        raise RuntimeError(
+            f"{checkpoint_name} was trained against the embedding-tied head (head={head_mode!r}) but this "
+            "target's lm_head is untied: the draft logits would be sampled through a different head than "
+            "training used, so acceptance is meaningless. Re-run capture_features and retrain."
+        )
+
+
+def checkpoint_names_from_config(eval_cfg: dict) -> list[str]:
+    """Checkpoint names to evaluate; an empty list would silently pass the gate."""
+    names = [str(name) for name in eval_cfg.get("checkpoints", ["ckpt_final.pt", "ckpt_init.pt"])]
+    if not names:
+        raise ValueError("eval.checkpoints is empty; nothing would be evaluated.")
+    return names
+
+
+def assert_all_checkpoints_evaluated(equivalence_runs: dict, checkpoint_names: list[str]) -> None:
+    """Refuse to report a token-exact pass for checkpoints that were never run."""
+    if len(equivalence_runs) != len(checkpoint_names):
+        raise RuntimeError(
+            f"evaluated {len(equivalence_runs)} of {len(checkpoint_names)} checkpoints; "
+            "refusing to write a partial eval result."
+        )
+
+
 def evaluate(
     cfg: dict,
     run_dir: str | Path,
@@ -37,7 +77,7 @@ def evaluate(
     eval_cfg = cfg.get("eval", {})
     num_prompts = int(num_prompts if num_prompts is not None else eval_cfg.get("num_prompts", 64))
     max_new_tokens = int(max_new_tokens if max_new_tokens is not None else eval_cfg.get("max_new_tokens", 128))
-    checkpoint_names = list(eval_cfg.get("checkpoints", ["ckpt_final.pt", "ckpt_init.pt"]))
+    checkpoint_names = checkpoint_names_from_config(eval_cfg)
     sequential_verification = bool(eval_cfg.get("sequential_target_verification", True))
     verify_backend = str(eval_cfg.get("verify_sdpa_backend", "parity"))
     if verify_backend not in {"parity", "reference"}:
@@ -52,6 +92,13 @@ def evaluate(
     rows = rows[:num_prompts]
     model, processor = load_target(cfg, contract)
     device = next(model.parameters()).device
+    target_tied_head = _target_head_is_tied(model)
+    contract_tied = contract.get("head", {}).get("tie_word_embeddings")
+    if contract_tied is not None and bool(contract_tied) != target_tied_head:
+        raise RuntimeError(
+            "Loaded target head disagrees with the resolved contract: "
+            f"runtime tie_word_embeddings={target_tied_head}, contract={bool(contract_tied)}."
+        )
     stop_ids = set(_stops(model))
     block_size = int(cfg["drafter"]["block_size"])
     dtype_name = str(cfg.get("target", {}).get("dtype", "bfloat16"))
@@ -89,6 +136,7 @@ def evaluate(
         draft, meta = load_checkpoint(checkpoint_path)
         if meta.get("identity") is not None:
             assert_identity(identity_from_contract(contract), meta["identity"], f"eval vs {checkpoint_name}")
+        check_checkpoint_head(checkpoint_name, meta, target_tied_head)
         draft.to(device=device, dtype=draft_dtype)
         draft.eval()
         samples, equivalent_flags = [], []
@@ -164,6 +212,8 @@ def evaluate(
             max_new_tokens, block_size, parallel_diagnostic_prompts,
         )
 
+    assert_all_checkpoints_evaluated(equivalence_runs, checkpoint_names)
+
     result = {
         "format": "vlm-dflash-eval-v1",
         "identity": identity_from_contract(contract),
@@ -175,10 +225,11 @@ def evaluate(
             "dtype": dtype_name,
             "attn_impl": attn_name,
             "block_size": block_size,
+            "target_tie_word_embeddings": target_tied_head,
         },
         "equivalence_check": {
             "num_prompts": len(rows),
-            "token_exact": all(run["token_exact"] for run in equivalence_runs.values()),
+            "token_exact": bool(equivalence_runs) and all(run["token_exact"] for run in equivalence_runs.values()),
             "runs": equivalence_runs,
             "dtype": dtype_name,
             "attn_impl": attn_name,

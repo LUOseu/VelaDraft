@@ -138,6 +138,35 @@ stages end to end in ~3.5 min on the same card and finishes with
 
 ## Measured v0.2 run (Qwen3-VL-8B, same card)
 
+Full pipeline with `configs/qwen3_vl_8b.yaml` (Qwen3-VL-8B-Instruct target,
+bf16, 512 long-answer LLaVA-Instruct samples, seq 2048, 6 epochs, block 8,
+3 draft layers, interleaved MRoPE), measured end to end on one A6000 48GB:
+
+| stage | wall | outcome |
+| --- | --- | --- |
+| prepare (512 train + 64 val) | < 1 min | `rows_sha256` recorded |
+| target-native regen (max 160 new tokens) | ~4 min | 512/512 kept (>= 128 tokens) |
+| feature capture (512 samples, seq 2048) | ~2.5 min | visual-path check passed |
+| drafter training (384 steps) | 13.7 min | block CE 10.29 (first 10%) -> 4.78 (last 10%); no NaN/Inf; overfit sanity passed; peak GPU memory 42.9 GB |
+| acceptance eval (64 held-out prompts, <= 128 new tokens) | ~19 min | token-exact gate: 64/64 (trained and random-init) |
+
+Results (numbers only, no thresholding):
+
+- AL (speculation): trained drafter **1.322** vs random-init drafter **1.000**.
+- Per-slot acceptance (trained): `[0.244, 0.058, 0.018, 0.005, 0, 0, 0]`;
+  draft acceptance rate 4.8%.
+
+**Untied target heads.** Qwen3-VL-8B does not tie `lm_head` to the input
+embeddings (`tie_word_embeddings: false`). The pipeline handles both layouts:
+`capture_features` stores the target's own output projection in
+`features/target_head.pt`, `contract.json` records `head.tie_word_embeddings`,
+every checkpoint records the head it was trained against, and `train`/`eval`
+hard-fail on any disagreement. This matters because training against the
+embedding-tied head while `spec_generate` samples through the real `lm_head` is
+*silent*: training-side acceptance looks normal and end-to-end AL collapses to
+exactly 1.000. The numbers above are a head-consistent retrain; see
+`docs/REFERENCE.md` (Training semantics).
+
 CLI smoke (`vlm-dflash train --preset smoke --target .../Qwen3-VL-8B-Instruct
 --limit 8 --steps 4`, COCO captions) proves the family adapter path end to end:
 capture visual-path check passed, drafter logits move when the image is swapped

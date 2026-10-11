@@ -43,6 +43,16 @@ block size 8, 256 anchors, loss gamma 7, lr 6e-4, warmup 0.04).
   output budget are excluded from denominators they never had).
 - Stopping: sequences are cut at the first stop token (EOS/EOT), both in the
   speculative loop and before any equivalence comparison.
+- Output head: the draft logits always go through the **target's own output
+  projection** - the tied embedding matrix when `tie_word_embeddings=true`
+  (Qwen2.5-VL-3B), the separate `lm_head` when false (Qwen3-VL-8B). The trainer
+  therefore consumes the head captured in `features/target_head.pt` (untied
+  targets store their own weight), `contract.json` records
+  `head.tie_word_embeddings`, every checkpoint stores the `head` tag it was
+  trained with, and `train`/`eval` hard-fail when the two disagree. Tying an
+  untied target's head to the embeddings trains a projection that inference
+  never samples through: training-side acceptance looks healthy while
+  end-to-end acceptance collapses to zero.
 
 ## MRoPE (Qwen2.5-VL)
 

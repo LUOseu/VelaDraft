@@ -167,6 +167,7 @@ def collect_doctor_report(target: str | None, mask_token_id: int | None, samples
                 "image_pixels": [contract["image"]["min_pixels"], contract["image"]["max_pixels"]],
                 "num_target_layers": contract["text"]["num_target_layers"],
                 "hidden_size": contract["text"]["hidden_size"],
+                "tie_word_embeddings": contract.get("head", {}).get("tie_word_embeddings"),
             }
             hidden = int(contract["text"]["hidden_size"])
             layers = int(contract["layers"]["num_draft_layers"])
@@ -203,7 +204,8 @@ def cmd_doctor(args) -> int:
             contract = report["contract"]
             print(
                 "  contract: mask={mask_token_id} mrope={mrope_sections} layers={draft_layer_ids} "
-                "pixels={image_pixels} depth={num_target_layers} hidden={hidden_size}".format(**contract)
+                "pixels={image_pixels} depth={num_target_layers} hidden={hidden_size} "
+                "tied_head={tie_word_embeddings}".format(**contract)
             )
         if "estimates" in report:
             print(f"  estimates: {report['estimates']}")

@@ -355,7 +355,18 @@ def train_dflash(cfg: dict, run_dir: str | Path, contract: dict, steps: int | No
     target_head = torch.load(features_dir / "target_head.pt", map_location="cpu", weights_only=False)
     if target_head["model_fingerprint"] != contract["target"]["model_fingerprint"]:
         raise RuntimeError("features/target_head.pt was produced from a different target fingerprint.")
-    module = build_trainer_module(draft_config, contract, cfg, target_head["embed_tokens"])
+    tied_head = bool(target_head.get("tie_word_embeddings", True))
+    lm_head_weight = target_head.get("lm_head")
+    if not tied_head and lm_head_weight is None:
+        raise RuntimeError(
+            "features/target_head.pt has no untied lm_head weight (captured before the head fix). "
+            "Re-run capture_features so training uses the same output head as inference."
+        )
+    if tied_head and lm_head_weight is not None:
+        raise RuntimeError("features/target_head.pt records a tied target but also stores a separate lm_head.")
+    module = build_trainer_module(
+        draft_config, contract, cfg, target_head["embed_tokens"], lm_head_weight=lm_head_weight
+    )
     init_state = {key: value.clone() for key, value in module.draft_model.state_dict().items()}
 
     train_dir = ensure_dir(run_dir / "train")
@@ -368,6 +379,9 @@ def train_dflash(cfg: dict, run_dir: str | Path, contract: dict, steps: int | No
         "num_anchors": int(cfg["drafter"].get("num_anchors", 256)),
         "loss_decay_gamma": float(cfg["drafter"].get("loss_decay_gamma", 7.0)),
         "target_layer_ids": [int(x) for x in contract["layers"]["draft_layer_ids"]],
+        # Which frozen output head the draft logits were trained against. Eval
+        # refuses checkpoints whose head does not match the target's tie state.
+        "head": "tied_embedding" if tied_head else "target_lm_head",
         "identity": identity_from_contract(contract),
     }
     torch.save({**checkpoint_common, "step": 0, "model": init_state}, train_dir / "ckpt_init.pt")

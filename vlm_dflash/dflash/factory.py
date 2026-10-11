@@ -47,8 +47,21 @@ def build_draft_config(contract: dict, cfg: dict):
     return config
 
 
-def build_trainer_module(draft_config, contract: dict, cfg: dict, embed_weight: torch.Tensor):
-    """Trainer module with frozen target embed/lm-head (tied if the target ties)."""
+def build_trainer_module(
+    draft_config,
+    contract: dict,
+    cfg: dict,
+    embed_weight: torch.Tensor,
+    lm_head_weight: torch.Tensor | None = None,
+):
+    """Trainer module with the target's frozen embed and output head.
+
+    The output head must be the one inference actually samples through
+    (``target.lm_head`` in ``spec_generate``): tied targets share the embedding
+    matrix, untied targets (e.g. Qwen3-VL-8B) pass their own ``lm_head_weight``
+    captured alongside the features. Passing ``None`` for an untied target would
+    silently train against the embeddings and zero out acceptance at eval.
+    """
     from .draft_model import Qwen3DFlashDraftModel
     from .trainer_core import DFlashTrainerModule
 
@@ -60,7 +73,17 @@ def build_trainer_module(draft_config, contract: dict, cfg: dict, embed_weight: 
         embed.weight.copy_(embed_weight)
     embed.weight.requires_grad_(False)
     lm_head = nn.Linear(hidden_size, vocab_size, bias=False, dtype=embed_weight.dtype)
-    lm_head.weight = embed.weight
+    if lm_head_weight is None:
+        lm_head.weight = embed.weight
+    else:
+        if tuple(lm_head_weight.shape) != (vocab_size, hidden_size):
+            raise ValueError(
+                "lm_head_weight must have shape "
+                f"{(vocab_size, hidden_size)}, got {tuple(lm_head_weight.shape)}."
+            )
+        with torch.no_grad():
+            lm_head.weight.copy_(lm_head_weight)
+        lm_head.weight.requires_grad_(False)
     module = DFlashTrainerModule(
         draft_model=draft,
         target_lm_head=lm_head,

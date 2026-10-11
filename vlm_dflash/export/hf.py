@@ -63,6 +63,13 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
             "processor_fingerprint": contract["target"]["processor_fingerprint"],
             "image_min_pixels": contract["image"]["min_pixels"],
             "image_max_pixels": contract["image"]["max_pixels"],
+            # Which frozen output head the draft logits were trained against: the
+            # embedding matrix (tied) or the target's own lm_head (untied). Serving
+            # must sample through the same head or acceptance collapses.
+            "head": {
+                "trained_with": checkpoint.get("head", "tied_embedding"),
+                "tie_word_embeddings": contract.get("head", {}).get("tie_word_embeddings"),
+            },
             "special_tokens": contract["tokens"],
         },
         "drafter": {
