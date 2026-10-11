@@ -125,12 +125,12 @@ Consequences:
   `model.generate()` greedy; keep it as the correctness gate (the token-exact
   results above the table, e.g. 64/64 on the 64-prompt gate, are all
   `sequential`).
-* `parallel` / `strict_parallel` are throughput experiments. At the current
-  drafter quality (AL ~1.33) they are also *not* faster: one block verify costs
-  about what the ~1.3 tokens it commits save, and every fallback round adds one
-  or more sequential target forwards. In this harness the parallel path breaks
-  even at AL ~1.3 and reaches ~1.5x around AL ~2.0; the sequential gate needs
-  AL ~1.6 to break even.
+* `parallel` / `strict_parallel` are throughput experiments. Their speed scales
+  with drafter quality: 1.02x at AL 1.33 (512-sample 8B drafter) and 1.25x at
+  AL 1.68 (2K-scale 3B drafter), while the sequential gate stays below 1x
+  (0.84x / 0.86x) because it re-runs the target once per drafted token. Every
+  fallback round of `strict_parallel` adds one or more sequential target
+  forwards on top.
 * The reference SDPA backend narrowing (`.verify_sdpa_backend: reference`) is a
   second, smaller near-tie source; `parity` disables it. The numbers above are
   `parity`.

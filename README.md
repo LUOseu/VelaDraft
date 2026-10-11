@@ -201,9 +201,18 @@ step-3 rows in `train/train_log.jsonl` are equal).
 | `strict_parallel`, margin 2.0 | 10/32 (45.8% re-verified) | 6.61 s | 0.67x |
 | `strict_parallel`, margin 1e9 (control) | **32/32** | 8.66 s | 0.51x |
 
-Protocol: `runs/qwen3vl8b_dflash`, `ckpt_final.pt`, 32 held-out prompts, greedy,
-bf16, one A6000, `verify_sdpa_backend: parity`; raw numbers in
-`eval/eval_result_*.json`, drift probe in `scripts/diag_verify_drift.py`.
+Protocol: `ckpt_final.pt`, 32 held-out prompts, greedy, bf16, one A6000,
+`verify_sdpa_backend: parity`; raw numbers in `eval/eval_result_*.json`, drift
+probe in `scripts/diag_verify_drift.py`. The 8B rows above are the
+512-sample drafter (`runs/qwen3vl8b_dflash`, AL ~1.33). The same probe on the
+2K-scale 3B drafter (`runs/qwen25vl3b_2k`, AL ~1.68) shows the speed crossing
+over while exactness does not:
+
+| mode | token-exact | AL | wall / sample | speed vs target-only |
+| --- | --- | --- | --- | --- |
+| `sequential` (gate) | **32/32** | 1.692 | 4.35 s | 0.86x |
+| `parallel` | 8/32 | 1.677 | 2.97 s | **1.25x** |
+| `strict_parallel`, margin 0.25 | 7/32 (14.0% re-verified) | 1.690 | 3.66 s | 1.03x |
 
 Reading:
 
@@ -213,14 +222,32 @@ Reading:
   per-round near-tie guard reduces but cannot eliminate divergence - the
   control run re-verifies every round and lands exactly on 32/32 with the same
   AL, which pins the residual divergence on numerics rather than bookkeeping.
-- At the current drafter quality (AL 1.33 on this 512-sample run) there is no
-  wall-clock win: one block verify costs about what the ~1.3 tokens it commits
-  save. In this harness the parallel path breaks even at AL ~1.3 and reaches
-  ~1.5x only around AL ~2.0, while the sequential gate needs AL ~1.6 just to
-  break even - which is what the scaling runs
-  (`scripts/run_scaling_suite.sh`) are testing.
+- Speed scales with drafter quality, exactness does not follow: the parallel
+  path measured 1.02x at AL 1.33 (512-sample 8B drafter) and 1.25x at AL 1.68
+  (2K-scale 3B drafter), while the sequential gate - the only bitwise-exact
+  mode - was 0.84x and 0.86x on the same settings.
 - `sequential` therefore remains the correctness gate; parallel modes are
   throughput experiments whose agreement rate is reported per run.
+
+### Scaling (Phase 2, in progress)
+
+Same recipe, larger LLaVA-Instruct slices, Qwen2.5-VL-3B target,
+`verification: sequential` (128 val prompts; the 512 point keeps the original
+64-prompt val set for comparison with v0.1):
+
+| slice | kept | train steps | AL (trained) | AL (random-init) | per-slot (trained) | token-exact |
+| --- | --- | --- | --- | --- | --- | --- |
+| 512 | 274 | 210 | 1.198 | 1.003 | [0.184, 0.011, 0, 0, 0, 0, 0] | 64/64 |
+| 2000 | 1050 | 792 | **1.630** | 1.003 | [0.413, 0.149, 0.048, 0.015, 0.004, 0.001, 0] | 128/128 |
+| 5000 | running | | | | | |
+
+(512 row is the post-v0.2 rerun; the original v0.1 run measured 1.220 - see the
+non-determinism note below. 2000-slice training: block CE 7.50 -> 3.79
+first/last-10% means, overfit sanity passed, peak 29.5 GB, ~10 min on one
+A6000.) Slots 2-5 become non-zero between the 512 and 2K points, and the
+runtime probe above shows the parallel verification path crossing 1x on the
+same checkpoint; the 5K and 8B-2K points are produced by
+`scripts/run_scaling_suite.sh`.
 
 Same-seed reruns: data, regen and the protocol reproduce (`rows_sha256`
 identical, 274/512 regen keeps identical), but the bf16 capture and training
