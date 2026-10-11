@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vlm-dflash"
+version = "0.1.0"
+description = "Minimal reproducible path to train a multimodal DFlash drafter for Qwen-VL"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.6",
+    "transformers>=4.53",
+    "datasets>=3.0",
+    "pillow",
+    "pyyaml",
+    "numpy",
+    "safetensors",
+    "accelerate",
+]
+
+[tool.setuptools.packages.find]
+include = ["vlm_dflash*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires the real target model (set VLM_DFLASH_TEST_MODEL to a local dir)",
+]
+addopts = "-q"
+
+# Tested version combination (cluster, 2026-10):
+#   torch==2.10.0 (cu128), transformers==5.12.1, datasets==4.2.0

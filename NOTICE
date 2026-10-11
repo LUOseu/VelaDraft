@@ -1,0 +1,16 @@
+vlm-dflash
+Copyright 2026 vlm-dflash contributors
+
+This product includes software developed as part of the NVIDIA NeMo
+Automodel project and SpecForge, obtained via the reference implementation
+https://github.com/jacky566/Automodel_lao (commit d21fb5aa, Apache-2.0):
+
+  * vlm_dflash/dflash/draft_model.py  (adapted from draft_qwen3.py)
+  * vlm_dflash/dflash/trainer_core.py (adapted from speculative/dflash/core.py)
+  * vlm_dflash/dflash/mask.py         (adapted from attention/dflash_mask.py)
+  * vlm_dflash/dflash/decay_loss.py   (adapted from loss/dllm_loss.py)
+
+Local modifications are limited to import paths and additive per-position
+metrics; see docs/REFERENCE.md for the port notes.
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
