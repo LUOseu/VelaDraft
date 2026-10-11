@@ -66,6 +66,18 @@ def assert_all_checkpoints_evaluated(equivalence_runs: dict, checkpoint_names: l
         )
 
 
+def preflight_checkpoints(run_dir: Path, checkpoint_names: list[str], contract: dict, target_tied_head: bool) -> None:
+    """Validate every checkpoint's provenance before the expensive generation pass."""
+    for checkpoint_name in checkpoint_names:
+        checkpoint_path = run_dir / "train" / checkpoint_name
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f"Missing draft checkpoint {checkpoint_path}.")
+        meta = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        if meta.get("identity") is not None:
+            assert_identity(identity_from_contract(contract), meta["identity"], f"eval vs {checkpoint_name}")
+        check_checkpoint_head(checkpoint_name, meta, target_tied_head)
+
+
 def evaluate(
     cfg: dict,
     run_dir: str | Path,
@@ -104,6 +116,7 @@ def evaluate(
     dtype_name = str(cfg.get("target", {}).get("dtype", "bfloat16"))
     attn_name = str(cfg.get("target", {}).get("attn_implementation", "sdpa"))
     draft_dtype = getattr(torch, dtype_name, torch.bfloat16)
+    preflight_checkpoints(run_dir, checkpoint_names, contract, target_tied_head)
 
     log(f"eval: target-only greedy on {len(rows)} prompts")
     prompts = []
@@ -130,13 +143,7 @@ def evaluate(
 
     all_results, equivalence_runs, per_sample_rows = {}, {}, []
     for checkpoint_name in checkpoint_names:
-        checkpoint_path = run_dir / "train" / checkpoint_name
-        if not checkpoint_path.exists():
-            raise FileNotFoundError(f"Missing draft checkpoint {checkpoint_path}.")
-        draft, meta = load_checkpoint(checkpoint_path)
-        if meta.get("identity") is not None:
-            assert_identity(identity_from_contract(contract), meta["identity"], f"eval vs {checkpoint_name}")
-        check_checkpoint_head(checkpoint_name, meta, target_tied_head)
+        draft, _ = load_checkpoint(run_dir / "train" / checkpoint_name)
         draft.to(device=device, dtype=draft_dtype)
         draft.eval()
         samples, equivalent_flags = [], []
