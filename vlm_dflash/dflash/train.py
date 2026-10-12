@@ -168,6 +168,11 @@ def run_training_loop(
         )
     stall_epochs = 0
     gradient_coverage: dict | None = None
+    # Algorithms with a curriculum (Domino) can declare that their heads only
+    # receive gradients after a warm-up; audit at that fraction of the run so
+    # "head created but never updated" stays detectable.
+    audit_fraction = float(getattr(module, "coverage_audit_fraction", 0.0) or 0.0)
+    coverage_audit_step = max(0, min(total_steps - 1, int(total_steps * audit_fraction)))
     started = time.time()
     from .trainer_core import NoValidAnchorsError
 
@@ -189,6 +194,12 @@ def run_training_loop(
         for batch in iterator:
             batch = {key: value for key, value in batch.items() if key != "lengths"}
             batch = {key: value.to(device) if torch.is_tensor(value) else value for key, value in batch.items()}
+            # Algorithm progress hook: curricula (e.g. Domino's lambda_base)
+            # need the optimizer-step counter before the forward runs. Modules
+            # that do not define it (DFlash, DSpark) are unaffected.
+            progress_hook = getattr(module, "set_training_progress", None)
+            if progress_hook is not None:
+                progress_hook(step, total_steps)
             try:
                 metrics = module(
                     input_ids=batch["input_ids"],
@@ -207,16 +218,18 @@ def run_training_loop(
             (loss / accumulation).backward()
             micro_step += 1
             if micro_step % accumulation == 0:
-                if step == 0:
+                if step == coverage_audit_step:
                     # Gradient coverage audit (GOAL §13): a new head that never
                     # receives a gradient still trains the rest of the model and
-                    # looks plausible, so audit the first optimizer step. This has
-                    # to happen here — the fp32 master sync below clears every
-                    # .grad, and auditing after it reports a misleading 0/N.
+                    # looks plausible, so audit while the current backward's .grad
+                    # is still present — the fp32 master sync below clears it, and
+                    # auditing after that reports a misleading 0/N.
                     from ..utils import gradient_coverage_report
 
                     coverage = gradient_coverage_report(module)
-                    coverage["source"] = "step1_micro_batch"
+                    coverage["source"] = "optimizer_step_micro_batch"
+                    coverage["audit_step"] = step
+                    coverage["audit_fraction"] = audit_fraction
                     gradient_coverage = coverage
                     log(
                         "gradient coverage: "

@@ -678,6 +678,46 @@ class DFlashTrainerModule(nn.Module):
         if self.loss_type == "variable_prefix":
             return self._variable_prefix_loss(logits.view(bsz, n, bs, -1), target_ids, block_mask, prefix_lengths)
 
+        return self._block_loss_step(
+            logits=logits,
+            target_ids=target_ids,
+            block_mask=block_mask,
+            aux_loss=aux_loss,
+            aux_metrics=aux_metrics,
+            bsz=bsz,
+            n=n,
+            bs=bs,
+        )
+
+    @staticmethod
+    def _public_extra_metrics(aux_metrics: dict | None) -> dict | None:
+        """Drop algorithm-internal (underscore-prefixed) entries from a metrics dict."""
+        if not aux_metrics:
+            return None
+        public = {key: value for key, value in aux_metrics.items() if not str(key).startswith("_")}
+        return public or None
+
+    def _block_loss_step(
+        self,
+        *,
+        logits: torch.Tensor,
+        target_ids: torch.Tensor,
+        block_mask: torch.Tensor,
+        aux_loss: torch.Tensor | None,
+        aux_metrics: dict | None,
+        bsz: int,
+        n: int,
+        bs: int,
+    ) -> DFlashStepMetrics:
+        """Decay-weighted block CE and standard metrics on (possibly corrected) logits.
+
+        The scoring half of the training forward, factored out so that
+        causal-correction algorithms (Domino) can score *two* logit tensors with
+        the same mask and decay conventions and mix them (see
+        ``domino/trainer.py``). ``aux_metrics`` entries whose key starts with
+        ``_`` are algorithm-internal state (often non-scalar tensors passed from
+        ``_apply_algorithm_terms``) and are never logged.
+        """
         # For DFlash, drop block position 0 (the clean anchor token, never a
         # target); DSpark with sample_from_anchor=True supervises every slot.
         first = self.first_supervised_slot
@@ -720,7 +760,7 @@ class DFlashTrainerModule(nn.Module):
             valid_blocks=valid_blocks.detach(),
             pos_correct=loss_out.draft_correct_per_pos,
             pos_count=loss_out.draft_count_per_pos,
-            extra_metrics=aux_metrics,
+            extra_metrics=self._public_extra_metrics(aux_metrics),
         )
 
     def _variable_prefix_loss(
