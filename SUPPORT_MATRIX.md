@@ -13,6 +13,7 @@ truthful, it is the contract for what the repo actually supports.
 | dspark | validated | experimental | validated | unsupported | unsupported | validated | validated | validated (loader dispatch) |
 | domino | validated | experimental | validated | unsupported | unsupported | validated | validated | validated (loader dispatch) |
 | jetspec | validated | untested | validated | unsupported | unsupported | validated | validated (causal-mask serving; tree runtime not ported) | validated (loader dispatch) |
+| dflash2 | experimental | untested | validated | unsupported | unsupported | experimental (upstream objective undisclosed; experimental split objective) | validated | validated (loader dispatch) |
 
 Algorithm metadata is machine-readable in
 `vlm_dflash/algorithms/<name>.py::<Algorithm>.metadata` and surfaced by

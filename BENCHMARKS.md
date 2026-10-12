@@ -15,6 +15,7 @@ reference. Do not mix experimental parallel-runtime numbers into these tables.
 | Qwen3-VL-8B | 512 | 274 kept | 32 | 1.322 | 1.003 | 32/32 | see eval_result.json |
 | Qwen3-VL-8B | 2K | 1996 kept | 32 | 1.665 | 1.000 | 32/32 | .413, .160, .063, .027, .010, .002, .0004 |
 | Qwen2.5-VL-3B | 5K | 2629 kept | 128 | 1.817 | 1.003 | 128/128 | .482, .210, .080, .030, .011, .005, .001 |
+| Qwen2.5-VL-3B (dflash2, experimental) | 2K | 1050 kept | 128 | 1.954 | 1.003 | 128/128 | .495, .243, .118, .060, .027, .013, .006 |
 
 Notes
 - The 512-corpus 3B row is the 2026-10-11 rerun (original v0.1: AL 1.220);
@@ -61,6 +62,7 @@ are the same run recipe with one algorithm knob flipped.
 | Domino `enable_correction_head: false` (ablation) | 1.662 | .457 | .148 | .042 | .013 | .002 | .001 | 0 | 128/128 |
 | JetSpec (causal-mask serving, faithful) | 1.599 | .408 | .137 | .040 | .011 | .003 | .001 | 0 | 128/128 |
 | JetSpec (shared runtime, no in-block mask) | 1.338 | .242 | .069 | .020 | .005 | .001 | .0004 | .0002 | 128/128 |
+| DFlash2 (conv + selector, experimental objective) | 1.954 | .495 | .243 | .118 | .060 | .027 | .013 | .006 | 128/128 |
 
 - DSpark decomposition: at the frozen DFlash round width the Markov head alone
   lifts AL 1.630 -> 1.719 (+0.089, deep slots roughly doubled); drafting the
@@ -83,6 +85,33 @@ are the same run recipe with one algorithm knob flipped.
   window; the disabled run reproduces roughly the DFlash objective on the
   shifted window (its 1.662 vs 1.630 difference reflects the shifted-label
   supervision and ~2% protocol noise, not the head).
+- DFlash2 / 2K (**experimental objective**): same corpus, features, block
+  size, seed protocol and eval prompts as the rows above. AL 1.954,
+  token-exact 128/128; per-slot `[.495, .243, .118, .060, .027, .013, .006]`
+  — every slot ahead of DFlash (its frozen baseline) and of DSpark/Domino at
+  this scale. 792 steps, unary KL 3.41 -> 1.20 and selector CE 2.20 -> 0.28
+  (first/last-10 means), train candidate recall@16 0.78, overfit sanity
+  0.995/1.0, gradient coverage 51/51 (conv + selector tensors included),
+  drafter visual check logits_diff 7.92; peak 31.1 GB, 22.6 min. Speedup vs
+  target-only 0.82x (sequential parity path).
+- DFlash2 selector contribution (serving-time decomposition, 16 prompts, same
+  checkpoint, `scripts/diag_dflash2_selector.py` ->
+  `eval/selector_ablation.json`): reranking the unary top-16 with the trained
+  transition scores gives AL 2.060 vs **1.965** when the *same* candidate set is
+  ranked by unary logits alone. The selector changes the pick at ~60% of
+  proposal positions, and its gain is concentrated in the deep slots
+  (slot 3 .046 -> .083, slot 4 .025 -> .039, slot 6 .005 -> .011), while
+  unary-only ranking keeps more of slot 1 (.548 vs .511).
+- DFlash2 caveat (read before quoting +0.32): the objective is **not
+  published**; the number above is the maintainer implementation's
+  experimental split objective, so it must not be cited as "DFlash2's training
+  method" (see `docs/upstream/dflash2.md`). It also differs from the frozen
+  DFlash baseline on two axes at once — forward-KL unary instead of decayed
+  hard-label CE, plus conv + selector — so the scoreboard delta cannot be
+  attributed to a single module. The local-mixing ablation
+  (`algorithm.dflash2.conv_kernel_size: 1`, `selector_loss_alpha: 0.0`, same
+  recipe/features/seed) is the decomposition control for the convolution
+  (`qwen25vl3b_dflash2_2k_ablate_nomix`).
 - `AL = new_tokens / target_verification_steps` (bonus-token-inclusive);
   random-init drafter AL ~1.003 means proposals are almost never accepted.
 

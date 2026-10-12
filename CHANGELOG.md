@@ -2,8 +2,36 @@
 
 ## v0.3.0 (in development)
 
-Three algorithm-zoo stages land in this release: DSpark (stage 2), Domino
-(stage 3) and JetSpec (stage 4).
+Four algorithm-zoo stages land in this release: DSpark (stage 2), Domino
+(stage 3), JetSpec (stage 4) and DFlash2 (stage 5).
+
+### Stage 5: DFlash2 (local convolutions + candidate selector, Experimental)
+
+- Upstream audit (`docs/upstream/dflash2.md`): architecture pinned to
+  z-lab/dflash `dflash/model.py` @ 07ebd93d via speculators @ 55ebbd5b; the
+  training objective is **not published upstream**, so the port implements the
+  maintainer implementation's experimental split objective and ships as
+  Experimental. (Also corrects the old NeMo pin: `NVIDIA-NeMo/Automodel @
+  bb5b34ce` has no dflash2.)
+- Added `vlm_dflash/dflash2/`: `GroupedDynamicCausalConv` (grouped,
+  token-conditioned, block-causal local convolution with identity init),
+  `CandidateSelector`, conv-wrapped decoder layer, `Qwen3DFlash2DraftModel`
+  (serving = one parallel draft forward + a sequential top-K candidate walk),
+  `DFlash2TrainerModule` (unary forward KL with the exact staged teacher +
+  K-way selector CE with rank-K target injection, fixed-exp decay, masked-count
+  denominator; serving metrics gated on the un-injected candidate set), factory
+  and plugin. NOTICE records the MIT attribution for the ported modules.
+- `_make_decoder_layer` hook added to the DFlash draft model (default
+  unchanged); `doctor --algorithm dflash2` reports the full-vocab requirement;
+  eval summaries record `draft_candidate_selector`; export records
+  `method_details` + a runtime note.
+- 24 new tests (scalar-loop references for conv/selector math, identity-init
+  equivalence with DFlash, serving walk + selector-override checks, objective
+  plumbing, fail-loud gates, draft-config round trip).
+- COCO smoke: full chain (prepare -> regen -> capture with visual check ->
+  train -> eval), token-exact 8/8, AL 1.362 vs init 1.000. 2K canonical:
+  AL 1.954 token-exact 128/128, slots `[.495,.243,.118,.060,.027,.013,.006]`;
+  selector serving-ablation 2.060 vs 1.965 (unary-only ranking).
 
 ### Stage 4: JetSpec (causal block-parallel drafting + forward-KL distillation)
 

@@ -7,19 +7,19 @@ row up to `Documentation` is `DONE` (GOAL §30); otherwise it stays
 
 | Stage | dflash | dspark | domino | jetspec | dflash2 |
 | --- | --- | --- | --- | --- | --- |
-| Upstream audit doc | DONE | DONE | DONE | DONE | PLANNED (sources pinned) |
-| Architecture implemented | DONE | DONE | DONE | DONE (unmodified DFlash backbone) | PLANNED |
-| Loss implemented | DONE | DONE | DONE (dual-logit + curriculum) | DONE (forward KL + causal mask) | PLANNED |
-| Unit tests | DONE | DONE | DONE (11 tests) | DONE (19 tests) | PLANNED |
-| Synthetic overfit (CPU) | DONE | DONE | DONE (overfit test) | DONE (overfit test) | PLANNED |
-| Gradient coverage audit | DONE | DONE | DONE (10% audit point) | DONE (36/36) | PLANNED |
-| Real VLM smoke (Qwen2.5-VL-3B) | DONE | DONE (8/8 exact) | DONE (8/8 exact) | DONE (8/8 exact) | PLANNED |
-| Visual-path check | DONE | DONE | DONE | DONE | PLANNED |
-| Checkpoint save/load | DONE | DONE (roundtrip test) | DONE (eval loads ckpts) | DONE (eval loads ckpts) | PLANNED |
-| Eval (canonical metrics) | DONE | DONE (AL 1.735) | DONE (AL 1.764) | DONE (AL 1.599, causal-mask serving) | PLANNED |
-| Export | DONE | DONE (verified) | DONE (verified) | DONE (verified, serving flag recorded) | PLANNED |
-| Documentation | DONE | DONE | DONE | DONE | PLANNED |
-| 2K apples-to-apples benchmark | DONE (baseline) | DONE (+ ablation) | DONE (+ ablation) | DONE (runtime-mask decomposition) | PLANNED |
+| Upstream audit doc | DONE | DONE | DONE | DONE | DONE (objective undisclosed upstream) |
+| Architecture implemented | DONE | DONE | DONE | DONE (unmodified DFlash backbone) | DONE (conv + selector) |
+| Loss implemented | DONE | DONE | DONE (dual-logit + curriculum) | DONE (forward KL + causal mask) | DONE (experimental split: unary KL + selector CE) |
+| Unit tests | DONE | DONE | DONE (11 tests) | DONE (19 tests) | DONE (24 tests) |
+| Synthetic overfit (CPU) | DONE | DONE | DONE (overfit test) | DONE (overfit test) | DONE (overfit test) |
+| Gradient coverage audit | DONE | DONE | DONE (10% audit point) | DONE (36/36) | DONE (51/51 incl. conv + selector) |
+| Real VLM smoke (Qwen2.5-VL-3B) | DONE | DONE (8/8 exact) | DONE (8/8 exact) | DONE (8/8 exact) | DONE (8/8 exact) |
+| Visual-path check | DONE | DONE | DONE | DONE | DONE (2K logits_diff 7.92) |
+| Checkpoint save/load | DONE | DONE (roundtrip test) | DONE (eval loads ckpts) | DONE (eval loads ckpts) | DONE (eval + export round trip) |
+| Eval (canonical metrics) | DONE | DONE (AL 1.735) | DONE (AL 1.764) | DONE (AL 1.599, causal-mask serving) | DONE (AL 1.954, 128/128 exact) |
+| Export | DONE | DONE (verified) | DONE (verified) | DONE (verified, serving flag recorded) | DONE (verified + reload) |
+| Documentation | DONE | DONE | DONE | DONE | DONE (marked Experimental) |
+| 2K apples-to-apples benchmark | DONE (baseline) | DONE (+ ablation) | DONE (+ ablation) | DONE (runtime-mask decomposition) | DONE (AL 1.954 + conv/selector decomposition) |
 | Runtime integration | N/A (future) | N/A | N/A | N/A | N/A |
 
 Notes
@@ -35,5 +35,10 @@ Notes
   trained with (`inference_in_block_causal`); serving the default unmasked
   block forward costs 0.26 AL (7.6% greedy-argmax flips). The parallel-tree
   runtime is not ported; eval results state that.
-- DFlash2 sources are pinned in `docs/upstream/dflash2.md`; its audit completes
-  before implementation starts (GOAL §2).
+- DFlash2 (stage 5, the last zoo stage) is **Experimental** by contract:
+  upstream publishes the inference architecture but no training objective, so
+  the port implements speculators' experimental split objective. Records: the
+  conv + selector architecture with canonical checkpoint key names, the
+  serving-time selector walk, a 2K canonical run (AL 1.954 token-exact) and a
+  conv/selector decomposition. Audit + `what is official / inferred /
+  experimental` split: `docs/upstream/dflash2.md`.

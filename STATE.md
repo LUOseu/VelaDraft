@@ -103,6 +103,45 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
   is not testable at 2K. Exports verified (`/tmp/export_jetspec_2k`,
   `/tmp/export_jetspec_smoke`).
 
+## DFlash2 stage (2026-10-12, stage 5 - zoo complete, Experimental)
+
+- Upstream audit completed (`docs/upstream/dflash2.md`): sources pinned
+  (z-lab/dflash `dflash/model.py` @ 07ebd93d, MIT; speculators @ 55ebbd5b,
+  Apache-2.0; blog https://inco.ai/blog/dflash2/). The old NeMo pin was wrong -
+  `NVIDIA-NeMo/Automodel @ bb5b34ce` contains no dflash2 (re-checked). Honest
+  split recorded: architecture official, serving walk inferred, **training
+  objective undisclosed upstream** (we implement speculators' experimental
+  split objective) -> the algorithm ships as Experimental.
+- Port (`vlm_dflash/dflash2/`): GroupedDynamicCausalConv (block-causal grouped
+  taps, identity init) + CandidateSelector (predecessor/successor codebooks +
+  hidden projection) + conv-wrapped decoder layer + `Qwen3DFlash2DraftModel`
+  with the documented serving walk (one parallel draft forward, then a
+  sequential top-K candidate walk chained on the selected predecessor);
+  trainer = unary forward KL (chunked, exact staged teacher) + K-way selector
+  CE with rank-K target injection, fixed-exp decay (gamma 4.0), masked-count
+  denominator; serving metrics gated on the un-injected candidate set.
+  24 new tests (140 total green).
+- COCO smoke (64 rows): prepare/regen/capture (visual check passed) ->
+  overfit sanity drop 0.998 / slot0 1.0 -> 48-step train (visual check
+  logits_diff 0.31 passed) -> eval token-exact 8/8, AL 1.362 vs init 1.000.
+- 2K canonical (`runs/qwen25vl3b_dflash2_2k`, shared corpus/features/protocol):
+  792 steps, unary KL 3.41 -> 1.20, selector CE 2.20 -> 0.28, candidate recall
+  0.78, overfit 0.995/1.0, coverage 51/51, visual check 7.92; peak 31.1 GB,
+  22.6 min. Eval AL **1.954** token-exact 128/128, slots
+  `[.495,.243,.118,.060,.027,.013,.006]` - best at this scale (DFlash 1.630,
+  DSpark 1.735, Domino 1.764, JetSpec 1.599).
+- Decomposition so far: serving-time selector ablation (16 prompts, same
+  checkpoint) AL 2.060 (selector) vs 1.965 (unary-only ranking of the same
+  candidates); ~60% of proposal positions are re-picked, gains concentrated in
+  deep slots. Local-mixing ablation training (`conv_kernel_size: 1`,
+  `selector_loss_alpha: 0.0`, run `qwen25vl3b_dflash2_2k_ablate_nomix`) is the
+  control for the convolution; eval pending.
+- Export verified (`/tmp/export_dflash2_2k`): `method: dflash2`,
+  `method_details` (conv/selector + experimental-objective tag), runtime note;
+  `load_export` rebuilds the selector model and forwards (328.5M params).
+- Doctor reports the full-vocab requirement for DFlash2; eval summaries record
+  `draft_candidate_selector`.
+
 ## Registry refactor verification (2026-10-11, no DFlash regression)
 - 61/61 CPU tests green after the refactor.
 - `vlm-dflash doctor --algorithm dflash` reports the registry + metadata.
@@ -127,13 +166,16 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
 - Hugging Face / PyPI publishing: pending release audit.
 
 ## Next highest-value tasks
-1. DFlash2 stage (stage 5, last in the zoo order): complete the upstream audit
-   in `docs/upstream/dflash2.md` (sources pinned), then implement local conv +
-   candidate selector; must be labeled Experimental per GOAL §8 and record the
-   full-vocabulary constraint in doctor/config validation/checkpoint contract.
-2. Serving-fidelity follow-ups from the JetSpec stage: decide whether the
+1. Finish the DFlash2 decomposition: local-mixing ablation (running) answers
+   whether the convolution (vs the KL objective) carries the gain; if positive,
+   a `unary_loss: ce` control isolates the objective axis. Then fill the
+   ablation rows in `BENCHMARKS.md`.
+2. Algorithm-zoo wrap-up for the GOAL report: regenerate the support matrix
+   from `AlgorithmMetadata` (currently hand-maintained), and add Qwen3-VL
+   reduced-scale validation for DSpark/Domino (already `experimental` there).
+3. Serving-fidelity follow-ups from the JetSpec stage: decide whether the
    `inference_in_block_causal` mask path should be exercised by a
    `strict`-style test on a GPU CI run (currently unit-tested + smoke-tested).
-3. Deterministic benchmark prompt file for `caption_general`; land one public
+4. Deterministic benchmark prompt file for `caption_general`; land one public
    dataset adapter (TextVQA first) to move a workload from planned -> validated.
-4. Model cards for released checkpoints (export already emits most fields).
+5. Model cards for released checkpoints (export already emits most fields).

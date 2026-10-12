@@ -36,14 +36,38 @@ correctly and testably.
   `eval.verification` selects `sequential` (the parity gate) / `parallel` /
   `strict_parallel`; see the runtime probe below.
 
-## Algorithm registry + benchmark harness (v0.2-dev)
+## Algorithms (v0.3-dev zoo)
 
 Drafter algorithms are plugins behind a small interface
-(`vlm_dflash/algorithms/`); DFlash is the first (and currently only) entry and
-is frozen as the reference. Every checkpoint records its algorithm and
-`eval`/`export` refuse mismatched checkpoints. `vlm-dflash doctor --algorithm
-dflash` reports the registry status and metadata; `docs/adding_an_algorithm.md`
-documents what a new algorithm must implement.
+(`vlm_dflash/algorithms/`); DFlash is the frozen reference. Everything
+multimodal — processor, MRoPE, image spans, capture, provenance, eval, export —
+is shared, so switching algorithms never re-opens the plumbing. Every checkpoint
+records its algorithm and `eval`/`export` refuse mismatched checkpoints;
+`vlm-dflash doctor --algorithm <name>` reports the registry status and metadata
+(`docs/adding_an_algorithm.md` documents what a new algorithm must implement).
+
+```text
+              DFlash  (frozen baseline: decayed block CE)
+              /  |   \
+        DSpark Domino DFlash2
+              \  |
+             JetSpec
+```
+
+| Algorithm | Qwen2.5-VL | Qwen3-VL | Train | Multimodal validated | Export | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| DFlash | validated | validated | yes | yes | yes | Stable |
+| DSpark | validated | experimental | yes | yes | yes | Validated |
+| Domino | validated | experimental | yes | yes | yes | Validated |
+| JetSpec | validated | untested | yes | yes | yes | Validated (tree runtime not ported) |
+| DFlash2 | experimental | untested | yes | yes | yes | Experimental (upstream objective undisclosed) |
+
+Shared: parallel block-drafter backbone. DSpark adds a Markov logit bias +
+confidence head; Domino adds a causal GRU correction; JetSpec changes the
+in-block mask to causal and swaps CE for forward KL; DFlash2 adds local dynamic
+convolutions plus a predecessor-conditioned candidate selector. Per-algorithm
+pages live in `docs/algorithms/`, upstream audits in `docs/upstream/`, the
+measured zoo scoreboard in `BENCHMARKS.md`.
 
 The benchmark harness runs fixed workload manifests and writes a report with
 its protocol attached: `python scripts/benchmark.py --run-dir runs/<run>
