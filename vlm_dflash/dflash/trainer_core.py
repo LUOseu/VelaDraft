@@ -176,6 +176,12 @@ class DFlashTrainerModule(nn.Module):
     # override this; the loop falls back to NoValidAnchorsError when unset).
     skippable_errors = (NoValidAnchorsError,)
 
+    # In-block attention mask. DFlash (and Domino/DSpark, which inherit the
+    # bidirectional objective) train with the bidirectional block mask; JetSpec
+    # trains causally so the draft factorization mirrors the target's
+    # autoregressive order (its trainer subclass sets this to True).
+    causal_in_block: bool = False
+
     def __init__(
         self,
         draft_model: Qwen3DFlashDraftModel,
@@ -540,6 +546,7 @@ class DFlashTrainerModule(nn.Module):
         n: int,
         bs: int,
         seq_len: int,
+        teacher_hidden: torch.Tensor | None = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[dict]]:
         """Algorithm seam between the draft backbone and the block CE loss.
 
@@ -562,6 +569,7 @@ class DFlashTrainerModule(nn.Module):
         doc_remaining: torch.Tensor | None = None,
         image_mask: torch.Tensor | None = None,
         multimodal_position_ids: torch.Tensor | None = None,
+        teacher_hidden: torch.Tensor | None = None,
     ) -> DFlashStepMetrics:
         """Parallel block-wise training forward pass.
 
@@ -582,6 +590,9 @@ class DFlashTrainerModule(nn.Module):
                 at image-token positions.
             multimodal_position_ids: Optional long tensor of shape [3, batch,
                 sequence], with temporal, height, and width positions.
+            teacher_hidden: Optional target final hidden states ``[batch, sequence,
+                hidden]`` from a capture-v2 feature store. Only distillation
+                algorithms (JetSpec) consume it; DFlash/DSpark/Domino ignore it.
 
         Returns:
             Scalar loss and additive DFlash training metrics.
@@ -607,7 +618,12 @@ class DFlashTrainerModule(nn.Module):
 
         anchor_positions, block_keep_mask, noise_embedding, full_position_ids, dflash_attn_mask, prefix_lengths = (
             self._prepare_block_inputs(
-                input_ids, loss_mask, position_ids=position_ids, seq_lens=seq_lens, doc_remaining=doc_remaining
+                input_ids,
+                loss_mask,
+                position_ids=position_ids,
+                seq_lens=seq_lens,
+                doc_remaining=doc_remaining,
+                causal=self.causal_in_block,
             )
         )
 
@@ -673,6 +689,7 @@ class DFlashTrainerModule(nn.Module):
             n=n,
             bs=bs,
             seq_len=seq_len,
+            teacher_hidden=teacher_hidden,
         )
 
         if self.loss_type == "variable_prefix":

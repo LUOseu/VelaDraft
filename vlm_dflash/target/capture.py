@@ -111,8 +111,16 @@ def forward_and_capture(
     image_token_id: int,
     dtype: torch.dtype,
     merge_size: int = 2,
+    store_final_hidden: bool = False,
 ) -> dict:
-    """One capture forward; returns the sample record consumed by training."""
+    """One capture forward; returns the sample record consumed by training.
+
+    ``store_final_hidden`` additionally records the target's final hidden state
+    (the post-final-norm tensor the target lm_head consumes), which distillation
+    objectives (JetSpec) project to full-vocab teacher logits at training time.
+    Old feature stores do not have this field; JetSpec training fails loud on
+    them instead of silently training against the wrong teacher.
+    """
     device = next(model.parameters()).device
     input_ids = full_ids.unsqueeze(0).to(device)
     attention_mask = torch.ones_like(input_ids)
@@ -137,6 +145,10 @@ def forward_and_capture(
     output = model(**forward_kwargs)
     hidden_states = output.hidden_states
     fused = torch.cat([hidden_states[layer_id + 1][0] for layer_id in layer_ids], dim=-1)
+    # hidden_states[-1] is the post-final-norm tensor; ``lm_head`` applied to it
+    # reproduces the target's own output logits (verified by the capture-time
+    # teacher-logits check in the smoke pipeline).
+    final_hidden = hidden_states[-1][0].to(dtype).cpu() if store_final_hidden else None
     positions = compute_multimodal_positions(
         model, input_ids, attention_mask, inputs.get("image_grid_thw"), mm_token_type_ids=mm_token_type_ids
     )
@@ -144,7 +156,7 @@ def forward_and_capture(
     grid = inputs.get("image_grid_thw")
     # image_grid_thw counts 14px patches; every merge_size^2 patches become one token.
     expected = int(grid.prod().item()) // (merge_size * merge_size) if grid is not None else None
-    return {
+    record = {
         "input_ids": full_ids.to(torch.int32),
         "hidden": fused.to(dtype).cpu(),
         "position3": positions.to(torch.int32).cpu(),
@@ -152,6 +164,9 @@ def forward_and_capture(
         "n_image_tokens": span_count,
         "n_image_tokens_expected": expected,
     }
+    if final_hidden is not None:
+        record["final_hidden"] = final_hidden
+    return record
 
 
 def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | None = None) -> dict:
@@ -168,6 +183,7 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
     layer_ids = [int(layer) for layer in contract["layers"]["draft_layer_ids"]]
     image_token_id = int(contract["tokens"]["image_token_id"])
     merge_size = int(contract["image"]["merge_size"])
+    store_final_hidden = bool(cap_cfg.get("store_final_hidden", False))
 
     model, processor = load_target(cfg, contract)
     features_dir = ensure_dir(run_dir / "features")
@@ -216,7 +232,16 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
         if answer_len < len(answer_ids):
             truncated += 1
         full_ids = torch.tensor(stored_prompt + answer_ids[:answer_len], dtype=torch.long)
-        record = forward_and_capture(model, inputs, full_ids, layer_ids, image_token_id, dtype, merge_size=merge_size)
+        record = forward_and_capture(
+            model,
+            inputs,
+            full_ids,
+            layer_ids,
+            image_token_id,
+            dtype,
+            merge_size=merge_size,
+            store_final_hidden=store_final_hidden,
+        )
         if record["n_image_tokens_expected"] != record["n_image_tokens"]:
             raise RuntimeError(
                 f"Image token count mismatch for sample {row.get('id')}: "
@@ -254,6 +279,7 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
         "num_samples": len(index_rows),
         "num_truncated": truncated,
         "draft_layer_ids": layer_ids,
+        "stores_final_hidden": store_final_hidden,
         "tie_word_embeddings": not lm_head_saved,
         "lm_head_saved": lm_head_saved,
         "seq_len_stats": {

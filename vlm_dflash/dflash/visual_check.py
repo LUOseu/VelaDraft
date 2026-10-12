@@ -25,7 +25,7 @@ def draft_block_logits(module, input_ids, loss_mask, hidden, position3):
     """Draft block logits for one batch; mirrors the trainer forward's prologue."""
     torch.manual_seed(_ANCHOR_SEED)
     anchors, keep_mask, noise_embedding, full_positions, attention_mask, _ = module._prepare_block_inputs(
-        input_ids, loss_mask
+        input_ids, loss_mask, causal=getattr(module, "causal_in_block", False)
     )
     multimodal_positions = None
     if module.draft_model.spatial_rope_enabled and position3 is not None:

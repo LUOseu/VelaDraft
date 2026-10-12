@@ -45,7 +45,7 @@ class FeatureDataset(Dataset):
 
     def __getitem__(self, index: int) -> dict:
         record = self.store.get(index)
-        return {
+        item = {
             "input_ids": record["input_ids"].to(torch.long),
             "loss_mask": record["loss_mask"].to(torch.float32),
             "hidden": record["hidden"],
@@ -53,6 +53,11 @@ class FeatureDataset(Dataset):
             "image_span": tuple(record["image_span"]),
             "sample_id": record["sample_id"],
         }
+        # Capture-v2 stores additionally carry the target's final hidden state
+        # (the teacher signal for distillation trainers). Old stores return None.
+        if record.get("final_hidden") is not None:
+            item["final_hidden"] = record["final_hidden"]
+        return item
 
 
 def collate_features(batch: list[dict], image_token_id: int) -> dict:
@@ -65,14 +70,23 @@ def collate_features(batch: list[dict], image_token_id: int) -> dict:
     loss_mask = torch.zeros(size, max_len, dtype=torch.float32)
     hidden = torch.zeros(size, max_len, hidden_size, dtype=batch[0]["hidden"].dtype)
     position3 = torch.zeros(3, size, max_len, dtype=torch.long)
+    # Only a fully capture-v2 batch carries the distillation teacher signal;
+    # mixed batches would silently train JetSpec on zeros for part of the batch.
+    has_final_hidden = all(item.get("final_hidden") is not None for item in batch)
+    final_hidden = None
+    if has_final_hidden:
+        final_size = batch[0]["final_hidden"].shape[-1]
+        final_hidden = torch.zeros(size, max_len, final_size, dtype=batch[0]["final_hidden"].dtype)
     for row, item in enumerate(batch):
         length = lengths[row]
         input_ids[row, :length] = item["input_ids"]
         loss_mask[row, :length] = item["loss_mask"]
         hidden[row, :length] = item["hidden"]
         position3[:, row, :length] = item["position3"]
+        if has_final_hidden:
+            final_hidden[row, :length] = item["final_hidden"]
     image_mask = input_ids == image_token_id
-    return {
+    collated = {
         "input_ids": input_ids,
         "loss_mask": loss_mask,
         "hidden": hidden,
@@ -80,3 +94,6 @@ def collate_features(batch: list[dict], image_token_id: int) -> dict:
         "image_mask": image_mask,
         "lengths": torch.tensor(lengths, dtype=torch.long),
     }
+    if final_hidden is not None:
+        collated["final_hidden"] = final_hidden
+    return collated

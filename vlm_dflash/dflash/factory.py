@@ -94,6 +94,10 @@ def build_trainer_module(
         with torch.no_grad():
             lm_head.weight.copy_(lm_head_weight)
         lm_head.weight.requires_grad_(False)
+    # ``null`` disables depth decay entirely (JetSpec's forward-KL objective
+    # weights every position uniformly); algorithms that need decay keep a float.
+    gamma_raw = drafter.get("loss_decay_gamma", 7.0)
+    loss_decay_gamma = None if gamma_raw is None else float(gamma_raw)
     module = module_class(
         draft_model=draft,
         target_lm_head=lm_head,
@@ -102,7 +106,7 @@ def build_trainer_module(
         block_size=int(drafter["block_size"]),
         attention_backend=str(drafter.get("attention_backend", "flex_attention")),
         num_anchors=int(drafter.get("num_anchors", 256)),
-        loss_decay_gamma=float(drafter.get("loss_decay_gamma", 7.0)),
+        loss_decay_gamma=loss_decay_gamma,
         loss_type="dflash",
         **(module_kwargs or {}),
     )

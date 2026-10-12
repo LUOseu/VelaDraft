@@ -207,6 +207,10 @@ def run_training_loop(
                     loss_mask=batch["loss_mask"],
                     image_mask=batch["image_mask"],
                     multimodal_position_ids=batch["position3"] if spatial else None,
+                    # Capture-v2 feature stores carry the target's final hidden
+                    # states for distillation objectives (JetSpec); older stores
+                    # do not have the key and pass None.
+                    teacher_hidden=batch.get("final_hidden"),
                 )
             except skippable_errors:
                 skipped_batches += 1

@@ -187,6 +187,7 @@ class DominoTrainerModule(DFlashTrainerModule):
         n: int,
         bs: int,
         seq_len: int,
+        teacher_hidden: torch.Tensor | None = None,
     ):
         block_logits = logits.view(bsz, n, bs, -1)
         metrics: dict = {
