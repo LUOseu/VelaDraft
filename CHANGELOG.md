@@ -2,7 +2,38 @@
 
 ## v0.3.0 (in development)
 
-Algorithm zoo stage 2: DSpark.
+Two algorithm-zoo stages land in this release: DSpark (stage 2) and Domino
+(stage 3).
+
+### Stage 3: Domino
+
+Added
+- **Domino** (`algorithm: domino`, knobs under `algorithm.domino`): DFlash
+  backbone + causal GRU correction head (`prefix_gru` + low-rank `embed_proj`
+  logit delta applied on the corrected suffix) and the base-anchor curriculum
+  `loss = (1 - lambda_base) * final_loss + lambda_base * base_loss` with a
+  linear decay of `lambda_base` over `lambda_base_decay_ratio` of the run.
+  Defaults follow the maintainer VL recipe (`emb_dim: 256`,
+  `gru_hidden_dim: 1024`, `pure_draft_prefix_len: 1`, `shift_label: true`,
+  `lambda_base_start: 1.0`, `lambda_base_decay_ratio: 1.0`). Audit in
+  `docs/upstream/domino.md`, usage in `docs/algorithms/domino.md`.
+- Ablation-only `algorithm.domino.enable_correction_head` switch (not an
+  upstream knob): trains the exact DFlash objective on the same architecture
+  so the required enabled/disabled comparison isolates the head.
+- Shared trainer seams for causal-correction algorithms: `_block_loss_step`
+  (dual-logit scoring under one mask/decay convention; underscore-prefixed
+  metrics stay internal) and a `set_training_progress(step, total_steps)`
+  curriculum hook; `coverage_audit_fraction` lets curriculum-gated heads audit
+  gradient coverage after their warm-up instead of at step 0.
+- `configs/domino/` (2K canonical + COCO smoke).
+
+Changed
+- `gradient_coverage.json` gains additive `audit_step` / `audit_fraction`
+  fields and a generic `source`; DFlash/DSpark still audit at the first
+  optimizer step, Domino at 10% of the run (λ=1 at step 0 intentionally gives
+  the correction head no gradient).
+
+### Stage 2: DSpark
 
 Added
 - **DSpark** (`algorithm: dspark`, knobs under `algorithm.dspark`): DFlash
