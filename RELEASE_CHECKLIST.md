@@ -20,4 +20,4 @@ benchmark adapters, reduced validation, CI, security/license cleanup only.
 - [x] Large-file audit (`find . -type f -size +20M`)
 - [x] Claim audit (DFlash2 wording; no lossless-speedup claims; parallel marked experimental)
 - [x] RELEASE_VALIDATION.md complete (only the tag-time commit hash was pending at review, filled in at tag time)
-- [ ] Release commit tagged `v0.3.0-rc1`, pushed to private GitHub repo (visibility: private)
+- [x] Release commit `5b1c41b` tagged `v0.3.0-rc1`, pushed to private GitHub repo (`LUOseu/vlm-dflash`, visibility: private; CI green)
