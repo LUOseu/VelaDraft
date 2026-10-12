@@ -130,12 +130,17 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
   22.6 min. Eval AL **1.954** token-exact 128/128, slots
   `[.495,.243,.118,.060,.027,.013,.006]` - best at this scale (DFlash 1.630,
   DSpark 1.735, Domino 1.764, JetSpec 1.599).
-- Decomposition so far: serving-time selector ablation (16 prompts, same
+- Decomposition (completed): serving-time selector ablation (16 prompts, same
   checkpoint) AL 2.060 (selector) vs 1.965 (unary-only ranking of the same
   candidates); ~60% of proposal positions are re-picked, gains concentrated in
-  deep slots. Local-mixing ablation training (`conv_kernel_size: 1`,
-  `selector_loss_alpha: 0.0`, run `qwen25vl3b_dflash2_2k_ablate_nomix`) is the
-  control for the convolution; eval pending.
+  deep slots. Local-mixing + selector ablation (`conv_kernel_size: 1`,
+  `selector_loss_alpha: 0.0`, run `qwen25vl3b_dflash2_2k_ablate_nomix`, same
+  recipe/features/seed): 792 steps, final loss 0.976, overfit + visual checks
+  passed. Eval AL **1.798** token-exact 128/128 - the joint conv+selector share
+  is +0.156; the ablated run still beats DSpark/Domino, and its
+  `selector_override_rate` is 0.0 (ranking knob confirmed off). The objective
+  axis (CE -> forward-KL) is *not* isolated; a `unary_loss: ce` control would
+  be the next decomposition step if needed.
 - Export verified (`/tmp/export_dflash2_2k`): `method: dflash2`,
   `method_details` (conv/selector + experimental-objective tag), runtime note;
   `load_export` rebuilds the selector model and forwards (328.5M params).
@@ -153,6 +158,17 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
 - Packaging: `vlm_dflash-0.2.0` wheel + sdist build; wheel contains the
   algorithms/benchmark subpackages and the `vlm-dflash` console script.
 
+## DFlash stage-5 regression (2026-10-12, after DFlash2 code landed)
+- 8 prompts, registry paths, same frozen 2K checkpoint
+  (`eval_result_post_dflash2_stage_regression.json`): AL 1.6096 - bit-identical
+  to the pre-DFlash2 registry check (1.6096) and token-exact; `ckpt_init`
+  1.002. The `_make_decoder_layer` seam did not move DFlash.
+- Full canonical re-eval, 128 prompts / 128 tokens
+  (`eval_result_post_dflash2_full128.json`): AL **1.6298**, bit-identical to
+  the frozen pre-zoo baseline (1.6298365840801265); both checkpoints
+  token-exact (128/128). Machine-readable record:
+  `tests/reference_dflash/manifest.json`.
+
 ## Known bugs / caveats
 - bf16 capture/training: protocol-reproducible, not bit-identical.
 - `parallel` verification exactness is numerically unreachable with the
@@ -160,22 +176,26 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
   lossless.
 
 ## Blocked / waiting
-- 8B-2K scaling job on the cluster (started 23:31 after pruning the completed
-  8B-512 / 3B-refresh features to pass the disk pre-check); `/home` stays
-  near-full, the suite pre-checks and skips rather than failing.
-- Hugging Face / PyPI publishing: pending release audit.
+- Hugging Face / PyPI publishing: pending release audit (no push before that).
+- Server disk policy in effect: feature stores are pruned once a run is
+  recorded ("deterministic to recapture"); the zoo 2K stores live in
+  `runs/qwen25vl3b_jetspec_2k/features` (capture-v2 superset), symlinked by
+  the dspark/domino/dflash2 2K runs. `/home` is at ~99% (278G free as of
+  2026-10-12; the cleanup reclaimed ~23G: tmp debug scripts, /tmp exports,
+  a stale code copy, smoke resume states, duplicate feature store).
 
 ## Next highest-value tasks
-1. Finish the DFlash2 decomposition: local-mixing ablation (running) answers
-   whether the convolution (vs the KL objective) carries the gain; if positive,
-   a `unary_loss: ce` control isolates the objective axis. Then fill the
-   ablation rows in `BENCHMARKS.md`.
-2. Algorithm-zoo wrap-up for the GOAL report: regenerate the support matrix
-   from `AlgorithmMetadata` (currently hand-maintained), and add Qwen3-VL
-   reduced-scale validation for DSpark/Domino (already `experimental` there).
-3. Serving-fidelity follow-ups from the JetSpec stage: decide whether the
+1. DFlash2 objective isolation (only if the 1.954 is quoted as a method
+   claim): a `unary_loss: ce` control separates the forward-KL objective axis
+   from conv + selector; features and recipe are ready
+   (`runs/qwen25vl3b_jetspec_2k/features`, ~25 min GPU per run + eval).
+2. Algorithm-zoo wrap-up: Qwen3-VL reduced-scale validation for
+   DSpark/Domino/DFlash2 (currently `experimental`/`untested` there), and
+   regenerate `SUPPORT_MATRIX.md` from `AlgorithmMetadata` instead of by hand.
+3. Serving-fidelity follow-up from the JetSpec stage: decide whether the
    `inference_in_block_causal` mask path should be exercised by a
    `strict`-style test on a GPU CI run (currently unit-tested + smoke-tested).
 4. Deterministic benchmark prompt file for `caption_general`; land one public
    dataset adapter (TextVQA first) to move a workload from planned -> validated.
-5. Model cards for released checkpoints (export already emits most fields).
+5. HF release prep: publish model cards (export already emits `model_card.md`),
+   run the release audit, then push.

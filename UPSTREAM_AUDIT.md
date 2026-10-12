@@ -9,9 +9,9 @@ format, what we port, what we change (and why), and the parity level.
 | --- | --- | --- | --- | --- |
 | DFlash | `docs/upstream/dflash.md` | 55ebbd5b | bb5b34ce | maintainer implementation (via fork port) |
 | DSpark | `docs/upstream/dspark.md` | 55ebbd5b | bb5b34ce | maintainer-informed reconstruction (2 documented deviations) |
-| Domino | `docs/upstream/domino.md` | — | bb5b34ce | audit pending before implementation |
-| JetSpec | `docs/upstream/jetspec.md` | — | bb5b34ce | audit pending before implementation |
-| DFlash2 | `docs/upstream/dflash2.md` | 55ebbd5b | bb5b34ce | audit pending before implementation |
+| Domino | `docs/upstream/domino.md` | — | bb5b34ce | maintainer implementation (ported semantics + same defaults) |
+| JetSpec | `docs/upstream/jetspec.md` | — | bb5b34ce | maintainer implementation (training semantics + mask + metrics; runtime not ported) |
+| DFlash2 | `docs/upstream/dflash2.md` | 55ebbd5b | — (has no dflash2 at bb5b34ce) | architecture: maintainer / objective: experimental reconstruction (undisclosed) / runtime: inferred |
 
 Pinned commits
 

@@ -32,6 +32,17 @@ Four algorithm-zoo stages land in this release: DSpark (stage 2), Domino
   train -> eval), token-exact 8/8, AL 1.362 vs init 1.000. 2K canonical:
   AL 1.954 token-exact 128/128, slots `[.495,.243,.118,.060,.027,.013,.006]`;
   selector serving-ablation 2.060 vs 1.965 (unary-only ranking).
+- DFlash2 decomposition: local-mixing + selector ablation
+  (`conv_kernel_size: 1`, `selector_loss_alpha: 0.0`, same recipe/seed) drops
+  AL to 1.798 but still beats DSpark/Domino, bounding the joint conv+selector
+  share at +0.156; the objective axis (CE -> forward-KL) stays entangled and
+  is not claimed. Selector override rate on the ablated checkpoint is 0.0
+  (knob verified off). See `BENCHMARKS.md` for the full table.
+- Frozen DFlash reference: `tests/reference_dflash/manifest.json` records the
+  pre-zoo baselines (3B-2K AL 1.630, 3B-5K 1.817, 8B-512 1.322, 8B-2K 1.665),
+  checkpoint/feature semantics and the regression gates; post-stage
+  re-measurements after DSpark..DFlash2 land are recorded there and in
+  `STATE.md` (8-prompt registry path reproduced bit-identically at 1.6096).
 
 ### Stage 4: JetSpec (causal block-parallel drafting + forward-KL distillation)
 
