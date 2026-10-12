@@ -11,6 +11,7 @@ reference. Do not mix experimental parallel-runtime numbers into these tables.
 | Qwen2.5-VL-3B | 512 | 278 kept | 64 | 1.198 | 1.003 | 64/64 | see eval_result.json |
 | Qwen2.5-VL-3B | 2K | 1050 kept | 128 | 1.630 | 1.003 | 128/128 | .413, .149, .048, .015, .004, .001, 0 |
 | Qwen2.5-VL-3B (dspark) | 2K | 1050 kept | 128 | 1.735 | 1.003 | 128/128 | .432, .173, .075, .034, .015, .007, .003 |
+| Qwen2.5-VL-3B (domino) | 2K | 1050 kept | 128 | 1.764 | 1.003 | 128/128 | .443, .180, .078, .036, .016, .009, .005 |
 | Qwen3-VL-8B | 512 | 274 kept | 32 | 1.322 | 1.003 | 32/32 | see eval_result.json |
 | Qwen3-VL-8B | 2K | 1996 kept | 32 | 1.665 | 1.000 | 32/32 | .413, .160, .063, .027, .010, .002, .0004 |
 | Qwen2.5-VL-3B | 5K | 2629 kept | 128 | 1.817 | 1.003 | 128/128 | .482, .210, .080, .030, .011, .005, .001 |
@@ -36,6 +37,14 @@ Notes
   constant). Speedup vs target-only 0.86x (sequential verification path).
 - DSpark COCO smoke (64 rows, pipeline check only): AL 1.123 vs init 1.000,
   token-exact 8/8 after the verify-parity fix.
+- Domino / 2K: same corpus, features, block size and protocol as the rows
+  above. AL 1.764 (best of the three at this point), token-exact 128/128;
+  slot gains over DFlash again grow with depth (slot 3: .048 -> .078,
+  slot 4: .015 -> .036, slot 5: .004 -> .016, slot 6: .001 -> .009,
+  slot 7: 0 -> .005). 792 steps; the dual-logit log shows final_loss below
+  base_loss by the end of the curriculum; overfit sanity, gradient coverage
+  (audited at 10%), and the drafter visual check (logits_diff 7.46) passed.
+  Speedup vs target-only 0.84x (sequential verification path).
 - `AL = new_tokens / target_verification_steps` (bonus-token-inclusive);
   random-init drafter AL ~1.003 means proposals are almost never accepted.
 
