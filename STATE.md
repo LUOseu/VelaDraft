@@ -46,7 +46,24 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
 - DFlash regression check after the eval fix (`dflash_regress8`, 8 prompts):
   AL 1.766, token-exact.
 - DSpark 2K canonical: features captured (1050 samples, 7.2 GB, replay
-  bitwise, visual-span + downstream change passed); training started 12:59.
+  bitwise, visual-span + downstream change passed). Training 12:59-13:14
+  (792 steps, final loss 3.53, overfit sanity drop 0.9997 / slot0 1.0,
+  gradient coverage 40/40 with markov/confidence heads covered, drafter
+  visual check logits_diff=7.56 passed; confidence calibration BCE 0.590 /
+  ECE 0.048 / AUROC 0.745, pred_std 0.213 -> not constant). 128-prompt eval
+  running.
+
+## Domino stage (2026-10-12)
+- Trainer/factory/plugin landed (`refactor` + `feat(domino)`): dual-logit
+  objective `(1-λ)·CE(final) + λ·CE(base)` with the upstream linear λ decay,
+  shifted-label slot convention, suffix-only correction, ablation-only
+  `enable_correction_head` switch; 11 new unit tests (98 total green).
+- COCO smoke (Qwen2.5-VL-3B, 64-row slice, shared capture): overfit sanity
+  drop 1.000 / slot0 1.0; gradient coverage 40/40 at 10% of the run with
+  prefix_gru + embed_proj covered; drafter visual check passed; eval
+  token-exact, AL 1.123 vs init 1.000.
+- Domino 2K canonical: trained 13:25-13:42 (792 steps, final loss 2.20,
+  visual check logits_diff=7.46 passed); 128-prompt eval running.
 
 ## Registry refactor verification (2026-10-11, no DFlash regression)
 - 61/61 CPU tests green after the refactor.
