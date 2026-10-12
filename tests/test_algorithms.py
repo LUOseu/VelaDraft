@@ -124,3 +124,25 @@ def test_checkpoint_algorithm_mismatch_is_rejected():
     check_checkpoint_algorithm("ckpt_final.pt", {"algorithm": "dflash"}, algorithm)
     with pytest.raises(RuntimeError, match="algorithm"):
         check_checkpoint_algorithm("ckpt_final.pt", {"algorithm": "dspark"}, algorithm)
+
+
+@pytest.mark.parametrize("name", available_algorithms())
+def test_verify_backend_switch_reaches_shared_inference_engine(name):
+    """The evaluator's verify_sdpa_backend setting must bind every algorithm.
+
+    Regression for the DSpark token-exact gate failure (2026-10-12): the base
+    class left ``configure_verify_backend`` as a no-op, so DSpark verified under
+    the reference SDPA backend narrowing while ``generate()`` used the default
+    backends; the bf16 kernel mismatch flipped a near-tie on 1/8 COCO smoke
+    prompts.
+    """
+    from vlm_dflash.dflash.draft_model import verify_sdpa_backend_switch_enabled
+
+    algorithm = get_algorithm(name)
+    try:
+        algorithm.configure_verify_backend(False)
+        assert verify_sdpa_backend_switch_enabled() is False
+        algorithm.configure_verify_backend(True)
+        assert verify_sdpa_backend_switch_enabled() is True
+    finally:
+        algorithm.configure_verify_backend(True)

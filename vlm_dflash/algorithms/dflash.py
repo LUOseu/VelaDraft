@@ -115,10 +115,4 @@ class DFlashAlgorithm(DrafterAlgorithm):
         config._attn_implementation = attention_backend or "flex_attention"
         return Qwen3DFlashDraftModel(config)
 
-    def configure_verify_backend(self, reference: bool) -> None:
-        from ..dflash import draft_model
-
-        draft_model.set_verify_sdpa_backend_switch(bool(reference))
-
-
 register(DFlashAlgorithm())

@@ -400,6 +400,7 @@ def evaluate(
             "sequential_target_verification": sequential_verification,
             "strict_parallel_margin": strict_parallel_margin,
             "verify_sdpa_backend": verify_backend,
+            "verify_backend_switch_enabled": _effective_verify_backend_switch(),
             "note": (
                 "Parity mode (sequential verification + generate()-backend logits) reproduces "
                 "target-only greedy exactly. Parallel block verification can flip bf16 near-tie "
@@ -506,6 +507,22 @@ def _run_parallel_diagnostic(
         "mismatches": mismatches,
         "note": "Reference verify backend, parallel block verification; target_top2_margin is the logit gap at the first divergent step.",
     }
+
+
+def _effective_verify_backend_switch() -> bool | None:
+    """Effective state of the shared verify-time SDPA narrowing switch.
+
+    Recorded in ``eval_result.json`` so a plugin that fails to forward
+    ``configure_verify_backend`` becomes visible in the artifact instead of
+    silently verifying under reference numerics while the run claims
+    ``verify_sdpa_backend: parity`` (the 2026-10-12 DSpark near-tie gate
+    failure).
+    """
+    try:
+        from ..dflash.draft_model import verify_sdpa_backend_switch_enabled
+    except Exception:
+        return None
+    return bool(verify_sdpa_backend_switch_enabled())
 
 
 def eval_cfg_checkpoint(cfg):

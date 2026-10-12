@@ -97,5 +97,16 @@ class DrafterAlgorithm(ABC):
         )
 
     def configure_verify_backend(self, reference: bool) -> None:
-        """Optional hook toggling verify-time numerics (default: no-op)."""
-        return None
+        """Toggle verify-time numerics for the shared speculative inference path.
+
+        Every algorithm registered here reuses the shared block-parallel
+        ``spec_generate`` machinery, whose reference behavior narrows the
+        verify-time SDPA backends (a cuDNN-plan / throughput choice) unless
+        parity mode is requested. The default implementation forwards to that
+        shared switch so an evaluation's ``verify_sdpa_backend`` setting can
+        never silently become a no-op for a plugin; algorithms with an
+        independent inference path may override this.
+        """
+        from ..dflash import draft_model
+
+        draft_model.set_verify_sdpa_backend_switch(bool(reference))

@@ -133,7 +133,9 @@ Consequences:
   forwards on top.
 * The reference SDPA backend narrowing (`.verify_sdpa_backend: reference`) is a
   second, smaller near-tie source; `parity` disables it. The numbers above are
-  `parity`.
+  `parity`. All algorithms forward the switch through
+  `DrafterAlgorithm.configure_verify_backend`, and `eval_result.json` records
+  the effective state as `verify_backend_switch_enabled`.
 * Reruns reproduce the protocol (`rows_sha256` identical, identical regen keeps),
   not the bits: captured feature shards and training step-1 loss differ between
   same-seed runs on this bf16 stack.

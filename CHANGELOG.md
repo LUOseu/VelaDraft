@@ -44,6 +44,17 @@ Fixed
   ownership identity, bf16 cast propagation, disagreement and bare
   `Qwen3DFlashDraftModel` rejection; `gradient_coverage_report` now reports
   `draft_model.<child>` groups so a head cannot hide inside the backbone line.
+- **Verify-backend parity now binds every algorithm, not just DFlash.** The
+  base-class `configure_verify_backend` was a no-op, so the evaluator's
+  `verify_sdpa_backend: parity` never disabled the reference verify-time SDPA
+  narrowing for DSpark: verification ran on the narrowed [EFFICIENT+MATH]
+  kernels while `generate()` used flash, and the resulting ~1-ULP bf16 KV
+  drift flipped a near-tie at token 8 of `coco_000000562157_686936` (the
+  token-exact gate failed on 1/8 COCO smoke prompts for both the trained and
+  the random-init checkpoint). The switch now lives in `DrafterAlgorithm`
+  (single source of truth for the shared `spec_generate` path) and
+  `eval_result.json` records the effective state as
+  `verify_backend_switch_enabled`.
 
 ## v0.2.0 (in development)
 
