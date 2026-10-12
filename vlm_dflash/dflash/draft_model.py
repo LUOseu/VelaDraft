@@ -856,6 +856,12 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         self.projector_type = dflash_config.get("projector_type", None)
         self.pure_draft_prefix_len = dflash_config.get("pure_draft_prefix_len", 0)
         self.shift_label = dflash_config.get("shift_label", False)
+        # Block-slot convention at inference (upstream DFlash family switch).
+        # False (DFlash): the anchor is the verifier's bonus token and the draft
+        # proposes ``block_size - 1`` suffix tokens. True (DSpark default): the
+        # anchor slot itself is drafted, so a round proposes ``block_size``
+        # tokens and its verification window is one position wider.
+        self.sample_from_anchor = bool(dflash_config.get("sample_from_anchor", False))
         if self.projector_type == "domino":
             self.emb_dim = dflash_config["emb_dim"]
             self.gru_hidden_dim = dflash_config["gru_hidden_dim"]
@@ -1195,6 +1201,8 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
 
         current_hidden = draft_hidden[:, -block_size:, :]
         if self.projector_type is None:
+            if self.sample_from_anchor:
+                return sample(target.lm_head(current_hidden))
             draft_logits = target.lm_head(current_hidden[:, 1:, :])
             return sample(draft_logits)
 
@@ -1286,9 +1294,13 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         num_input_tokens = input_ids.shape[1]
         max_length = num_input_tokens + max_new_tokens
         block_size = self.block_size
+        # Verification-round width: one anchor position plus this round's
+        # proposals (block_size - 1 for DFlash, block_size for DSpark's
+        # sample_from_anchor convention).
+        round_width = block_size + 1 if self.sample_from_anchor else block_size
 
         output_ids = torch.full(
-            (1, max_length + block_size), self.mask_token_id, dtype=torch.long, device=target.device
+            (1, max_length + round_width), self.mask_token_id, dtype=torch.long, device=target.device
         )
         position_ids = torch.arange(output_ids.shape[1], device=target.device).unsqueeze(0)
         # Qwen2.5-VL derives 3-D MRoPE positions (and rope deltas) inside its
@@ -1615,9 +1627,12 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             return posterior, acceptance_length, verified_target_hidden, min_decision_margin
 
         while start < max_length:
-            block_output_ids = output_ids[:, start : start + block_size].clone()
+            block_output_ids = output_ids[:, start : start + round_width].clone()
             block_position_ids = position_ids[:, start : start + block_size]
-            noise_embedding = target_embeddings(block_output_ids)
+            # The draft always consumes its own block window (anchor + block_size-1
+            # mask slots); sample_from_anchor rounds only widen the verification
+            # window, not the draft's input block.
+            noise_embedding = target_embeddings(block_output_ids[:, :block_size])
             phase_start = start_timing()
             draft_hidden = self(
                 target_hidden=target_hidden,

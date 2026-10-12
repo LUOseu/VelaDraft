@@ -394,14 +394,21 @@ class DFlashDecayLoss(nn.Module):
         use_fused_linear_ce: bool = False,
         chunk_size: int = 1024,
         normalize: str = "tokens",
+        first_slot: int = 1,
     ):
         super().__init__()
         if normalize not in ("tokens", "mean"):
             raise ValueError(f"normalize must be 'tokens' or 'mean', got {normalize!r}")
+        if int(first_slot) < 0:
+            raise ValueError(f"first_slot must be >= 0, got {first_slot!r}")
         self.loss_gamma = None if loss_gamma is None else float(loss_gamma)
         self.use_fused_linear_ce = bool(use_fused_linear_ce)
         self.chunk_size = int(chunk_size)
         self.normalize = normalize
+        # First supervised block slot: DFlash supervises slots 1..block_size-1
+        # (slot 0 is the clean anchor copy); algorithms that draft the anchor
+        # itself (DSpark sample_from_anchor=True) pass first_slot=0.
+        self.first_slot = int(first_slot)
 
     def _decay_weights(self, T: int, block_size: Optional[int], device, dtype) -> torch.Tensor:
         """Eq. 4 weights for ``T`` predicted positions, resetting per block.
@@ -411,7 +418,7 @@ class DFlashDecayLoss(nn.Module):
         if self.loss_gamma is None:
             return torch.ones(T, device=device, dtype=dtype)
         if block_size is not None:
-            T_per = block_size - 1
+            T_per = block_size - self.first_slot
             n_blocks = T // T_per if T_per > 0 else 1
             w_single = torch.exp(-torch.arange(T_per, device=device, dtype=dtype) / self.loss_gamma)
             return w_single.repeat(n_blocks)
@@ -442,8 +449,8 @@ class DFlashDecayLoss(nn.Module):
             draft_count_per_pos=draft_count_per_pos,
         )
 
-    @staticmethod
     def _draft_acc_per_pos(
+        self,
         correct: torch.Tensor,
         block_mask: torch.Tensor,
         block_size: Optional[int],
@@ -459,7 +466,9 @@ class DFlashDecayLoss(nn.Module):
         """
         if block_size is None or block_size <= 1:
             return None, None
-        T_per = block_size - 1
+        T_per = block_size - self.first_slot
+        if T_per <= 0:
+            return None, None
         B, T = correct.shape
         if T % T_per != 0:
             return None, None

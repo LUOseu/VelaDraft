@@ -106,6 +106,15 @@ class DFlashAlgorithm(DrafterAlgorithm):
 
         return load_checkpoint(checkpoint_path, map_location=map_location)
 
+    def build_inference_module(self, draft_config_dict: dict, attention_backend: str):
+        from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
+
+        from ..dflash.draft_model import Qwen3DFlashDraftModel
+
+        config = Qwen3Config.from_dict(draft_config_dict)
+        config._attn_implementation = attention_backend or "flex_attention"
+        return Qwen3DFlashDraftModel(config)
+
     def configure_verify_backend(self, reference: bool) -> None:
         from ..dflash import draft_model
 

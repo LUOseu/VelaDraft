@@ -197,23 +197,21 @@ def export_run(run_dir: str | Path, *, checkpoint: str = "ckpt_final.pt", out_di
 def load_export(export_dir: str | Path):
     """Rebuild the draft model from an exported directory (no run dir needed)."""
     from safetensors.torch import load_file
-    from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
 
-    from ..dflash.draft_model import Qwen3DFlashDraftModel
+    from ..algorithms import get_algorithm
 
     export_dir = Path(export_dir)
     export_config = read_json(export_dir / "config.json")
     if export_config.get("format") != EXPORT_FORMAT:
         raise ValueError(f"Unrecognized export format in {export_dir}: {export_config.get('format')!r}")
     method = str(export_config.get("method", "dflash"))
-    if method != "dflash":
-        raise NotImplementedError(
-            f"export was produced by algorithm={method!r}; loading non-dflash exports needs the "
-            "algorithm's own decoder loader (see docs/adding_an_algorithm.md). Refusing to guess."
-        )
-    qwen3_config = Qwen3Config.from_dict(export_config["drafter"]["draft_config"])
-    qwen3_config._attn_implementation = export_config["drafter"].get("attention_backend", "flex_attention")
-    model = Qwen3DFlashDraftModel(qwen3_config)
+    # Dispatch on the recorded algorithm (the export is self-describing);
+    # unknown names raise UnknownAlgorithmError instead of guessing a loader.
+    algorithm = get_algorithm(method)
+    model = algorithm.build_inference_module(
+        export_config["drafter"]["draft_config"],
+        export_config["drafter"].get("attention_backend", "flex_attention"),
+    )
     model.load_state_dict(load_file(export_dir / "model.safetensors"))
     model.eval()
     return model, export_config

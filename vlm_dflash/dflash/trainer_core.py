@@ -117,6 +117,7 @@ class DFlashStepMetrics:
     valid_blocks: torch.Tensor
     pos_correct: Optional[torch.Tensor] = None
     pos_count: Optional[torch.Tensor] = None
+    extra_metrics: Optional[dict] = None
 
 
 def compute_accept_len(
@@ -187,6 +188,7 @@ class DFlashTrainerModule(nn.Module):
         loss_decay_gamma: Optional[float] = None,
         loss_type: str = "dflash",
         prefix_weight_base: float = 0.9,
+        sample_from_anchor: bool = False,
     ):
         super().__init__()
         if loss_type not in _DFLASH_LOSS_TYPES:
@@ -209,6 +211,14 @@ class DFlashTrainerModule(nn.Module):
         self.loss_decay_gamma = loss_decay_gamma
         self.loss_type = loss_type
         self.prefix_weight_base = float(prefix_weight_base)
+        # Block-slot convention. DFlash (sample_from_anchor=False) treats the
+        # anchor as the clean bonus token: slot k predicts ``anchor + k`` and
+        # only slots 1..block_size-1 are supervised. DSpark with
+        # sample_from_anchor=True drafts the anchor position too: slot k
+        # predicts ``anchor + 1 + k`` and every slot is supervised.
+        self.sample_from_anchor = bool(sample_from_anchor)
+        self.input_shift = 1 if self.sample_from_anchor else 0
+        self.first_supervised_slot = 0 if self.sample_from_anchor else 1
         # Smallest visible-prefix length variable-prefix training samples (and the
         # slice point of its loss); single source of truth for both methods.
         self._min_prefix = min(2, block_size - 1)
@@ -218,7 +228,15 @@ class DFlashTrainerModule(nn.Module):
         # ``loss_decay_gamma=None`` disables decay (uniform weights). The
         # variable-prefix objective needs per-block data-dependent weights and
         # computes its loss inline instead (see _variable_prefix_loss).
-        self.loss_fn = DFlashDecayLoss(loss_gamma=loss_decay_gamma, normalize="mean") if loss_type == "dflash" else None
+        self.loss_fn = (
+            DFlashDecayLoss(
+                loss_gamma=loss_decay_gamma,
+                normalize="mean",
+                first_slot=self.first_supervised_slot,
+            )
+            if loss_type == "dflash"
+            else None
+        )
 
         # Per-block offset constant (block_size,) for label gathering / position ids.
         self.register_buffer("_block_offsets", torch.arange(block_size).view(1, 1, -1), persistent=False)
@@ -509,6 +527,31 @@ class DFlashTrainerModule(nn.Module):
             )
         return anchor_positions, block_keep_mask, noise_embedding, full_position_ids, attn_mask, prefix_lengths
 
+    def _apply_algorithm_terms(
+        self,
+        *,
+        logits: torch.Tensor,
+        output_hidden: torch.Tensor,
+        input_ids: torch.Tensor,
+        label_indices: torch.Tensor,
+        target_ids: torch.Tensor,
+        block_mask: torch.Tensor,
+        bsz: int,
+        n: int,
+        bs: int,
+        seq_len: int,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[dict]]:
+        """Algorithm seam between the draft backbone and the block CE loss.
+
+        Receives the raw block logits ``[bsz, n * bs, vocab]`` (and the draft
+        hidden states ``[bsz, n * bs, hidden]`` that produced them) and returns
+        ``(corrected_logits, auxiliary_loss, extra_metrics)``. The base DFlash
+        implementation is the identity; subclasses add their own terms (DSpark
+        adds the Markov logit bias here and its confidence-head BCE as the
+        auxiliary loss).
+        """
+        return logits, None, None
+
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -607,28 +650,50 @@ class DFlashTrainerModule(nn.Module):
         n = anchor_positions.size(1)
         bs = self.block_size
 
-        # Block position k predicts the token at anchor + k.
-        _, target_ids, block_mask = self._build_block_targets(
-            input_ids, loss_mask, anchor_positions, block_keep_mask, seq_len
+        # Block position k predicts the token at anchor + input_shift + k.
+        label_indices, target_ids, block_mask = self._build_block_targets(
+            input_ids,
+            loss_mask,
+            anchor_positions,
+            block_keep_mask,
+            seq_len,
+            label_start=self.input_shift,
+        )
+        # Algorithm seam: logit correction (e.g. DSpark's Markov bias) plus any
+        # auxiliary objective (e.g. the DSpark confidence BCE). The base DFlash
+        # implementation is the identity; see ``algorithms/dspark.py``.
+        logits, aux_loss, aux_metrics = self._apply_algorithm_terms(
+            logits=logits,
+            output_hidden=output_hidden,
+            input_ids=input_ids,
+            label_indices=label_indices,
+            target_ids=target_ids,
+            block_mask=block_mask,
+            bsz=bsz,
+            n=n,
+            bs=bs,
+            seq_len=seq_len,
         )
 
         if self.loss_type == "variable_prefix":
             return self._variable_prefix_loss(logits.view(bsz, n, bs, -1), target_ids, block_mask, prefix_lengths)
 
-        # Drop block position 0 (the clean anchor token, never a target); the
-        # remaining bs-1 predicted positions are what the loss supervises.
-        pred_logits = logits.view(bsz, n, bs, -1)[:, :, 1:, :].reshape(bsz, n * (bs - 1), -1)
-        pred_targets = target_ids[:, :, 1:].reshape(bsz, n * (bs - 1))
-        pred_mask = block_mask[:, :, 1:].reshape(bsz, n * (bs - 1))
+        # For DFlash, drop block position 0 (the clean anchor token, never a
+        # target); DSpark with sample_from_anchor=True supervises every slot.
+        first = self.first_supervised_slot
+        slots = bs - first
+        pred_logits = logits.view(bsz, n, bs, -1)[:, :, first:, :].reshape(bsz, n * slots, -1)
+        pred_targets = target_ids[:, :, first:].reshape(bsz, n * slots)
+        pred_mask = block_mask[:, :, first:].reshape(bsz, n * slots)
 
         loss_fn = self.loss_fn
         assert loss_fn is not None, "loss_fn is always constructed for loss_type='dflash'"
         loss_out = loss_fn(pred_logits, pred_targets, pred_mask, num_tokens=None, block_size=bs)
 
-        loss_weights = pred_mask.view(bsz, n, bs - 1)
+        loss_weights = pred_mask.view(bsz, n, slots)
         if self.loss_decay_gamma is not None:
             depth_weights = torch.exp(
-                -torch.arange(bs - 1, device=pred_mask.device, dtype=pred_mask.dtype) / self.loss_decay_gamma
+                -torch.arange(slots, device=pred_mask.device, dtype=pred_mask.dtype) / self.loss_decay_gamma
             )
             loss_weights = loss_weights * depth_weights
         loss_weight = loss_weights.sum()
@@ -638,13 +703,14 @@ class DFlashTrainerModule(nn.Module):
         correct_tokens = loss_out.draft_correct_per_pos.sum()
         accuracy = correct_tokens / valid_tokens.clamp_min(1)
         accept_len, accept_len_sum, valid_blocks = compute_acceptance_stats(
-            pred_logits.argmax(dim=-1).view(bsz, n, bs - 1),
-            pred_targets.view(bsz, n, bs - 1),
-            pred_mask.view(bsz, n, bs - 1).bool(),
+            pred_logits.argmax(dim=-1).view(bsz, n, slots),
+            pred_targets.view(bsz, n, slots),
+            pred_mask.view(bsz, n, slots).bool(),
         )
 
+        total_loss = loss_out.total_loss if aux_loss is None else loss_out.total_loss + aux_loss
         return DFlashStepMetrics(
-            loss=loss_out.total_loss,
+            loss=total_loss,
             loss_weight=loss_weight.detach(),
             accuracy=accuracy.detach(),
             valid_tokens=valid_tokens.detach(),
@@ -654,6 +720,7 @@ class DFlashTrainerModule(nn.Module):
             valid_blocks=valid_blocks.detach(),
             pos_correct=loss_out.draft_correct_per_pos,
             pos_count=loss_out.draft_count_per_pos,
+            extra_metrics=aux_metrics,
         )
 
     def _variable_prefix_loss(

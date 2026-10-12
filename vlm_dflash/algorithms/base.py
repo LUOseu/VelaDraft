@@ -86,6 +86,16 @@ class DrafterAlgorithm(ABC):
     def checkpoint_metadata(self, contract: dict, cfg: dict, draft_config) -> dict:
         """Algorithm-specific checkpoint fields (re-read by eval/export)."""
 
+    def build_inference_module(self, draft_config_dict: dict, attention_backend: str):
+        """Rebuild the inference-side drafter from a serialized draft config.
+
+        Used by export loading; ``draft_config_dict`` is the ``draft_config``
+        field of an algorithm checkpoint / export (a ``Qwen3Config.to_dict()``).
+        """
+        raise NotImplementedError(
+            f"algorithm {self.name!r} does not implement build_inference_module()."
+        )
+
     def configure_verify_backend(self, reference: bool) -> None:
         """Optional hook toggling verify-time numerics (default: no-op)."""
         return None

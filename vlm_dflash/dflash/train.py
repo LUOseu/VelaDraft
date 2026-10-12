@@ -167,6 +167,7 @@ def run_training_loop(
             f"(micro_step={micro_step}, skipped={skipped_batches}, history_rows={len(history)})"
         )
     stall_epochs = 0
+    gradient_coverage: dict | None = None
     started = time.time()
     from .trainer_core import NoValidAnchorsError
 
@@ -219,6 +220,26 @@ def run_training_loop(
                     for name, parameter in module.draft_model.named_parameters():
                         parameter.copy_(master_parameters[name])
                 step += 1
+                if step == 1:
+                    # Gradient coverage audit (GOAL §13): a new head that never
+                    # receives a gradient still trains the rest of the model and
+                    # looks plausible, so check coverage once per run.
+                    from ..utils import gradient_coverage_report
+
+                    coverage = gradient_coverage_report(module)
+                    coverage["source"] = "step1_micro_batch"
+                    gradient_coverage = coverage
+                    log(
+                        "gradient coverage: "
+                        f"{coverage['params_with_grad']}/{coverage['trainable_params']} trainable tensors "
+                        f"with grad (fraction={coverage['fraction_with_grad']:.3f})"
+                    )
+                    for group in coverage["groups"]:
+                        if group["trainable_params"] or group["group"] == "frozen":
+                            log(
+                                f"  {group['group']}: trainable={group['trainable_params']} "
+                                f"with_grad={group['params_with_grad']} grad_norm={group['grad_norm']:.4g}"
+                            )
                 row = {
                     "step": step,
                     "loss": float(loss.detach()),
@@ -228,6 +249,8 @@ def run_training_loop(
                     "lr": float(scheduler.get_last_lr()[0]),
                     "grad_norm": float(grad_norm),
                 }
+                if getattr(metrics, "extra_metrics", None):
+                    row.update({key: float(value) for key, value in metrics.extra_metrics.items()})
                 if metrics.pos_correct is not None and metrics.pos_count is not None:
                     row["slot0_accuracy"] = float(metrics.pos_correct[0] / metrics.pos_count[0].clamp_min(1))
                 history.append(row)
@@ -283,7 +306,7 @@ def run_training_loop(
             torch.cuda.max_memory_allocated(device) / 1e9 if device.type == "cuda" else None
         ),
     }
-    return {"summary": summary, "history": history}
+    return {"summary": summary, "history": history, "gradient_coverage": gradient_coverage}
 
 
 def run_overfit_sanity(cfg: dict, contract: dict, features_dir: Path, run_dir: Path, device, module, init_state) -> dict:
@@ -441,7 +464,33 @@ def train_dflash(cfg: dict, run_dir: str | Path, contract: dict, steps: int | No
     from .visual_check import check_drafter_visual_dependence
 
     visual = check_drafter_visual_dependence(cfg, contract, run_dir, device, module)
-    summary = {**output["summary"], "overfit_sanity": overfit, "visual_dependence": visual}
+    if output.get("gradient_coverage"):
+        write_json(train_dir / "gradient_coverage.json", output["gradient_coverage"])
+    # Algorithm-specific calibration diagnostics (e.g. DSpark's confidence
+    # head): only modules that implement the hook produce an artifact.
+    calibration = None
+    if hasattr(module, "calibration_report"):
+        from torch.utils.data import DataLoader
+
+        calibration_dataset = FeatureDataset(features_dir)
+        calibration_image_token_id = int(contract["tokens"]["image_token_id"])
+        calibration_loader = DataLoader(
+            calibration_dataset,
+            batch_size=int(train_cfg.get("micro_batch_size", 8)),
+            shuffle=False,
+            collate_fn=lambda batch: collate_features(batch, calibration_image_token_id),
+        )
+        calibration = module.calibration_report(calibration_loader, device)
+        if calibration is not None:
+            calibration["source"] = "train_features_head_batches"
+            write_json(train_dir / "confidence_calibration.json", calibration)
+            log(f"train: confidence calibration -> {train_dir / 'confidence_calibration.json'}")
+    summary = {
+        **output["summary"],
+        "overfit_sanity": overfit,
+        "visual_dependence": visual,
+        "confidence_calibration": calibration,
+    }
     write_json(train_dir / "train_summary.json", summary)
     record_stage(run_dir, "train", {"identity": identity_from_contract(contract), "summary": summary,
                                     "code": "vlm_dflash.dflash.train.train_dflash"})

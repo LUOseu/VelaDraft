@@ -11,6 +11,7 @@ from .base import AlgorithmMetadata, DrafterAlgorithm
 from .registry import (
     DEFAULT_ALGORITHM,
     UnknownAlgorithmError,
+    algorithm_name,
     available_algorithms,
     get_algorithm,
     register,
@@ -21,6 +22,7 @@ __all__ = [
     "DrafterAlgorithm",
     "DEFAULT_ALGORITHM",
     "UnknownAlgorithmError",
+    "algorithm_name",
     "available_algorithms",
     "get_algorithm",
     "register",

@@ -273,7 +273,10 @@ def build_train_config(args) -> dict:
             "(the smoke preset ships its own COCO slice)."
         )
     if getattr(args, "algorithm", None):
-        cfg["algorithm"] = str(args.algorithm)
+        if isinstance(cfg.get("algorithm"), dict):
+            cfg["algorithm"]["name"] = str(args.algorithm)
+        else:
+            cfg["algorithm"] = str(args.algorithm)
     from .algorithms import get_algorithm
 
     algorithm = get_algorithm(cfg.get("algorithm"))

@@ -46,6 +46,7 @@ def _load_defaults() -> None:
         return
     _DEFAULTS_LOADED = True
     from . import dflash as _dflash  # noqa: F401  (self-registers DFlashAlgorithm)
+    from . import dspark as _dspark  # noqa: F401  (self-registers DSparkAlgorithm)
 
 
 def available_algorithms() -> list[str]:
@@ -53,11 +54,23 @@ def available_algorithms() -> list[str]:
     return sorted(_REGISTRY)
 
 
-def get_algorithm(name: str | None = None) -> DrafterAlgorithm:
+def algorithm_name(algorithm_cfg) -> str:
+    """Resolve an algorithm name from a config value.
+
+    Accepts the plain string form (``algorithm: dflash``) and the namespaced
+    mapping form (``algorithm: {name: dspark, dspark: {...}}``).
+    """
+    if isinstance(algorithm_cfg, dict):
+        raw = algorithm_cfg.get("name")
+    else:
+        raw = algorithm_cfg
+    key = str(raw).strip() if raw else ""
+    return key or DEFAULT_ALGORITHM
+
+
+def get_algorithm(name: str | dict | None = None) -> DrafterAlgorithm:
     _load_defaults()
-    key = str(name).strip() if name else DEFAULT_ALGORITHM
-    if not key:
-        key = DEFAULT_ALGORITHM
+    key = algorithm_name(name)
     if key not in _REGISTRY:
         raise UnknownAlgorithmError(key, available_algorithms())
     return _REGISTRY[key]
@@ -67,6 +80,7 @@ __all__ = [
     "AlgorithmMetadata",
     "DrafterAlgorithm",
     "UnknownAlgorithmError",
+    "algorithm_name",
     "available_algorithms",
     "get_algorithm",
     "register",

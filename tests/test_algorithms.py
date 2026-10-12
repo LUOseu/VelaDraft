@@ -38,9 +38,9 @@ def test_none_resolves_default_algorithm():
 
 def test_unknown_algorithm_error_lists_available():
     with pytest.raises(UnknownAlgorithmError) as excinfo:
-        get_algorithm("dspark")
+        get_algorithm("nosuchalgorithm")
     message = str(excinfo.value)
-    assert "dspark" in message and "dflash" in message
+    assert "nosuchalgorithm" in message and "dflash" in message and "dspark" in message
 
 
 def test_dflash_validate_config_gates():
@@ -111,7 +111,7 @@ def test_cli_train_unknown_algorithm_fails_loud(tmp_path):
             "--target", "/models/Qwen2.5-VL-3B-Instruct",
             "--dataset", str(tmp_path / "data.jsonl"),
             "--preset", "single-gpu-24g",
-            "--algorithm", "dspark",
+            "--algorithm", "nosuchalgorithm",
         ]
     )
     with pytest.raises(UnknownAlgorithmError):

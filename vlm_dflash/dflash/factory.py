@@ -53,6 +53,10 @@ def build_trainer_module(
     cfg: dict,
     embed_weight: torch.Tensor,
     lm_head_weight: torch.Tensor | None = None,
+    *,
+    model_class=None,
+    module_class=None,
+    module_kwargs: dict | None = None,
 ):
     """Trainer module with the target's frozen embed and output head.
 
@@ -61,12 +65,18 @@ def build_trainer_module(
     matrix, untied targets (e.g. Qwen3-VL-8B) pass their own ``lm_head_weight``
     captured alongside the features. Passing ``None`` for an untied target would
     silently train against the embeddings and zero out acceptance at eval.
+
+    ``model_class`` / ``module_class`` / ``module_kwargs`` let algorithm plugins
+    (e.g. DSpark) reuse this frozen-embed/lm_head wiring with their own draft
+    backbone model and trainer module.
     """
     from .draft_model import Qwen3DFlashDraftModel
     from .trainer_core import DFlashTrainerModule
 
+    model_class = model_class or Qwen3DFlashDraftModel
+    module_class = module_class or DFlashTrainerModule
     drafter = cfg["drafter"]
-    draft = Qwen3DFlashDraftModel(draft_config)
+    draft = model_class(draft_config)
     vocab_size, hidden_size = int(embed_weight.shape[0]), int(embed_weight.shape[1])
     embed = nn.Embedding(vocab_size, hidden_size, dtype=embed_weight.dtype)
     with torch.no_grad():
@@ -84,7 +94,7 @@ def build_trainer_module(
         with torch.no_grad():
             lm_head.weight.copy_(lm_head_weight)
         lm_head.weight.requires_grad_(False)
-    module = DFlashTrainerModule(
+    module = module_class(
         draft_model=draft,
         target_lm_head=lm_head,
         target_embed_tokens=embed,
@@ -94,22 +104,24 @@ def build_trainer_module(
         num_anchors=int(drafter.get("num_anchors", 256)),
         loss_decay_gamma=float(drafter.get("loss_decay_gamma", 7.0)),
         loss_type="dflash",
+        **(module_kwargs or {}),
     )
     return module
 
 
-def load_checkpoint(path, map_location="cpu"):
+def load_checkpoint(path, map_location="cpu", model_class=None):
     """Load a vlm-dflash draft checkpoint (own format; trusted local file)."""
     from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
 
     from .draft_model import Qwen3DFlashDraftModel
 
+    model_class = model_class or Qwen3DFlashDraftModel
     checkpoint = torch.load(path, map_location=map_location, weights_only=False)
     if checkpoint.get("format") != "vlm-dflash-ckpt-v1":
         raise ValueError(f"Unrecognized checkpoint format in {path}: {checkpoint.get('format')!r}")
     config = Qwen3Config.from_dict(checkpoint["draft_config"])
     config._attn_implementation = checkpoint.get("attention_backend", "flex_attention")
-    draft = Qwen3DFlashDraftModel(config)
+    draft = model_class(config)
     draft.load_state_dict(checkpoint["model"])
     draft.eval()
     return draft, checkpoint
