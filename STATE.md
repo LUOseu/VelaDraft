@@ -66,6 +66,12 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
   visual check logits_diff=7.46 passed); eval AL 1.764 (token-exact 128/128),
   slots `[.443,.180,.078,.036,.016,.009,.005]` - ahead of DSpark (1.735) and
   DFlash (1.630) on the same corpus/protocol.
+- Ablations (same corpus/protocol): DSpark `sample_from_anchor: false` AL
+  1.719 (Markov head alone +0.089 over DFlash; anchor slot +0.016 on top);
+  Domino `enable_correction_head: false` AL 1.662 (correction head +0.102).
+  Zoo scoreboard table in BENCHMARKS.md.
+- Exports verified for both algorithms (`--out-dir /tmp/export_*`):
+  `method: dspark` / `method: domino` with the head fields in `draft_config`.
 
 ## Registry refactor verification (2026-10-11, no DFlash regression)
 - 61/61 CPU tests green after the refactor.

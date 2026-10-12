@@ -45,6 +45,31 @@ Notes
   base_loss by the end of the curriculum; overfit sanity, gradient coverage
   (audited at 10%), and the drafter visual check (logits_diff 7.46) passed.
   Speedup vs target-only 0.84x (sequential verification path).
+
+### Algorithm-zoo scoreboard (3B / 2K corpus / 128 prompts / 128 tokens)
+
+All rows use the same data, regen, captured features, block size 8, seed
+protocol, sequential (token-exact) verification and eval prompts. Ablations
+are the same run recipe with one algorithm knob flipped.
+
+| Run | AL | slot 1 | slot 2 | slot 3 | slot 4 | slot 5 | slot 6 | slot 7 | Token-exact |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| DFlash (frozen baseline) | 1.630 | .413 | .149 | .048 | .015 | .004 | .001 | 0 | 128/128 |
+| DSpark (anchor mode, upstream default) | 1.735 | .432 | .173 | .075 | .034 | .015 | .007 | .003 | 128/128 |
+| DSpark `sample_from_anchor: false` (DFlash-width ablation) | 1.719 | .418 | .170 | .075 | .033 | .016 | .006 | .003 | 128/128 |
+| Domino (correction enabled) | 1.764 | .443 | .180 | .078 | .036 | .016 | .009 | .005 | 128/128 |
+| Domino `enable_correction_head: false` (ablation) | 1.662 | .457 | .148 | .042 | .013 | .002 | .001 | 0 | 128/128 |
+
+- DSpark decomposition: at the frozen DFlash round width the Markov head alone
+  lifts AL 1.630 -> 1.719 (+0.089, deep slots roughly doubled); drafting the
+  anchor slot as well adds +0.016 on top (mostly slot 1). Both correction
+  families relieve the same suffix-acceptance decay the block-parallel drafter
+  suffers, and DSpark/Domino per-slot profiles differ (Domino keeps more of
+  slot-1 acceptance while gaining deeper), so the two heads are not redundant.
+- Domino ablation: the causal GRU correction is worth +0.102 AL at the same
+  window; the disabled run reproduces roughly the DFlash objective on the
+  shifted window (its 1.662 vs 1.630 difference reflects the shifted-label
+  supervision and ~2% protocol noise, not the head).
 - `AL = new_tokens / target_verification_steps` (bonus-token-inclusive);
   random-init drafter AL ~1.003 means proposals are almost never accepted.
 
