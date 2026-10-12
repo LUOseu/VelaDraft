@@ -63,6 +63,7 @@ are the same run recipe with one algorithm knob flipped.
 | JetSpec (causal-mask serving, faithful) | 1.599 | .408 | .137 | .040 | .011 | .003 | .001 | 0 | 128/128 |
 | JetSpec (shared runtime, no in-block mask) | 1.338 | .242 | .069 | .020 | .005 | .001 | .0004 | .0002 | 128/128 |
 | DFlash2 (conv + selector, experimental objective) | 1.954 | .495 | .243 | .118 | .060 | .027 | .013 | .006 | 128/128 |
+| DFlash2 `conv_kernel_size: 1` + `selector_loss_alpha: 0` (ablation) | 1.798 | .482 | .203 | .077 | .027 | .009 | .003 | .001 | 128/128 |
 
 - DSpark decomposition: at the frozen DFlash round width the Markov head alone
   lifts AL 1.630 -> 1.719 (+0.089, deep slots roughly doubled); drafting the
@@ -101,17 +102,28 @@ are the same run recipe with one algorithm knob flipped.
   ranked by unary logits alone. The selector changes the pick at ~60% of
   proposal positions, and its gain is concentrated in the deep slots
   (slot 3 .046 -> .083, slot 4 .025 -> .039, slot 6 .005 -> .011), while
-  unary-only ranking keeps more of slot 1 (.548 vs .511).
+  unary-only ranking keeps more of slot 1 (.548 vs .511). On the ablated
+  checkpoint the same diagnostic reports `selector_override_rate: 0.0`
+  (selector and unary rankings identical, both AL 1.897 at 16 prompts),
+  confirming the knob really turns the trained reranking off.
 - DFlash2 caveat (read before quoting +0.32): the objective is **not
   published**; the number above is the maintainer implementation's
   experimental split objective, so it must not be cited as "DFlash2's training
   method" (see `docs/upstream/dflash2.md`). It also differs from the frozen
   DFlash baseline on two axes at once — forward-KL unary instead of decayed
   hard-label CE, plus conv + selector — so the scoreboard delta cannot be
-  attributed to a single module. The local-mixing ablation
-  (`algorithm.dflash2.conv_kernel_size: 1`, `selector_loss_alpha: 0.0`, same
-  recipe/features/seed) is the decomposition control for the convolution
-  (`qwen25vl3b_dflash2_2k_ablate_nomix`).
+  attributed to a single module. The completed local-mixing + selector
+  ablation (`algorithm.dflash2.conv_kernel_size: 1`,
+  `selector_loss_alpha: 0.0`, same recipe/features/seed, run
+  `qwen25vl3b_dflash2_2k_ablate_nomix`) bounds the joint conv+selector share:
+  **1.954 -> 1.798 (-0.156 AL)**, all else equal. The ablated checkpoint
+  still beats DSpark (1.735) and Domino (1.764), so the remaining +0.17 vs
+  the frozen baseline goes with the objective axis (hard-label CE ->
+  forward-KL), which is **not isolated yet** — a `unary_loss: ce` control
+  would be needed before quoting that residual as the objective's value.
+  (Ablation run: 792 steps, first/last-10 loss 3.31 -> 1.01, overfit sanity
+  0.995/0.98 passed, visual check logits_diff 9.51, peak 30.1 GB, 19.5 min,
+  token-exact 128/128.)
 - `AL = new_tokens / target_verification_steps` (bonus-token-inclusive);
   random-init drafter AL ~1.003 means proposals are almost never accepted.
 
@@ -135,6 +147,12 @@ reported as experimental throughput only.
 
 ## Reproducibility
 
+- Post-zoo regression (2026-10-12): re-evaluating the frozen 3B-2K DFlash
+  checkpoint with the full five-algorithm code reproduces AL **1.6298**
+  bit-identically at the canonical 128-prompt / 128-token protocol (both
+  checkpoints token-exact 128/128); the 8-prompt registry path reproduces
+  1.6096. Frozen baselines, semantics and re-measurements:
+  `tests/reference_dflash/manifest.json`.
 - Same seed + same data: `rows_sha256` and regen keeps reproduce; captured
   shard hashes and bf16 training losses do not (kernel nondeterminism).
 - Treat AL differences < ~2% as noise unless the protocol pins more seeds.

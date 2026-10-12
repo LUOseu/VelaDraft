@@ -1,0 +1,141 @@
+{
+  "format": "vlm-dflash-reference-manifest-v1",
+  "created": "2026-10-12",
+  "purpose": "Frozen pre-zoo DFlash reference for the algorithm-zoo refactor (GOAL section 1). Numbers mirror BENCHMARKS.md; run dirs live on the training server (runs/ is gitignored). After any refactor, re-measure the gate rows (sequential verification only) and append the result to remeasurements.",
+  "metric_definitions": {
+    "al": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)",
+    "per_slot_acceptance": "accepted(k) / opportunities(k), k = 1..block_size-1; slot 0 is the clean anchor and is never supervised",
+    "token_exact": "speculative (draft + verify) greedy output equals target-only greedy output token-for-token; sequential verification, batch 1, same dtype/attn"
+  },
+  "baselines": [
+    {
+      "name": "qwen25vl3b-2k",
+      "algorithm": "dflash",
+      "target": "Qwen2.5-VL-3B-Instruct",
+      "target_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+      "train_rows_kept": 1050,
+      "run_dir": "runs/qwen25vl3b_2k",
+      "prompts": 128,
+      "max_new_tokens": 128,
+      "al": 1.6298,
+      "al_random_init_drafter": 1.003,
+      "per_slot_acceptance": [0.413, 0.149, 0.048, 0.015, 0.004, 0.001, 0.0],
+      "token_exact": true,
+      "train": {
+        "steps": 792,
+        "first10_mean_loss": 7.498,
+        "last10_mean_loss": 3.785,
+        "wall_seconds": 586,
+        "peak_gpu_mem_gb": 29.5
+      }
+    },
+    {
+      "name": "qwen25vl3b-5k",
+      "algorithm": "dflash",
+      "target": "Qwen2.5-VL-3B-Instruct",
+      "train_rows_kept": 2629,
+      "run_dir": "runs/qwen25vl3b_5k",
+      "prompts": 128,
+      "max_new_tokens": 128,
+      "al": 1.8169,
+      "al_random_init_drafter": 1.003,
+      "per_slot_acceptance": [0.482, 0.210, 0.080, 0.030, 0.011, 0.005, 0.001],
+      "token_exact": true,
+      "train": {
+        "steps": 1974,
+        "first10_mean_loss": 6.84,
+        "last10_mean_loss": 2.58,
+        "wall_seconds_approx": 2400,
+        "peak_gpu_mem_gb": 30.0
+      }
+    },
+    {
+      "name": "qwen3vl8b-512",
+      "algorithm": "dflash",
+      "target": "Qwen3-VL-8B",
+      "train_rows_kept": 274,
+      "run_dir": "runs/qwen3vl8b_dflash",
+      "prompts": 64,
+      "max_new_tokens": 128,
+      "al": 1.3219,
+      "al_random_init_drafter": 1.003,
+      "per_slot_acceptance": [0.244, 0.058, 0.018, 0.005, 0.0, 0.0, 0.0],
+      "token_exact": true
+    },
+    {
+      "name": "qwen3vl8b-2k",
+      "algorithm": "dflash",
+      "target": "Qwen3-VL-8B",
+      "train_rows_kept": 1996,
+      "run_dir": "runs/qwen3vl8b_2k",
+      "prompts": 32,
+      "max_new_tokens": 128,
+      "al": 1.665,
+      "al_random_init_drafter": 1.0,
+      "per_slot_acceptance": [0.413, 0.160, 0.063, 0.027, 0.010, 0.002, 0.0004],
+      "token_exact": true,
+      "train": {
+        "steps": 1500,
+        "final_loss": 2.69,
+        "slot0_teacher_forced_accuracy": 0.73
+      }
+    }
+  ],
+  "checkpoint_semantics": {
+    "ckpt_final.pt": "trained drafter; stores algorithm + head (tied/untied) tags plus the feature-identity bindings; train/eval hard-fail on mismatch",
+    "ckpt_init.pt": "random-init acceptance baseline (AL ~1.003)",
+    "resume": "last.pt + optimizer state, atomic replace"
+  },
+  "feature_semantics": {
+    "format": "vlm-dflash-features-v1 (features/manifest.json + index.jsonl + shard_*.pt)",
+    "index_fields": ["sample_id", "shard", "shard_index", "seq_len", "prompt_len", "answer_len", "image_span", "n_image_tokens"],
+    "identity_fields": ["target_model_path", "model_fingerprint", "processor_fingerprint", "mask_token_id", "spatial_rope_sections", "draft_layer_ids", "image_min_pixels", "image_max_pixels"],
+    "capture_v2_marker": "stores_final_hidden: true - needed by the exact staged teacher used by JetSpec/DFlash2; DSpark/Domino/DFlash2 2K runs reuse runs/qwen25vl3b_jetspec_2k/features",
+    "tied_head": "features/target_head.pt is stored only when the target is untied; tied targets project through the embedding matrix"
+  },
+  "regression_gates": [
+    "token_exact stays true for every gate row (hard gate; sequential verification only)",
+    "AL moves only within the recorded run-to-run noise (~2% bf16)",
+    "per-slot acceptance profile shape unchanged (slot 1 dominates, anchor never supervised)",
+    "ckpt_final/ckpt_init load from the frozen run and reproduce the recorded AL on the frozen eval prompts",
+    "the drafter visual-path check still passes (captured features carry image information)"
+  ],
+  "remeasurements": [
+    {
+      "date": "2026-10-11",
+      "tag": "registry_check",
+      "file": "runs/qwen25vl3b_2k/eval/eval_result_registry_check.json",
+      "prompts": 8,
+      "max_new_tokens": 128,
+      "al": 1.6096,
+      "token_exact": true,
+      "note": "post-registry-refactor re-check on the frozen 2K checkpoint"
+    },
+    {
+      "date": "2026-10-12",
+      "tag": "post_dflash2_stage_regression",
+      "file": "runs/qwen25vl3b_2k/eval/eval_result_post_dflash2_stage_regression.json",
+      "prompts": 8,
+      "max_new_tokens": 128,
+      "al": 1.6096,
+      "token_exact": true,
+      "note": "after the DFlash2 stage landed; bit-identical to registry_check"
+    },
+    {
+      "date": "2026-10-12",
+      "tag": "post_dflash2_full128",
+      "file": "runs/qwen25vl3b_2k/eval/eval_result_post_dflash2_full128.json",
+      "prompts": 128,
+      "max_new_tokens": 128,
+      "al": 1.6298,
+      "token_exact": true,
+      "note": "full canonical re-eval of the frozen checkpoint with post-DFlash2 code; reproduces the frozen 1.6298365840801265 bit-identically (ckpt_init 1.0030, both token-exact)"
+    }
+  ],
+  "not_comparable": [
+    {
+      "file": "runs/qwen25vl3b_2k/eval/eval_result_dflash_regress8.json",
+      "why": "max_new_tokens 32 slice; its AL 1.7655 does not compare to the max_new_tokens 128 gates"
+    }
+  ]
+}
