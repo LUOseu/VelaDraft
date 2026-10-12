@@ -148,7 +148,6 @@ class DFlash2TrainerModule(DFlashTrainerModule):
         payload = {
             "unary": logits.view(bsz, n, bs, -1)[:, :, first:, :].reshape(bsz, n * slots, -1),
             "hidden": output_hidden.view(bsz, n, bs, -1)[:, :, first:, :].reshape(bsz, n * slots, -1),
-            "ground_truth": target_ids[:, :, first:].reshape(bsz, n * slots),
             "pred_mask": block_mask[:, :, first:].reshape(bsz, n * slots),
             "teacher_hidden": self._gather_rows(teacher_hidden, teacher_index),
             "predecessor_ids": torch.gather(input_ids, 1, teacher_index),
