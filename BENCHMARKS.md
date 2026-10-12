@@ -11,6 +11,7 @@ reference. Do not mix experimental parallel-runtime numbers into these tables.
 | Qwen2.5-VL-3B | 512 | 278 kept | 64 | 1.198 | 1.003 | 64/64 | see eval_result.json |
 | Qwen2.5-VL-3B | 2K | 1050 kept | 128 | 1.630 | 1.003 | 128/128 | .413, .149, .048, .015, .004, .001, 0 |
 | Qwen3-VL-8B | 512 | 274 kept | 32 | 1.322 | 1.003 | 32/32 | see eval_result.json |
+| Qwen3-VL-8B | 2K | 1996 kept | 32 | 1.665 | 1.000 | 32/32 | .413, .160, .063, .027, .010, .002, .0004 |
 | Qwen2.5-VL-3B | 5K | 2629 kept | 128 | 1.817 | 1.003 | 128/128 | .482, .210, .080, .030, .011, .005, .001 |
 
 Notes
@@ -20,6 +21,9 @@ Notes
   acceptance through slot 5, 5K extends it through slot 6.
 - 5K training: block CE 6.84 -> 2.58 (first/last-10% means), 1974 steps,
   peak 30.0 GB, ~40 min on one A6000; overfit sanity passed.
+- 8B / 2K: regen kept 1996/2000 rows, capture 1996 samples (visual-path check
+  passed), training 1500 steps (resumed from 375), final loss 2.69, slot-0
+  teacher-forced accuracy 0.73; eval 32 prompts / 128 tokens, speedup 0.81x.
 - `AL = new_tokens / target_verification_steps` (bonus-token-inclusive);
   random-init drafter AL ~1.003 means proposals are almost never accepted.
 
@@ -31,6 +35,7 @@ Notes
 | 3B / 2K | parallel | 8/32 | - | 1.25x | experimental, not lossless |
 | 3B / 2K | strict τ=0.25 | 7/32 | - | 1.03x | diagnostic |
 | 8B / 512 (AL 1.33) | sequential | 32/32 | 5.25 | 0.84x | correctness path |
+| 8B / 2K (AL 1.67) | sequential | 32/32 | 5.60 | 0.81x | correctness path |
 | 8B / 512 | parallel | 6/32 | 4.31 | 1.02x | experimental, not lossless |
 | 8B / 512 | strict τ=2.0 | 10/32 | 6.61 | 0.67x | diagnostic |
 
