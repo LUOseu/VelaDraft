@@ -19,13 +19,20 @@ import torch
 import torch.nn.functional as F
 
 from ..dflash.trainer_core import DFlashTrainerModule
-from .heads import ConfidenceHead, build_markov_head
 
 __all__ = ["DSparkTrainerModule"]
 
 
 class DSparkTrainerModule(DFlashTrainerModule):
-    """DFlash block-CE training plus the DSpark Markov bias and confidence BCE."""
+    """DFlash block-CE training plus the DSpark Markov bias and confidence BCE.
+
+    The two DSpark heads are constructed by ``Qwen3DSparkDraftModel`` (from the
+    ``algorithm.dspark`` knobs baked into its ``dflash_config``); this module
+    reuses those instances, and the optional ``markov_rank`` /
+    ``markov_head_type`` / ``enable_confidence_head`` /
+    ``confidence_head_with_markov`` arguments are validation-only overrides of
+    what the model already holds.
+    """
 
     # Optional sink for the post-training calibration report (``None`` during
     # training: zero overhead). Each entry is a detached CPU triple
@@ -39,10 +46,10 @@ class DSparkTrainerModule(DFlashTrainerModule):
         target_embed_tokens,
         mask_token_id: int,
         *,
-        markov_rank: int = 256,
-        markov_head_type: str = "vanilla",
-        enable_confidence_head: bool = True,
-        confidence_head_with_markov: bool = True,
+        markov_rank: Optional[int] = None,
+        markov_head_type: Optional[str] = None,
+        enable_confidence_head: Optional[bool] = None,
+        confidence_head_with_markov: Optional[bool] = None,
         confidence_head_alpha: float = 1.0,
         sample_from_anchor: bool = True,
         **kwargs,
@@ -55,24 +62,61 @@ class DSparkTrainerModule(DFlashTrainerModule):
             sample_from_anchor=sample_from_anchor,
             **kwargs,
         )
-        hidden_size = int(draft_model.config.hidden_size)
-        vocab_size = int(target_lm_head.out_features)
-        self.markov_rank = int(markov_rank)
-        self.markov_head = build_markov_head(
-            vocab_size=vocab_size,
-            markov_rank=self.markov_rank,
-            markov_head_type=markov_head_type,
-            hidden_size=hidden_size,
-        )
-        self.enable_confidence_head = bool(enable_confidence_head)
-        self.confidence_head_with_markov = bool(confidence_head_with_markov)
+        # The heads are owned by the draft model (``Qwen3DSparkDraftModel``), not
+        # re-created here. One shared instance keeps three things consistent by
+        # construction:
+        #   * ``module.draft_model.to(dtype)`` in the training loop casts the
+        #     heads too (a duplicated fp32 head crashes against bf16 features),
+        #   * the optimizer's master parameters and the saved checkpoint come
+        #     from ``draft_model.named_parameters()`` / ``state_dict()``, so the
+        #     trained head weights are actually persisted and reloaded (a
+        #     duplicated head would silently stay at its random init),
+        #   * inference (``load_checkpoint``) rebuilds the very same slots.
+        missing = [name for name in ("markov_head", "confidence_head") if not hasattr(draft_model, name)]
+        if missing:
+            raise ValueError(
+                "DSpark heads live on the draft model; expected attributes "
+                f"{missing} on {type(draft_model).__name__}. Build the trainer module "
+                "through vlm_dflash.dspark.factory so the draft model is a "
+                "Qwen3DSparkDraftModel."
+            )
+        mismatches: list[str] = []
+        if markov_rank is not None and int(markov_rank) != int(draft_model.markov_rank):
+            mismatches.append(f"markov_rank {int(markov_rank)} != model's {int(draft_model.markov_rank)}")
+        if markov_head_type is not None and str(markov_head_type).lower() != str(draft_model.markov_head_type):
+            mismatches.append(
+                f"markov_head_type {str(markov_head_type)!r} != model's {draft_model.markov_head_type!r}"
+            )
+        if enable_confidence_head is not None and bool(enable_confidence_head) != bool(
+            draft_model.enable_confidence_head
+        ):
+            mismatches.append(
+                f"enable_confidence_head {bool(enable_confidence_head)} != model's "
+                f"{bool(draft_model.enable_confidence_head)}"
+            )
+        if confidence_head_with_markov is not None and bool(confidence_head_with_markov) != bool(
+            draft_model.confidence_head_with_markov
+        ):
+            mismatches.append(
+                f"confidence_head_with_markov {bool(confidence_head_with_markov)} != model's "
+                f"{bool(draft_model.confidence_head_with_markov)}"
+            )
+        if mismatches:
+            raise ValueError(
+                "DSpark head knobs disagree with the draft model config (the model is the "
+                "single source of truth; both sides must come from algorithm.dspark): "
+                + "; ".join(mismatches)
+            )
+        if float(confidence_head_alpha) < 0:
+            raise ValueError(f"confidence_head_alpha must be >= 0, got {confidence_head_alpha}")
+        self.markov_rank = int(draft_model.markov_rank)
+        self.enable_confidence_head = bool(draft_model.enable_confidence_head)
+        self.confidence_head_with_markov = bool(draft_model.confidence_head_with_markov)
         self.confidence_head_alpha = float(confidence_head_alpha)
-        if self.confidence_head_alpha < 0:
-            raise ValueError(f"confidence_head_alpha must be >= 0, got {self.confidence_head_alpha}")
-        if self.enable_confidence_head and self.confidence_head_with_markov and self.markov_head is None:
-            raise ValueError("confidence_head_with_markov=True requires markov_rank > 0.")
-        input_dim = hidden_size + (self.markov_rank if self.confidence_head_with_markov else 0)
-        self.confidence_head = ConfidenceHead(input_dim) if self.enable_confidence_head else None
+        # Shared references (the module already owns these as submodules; binding
+        # them here is only for attribute access in ``_apply_algorithm_terms``).
+        self.markov_head = draft_model.markov_head
+        self.confidence_head = draft_model.confidence_head
 
     def _apply_algorithm_terms(
         self,
@@ -143,11 +187,14 @@ class DSparkTrainerModule(DFlashTrainerModule):
                 metrics["confidence_target_mean"] = float((accepted * mask_sup).sum() / denom)
                 metrics["confidence_abs_error"] = float(((probs - accepted).abs() * mask_sup).sum() / denom)
                 if self.calibration_sink is not None:
+                    # Flatten the block axis: the number of sampled anchors varies
+                    # per batch, so concatenating [B, N_i, slots] tensors along
+                    # dim 0 would raise a size mismatch.
                     self.calibration_sink.append(
                         (
-                            probs.float().cpu(),
-                            accepted.float().cpu(),
-                            mask_sup.detach().float().cpu(),
+                            probs.reshape(-1, probs.shape[-1]).float().cpu(),
+                            accepted.reshape(-1, accepted.shape[-1]).float().cpu(),
+                            mask_sup.reshape(-1, mask_sup.shape[-1]).detach().float().cpu(),
                         )
                     )
         return block_logits.view(bsz, n * bs, -1), aux_loss, metrics or None
@@ -210,12 +257,12 @@ class DSparkTrainerModule(DFlashTrainerModule):
             auroc = float((ranks[y.bool()].sum() - positives * (positives + 1) / 2) / (positives * negatives))
         else:
             auroc = None
-        per_slot_pred = probs.mean(dim=(0, 1)).tolist()
+        per_slot_pred = probs.mean(dim=0).tolist()
         per_slot_obs = []
         for slot in range(probs.shape[-1]):
-            slot_mask = mask[:, :, slot]
+            slot_mask = mask[:, slot]
             per_slot_obs.append(
-                float(accepted[:, :, slot][slot_mask].mean()) if slot_mask.any() else None
+                float(accepted[:, slot][slot_mask].mean()) if slot_mask.any() else None
             )
         return {
             "confidence_bce": bce,

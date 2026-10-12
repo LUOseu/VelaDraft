@@ -146,3 +146,21 @@ def test_resume_state_carries_optimizer_and_rng():
     assert state["steps_total_planned"] == 6
     assert "torch_rng_state" in state
     assert state["optimizer"]["state"], "optimizer state must be present for exact resume"
+
+
+def test_gradient_coverage_is_measured_while_grads_are_populated():
+    """GOAL 13 audit must read the live .grad fields, not the cleared ones.
+
+    The fp32-master sync clears every ``.grad`` before the optimizer step, so
+    auditing after it reported 0/N trainable tensors with grad — a result that
+    reads like "nothing trains" while the run is fine.
+    """
+    output = _run(_tiny_module())
+    coverage = output["gradient_coverage"]
+    assert coverage is not None
+    assert coverage["params_with_grad"] > 0
+    assert coverage["params_with_grad"] == coverage["trainable_tensors"]
+    assert coverage["fraction_with_grad"] > 0.9  # element-weighted, not 22/74k
+    groups = {group["group"]: group for group in coverage["groups"]}
+    assert groups["draft_model.layers"]["params_with_nonzero_grad"] > 0
+    assert groups["draft_model.layers"]["trainable_tensors"] > 0

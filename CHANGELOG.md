@@ -32,6 +32,19 @@ Changed
   `_apply_algorithm_terms` lets algorithms add logit corrections/auxiliary
   losses without touching the frozen DFlash path.
 
+Fixed
+- **DSpark heads are owned by the draft model, not duplicated by the trainer.**
+  The duplicate heads kept fp32 weights while the backbone was cast to bf16
+  (`RuntimeError: mat1 and mat2 must have the same dtype`), and — the more
+  dangerous half — were invisible to the optimizer's master-parameter set and
+  to the saved `draft_model.state_dict()`, so head weights would have trained
+  on nothing and reloaded at their random init. `DSparkTrainerModule` now binds
+  `draft_model.markov_head` / `confidence_head` (single source of truth) and
+  validates explicit knob overrides against the model config. Regression tests:
+  ownership identity, bf16 cast propagation, disagreement and bare
+  `Qwen3DFlashDraftModel` rejection; `gradient_coverage_report` now reports
+  `draft_model.<child>` groups so a head cannot hide inside the backbone line.
+
 ## v0.2.0 (in development)
 
 Qwen3-VL support, verification modes, scaling evidence, and the algorithm

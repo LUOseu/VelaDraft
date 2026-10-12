@@ -1650,7 +1650,12 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             block_output_ids[:, 1:] = self._sample_draft_tokens(
                 target,
                 draft_hidden,
-                block_output_ids,
+                # Contract: the sampler receives the draft's own block window
+                # (anchor + block_size - 1 mask slots). In sample_from_anchor
+                # mode the round window is one position wider; the extra slot is
+                # the verifier's bonus token, so the wide block must not be
+                # passed through (it would also trip the block_size check).
+                block_output_ids[:, :block_size],
             )
             end_timing("draft", phase_start)
             past_key_values_draft.crop(start)

@@ -117,7 +117,8 @@ def gradient_coverage_report(model, *, group_prefixes: Iterable[str] = ()) -> di
     Args:
         model: Any ``torch.nn.Module`` (usually the trainer module).
         group_prefixes: Optional parameter-name prefixes to group by; defaults
-            to one group per top-level submodule (first dotted segment).
+            to one group per top-level submodule, with the draft model's direct
+            children (layers / heads) as their own groups.
 
     Returns:
         Dict with ``groups`` (list of per-group dicts), and totals
@@ -135,23 +136,36 @@ def gradient_coverage_report(model, *, group_prefixes: Iterable[str] = ()) -> di
                     break
             if key is None:
                 parts = name.split(".")
-                # Top-level submodule granularity: draft_model, markov_head,
-                # confidence_head, ... one line per group in the audit.
-                key = parts[0]
+                # One group per top-level submodule. Inside the draft model use
+                # its direct children (``draft_model.layers``,
+                # ``draft_model.markov_head``, ``draft_model.confidence_head``,
+                # ...) so an algorithm head that never receives an update cannot
+                # hide inside the backbone's aggregate line.
+                if parts[0] == "draft_model" and len(parts) > 1:
+                    key = f"{parts[0]}.{parts[1]}"
+                else:
+                    key = parts[0]
         group = groups.setdefault(
             key,
             {
                 "group": key,
+                # ``*_params`` are parameter-element (numel) counts, ``*_tensors``
+                # are tensor counts; mixing them made ``fraction_with_grad`` read
+                # as ~0 for a perfectly healthy run (22 tensors / 74k elements).
                 "trainable_params": 0,
+                "trainable_tensors": 0,
                 "params_with_grad": 0,
+                "params_with_grad_elements": 0,
                 "params_with_nonzero_grad": 0,
                 "grad_sq_sum": 0.0,
             },
         )
         if parameter.requires_grad:
             group["trainable_params"] += parameter.numel()
+            group["trainable_tensors"] += 1
             if parameter.grad is not None:
                 group["params_with_grad"] += 1
+                group["params_with_grad_elements"] += parameter.numel()
                 grad = parameter.grad.detach().float()
                 grad_sq = float(grad.pow(2).sum())
                 group["grad_sq_sum"] += grad_sq
@@ -161,12 +175,14 @@ def gradient_coverage_report(model, *, group_prefixes: Iterable[str] = ()) -> di
         group["grad_norm"] = group.pop("grad_sq_sum") ** 0.5
     ordered = sorted(groups.values(), key=lambda item: item["group"])
     trainable = sum(item["trainable_params"] for item in ordered)
-    with_grad = sum(item["params_with_grad"] for item in ordered)
-    with_nonzero = sum(item["params_with_nonzero_grad"] for item in ordered)
+    with_grad_elements = sum(item["params_with_grad_elements"] for item in ordered)
     return {
         "groups": ordered,
         "trainable_params": trainable,
-        "params_with_grad": with_grad,
-        "params_with_nonzero_grad": with_nonzero,
-        "fraction_with_grad": (with_grad / trainable) if trainable else 0.0,
+        "trainable_tensors": sum(item["trainable_tensors"] for item in ordered),
+        "params_with_grad": sum(item["params_with_grad"] for item in ordered),
+        "params_with_nonzero_grad": sum(item["params_with_nonzero_grad"] for item in ordered),
+        # Element-weighted coverage: the share of trainable parameters whose
+        # tensor received *a* gradient at the audited step.
+        "fraction_with_grad": (with_grad_elements / trainable) if trainable else 0.0,
     }

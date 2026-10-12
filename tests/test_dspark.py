@@ -24,7 +24,9 @@ from vlm_dflash.dspark.trainer import DSparkTrainerModule
 from vlm_dflash.utils import gradient_coverage_report
 
 
-def _tiny_dspark_module(seed: int = 0, *, sample_from_anchor: bool = True) -> DSparkTrainerModule:
+def _tiny_dspark_module(
+    seed: int = 0, *, sample_from_anchor: bool = True, markov_rank: int = 32
+) -> DSparkTrainerModule:
     torch.manual_seed(seed)
     from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
 
@@ -65,7 +67,7 @@ def _tiny_dspark_module(seed: int = 0, *, sample_from_anchor: bool = True) -> DS
         attention_backend="sdpa",
         num_anchors=16,
         loss_decay_gamma=7.0,
-        markov_rank=32,
+        markov_rank=markov_rank,
         markov_head_type="vanilla",
         sample_from_anchor=sample_from_anchor,
     )
@@ -239,11 +241,74 @@ def test_gradient_coverage_report_flags_unused_head():
     report = gradient_coverage_report(module)
     groups = {group["group"]: group for group in report["groups"]}
     assert report["trainable_params"] > 0
-    assert groups["markov_head"]["params_with_nonzero_grad"] > 0
-    assert groups["markov_head"]["grad_norm"] > 0
-    assert groups["confidence_head"]["params_with_nonzero_grad"] == 0
-    assert groups["confidence_head"]["grad_norm"] == 0.0
-    assert groups["confidence_head"]["trainable_params"] > 0
+    assert groups["draft_model.markov_head"]["params_with_nonzero_grad"] > 0
+    assert groups["draft_model.markov_head"]["grad_norm"] > 0
+    assert groups["draft_model.confidence_head"]["params_with_nonzero_grad"] == 0
+    assert groups["draft_model.confidence_head"]["grad_norm"] == 0.0
+    assert groups["draft_model.confidence_head"]["trainable_params"] > 0
+    # The backbone is reported under its own group, not merged with the heads.
+    assert "draft_model.layers" in groups
+
+
+def test_trainer_heads_are_owned_by_the_draft_model():
+    """Regression: a duplicated trainer-side head is trained on nothing.
+
+    The training loop casts ``module.draft_model`` to bf16 and builds the
+    optimizer / checkpoint from ``draft_model.named_parameters()`` and
+    ``state_dict()``. A head owned by the trainer module instead would keep
+    fp32 weights (dtype crash against bf16 features) and stay at its random
+    init while never being saved. The trainer must expose the model's
+    instances.
+    """
+    module = _tiny_dspark_module()
+    assert module.markov_head is module.draft_model.markov_head
+    assert module.confidence_head is module.draft_model.confidence_head
+    parameter_names = {name for name, _ in module.draft_model.named_parameters()}
+    assert any(name.startswith("markov_head.") for name in parameter_names)
+    assert any(name.startswith("confidence_head.") for name in parameter_names)
+    state_keys = set(module.draft_model.state_dict())
+    assert any(key.startswith("markov_head.") for key in state_keys)
+    assert any(key.startswith("confidence_head.") for key in state_keys)
+
+
+def test_dtype_cast_of_the_draft_model_reaches_the_heads():
+    """Mirror the training-loop cast that crashed with fp32 heads + bf16 features."""
+    input_ids, loss_mask, hidden = _tiny_batch()
+    module = _tiny_dspark_module()
+    module.draft_model.to(torch.bfloat16)
+    # In a real run the frozen target embed/lm_head are built from the captured
+    # (bf16) feature file, so they are bf16 alongside the draft.
+    module.lm_head.to(torch.bfloat16)
+    module.embed_tokens.to(torch.bfloat16)
+    assert module.markov_head.markov_w2.weight.dtype == torch.bfloat16
+    assert module.confidence_head.proj.weight.dtype == torch.bfloat16
+    metrics = module(input_ids=input_ids, hidden_states=hidden.to(torch.bfloat16), loss_mask=loss_mask)
+    assert torch.isfinite(metrics.loss)
+    metrics.loss.backward()
+    assert module.markov_head.markov_w2.weight.grad is not None
+    assert module.confidence_head.proj.weight.grad is not None
+
+
+def test_trainer_rejects_head_knobs_that_disagree_with_the_model():
+    with pytest.raises(ValueError, match="markov_rank"):
+        _tiny_dspark_module(markov_rank=8)
+
+
+def test_trainer_requires_a_dspark_draft_model():
+    from vlm_dflash.dflash.draft_model import Qwen3DFlashDraftModel
+
+    module = _tiny_dspark_module()
+    plain = Qwen3DFlashDraftModel(module.draft_model.config)
+    with pytest.raises(ValueError, match="heads live on the draft model"):
+        DSparkTrainerModule(
+            draft_model=plain,
+            target_lm_head=module.lm_head,
+            target_embed_tokens=module.embed_tokens,
+            mask_token_id=255,
+            block_size=8,
+            attention_backend="sdpa",
+            num_anchors=16,
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -282,6 +347,49 @@ def test_dspark_sample_from_anchor_returns_block_size_proposals():
     assert tokens.shape == (1, 8)
 
 
+@torch.no_grad()
+def test_dspark_spec_generate_runs_in_anchor_mode():
+    """Regression: the round window is `block_size + 1` in anchor mode.
+
+    ``spec_generate`` used to hand the full round window (9) to
+    ``_sample_draft_tokens``, whose contract is the draft's own block (8); every
+    DSpark eval round raised ``Expected a draft block of length 8, got 9``.
+    """
+    from transformers import Qwen3ForCausalLM
+    from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
+
+    torch.manual_seed(11)
+    target_config = Qwen3Config(
+        vocab_size=256,
+        hidden_size=64,
+        intermediate_size=128,
+        num_hidden_layers=2,
+        num_attention_heads=4,
+        num_key_value_heads=2,
+        head_dim=16,
+        max_position_embeddings=512,
+        rope_parameters={"rope_type": "default", "rope_theta": 10000.0},
+    )
+    target_config._attn_implementation = "sdpa"
+    target = Qwen3ForCausalLM(target_config)
+    target.eval()
+
+    draft = _tiny_dspark_module(sample_from_anchor=True).draft_model
+    draft.eval()
+    torch.manual_seed(5)
+    input_ids = torch.randint(0, 256, (1, 12))
+    ids, stats = draft.spec_generate(
+        target=target,
+        input_ids=input_ids,
+        max_new_tokens=16,
+        stop_token_ids=None,
+        temperature=0.0,
+        return_stats=True,
+    )
+    assert ids.shape[1] == input_ids.shape[1] + 16
+    assert stats["verify_steps"] > 0
+
+
 # --------------------------------------------------------------------------- #
 # calibration report
 # --------------------------------------------------------------------------- #
@@ -303,6 +411,38 @@ def test_calibration_report_reports_nonconstant_confidence():
     assert report["confidence_pred_std"] > 0
     assert report["confidence_auroc"] is None or 0.0 <= report["confidence_auroc"] <= 1.0
     assert len(report["per_slot_pred_mean"]) == 8
+
+
+def test_calibration_report_handles_varying_anchor_counts():
+    """Anchor counts vary per batch ([B, N_i, slots]); the sink must flatten them.
+
+    The canonical 2K run crashed here: ``torch.cat`` over stored tensors with
+    different N (e.g. 48 vs 41) raised a size mismatch, aborting the run after
+    training had already finished.
+    """
+    module = _tiny_dspark_module()
+    input_ids_a, loss_mask_a, hidden_a = _tiny_batch(batch_size=2, seq_len=48)
+    # A shorter sequence samples fewer anchors, so N differs between batches.
+    input_ids_b, loss_mask_b, hidden_b = _tiny_batch(batch_size=2, seq_len=24)
+
+    def batch(input_ids, loss_mask, hidden):
+        return {
+            "input_ids": input_ids,
+            "loss_mask": loss_mask,
+            "hidden": hidden,
+            "image_mask": torch.zeros_like(loss_mask, dtype=torch.bool),
+            "position3": torch.zeros(3, input_ids.shape[0], input_ids.shape[1], dtype=torch.long),
+        }
+
+    report = module.calibration_report(
+        [batch(input_ids_a, loss_mask_a, hidden_a), batch(input_ids_b, loss_mask_b, hidden_b)],
+        torch.device("cpu"),
+    )
+    assert report is not None
+    assert report["supervised_slots"] == 8
+    assert len(report["per_slot_pred_mean"]) == 8
+    assert len(report["per_slot_accept_rate"]) == 8
+    assert all(0.0 <= value <= 1.0 for value in report["per_slot_pred_mean"])
 
 
 # --------------------------------------------------------------------------- #

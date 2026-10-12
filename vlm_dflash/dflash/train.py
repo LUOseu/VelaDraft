@@ -207,6 +207,29 @@ def run_training_loop(
             (loss / accumulation).backward()
             micro_step += 1
             if micro_step % accumulation == 0:
+                if step == 0:
+                    # Gradient coverage audit (GOAL §13): a new head that never
+                    # receives a gradient still trains the rest of the model and
+                    # looks plausible, so audit the first optimizer step. This has
+                    # to happen here — the fp32 master sync below clears every
+                    # .grad, and auditing after it reports a misleading 0/N.
+                    from ..utils import gradient_coverage_report
+
+                    coverage = gradient_coverage_report(module)
+                    coverage["source"] = "step1_micro_batch"
+                    gradient_coverage = coverage
+                    log(
+                        "gradient coverage: "
+                        f"{coverage['params_with_grad']}/{coverage['trainable_tensors']} trainable tensors "
+                        f"with grad ({coverage['fraction_with_grad']:.3f} of trainable elements)"
+                    )
+                    for group in coverage["groups"]:
+                        if group["trainable_params"] or group["group"] == "frozen":
+                            log(
+                                f"  {group['group']}: trainable={group['trainable_tensors']} tensors/"
+                                f"{group['trainable_params']} elements with_grad={group['params_with_grad']} "
+                                f"grad_norm={group['grad_norm']:.4g}"
+                            )
                 with torch.no_grad():
                     for name, parameter in module.draft_model.named_parameters():
                         master = master_parameters[name]
@@ -220,26 +243,6 @@ def run_training_loop(
                     for name, parameter in module.draft_model.named_parameters():
                         parameter.copy_(master_parameters[name])
                 step += 1
-                if step == 1:
-                    # Gradient coverage audit (GOAL §13): a new head that never
-                    # receives a gradient still trains the rest of the model and
-                    # looks plausible, so check coverage once per run.
-                    from ..utils import gradient_coverage_report
-
-                    coverage = gradient_coverage_report(module)
-                    coverage["source"] = "step1_micro_batch"
-                    gradient_coverage = coverage
-                    log(
-                        "gradient coverage: "
-                        f"{coverage['params_with_grad']}/{coverage['trainable_params']} trainable tensors "
-                        f"with grad (fraction={coverage['fraction_with_grad']:.3f})"
-                    )
-                    for group in coverage["groups"]:
-                        if group["trainable_params"] or group["group"] == "frozen":
-                            log(
-                                f"  {group['group']}: trainable={group['trainable_params']} "
-                                f"with_grad={group['params_with_grad']} grad_norm={group['grad_norm']:.4g}"
-                            )
                 row = {
                     "step": step,
                     "loss": float(loss.detach()),

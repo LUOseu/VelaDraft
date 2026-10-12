@@ -83,6 +83,16 @@ Checkpoint format:         speculators HF-style speculator configs (speculators_
 - **Verification extension.** `sample_from_anchor=True` needs a round window of
   `block_size + 1` positions (anchor + `block_size` proposals) in
   `spec_generate`; the draft's own input block stays `block_size`.
+- **Head ownership (implementation detail, no semantic change).** The heads are
+  constructed once by `Qwen3DSparkDraftModel` (from the `algorithm.dspark`
+  knobs baked into its `dflash_config`); `DSparkTrainerModule` reuses those
+  instances instead of building its own copies. This keeps the training loop
+  coherent by construction: `module.draft_model.to(dtype)` casts the heads with
+  the backbone, and the optimizer's master parameters plus the saved
+  `state_dict` come from `draft_model.*`, so head weights are actually updated,
+  checkpointed and reloaded. Trainer-side `markov_rank` / `markov_head_type` /
+  `enable_confidence_head` / `confidence_head_with_markov` arguments are
+  validation-only overrides of the model config.
 
 ## Parity level
 
