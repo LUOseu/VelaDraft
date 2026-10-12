@@ -13,17 +13,27 @@ import yaml
 _ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
 
+def _replace_env(match: re.Match) -> str:
+    name, default = match.group(1), match.group(2)
+    if name in os.environ:
+        return os.environ[name]
+    if default is not None:
+        return default
+    raise ValueError(f"Config references environment variable {name} with no default and it is unset.")
+
+
+def expand_env_text(value: str) -> str:
+    """Expand ``${VAR}`` / ``${VAR:-default}`` references in a single string.
+
+    Same syntax as YAML configs (unlike ``os.path.expandvars``, which has no
+    default-value form); used for manifest prompt paths.
+    """
+    return _ENV_PATTERN.sub(_replace_env, value)
+
+
 def _expand_env(value: Any) -> Any:
     if isinstance(value, str):
-        def replace(match: re.Match) -> str:
-            name, default = match.group(1), match.group(2)
-            if name in os.environ:
-                return os.environ[name]
-            if default is not None:
-                return default
-            raise ValueError(f"Config references environment variable {name} with no default and it is unset.")
-
-        return _ENV_PATTERN.sub(replace, value)
+        return expand_env_text(value)
     if isinstance(value, dict):
         return {key: _expand_env(item) for key, item in value.items()}
     if isinstance(value, list):

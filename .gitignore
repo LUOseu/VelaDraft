@@ -7,3 +7,9 @@ assets/
 .pytest_cache/
 logs/
 benchmarks/reports/
+benchmarks/data/
+dist/
+build/
+*.egg-info/
+.ruff_cache/
+.eggs/

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vlm-dflash"
-version = "0.2.0"
-description = "Minimal reproducible path to train a multimodal DFlash drafter for Qwen-VL"
+version = "0.3.0"
+description = "A unified training and evaluation stack for multimodal parallel drafters (DFlash, DSpark, Domino, JetSpec, DFlash2)"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
@@ -14,6 +14,7 @@ dependencies = [
     "torchvision>=0.20",
     "transformers>=5.12",
     "datasets>=3.0",
+    "pyarrow",
     "pillow",
     "pyyaml",
     "numpy",
@@ -30,6 +31,10 @@ tested = [
     "datasets==4.2.0",
     "accelerate==1.15.0",
     "safetensors==0.8.0",
+]
+dev = [
+    "pytest>=8",
+    "build>=1.2",
 ]
 
 [project.scripts]

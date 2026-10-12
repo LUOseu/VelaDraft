@@ -1,0 +1,26 @@
+name: Runtime compatibility
+description: Questions or reports about serving / runtime integration of exported drafters.
+title: "[runtime] "
+labels: ["runtime"]
+body:
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      placeholder: "vLLM / SGLang / Transformers generate / custom"
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Setup
+      description: Which exported checkpoint, which target, how it was loaded, and what you expected.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        This repository trains/evaluates/exports drafters and does **not**
+        ship a serving runtime. Export layout and parity-level notes are in
+        `docs/algorithms/<name>.md` and each export's `model_card.md`; runtime
+        issues can be reported here for documentation purposes.

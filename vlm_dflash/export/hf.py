@@ -29,6 +29,8 @@ def _git_commit() -> str | None:
 
 
 def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -> dict:
+    from ..algorithms import get_algorithm
+
     contract = read_json(run_dir / "contract.json")
     train_summary = read_json(run_dir / "train" / "train_summary.json") if (run_dir / "train" / "train_summary.json").exists() else None
     manifest = read_json(run_dir / "data" / "manifest.json") if (run_dir / "data" / "manifest.json").exists() else None
@@ -50,6 +52,7 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
             "rows_sha256": manifest.get("rows_sha256"),
         }
     method = str(checkpoint.get("algorithm", "dflash"))
+    algorithm_metadata = get_algorithm(method).metadata.as_dict()
     # Algorithm-specific checkpoint fields (DSpark heads, Domino head knobs,
     # JetSpec KD settings) are re-emitted so a serving side can inspect them.
     method_details = checkpoint.get(method) if isinstance(checkpoint.get(method), dict) else None
@@ -75,6 +78,9 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
         # Which drafter algorithm produced these weights (checkpoints written
         # before the tag default to dflash).
         "method": method,
+        # Machine-readable support statement for the algorithm (maturity per
+        # axis + upstream references); also written to algorithm.json.
+        "algorithm_metadata": algorithm_metadata,
         "method_details": method_details,
         "runtime_note": runtime_note,
         "checkpoint": checkpoint_name,
@@ -115,7 +121,7 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
         },
         "training": None if train_summary is None else {
             key: train_summary.get(key)
-            for key in ("steps", "final_loss", "first10_mean_loss", "last10_mean_loss", "nan_seen", "wall_seconds", "peak_gpu_mem_gb")
+            for key in ("steps", "final_loss", "first10_mean_loss", "last10_mean_loss", "nan_seen", "wall_seconds", "peak_gpu_mem_gb", "gpu_name")
         },
         "data": data_block,
         "eval": None if eval_result is None else {
@@ -151,17 +157,25 @@ def render_model_card(export_config: dict) -> str:
     training = export_config["training"] or {}
     data = export_config["data"] or {}
     eval_block = export_config["eval"] or {}
+    metadata = export_config.get("algorithm_metadata") or {}
+    maturity = metadata.get("maturity") or {}
+    status = ", ".join(f"{axis}: {state}" for axis, state in sorted(maturity.items())) or "n/a"
+    targets = metadata.get("targets") or {}
+    target_support = ", ".join(f"{name}: {state}" for name, state in sorted(targets.items())) or "n/a"
     lines = [
         f"# vlm-dflash drafter — {Path(target['model_path']).name}",
         "",
         "| field | value |",
         "| --- | --- |",
         f"| method | {export_config['method']} (block drafter) |",
+        f"| algorithm status | {status} |",
+        f"| target support | {target_support} |",
         f"| target | `{target['model_path']}` ({target['model_type']}) |",
         f"| target fingerprint | `{target['model_fingerprint'][:16]}…` |",
         f"| adapter | {export_config['adapter']} |",
         f"| block size | {drafter['block_size']} |",
         f"| anchors / layers | {drafter['num_anchors']} / {drafter['num_hidden_layers']} |",
+        f"| trainable parameters | {export_config.get('trainable_parameters')} |",
         f"| mask token | {drafter['mask_token_id']} |",
         f"| routed target layers | {drafter['target_layer_ids']} |",
         f"| MRoPE sections | {drafter['spatial_rope']['sections']} ({drafter['spatial_rope']['mode']}) |",
@@ -176,6 +190,7 @@ def render_model_card(export_config: dict) -> str:
         lines += [
             f"| training steps | {training.get('steps')} |",
             f"| block CE (first10 → last10) | {training.get('first10_mean_loss')} → {training.get('last10_mean_loss')} |",
+            f"| GPU | {training.get('gpu_name') or 'recorded in RELEASE_VALIDATION.md'} |",
             f"| peak VRAM / wall | {training.get('peak_gpu_mem_gb')} GB / {training.get('wall_seconds')} s |",
         ]
     if eval_block:
@@ -192,6 +207,17 @@ def render_model_card(export_config: dict) -> str:
             )
     lines += [
         "",
+        "## Notes",
+        "",
+    ]
+    if export_config.get("runtime_note"):
+        lines += [export_config["runtime_note"], ""]
+    references = metadata.get("references") or {}
+    if references:
+        lines += ["Upstream references:", ""]
+        lines += [f"- {key}: {value}" for key, value in sorted(references.items())]
+        lines.append("")
+    lines += [
         "## Scope / limitations",
         "",
         "- Single-image image-text prompts; greedy decoding only.",
@@ -220,13 +246,58 @@ def export_run(run_dir: str | Path, *, checkpoint: str = "ckpt_final.pt", out_di
 
     export_config = build_export_config(run_dir, checkpoint_obj, checkpoint)
     write_json(export_dir / "config.json", export_config)
+    # Split, ecosystem-friendly copies of the metadata that Model Zoo consumers
+    # and external loaders expect to find as separate files.
+    write_json(
+        export_dir / "draft_config.json",
+        {
+            "format": "vlm-dflash-draft-config-v1",
+            "algorithm": export_config["method"],
+            "drafter": export_config["drafter"],
+        },
+    )
+    write_json(
+        export_dir / "algorithm.json",
+        {
+            "format": "vlm-dflash-algorithm-v1",
+            "algorithm": export_config["method"],
+            "metadata": export_config.get("algorithm_metadata"),
+            "method_details": export_config.get("method_details"),
+            "runtime_note": export_config.get("runtime_note"),
+        },
+    )
+    write_json(export_dir / "target_contract.json", read_json(run_dir / "contract.json"))
+    write_json(
+        export_dir / "training_manifest.json",
+        {
+            "format": "vlm-dflash-training-manifest-v1",
+            "created": export_config["created"],
+            "checkpoint": checkpoint,
+            "code_commit": export_config.get("code_commit"),
+            "algorithm": export_config["method"],
+            "target": export_config["target"],
+            "data": export_config["data"],
+            "training": export_config["training"],
+            "eval": export_config["eval"],
+            "provenance_stages": export_config["provenance_stages"],
+            "trainable_parameters": sum(int(t.numel()) for t in state.values()),
+        },
+    )
+    export_config["trainable_parameters"] = sum(int(t.numel()) for t in state.values())
     (export_dir / "model_card.md").write_text(render_model_card(export_config), encoding="utf-8")
     write_json(
         export_dir / "checksums.json",
         {
-            "model.safetensors": sha256_file(export_dir / "model.safetensors"),
-            "config.json": sha256_file(export_dir / "config.json"),
-            "model_card.md": sha256_file(export_dir / "model_card.md"),
+            name: sha256_file(export_dir / name)
+            for name in (
+                "model.safetensors",
+                "config.json",
+                "draft_config.json",
+                "algorithm.json",
+                "target_contract.json",
+                "training_manifest.json",
+                "model_card.md",
+            )
         },
     )
     log(f"export: wrote {export_dir} (format={EXPORT_FORMAT}, checkpoint={checkpoint})")

@@ -3,6 +3,7 @@ algorithm: dflash  # drafter plugin; see vlm_dflash/algorithms/
 # and half the dataset slice. NOT hardware-tested in the v0.1/v0.2 development
 # environment (48 GB card); treat as a starting point, check `vlm-dflash doctor`.
 target:
+  model: ${VLM_DFLASH_TARGET:-assets/models/Qwen2.5-VL-3B-Instruct}
   dtype: bfloat16
   attn_implementation: sdpa
   device: cuda:0

@@ -145,6 +145,29 @@ tokens' KV cache entries are computed by the block forward, so the drift
 propagates and per-round guards cannot restore exactness. Parallel mode must be
 reported as experimental throughput only.
 
+## Public workload: TextVQA (Qwen2.5-VL-3B zoo, pinned export)
+
+TextVQA validation split, 128-prompt seeded subset (seed 42; subset definition
+and per-row question/image hashes pinned in
+`benchmarks/prompts/textvqa_v1.jsonl`, protocol in
+`benchmarks/manifests/02_textvqa.json`); greedy, `max_new_tokens=32`,
+`verification: sequential` (token-exact gate); same 3B/2K checkpoints as the
+scoreboard above.
+
+| Algorithm | AL | acceptance rate | token-exact | per-slot acceptance (1..7) |
+| --- | ---: | ---: | --- | --- |
+| DFlash | 1.263 | 3.15% | 128/128 | [.178,.031,.004,.001,0,0,0] |
+| DSpark | 1.253 | 2.64% | 128/128 | [.162,.035,.005,.002,0,0,0] |
+| Domino | 1.268 | 3.21% | 128/128 | [.174,.037,.005,.002,0,0,0] |
+
+Short grounded answers (32-token budget) accept less than the long-caption
+val split (~1.63); the ordering across algorithms compresses to within 0.02 AL.
+Wall-clock speedup vs target-only is 0.94-0.98x on this card - the sequential
+path is the correctness reference, not a speed claim. Reproduce with
+`python scripts/prepare_benchmark.py --workload textvqa --source <download>`
+then `python scripts/benchmark.py --run-dir runs/qwen25vl3b_2k --workload
+textvqa` (see `docs/benchmark.md`).
+
 ## Reproducibility
 
 - Post-zoo regression (2026-10-12): re-evaluating the frozen 3B-2K DFlash
@@ -153,6 +176,16 @@ reported as experimental throughput only.
   checkpoints token-exact 128/128); the 8-prompt registry path reproduces
   1.6096. Frozen baselines, semantics and re-measurements:
   `tests/reference_dflash/manifest.json`.
+- Release-commit re-eval (2026-10-13): the frozen baseline reproduces
+  1.6298365840801265 bit-identically again; 16-prompt release regressions are
+  token-exact for DSpark (1.827), Domino (1.854), JetSpec (1.661) and DFlash2
+  (2.047) on the same checkpoints (sequential, random-init 1.002; subset AL
+  reads higher than the 128-prompt rows above).
+- Qwen3-VL reduced validation (2026-10-13, 256-row slice, 192 steps, 16
+  prompts): DSpark 1.221 / Domino 1.228 / JetSpec 1.119 / DFlash2 1.210,
+  token-exact 16/16 each — compatibility evidence for the Qwen3-VL column of
+  `SUPPORT_MATRIX.md`, not a scale comparison (full table in
+  `RELEASE_VALIDATION.md`).
 - Same seed + same data: `rows_sha256` and regen keeps reproduce; captured
   shard hashes and bf16 training losses do not (kernel nondeterminism).
 - Treat AL differences < ~2% as noise unless the protocol pins more seeds.

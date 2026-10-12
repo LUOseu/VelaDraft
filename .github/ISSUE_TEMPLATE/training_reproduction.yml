@@ -1,0 +1,36 @@
+name: Training reproduction report
+description: Report whether you could reproduce a recorded run (success or failure).
+title: "[repro] "
+labels: ["reproduction"]
+body:
+  - type: dropdown
+    id: run
+    attributes:
+      label: Which recorded run?
+      options:
+        - "3B / 2K canonical (DFlash 1.630)"
+        - "3B zoo (DSpark / Domino / JetSpec / DFlash2)"
+        - "8B / 2K (AL 1.665)"
+        - "smoke / quickstart"
+        - "other"
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What did you observe?
+      description: Your AL / token-exactness / loss numbers vs the recorded ones, and any protocol differences (GPU, dtype, versions).
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: GPU, driver, torch / transformers versions, dataset revision.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        Reminder: bf16 capture/training are protocol-reproducible, not
+        bit-identical; sub-2% AL differences are expected run-to-run noise.

@@ -14,9 +14,12 @@ reference algorithm; the other four plug in through the registry.
 - [x] DFlash2 ported + measured (AL 1.954, token-exact) — **Experimental**:
       upstream publishes the architecture but not the training objective; the
       conv/selector decomposition is bounded by an ablation.
-- [~] Benchmark harness (manifests + runner + report; public workloads are
-      still smoke-scale).
-- [ ] Qwen3-VL reduced-scale validation for DSpark / Domino / DFlash2.
+- [x] Benchmark harness (manifests + runner + report) + first public workload
+      validated: TextVQA (128-prompt seeded subset, pinned prompt manifest,
+      token-exact; see `RELEASE_VALIDATION.md`). DocVQA / ChartQA stay pinned
+      protocols without adapters.
+- [x] Qwen3-VL reduced-scale validation for DSpark / Domino / JetSpec / DFlash2
+      (v0.3.0-rc1; results in `RELEASE_VALIDATION.md`).
 
 ## Release (next)
 - Public checkpoints (3B zoo first, 8B DFlash), model cards (export already

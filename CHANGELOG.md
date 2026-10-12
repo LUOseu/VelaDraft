@@ -2,6 +2,40 @@
 
 ## v0.3.0 (in development)
 
+### Release engineering (v0.3.0-rc1)
+
+- Five-minute demo: `vlm-dflash demo` (tiny license-free synthetic sample,
+  token-exact evaluation, random-init acceptance baseline or
+  `--drafter <run|ckpt|export>` weights) and `vlm-dflash train-demo` (full
+  staged loop + tiny training + eval + export on the same sample).
+  `--drafter` demos align the sample's image pixel bounds with the drafter's
+  recorded target identity (the provenance gate stays hard) and use a
+  drafter-specific run directory.
+- Public benchmark: TextVQA adapter (`vlm_dflash/benchmark/adapters.py`,
+  `scripts/prepare_benchmark.py`) with a pinned 128-prompt seeded subset,
+  per-shard/per-row hashes and a repo-tracked prompt manifest
+  (`benchmarks/prompts/textvqa_v1.jsonl`); `02_textvqa.json` is now
+  `validated`. Benchmark manifests resolve prompt paths against the repo root.
+- Packaging: wheel + sdist build cleanly, fresh-venv install smoke-tested;
+  explicit `pyarrow` dependency; `[dev]` extras; version `0.3.0`.
+- Export metadata extension: exports now also carry `draft_config.json`,
+  `algorithm.json` (with the machine-readable support statement),
+  `target_contract.json` and `training_manifest.json` (trainable parameter
+  count, GPU); `scripts/export_zoo.py` builds and reload-verifies the six
+  canonical zoo checkpoints.
+- CI (`.github/workflows/ci.yml`): CPU tests on py3.10/3.12 + package build +
+  fresh wheel install + CLI help smoke; issue templates for bugs / algorithm
+  and target requests / reproduction reports / runtime compatibility.
+- Repo hygiene: CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, CITATION.cff;
+  absolute development-host paths removed from configs, presets, tests and
+  docs (env-var defaults only); secrets/large-file/license/claim audits
+  recorded in `RELEASE_VALIDATION.md`.
+- Qwen3-VL reduced validation for DSpark / Domino / JetSpec / DFlash2
+  (256-row slice, 16-prompt sequential eval, export + reload) — results in
+  `RELEASE_VALIDATION.md`.
+- Frozen-reference regression re-run on the release commit (DFlash 2K
+  baseline, `tests/reference_dflash/manifest.json`).
+
 Four algorithm-zoo stages land in this release: DSpark (stage 2), Domino
 (stage 3), JetSpec (stage 4) and DFlash2 (stage 5).
 

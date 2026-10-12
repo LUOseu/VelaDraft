@@ -10,7 +10,13 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from vlm_dflash.benchmark.harness import load_workloads, select_workloads, validate_workload
+from vlm_dflash.benchmark.adapters import select_indices
+from vlm_dflash.benchmark.harness import (
+    load_workloads,
+    resolve_prompt_source,
+    select_workloads,
+    validate_workload,
+)
 from vlm_dflash.eval.run import load_eval_rows
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +61,43 @@ def test_select_workloads_unknown_name_fails():
     assert [w["name"] for w in select_workloads(workloads, ["caption_general"])] == ["caption_general"]
     with pytest.raises(ValueError, match="Unknown workload"):
         select_workloads(workloads, ["nope"])
+
+
+def test_resolve_prompt_source_repo_relative():
+    source = resolve_prompt_source(
+        {"type": "sharegpt_jsonl", "path": "benchmarks/data/textvqa/textvqa_v1.jsonl", "meta": "benchmarks/data/textvqa/meta.json"}
+    )
+    assert Path(source["path"]).is_absolute()
+    assert str(source["path"]).endswith("benchmarks/data/textvqa/textvqa_v1.jsonl")
+    assert source["path"].startswith(str(REPO_ROOT))
+    # run_val sources have no paths and pass through untouched
+    assert resolve_prompt_source({"type": "run_val"}) == {"type": "run_val"}
+    assert resolve_prompt_source(None) is None
+
+
+def test_resolve_prompt_source_env_default_and_override(monkeypatch):
+    manifest_source = {
+        "type": "sharegpt_jsonl",
+        "path": "${VLM_DFLASH_BENCH_DATA:-benchmarks/data}/textvqa/textvqa_v1.jsonl",
+        "meta": "${VLM_DFLASH_BENCH_DATA:-benchmarks/data}/textvqa/meta.json",
+    }
+    monkeypatch.delenv("VLM_DFLASH_BENCH_DATA", raising=False)
+    default = resolve_prompt_source(manifest_source)
+    assert default["path"] == str(REPO_ROOT / "benchmarks" / "data" / "textvqa" / "textvqa_v1.jsonl")
+    monkeypatch.setenv("VLM_DFLASH_BENCH_DATA", "/mnt/bench")
+    overridden = resolve_prompt_source(manifest_source)
+    assert overridden["path"] == "/mnt/bench/textvqa/textvqa_v1.jsonl"
+
+
+def test_textvqa_selection_is_deterministic_and_bounded():
+    first = select_indices(5000, 128, seed=42)
+    assert first == select_indices(5000, 128, seed=42)
+    assert first != select_indices(5000, 128, seed=43)
+    assert len(first) == len(set(first)) == 128
+    assert first == sorted(first)
+    assert min(first) >= 0 and max(first) < 5000
+    with pytest.raises(ValueError, match="rows"):
+        select_indices(16, 32, seed=42)
 
 
 def test_load_eval_rows_sharegpt_jsonl(tmp_path):

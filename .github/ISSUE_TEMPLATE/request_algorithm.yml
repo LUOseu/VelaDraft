@@ -1,0 +1,55 @@
+name: Request a drafter algorithm
+description: Propose a new speculative-drafting algorithm for the zoo.
+title: "[algorithm] "
+labels: ["algorithm-request"]
+body:
+  - type: input
+    id: paper
+    attributes:
+      label: Paper
+      description: Link (arXiv / venue).
+    validations:
+      required: true
+  - type: input
+    id: repo
+    attributes:
+      label: Official repository
+    validations:
+      required: true
+  - type: input
+    id: license
+    attributes:
+      label: License of the reference implementation
+    validations:
+      required: true
+  - type: dropdown
+    id: training-code
+    attributes:
+      label: Is training code available upstream?
+      options:
+        - "Yes - official training objective published"
+        - "Partially - maintainer implementation only"
+        - "No - inference/architecture only"
+    validations:
+      required: true
+  - type: input
+    id: checkpoints
+    attributes:
+      label: Published checkpoints (if any)
+    validations:
+      required: false
+  - type: input
+    id: target
+    attributes:
+      label: Desired target
+      placeholder: "Qwen2.5-VL / Qwen3-VL / other"
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        Note the zoo contract: an algorithm ships as **Validated** only after
+        architecture + loss + unit tests + synthetic overfit + real VLM smoke +
+        visual-path check + checkpoint save/load + eval + export + docs
+        (`docs/adding_an_algorithm.md`). No published objective => it ships as
+        **Experimental** (see DFlash2).

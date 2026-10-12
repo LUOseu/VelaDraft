@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in the pipeline is broken, crashes, or produces wrong results.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Correctness bugs (token-exact gate failures,
+        provenance mismatches) are release blockers - please include raw output.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Command, config, expected vs observed. Paste the traceback and the relevant JSON (eval_result.json / provenance.json) if available.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: "vlm-dflash 0.3.0 or git commit hash"
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Which stage?
+      options:
+        - prepare / regen / capture
+        - train
+        - eval
+        - export / load_export
+        - CLI / doctor
+        - other
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: Target model
+      placeholder: "Qwen2.5-VL-3B-Instruct / Qwen3-VL-8B-Instruct / other"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python, torch / transformers versions (`pip freeze | grep -E "torch|transformers|datasets"`), GPU + VRAM.
+    validations:
+      required: true

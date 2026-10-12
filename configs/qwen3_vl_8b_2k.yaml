@@ -11,7 +11,7 @@ run:
   dir: runs/qwen3vl8b_2k
 
 target:
-  model: ${VLM_DFLASH_TARGET_QWEN3VL:-/home/lyh/vlm-dflash/assets/models/Qwen3-VL-8B-Instruct}
+  model: ${VLM_DFLASH_TARGET_QWEN3VL:-assets/models/Qwen3-VL-8B-Instruct}
   dtype: bfloat16
   attn_implementation: sdpa
   device: cuda:0
@@ -23,8 +23,8 @@ target:
 
 dataset:
   source: llava_instruct
-  annotation: ${VLM_DFLASH_LLAVA_JSON:-/home/dhz/Data/llava_instruct_150k.json}
-  images_dir: ${VLM_DFLASH_COCO_IMAGES:-/home/dhz/Data/COCO-caption/train2017}
+  annotation: ${VLM_DFLASH_LLAVA_JSON:-data/llava_instruct_150k.json}
+  images_dir: ${VLM_DFLASH_COCO_IMAGES:-data/coco/train2017}
   slice: 2000
   val_size: 128
   seed: 42

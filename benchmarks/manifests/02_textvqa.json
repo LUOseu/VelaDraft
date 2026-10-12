@@ -1,9 +1,27 @@
 {
   "name": "textvqa",
   "description": "TextVQA: short grounded answers over OCR-heavy natural images.",
-  "status": "planned",
-  "prompt_source": null,
+  "status": "validated",
+  "prompt_source": {
+    "type": "sharegpt_jsonl",
+    "path": "${VLM_DFLASH_BENCH_DATA:-benchmarks/data}/textvqa/textvqa_v1.jsonl",
+    "meta": "${VLM_DFLASH_BENCH_DATA:-benchmarks/data}/textvqa/meta.json"
+  },
   "num_prompts": 128,
   "max_new_tokens": 32,
-  "note": "Protocol pinned: lmms-lab/textvqa validation split, question rendered with the dataset's own question field, images exported to a sharegpt_jsonl + meta.json under benchmarks/data/. Adapter not landed yet."
+  "dataset": {
+    "id": "lmms-lab/textvqa",
+    "split": "validation",
+    "num_rows_in_split": 5000,
+    "subset": "seeded sample of 128 (seed=42) after sorting by question_id",
+    "export": "python scripts/prepare_benchmark.py --workload textvqa --source <lmms-lab/textvqa download>",
+    "rows_sha256": "7d79e6d5e9fbeaf97aa6fab322069bf5a13f35996eb906b763be87eb35550230",
+    "shards_sha256": {
+      "validation-00000-of-00003.parquet": "491649b5b8add2c5bde13a1e36707002fcd11898699255d65e2e568ac4fbddff",
+      "validation-00001-of-00003.parquet": "909ad12a378217431548a7f4b66fda163a6def9d21e70844c96449e64206c2dd",
+      "validation-00002-of-00003.parquet": "a770d03ec95fef58def04cda949d97669b7666caaf174af927856d75684e6fe6"
+    },
+    "pinned_prompt_manifest": "benchmarks/prompts/textvqa_v1.jsonl"
+  },
+  "note": "Pinned protocol: lmms-lab/textvqa validation split, raw dataset question rendered through the target's chat template, images exported byte-identical to the upstream JPEGs, greedy decoding, max_new_tokens=32, sequential verification. Per-row question/image hashes are recorded in benchmarks/prompts/textvqa_v1.jsonl; the export is reproducible from the pinned shard hashes with the same seed."
 }

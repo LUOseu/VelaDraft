@@ -325,6 +325,9 @@ def run_training_loop(
         "peak_gpu_mem_gb": (
             torch.cuda.max_memory_allocated(device) / 1e9 if device.type == "cuda" else None
         ),
+        "gpu_name": (
+            torch.cuda.get_device_name(device) if device.type == "cuda" else None
+        ),
     }
     return {"summary": summary, "history": history, "gradient_coverage": gradient_coverage}
 

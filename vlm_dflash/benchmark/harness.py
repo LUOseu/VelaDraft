@@ -24,6 +24,7 @@ from pathlib import Path
 import torch
 
 from ..algorithms import get_algorithm
+from ..config import expand_env_text
 from ..eval.run import (
     _stops,
     _target_head_is_tied,
@@ -38,6 +39,27 @@ from ..utils import ensure_dir, log, now_iso, write_json
 BENCHMARK_FORMAT = "vlm-dflash-benchmark-v1"
 _REQUIRED_KEYS = ("name", "description", "status", "prompt_source", "num_prompts", "max_new_tokens")
 _VALID_STATUS = {"validated", "scaffold", "planned"}
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def resolve_prompt_source(prompt_source: dict | None) -> dict | None:
+    """Resolve repo-relative prompt paths; ``load_eval_rows`` resolves the rest.
+
+    Manifest prompt paths are written relative to the repository root (with an
+    optional ``${VLM_DFLASH_BENCH_DATA}`` override for data that lives outside
+    the checkout); ``load_eval_rows`` itself resolves non-absolute paths
+    against the run directory, so the benchmark harness pre-resolves them.
+    """
+    if not prompt_source:
+        return prompt_source
+    source = dict(prompt_source)
+    for key in ("path", "meta"):
+        if source.get(key):
+            expanded = Path(expand_env_text(str(source[key]))).expanduser()
+            if not expanded.is_absolute():
+                expanded = (_REPO_ROOT / expanded).resolve()
+            source[key] = str(expanded)
+    return source
 
 
 def validate_workload(workload: dict, source: Path) -> None:
@@ -156,7 +178,7 @@ def run_benchmark(
             results[workload_name] = {"status": "planned", "note": workload.get("note")}
             log(f"bench[{workload_name}]: planned workload skipped ({workload.get('note', 'no note')})")
             continue
-        rows, media_dir = load_eval_rows(workload.get("prompt_source"), run_dir)
+        rows, media_dir = load_eval_rows(resolve_prompt_source(workload.get("prompt_source")), run_dir)
         count = min(int(num_prompts or workload["num_prompts"]), len(rows))
         budget = int(max_new_tokens or workload["max_new_tokens"])
         rows = rows[:count]

@@ -10,10 +10,10 @@ truthful, it is the contract for what the repo actually supports.
 | Algorithm | Qwen2.5-VL | Qwen3-VL | Image | Multi-image | Video | Train | Eval | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | dflash | validated | validated | validated | unsupported | unsupported | validated | validated | validated (HF-style) |
-| dspark | validated | experimental | validated | unsupported | unsupported | validated | validated | validated (loader dispatch) |
-| domino | validated | experimental | validated | unsupported | unsupported | validated | validated | validated (loader dispatch) |
-| jetspec | validated | untested | validated | unsupported | unsupported | validated | validated (causal-mask serving; tree runtime not ported) | validated (loader dispatch) |
-| dflash2 | experimental | untested | validated | unsupported | unsupported | experimental (upstream objective undisclosed; experimental split objective) | validated | validated (loader dispatch) |
+| dspark | validated | validated | validated | unsupported | unsupported | validated | validated | validated (loader dispatch) |
+| domino | validated | validated | validated | unsupported | unsupported | validated | validated | validated (loader dispatch) |
+| jetspec | validated | validated | validated | unsupported | unsupported | validated | validated (causal-mask serving; tree runtime not ported) | validated (loader dispatch) |
+| dflash2 | experimental | experimental | validated | unsupported | unsupported | experimental (upstream objective undisclosed; experimental split objective) | validated | validated (loader dispatch) |
 
 Algorithm metadata is machine-readable in
 `vlm_dflash/algorithms/<name>.py::<Algorithm>.metadata` and surfaced by
@@ -26,8 +26,12 @@ Algorithm metadata is machine-readable in
 | Qwen2.5-VL-3B-Instruct | qwen25_vl | validated | validated | validated | validated | validated |
 | Qwen3-VL-8B-Instruct | qwen3_vl | validated | validated | validated | validated | validated |
 
-Both are validated on single-image + text with greedy decoding. Multi-image,
-video and extra target families are roadmap items, not support claims.
+Both are validated on single-image + text with greedy decoding. Qwen3-VL was
+validated for the four zoo algorithms at reduced scale (256-row slice,
+16-prompt sequential eval, export + reload, all token-exact — see
+`RELEASE_VALIDATION.md`); DFlash has the full 2K-protocol run there.
+Multi-image, video and extra target families are roadmap items, not support
+claims.
 
 ## Verification modes
 
@@ -42,6 +46,6 @@ video and extra target families are roadmap items, not support claims.
 | Workload | Status | Prompt set |
 | --- | --- | --- |
 | caption_general | scaffold | run's own val split (provisional) |
-| textvqa | planned | protocol pinned, adapter pending |
+| textvqa | validated | pinned export (lmms-lab/textvqa validation, 128-prompt seed-42 subset; `benchmarks/prompts/textvqa_v1.jsonl`) |
 | docvqa | planned | protocol pinned, adapter pending |
 | chartqa | planned | protocol pinned, adapter pending |

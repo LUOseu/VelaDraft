@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from vlm_dflash.contract import ContractError, resolve_contract
 
-MODEL = os.environ.get("VLM_DFLASH_TEST_MODEL", "/home/lyh/vlm-dflash/assets/models/Qwen2.5-VL-3B-Instruct")
+MODEL = os.environ.get("VLM_DFLASH_TEST_MODEL", "assets/models/Qwen2.5-VL-3B-Instruct")
 
 pytestmark = pytest.mark.skipif(
     not Path(MODEL).exists(), reason="real target model not available (set VLM_DFLASH_TEST_MODEL)"
@@ -38,7 +38,7 @@ def test_contract_resolves_qwen25vl3b():
     assert contract["image"]["min_tokens"] == 256
 
 
-QWEN3_MODEL = os.environ.get("VLM_DFLASH_TEST_MODEL_QWEN3VL", "/home/lyh/vlm-dflash/assets/models/Qwen3-VL-8B-Instruct")
+QWEN3_MODEL = os.environ.get("VLM_DFLASH_TEST_MODEL_QWEN3VL", "assets/models/Qwen3-VL-8B-Instruct")
 
 QWEN3_DEFAULTS = {
     "mask_token_id": 151669,

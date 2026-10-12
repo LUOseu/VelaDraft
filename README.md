@@ -1,50 +1,23 @@
 # vlm-dflash
 
-**The simplest reproducible path to train a multimodal DFlash block drafter for Qwen-VL from image-text data.**
+**A unified training and evaluation stack for multimodal parallel drafters.**
 
-v0.2 supports two target families through one adapter interface: a local
-**Qwen2.5-VL-3B-Instruct** or **Qwen3-VL-8B-Instruct** checkpoint, single-image
-+ text samples, a staged DFlash-style block drafter (block size 8), and a
-minimal acceptance evaluation that checks speculative greedy decoding is
-**token-exact** against the target's own greedy output. Everything family
-specific (MRoPE layout, mask token, pixel bounds, layer routing) is resolved
-from the target at runtime and validated against the config.
+Train, validate and compare multimodal speculative drafters without rebuilding
+the VLM plumbing: Qwen-VL processor handling, MRoPE position ids, image-token
+spans, staged target hidden-state capture, provenance gates, token-exact
+evaluation and self-describing export are implemented once and shared by every
+algorithm. Five drafter algorithms plug into that stack; every support claim in
+this README is backed by a recorded run (`BENCHMARKS.md`, `docs/`).
 
-```
-image-text data -> target-native regen -> fused hidden-state capture
-                -> DFlash drafter training (target off GPU) -> acceptance eval
-```
+## Supported algorithms
 
-This is not a new speculative-decoding algorithm and not a framework: it is a
-small, complete, runnable loop around the existing DFlash method, with the
-multimodal plumbing (Qwen-VL processor, MRoPE, image spans, provenance) done
-correctly and testably.
-
-## What you get
-
-- Staged pipeline: every stage writes to `runs/<run>/{data,regen,features,train,eval}`;
-  training never keeps the 3B target in GPU memory (it reads captured features).
-- A runtime-resolved **model contract** (`contract.json`): mask token id, MRoPE
-  sections, draft layer routing, image pixel bounds, special tokens - parsed from
-  the target config/tokenizer/processor and validated against the YAML defaults.
-- **Provenance gates**: target identity / processor hashes are recorded per stage;
-  mismatched identity fails loudly (no silent teacher-target mismatch).
-- Minimal eval with a **token-exact equivalence gate** (speculative greedy ==
-  target greedy, per token, including EOS handling) plus AL / per-slot
-  acceptance / tokens-per-target-forward, and a random-init-drafter acceptance
-  baseline (target-only greedy is reported only as an output/speed reference).
-  `eval.verification` selects `sequential` (the parity gate) / `parallel` /
-  `strict_parallel`; see the runtime probe below.
-
-## Algorithms (v0.3-dev zoo)
-
-Drafter algorithms are plugins behind a small interface
-(`vlm_dflash/algorithms/`); DFlash is the frozen reference. Everything
-multimodal — processor, MRoPE, image spans, capture, provenance, eval, export —
-is shared, so switching algorithms never re-opens the plumbing. Every checkpoint
-records its algorithm and `eval`/`export` refuse mismatched checkpoints;
-`vlm-dflash doctor --algorithm <name>` reports the registry status and metadata
-(`docs/adding_an_algorithm.md` documents what a new algorithm must implement).
+| Algorithm | Qwen2.5-VL | Qwen3-VL | Train | Eval | Export | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| DFlash | validated | validated | yes | yes | yes | **Stable** (frozen reference) |
+| DSpark | validated | reduced validation | yes | yes | yes | **Validated** |
+| Domino | validated | reduced validation | yes | yes | yes | **Validated** |
+| JetSpec | validated | reduced validation | yes | yes | yes | **Validated** (tree runtime not ported) |
+| DFlash2 | experimental | reduced validation | yes | yes | yes | **Experimental** (upstream objective undisclosed) |
 
 ```text
               DFlash  (frozen baseline: decayed block CE)
@@ -54,247 +27,190 @@ records its algorithm and `eval`/`export` refuse mismatched checkpoints;
              JetSpec
 ```
 
-| Algorithm | Qwen2.5-VL | Qwen3-VL | Train | Multimodal validated | Export | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| DFlash | validated | validated | yes | yes | yes | Stable |
-| DSpark | validated | experimental | yes | yes | yes | Validated |
-| Domino | validated | experimental | yes | yes | yes | Validated |
-| JetSpec | validated | untested | yes | yes | yes | Validated (tree runtime not ported) |
-| DFlash2 | experimental | untested | yes | yes | yes | Experimental (upstream objective undisclosed) |
+All five share the parallel block-drafter backbone. DSpark adds a Markov logit
+bias + confidence head; Domino adds a causal GRU correction; JetSpec swaps the
+in-block mask to causal and CE for forward-KL distillation; DFlash2 adds local
+dynamic convolutions plus a predecessor-conditioned candidate selector.
 
-Shared: parallel block-drafter backbone. DSpark adds a Markov logit bias +
-confidence head; Domino adds a causal GRU correction; JetSpec changes the
-in-block mask to causal and swaps CE for forward KL; DFlash2 adds local dynamic
-convolutions plus a predecessor-conditioned candidate selector. Per-algorithm
-pages live in `docs/algorithms/`, upstream audits in `docs/upstream/`, the
-measured zoo scoreboard in `BENCHMARKS.md`.
+> **DFlash2 is Experimental.** The architecture is ported from the upstream
+> implementation, but the upstream *training objective is not publicly
+> disclosed*; this repo implements the maintainer implementation's experimental
+> split objective. It is an experimental training reconstruction - not an
+> official DFlash2 training reproduction. See `docs/upstream/dflash2.md`.
 
-The benchmark harness runs fixed workload manifests and writes a report with
-its protocol attached: `python scripts/benchmark.py --run-dir runs/<run>
---workload caption_general` (see `docs/benchmark.md`; TextVQA/DocVQA/ChartQA
-manifests are pinned as `planned` until their dataset adapters land).
+Switching algorithms never re-opens the multimodal plumbing: checkpoints record
+their algorithm, and `train` / `eval` / `export` fail loudly on mismatches.
+`vlm-dflash doctor --algorithm <name>` reports registry status and metadata.
 
-## Unified CLI (v0.2)
+## Supported targets
+
+| Target | Status | Notes |
+| --- | --- | --- |
+| Qwen2.5-VL-3B-Instruct | validated | full zoo, canonical 2K apples-to-apples benchmark |
+| Qwen3-VL-8B-Instruct | validated | DFlash full pipeline; remaining algorithms reduced-scale validation |
+
+Single image + text samples, greedy decoding. Everything family-specific
+(mask token, MRoPE sections, draft-layer routing, pixel bounds, tied vs untied
+`lm_head`) is resolved from the target at runtime into a `contract.json` and
+validated against the config defaults.
+
+## Why this exists
+
+Existing speculative-decoding stacks target text-only drafters. The multimodal
+gaps that bite you are Qwen-VL's MRoPE position ids, image-token spans, the
+processor's pixel bounds, and the target's reserved mask embedding row. This
+repo pins the whole loop around those details:
+
+- staged pipeline - `prepare -> target-native regen -> hidden-state capture ->
+  drafter training -> eval -> export`; the target model is off the GPU during
+  training (the trainer reads captured features only);
+- a runtime-resolved model contract and per-stage provenance - target identity
+  and processor hashes are recorded, teacher-target mismatches fail loudly;
+- a token-exact correctness gate - speculative greedy output must equal the
+  target's own greedy output token-for-token (sequential verification);
+- one algorithm registry so DFlash / DSpark / Domino / JetSpec / DFlash2 train,
+  evaluate, and export through the same commands and the same data.
+
+## Quickstart
 
 ```bash
-vlm-dflash doctor --target /path/to/Qwen3-VL-8B-Instruct
-vlm-dflash train  --target /path/to/Qwen3-VL-8B-Instruct \
-                  --config configs/qwen3_vl_8b.yaml --preset single-gpu-48g
-vlm-dflash eval   runs/<run>                          # token-exact gate + acceptance
-vlm-dflash export runs/<run>                          # self-describing HF-style checkpoint
-vlm-dflash train  --config ... --resume               # continue from train/ckpt_last.pt
-```
-
-`train` runs the whole staged pipeline (prepare -> target-native regen ->
-capture -> train); `--limit/--steps` shrink any stage for smoke runs, `--force`
-rebuilds finished stages, `--resume` restores model, optimizer, scheduler and
-RNG state (a plan mismatch fails loudly). The five stage scripts below remain
-the advanced interface. Presets: `smoke` (COCO captions, tiny), `single-gpu-48g`
-(measured reference recipe), `single-gpu-24g` (starting point, **not**
-hardware-tested).
-
-## Quickstart (4 steps)
-
-```bash
-# 0) environment: torch + transformers + torchvision (Qwen2-VL processor)
+# 0) install (from source until the release lands on PyPI)
 python -m venv .venv && . .venv/bin/activate
-pip install -e . && pip install torchvision
+pip install -e .
 
-# 1) point the config at your local model + dataset
-export VLM_DFLASH_TARGET=/path/to/Qwen2.5-VL-3B-Instruct
-export VLM_DFLASH_LLAVA_JSON=/path/to/llava_instruct_150k.json
-export VLM_DFLASH_COCO_IMAGES=/path/to/coco/train2017
+# 1) point the configs at your local target model + datasets
+export VLM_DFLASH_TARGET=assets/models/Qwen2.5-VL-3B-Instruct
+export VLM_DFLASH_LLAVA_JSON=data/llava_instruct_150k.json
+export VLM_DFLASH_COCO_IMAGES=data/coco/train2017
 
-# 2) one-shot smoke (COCO captions, needs only a few GPU-minutes)
-PYTHON=python bash scripts/quickstart.sh --config configs/smoke_coco.yaml --limit 64
+# 2) check the environment + model contract
+vlm-dflash doctor --target "$VLM_DFLASH_TARGET"
 
-# 3) full pipeline (long-answer LLaVA subset, ~1 GPU-hour on an A6000)
-PYTHON=python bash scripts/quickstart.sh --config configs/qwen2_5_vl_3b.yaml --limit 512
+# 3) one-shot smoke: the whole pipeline, a few GPU-minutes (COCO captions)
+vlm-dflash train --preset smoke --limit 64
+
+# 4) evaluate the trained drafter (token-exact gate + AL + per-slot acceptance)
+vlm-dflash eval runs/smoke_coco
+vlm-dflash export runs/smoke_coco   # self-describing checkpoint + model card
 ```
 
-Stages can also be run individually (all take `--config`, `--limit`, `--set k=v`):
+The full long-answer recipe (512-row LLaVA subset, ~1 GPU-hour on an A6000):
 
 ```bash
-python scripts/prepare_data.py      --config configs/qwen2_5_vl_3b.yaml
-python scripts/generate_target_data.py --config configs/qwen2_5_vl_3b.yaml
-python scripts/capture_features.py  --config configs/qwen2_5_vl_3b.yaml
-python scripts/train_dflash.py      --config configs/qwen2_5_vl_3b.yaml
-python scripts/eval_dflash.py       --config configs/qwen2_5_vl_3b.yaml
+bash scripts/quickstart.sh --config configs/qwen2_5_vl_3b.yaml --limit 512
 ```
 
-## Why not just patch an existing stack?
+Every stage is also a standalone script (`scripts/prepare_data.py`,
+`generate_target_data.py`, `capture_features.py`, `train_dflash.py`,
+`eval_dflash.py`) with `--config`, `--limit`, `--set k=v`; `train` additionally
+supports `--resume` (model + optimizer + scheduler + RNG state restore) and
+`--algorithm <name>` to switch drafters behind the same pipeline.
 
-Existing spec-decoding stacks target text-only drafters; the multimodal gaps
-that bite you are Qwen-VL's MRoPE position ids, image-token spans, the
-processor's pixel bounds, and the target's extra reserved mask embedding row.
-This repo pins the whole loop around those details, keeps training staged
-(no co-resident target), and ships the exact provenance/equivalence checks that
-catch teacher-target mismatches and silent text-only regressions.
+## Five-minute demo
 
-## Known limitations
+A local target checkout plus one CUDA GPU is the only requirement - there is no
+dataset to download. `demo` generates a tiny license-free sample, runs the
+token-exact evaluation and prints AL / token exactness / per-slot acceptance:
 
-- Two target families (Qwen2.5-VL, Qwen3-VL); one drafter family: DFlash block
-  drafter. Other families need a small adapter (`vlm_dflash/adapters/`).
-- Single image per sample; no video; no visual adaptor stages.
-- Acceptance eval is small-scale (64 prompts) and greedy-only; the token-exact
-  gate runs in `verification: sequential` (generate()-equivalent numerics -
-  see `docs/REFERENCE.md`). Parallel / strict-parallel verification is
-  available but is not bitwise-exact in bf16 and was not faster at the
-  drafter quality measured so far.
-- Not a serving runtime: this repo trains and evaluates a drafter; serving
-  integration is roadmap. `sequential` verification is correctness-first, not
-  a speed path.
+```bash
+vlm-dflash demo --target "$VLM_DFLASH_TARGET"
+# score real weights instead of the random-init acceptance baseline:
+vlm-dflash demo --target "$VLM_DFLASH_TARGET" --drafter assets/zoo/qwen25vl-3b-dflash
+```
 
-## Measured reference run (v0.1, one RTX A6000 48GB)
+`train-demo` runs the complete staged loop (prepare -> target-native regen ->
+capture -> tiny training -> eval -> export) on the same sample:
 
-Full pipeline with `configs/qwen2_5_vl_3b.yaml` (Qwen2.5-VL-3B target, bf16,
-greedy everything), measured end to end:
+```bash
+vlm-dflash train-demo --target "$VLM_DFLASH_TARGET" --steps 80
+```
 
-| stage | wall | outcome |
-| --- | --- | --- |
-| prepare (512 train + 64 val from a 64,969-row LLaVA-Instruct answer>=600-char pool) | < 1 min | `rows_sha256` recorded (stable across reruns) |
-| target-native regen (160 max new tokens) | ~6 min | 274/512 kept (regenerated answers must be >= 128 tokens) |
-| feature capture (274 samples, seq 2048) | < 1 min | + visual-path check passed |
-| drafter training | ~6 min | 210 steps; block CE (first-10% mean) 9.11 -> 6.11 (last-10% mean); no NaN/Inf; overfit sanity passed; peak GPU memory ~30.6 GB (includes the 16-sample sanity phase at batch 16) |
-| acceptance eval (64 held-out prompts, <= 128 new tokens) | ~16 min | token-exact gate: 64/64 (trained and random-init); see below |
+It finishes with the trained checkpoint scored against the random-init
+baseline on held-out prompts. Measured wall-clock/VRAM for both commands on
+the reference card are recorded in `RELEASE_VALIDATION.md`.
 
-Results (numbers only, no thresholding):
+## Model Zoo
 
-- AL (speculation): trained drafter **1.220** vs random-init drafter **1.003**
-  (random-init drafter is the acceptance baseline; target-only greedy is only an
-  output/speed reference - it has no draft proposals, so no AL).
-- Per-slot acceptance (trained): `[0.203, 0.013, 0.001, 0, 0, 0, 0]`; draft
-  acceptance rate 3.2%.
-- Equivalence: speculative greedy == target-only greedy token-exact on all 64
-  prompts for both checkpoints in parity mode (`verification: sequential`,
-  `verify_sdpa_backend: parity`). Parallel block verification flips bf16
-  near-tie argmax decisions on longer generations; see the runtime probe below
-  and `docs/REFERENCE.md`.
-- Rerun on the current code (`runs/qwen25vl3b_refresh`, same config and seed):
-  token-exact 64/64 again, AL 1.198 (vs 1.220 first run) - see the
-  non-determinism note in the runtime-probe section.
-- The eval is correctness-first: sequential verification makes wall-clock
-  comparable to (not faster than) plain target greedy. Speed is a serving-time
-  concern and out of scope for v0.1.
+Zoo exports are produced by the release pipeline
+(`python scripts/export_zoo.py --out assets/zoo`; see `RELEASE_VALIDATION.md`)
+with one self-describing directory per checkpoint - each contains
+`model.safetensors`, `config.json`, `draft_config.json`, `algorithm.json`,
+`target_contract.json`, `training_manifest.json` and a generated
+`model_card.md` (target, algorithm + status, corpus, steps, GPU/VRAM, AL,
+per-slot acceptance, token exactness, upstream references, license, known
+limitations):
 
-Pipeline smoke validation: `bash scripts/quickstart.sh --config
-configs/smoke_coco.yaml --limit 16 --steps 30 --eval-prompts 4` runs all five
-stages end to end in ~3.5 min on the same card and finishes with
-`token_exact=True` (trained AL 1.113 vs random-init 1.000).
+```text
+qwen25vl-3b-dflash   qwen25vl-3b-dspark   qwen25vl-3b-domino
+qwen25vl-3b-jetspec  qwen25vl-3b-dflash2-exp   qwen3vl-8b-dflash
+```
 
-## Measured v0.2 run (Qwen3-VL-8B, same card)
+## Benchmark scoreboard (canonical)
 
-Full pipeline with `configs/qwen3_vl_8b.yaml` (Qwen3-VL-8B-Instruct target,
-bf16, 512 long-answer LLaVA-Instruct samples, seq 2048, 6 epochs, block 8,
-3 draft layers, interleaved MRoPE), measured end to end on one A6000 48GB:
+Qwen2.5-VL-3B, 2K-row corpus, block size 8, 128 eval prompts / 128 tokens,
+greedy, **sequential verification - token-exact for every row** (the same
+prompts, corpus, features and seed protocol for all five algorithms):
 
-| stage | wall | outcome |
-| --- | --- | --- |
-| prepare (512 train + 64 val) | < 1 min | `rows_sha256` recorded |
-| target-native regen (max 160 new tokens) | ~14 min | 512/512 kept (>= 128 tokens) |
-| feature capture (512 samples, seq 2048) | ~2.5 min | visual-path check passed |
-| drafter training (384 steps, incl. the 16-sample overfit sanity) | ~20 min | block CE 10.29 (first 10%) -> 4.78 (last 10%); no NaN/Inf; overfit sanity passed; peak GPU memory 42.9 GB |
-| acceptance eval (64 held-out prompts, <= 128 new tokens) | ~19 min | token-exact gate: 64/64 (trained and random-init) |
+| Algorithm | AL | slot 1 | slot 3 | slot 6 | Token-exact |
+| --- | ---: | ---: | ---: | ---: | --- |
+| DFlash (frozen baseline) | 1.630 | .413 | .048 | .001 | 128/128 |
+| DSpark | 1.735 | .432 | .075 | .007 | 128/128 |
+| Domino | 1.764 | .443 | .078 | .009 | 128/128 |
+| JetSpec (causal-mask serving) | 1.599 | .408 | .040 | .001 | 128/128 |
+| DFlash2 (experimental objective) | 1.954 | .495 | .118 | .013 | 128/128 |
 
-Results (numbers only, no thresholding):
+Random-init drafter AL is ~1.003 across runs (the acceptance baseline);
+target-only greedy has no acceptance length and is only an output/speed
+reference. Full tables, ablations, the runtime probe and the public-workload
+benchmark live in `BENCHMARKS.md`; verification modes are documented in
+`docs/verification-modes.md` - `sequential` is the only bitwise-exact path,
+`parallel` is an experimental throughput path.
 
-- AL (speculation): trained drafter **1.322** vs random-init drafter **1.000**.
-- Per-slot acceptance (trained): `[0.244, 0.058, 0.018, 0.005, 0, 0, 0]`;
-  draft acceptance rate 4.8%.
+## Installation
 
-**Untied target heads.** Qwen3-VL-8B does not tie `lm_head` to the input
-embeddings (`tie_word_embeddings: false`). The pipeline handles both layouts:
-`capture_features` stores the target's own output projection in
-`features/target_head.pt`, `contract.json` records `head.tie_word_embeddings`,
-every checkpoint records the head it was trained against, and `train`/`eval`
-hard-fail on any disagreement. This matters because training against the
-embedding-tied head while `spec_generate` samples through the real `lm_head` is
-*silent*: training-side acceptance looks normal and end-to-end AL collapses to
-exactly 1.000. The numbers above are a head-consistent retrain; see
-`docs/REFERENCE.md` (Training semantics).
+```bash
+pip install vlm-dflash            # from PyPI after the v0.3.0 release
+pip install -e ".[tested]"        # exact validated dependency combo (from source)
+```
 
-CLI smoke (`vlm-dflash train --preset smoke --target .../Qwen3-VL-8B-Instruct
---run-dir runs/cli_smoke_8b --limit 8 --steps 3`, COCO captions) proves the CLI
-path end to end against an untied target: capture visual-path check passed,
-`vlm-dflash eval` reports `token_exact: true` on 8/8 prompts for both
-checkpoints (trained AL 1.076 vs random-init 1.000), and `vlm-dflash export`
-writes the portable HF-style checkpoint.
+Tested combination (recorded in `constraints-tested.txt` and
+`RELEASE_VALIDATION.md`): Python >= 3.10, `torch==2.10.0`,
+`transformers==5.12.1`, `datasets==4.2.0`. Everything was measured on a single
+48 GB card (A6000); 24 GB setups are a **suggested, unvalidated** target -
+lower `train.micro_batch_size` / `capture.seq_length` if you are
+memory-constrained.
 
-Resume was verified on the same run: re-running with a different `--steps`
-fails loudly ("Resume plan mismatch: checkpoint planned 3 total steps, this
-config computes 5"), and re-running with the matching plan restores model +
-optimizer + scheduler + RNG state so the resumed step is bit-identical (the two
-step-3 rows in `train/train_log.jsonl` are equal).
+## Documentation
 
-### Verification modes and a runtime probe (v0.2, Qwen3-VL-8B)
+| Document | What it covers |
+| --- | --- |
+| `docs/REFERENCE.md` | ported training semantics, AL definition, head/MRoPE rules |
+| `docs/algorithms/<name>.md` | per-algorithm design, config, train/eval commands |
+| `docs/upstream/<name>.md` | upstream audit: sources, commits, licenses, parity level |
+| `docs/benchmark.md` | the benchmark harness + workload manifests |
+| `docs/verification-modes.md` | sequential vs parallel verification, runtime probe |
+| `docs/measured-runs.md` | end-to-end measured runs and scaling tables |
+| `docs/adding_an_algorithm.md` | what a new drafter plugin must implement |
+| `BENCHMARKS.md` / `STATE.md` | every measured number / current project state |
+| `RELEASE_VALIDATION.md` | the release validation record for this version |
 
-`eval.verification` selects how the target verifies drafted blocks (see
-`docs/REFERENCE.md` for the mechanism):
+## Limitations
 
-| mode | token-exact vs target-only greedy | wall / sample | speed vs target-only |
-| --- | --- | --- | --- |
-| `sequential` (default; the gate) | **32/32 prompts** | 5.25 s | 0.84x |
-| `parallel` (one forward per block) | 6/32 | 4.31 s | 1.02x |
-| `strict_parallel`, margin 0.25 | 11/32 (4.6% of rounds re-verified) | 4.71 s | 0.97x |
-| `strict_parallel`, margin 2.0 | 10/32 (45.8% re-verified) | 6.61 s | 0.67x |
-| `strict_parallel`, margin 1e9 (control) | **32/32** | 8.66 s | 0.51x |
+- Single image + text only; no video, no multi-image, no multi-turn.
+- Two target families (Qwen2.5-VL-3B, Qwen3-VL-8B); other families need a
+  small adapter (`vlm_dflash/adapters/`).
+- No production serving integration - this repo trains, evaluates and exports
+  drafters; `sequential` verification is correctness-first, not a speed path.
+- Parallel / strict-parallel verification is **not bitwise exact** in bf16
+  (see `docs/verification-modes.md`); always compare exactness first.
+- DFlash2 trains with an experimental objective reconstruction (upstream
+  objective undisclosed); JetSpec's production parallel-tree runtime is not
+  ported.
+- bf16 capture and training are protocol-reproducible, not bit-identical
+  (observed run-to-run AL noise < ~2%).
 
-Protocol: `ckpt_final.pt`, 32 held-out prompts, greedy, bf16, one A6000,
-`verify_sdpa_backend: parity`; raw numbers in `eval/eval_result_*.json`, drift
-probe in `scripts/diag_verify_drift.py`. The 8B rows above are the
-512-sample drafter (`runs/qwen3vl8b_dflash`, AL ~1.33). The same probe on the
-2K-scale 3B drafter (`runs/qwen25vl3b_2k`, AL ~1.68) shows the speed crossing
-over while exactness does not:
+## License
 
-| mode | token-exact | AL | wall / sample | speed vs target-only |
-| --- | --- | --- | --- | --- |
-| `sequential` (gate) | **32/32** | 1.692 | 4.35 s | 0.86x |
-| `parallel` | 8/32 | 1.677 | 2.97 s | **1.25x** |
-| `strict_parallel`, margin 0.25 | 7/32 (14.0% re-verified) | 1.690 | 3.66 s | 1.03x |
-
-Reading:
-
-- Block-parallel verification is not bitwise-equivalent to step mode in bf16:
-  the same position with identical inputs moves by up to ~0.31 logits (prefill
-  deltas are 0). Accepted tokens carry that drift into the KV cache, so a
-  per-round near-tie guard reduces but cannot eliminate divergence - the
-  control run re-verifies every round and lands exactly on 32/32 with the same
-  AL, which pins the residual divergence on numerics rather than bookkeeping.
-- Speed scales with drafter quality, exactness does not follow: the parallel
-  path measured 1.02x at AL 1.33 (512-sample 8B drafter) and 1.25x at AL 1.68
-  (2K-scale 3B drafter), while the sequential gate - the only bitwise-exact
-  mode - was 0.84x and 0.86x on the same settings.
-- `sequential` therefore remains the correctness gate; parallel modes are
-  throughput experiments whose agreement rate is reported per run.
-
-### Scaling (Phase 2)
-
-Same recipe, larger LLaVA-Instruct slices, Qwen2.5-VL-3B target,
-`verification: sequential` (128 val prompts; the 512 point keeps the original
-64-prompt val set for comparison with v0.1):
-
-| slice | kept | train steps | AL (trained) | AL (random-init) | per-slot (trained) | token-exact |
-| --- | --- | --- | --- | --- | --- | --- |
-| 512 | 274 | 210 | 1.198 | 1.003 | [0.184, 0.011, 0, 0, 0, 0, 0] | 64/64 |
-| 2000 | 1050 | 792 | **1.630** | 1.003 | [0.413, 0.149, 0.048, 0.015, 0.004, 0.001, 0] | 128/128 |
-| 5000 | 2629 | 1974 | **1.817** | 1.003 | [0.482, 0.210, 0.080, 0.030, 0.011, 0.005, 0.001] | 128/128 |
-
-(512 row is the post-v0.2 rerun; the original v0.1 run measured 1.220 - see the
-non-determinism note below. 2000-slice: block CE 7.50 -> 3.79, peak 29.5 GB,
-~10 min. 5000-slice: block CE 6.84 -> 2.58, peak 30.0 GB, ~40 min.) AL keeps
-climbing 1.198 -> 1.630 -> 1.817 with slots 2-5 non-zero from the 2K point on
-(slot 6 first turns non-zero at 5K); acceptance is still length-limited by the
-128-prompt / 128-token eval budget, so treat the curve as "more data still
-helps", not as a plateau. The Qwen3-VL-8B 2K point is produced by
-`scripts/run_scaling_suite.sh` (running as of 2026-10-11).
-
-Same-seed reruns: data, regen and the protocol reproduce (`rows_sha256`
-identical, 274/512 regen keeps identical), but the bf16 capture and training
-passes are not bitwise deterministic across runs (feature shard hashes and
-step-1 loss differ between identical reruns; AL moved 1.220 -> 1.198 on the
-3B config). Reproduce the protocol, not the bits; treat sub-2% AL differences
-as run-to-run noise.
-
-Hardware note: all numbers above are from a single 48 GB card. 24 GB cards were
-**not** tested with these defaults; if you are memory-constrained, lower
-`train.micro_batch_size`, `capture.seq_length`, or run a smaller slice.
+Apache-2.0. Ported/adapted components carry their upstream attribution in
+`NOTICE`; each algorithm's parity level and license are recorded in
+`UPSTREAM_AUDIT.md` and `docs/upstream/`.

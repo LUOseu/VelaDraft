@@ -1,0 +1,46 @@
+name: Request a VLM target
+description: Ask for support for a new vision-language target family.
+title: "[target] "
+labels: ["target-request"]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Model name + hub id
+      placeholder: "e.g. Qwen2.5-VL-7B-Instruct"
+    validations:
+      required: true
+  - type: input
+    id: processor
+    attributes:
+      label: Processor / image preprocessing
+      description: What tokenizes images, pixel bounds, token expansion rules.
+    validations:
+      required: true
+  - type: input
+    id: vision-arch
+    attributes:
+      label: Vision architecture
+      description: ViT variant, patch merge, resolution handling.
+    validations:
+      required: true
+  - type: input
+    id: rope
+    attributes:
+      label: Position-id / MRoPE behavior
+      description: Text-only, MRoPE sections, interleaving, any per-modality handling.
+    validations:
+      required: true
+  - type: input
+    id: algorithm
+    attributes:
+      label: Requested drafter algorithm(s)
+      placeholder: "DFlash / DSpark / Domino / JetSpec / DFlash2"
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        Targets need a `TargetAdapter` + a real smoke run before they are
+        claimed as supported (`docs/adding_an_algorithm.md` describes the
+        contract side; `docs/REFERENCE.md` shows what must be validated).

@@ -1,10 +1,14 @@
-"""Unified command line: ``vlm-dflash {doctor,train,eval,export}``.
+"""Unified command line: ``vlm-dflash {doctor,demo,train-demo,train,eval,export}``.
 
 The five stage scripts remain the advanced interface; the CLI is the happy
 path: ``doctor`` preflights an environment/target, ``train`` runs the whole
 staged pipeline (prepare -> regen -> capture -> train) from a target + dataset
 with sensible presets, ``eval`` scores a finished run, and ``export`` writes
 the self-describing portable checkpoint.
+
+``demo`` is the five-minute first run (tiny synthetic sample, token-exact
+evaluation, no training; see :mod:`vlm_dflash.demo`); ``train-demo`` runs the
+complete staged loop on that same sample.
 """
 
 from __future__ import annotations
@@ -401,6 +405,22 @@ def cmd_export(args) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# demo / train-demo
+# --------------------------------------------------------------------------- #
+
+def cmd_demo(args) -> int:
+    from .demo import run_demo
+
+    return run_demo(args)
+
+
+def cmd_train_demo(args) -> int:
+    from .demo import run_train_demo
+
+    return run_train_demo(args)
+
+
+# --------------------------------------------------------------------------- #
 # argparse
 # --------------------------------------------------------------------------- #
 
@@ -416,6 +436,31 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--seq-length", type=int, default=2048)
     doctor.add_argument("--json", action="store_true")
     doctor.set_defaults(func=cmd_doctor)
+
+    def add_demo_args(parser: argparse.ArgumentParser, *, with_steps: bool) -> None:
+        parser.add_argument("--target", default=None, help="local target model directory (or set VLM_DFLASH_TARGET)")
+        parser.add_argument("--algorithm", default="dflash", help="drafter algorithm name (registered)")
+        parser.add_argument("--dataset", default=None, help="multimodal jsonl pool to use instead of the synthetic sample")
+        parser.add_argument("--images-dir", default=None, help="image root for --dataset (default: its sibling meta.json)")
+        parser.add_argument("--images", type=int, default=8, help="synthetic sample size (>= 2)")
+        parser.add_argument("--run-dir", default=None)
+        parser.add_argument("--num-prompts", type=int, default=4)
+        parser.add_argument("--max-new-tokens", type=int, default=64)
+        parser.add_argument("--set", dest="set_list", action="append", default=[], help="dotted key=value override")
+        if with_steps:
+            parser.add_argument("--steps", type=int, default=80, help="tiny training budget for train-demo")
+
+    demo = sub.add_parser("demo", help="five-minute first run: synthetic sample + token-exact eval, no training")
+    add_demo_args(demo, with_steps=False)
+    demo.add_argument("--drafter", default=None, help="run dir, checkpoint file or exported zoo dir with drafter weights")
+    demo.set_defaults(func=cmd_demo)
+
+    train_demo = sub.add_parser(
+        "train-demo",
+        help="full staged pipeline (prepare -> regen -> capture -> train -> eval -> export) on the synthetic sample",
+    )
+    add_demo_args(train_demo, with_steps=True)
+    train_demo.set_defaults(func=cmd_train_demo)
 
     train = sub.add_parser("train", help="prepare -> regen -> capture -> train in one command")
     train.add_argument("--target", default=None, help="local target model directory")

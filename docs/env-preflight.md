@@ -1,16 +1,17 @@
-# Environment preflight (Stage 0 findings)
+# Environment preflight (development host findings)
 
-Recorded 2026-10-11 on the GPU box and the Mac development host.
+Recorded 2026-10-11 on the development hosts. Personal paths are kept out of
+the repository on purpose; substitute your own checkout and dataset roots.
 
 ## GPU host layout
 
-- Repo checkout: `/home/lyh/vlm-dflash` (rsync mirror of the Mac repo; `runs/`,
-  `.venv/`, `assets/` are excluded from the mirror).
+- Repo checkout: `~/vlm-dflash` on the GPU host (rsync mirror of the working
+  copy; `runs/`, `.venv/`, `assets/` are excluded from the mirror).
 - Python: `.venv` created with `uv`, Python 3.11.16.
 - GPUs: 3x RTX A6000 48GB. Convention: `CUDA_VISIBLE_DEVICES=0` (other cards
   belong to other users; never run multi-GPU).
-- Sync command (from the Mac repo root):
-  `rsync -az --exclude runs/ --exclude .venv/ --exclude assets/ --exclude __pycache__/ ./ oab-remote:/home/lyh/vlm-dflash/`
+- Sync command (from the working copy root):
+  `rsync -az --exclude runs/ --exclude .venv/ --exclude assets/ --exclude __pycache__/ ./ <gpu-host>:~/vlm-dflash/`
 
 ## Pinned version combination (tested)
 
@@ -41,14 +42,15 @@ Recorded 2026-10-11 on the GPU box and the Mac development host.
   and per-file processor hashes are recorded in `runs/<run>/contract.json`.
   Qwen2.5-VL-3B @ download: `e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5`.
 
-## Data availability (read-only sources on the cluster)
+## Data availability (read-only cluster mirrors)
 
-- LLaVA-Instruct-150K conversations: `/home/dhz/Data/llava_instruct_150k.json`.
-  With `min_answer_chars: 600` the pool is 64,969 rows.
-- COCO train2017 images + captions:
-  `/home/dhz/Data/COCO-caption/{annotations/captions_train2017.json,train2017}`.
-  Used only for the pipeline smoke config (`configs/smoke_coco.yaml`).
-- Both sources are read-only; nothing under `/home/dhz` is ever written.
+- LLaVA-Instruct-150K conversations: point `VLM_DFLASH_LLAVA_JSON` at the
+  local mirror of `llava_instruct_150k.json`. With `min_answer_chars: 600` the
+  pool is 64,969 rows.
+- COCO train2017 images + captions: point `VLM_DFLASH_COCO_CAPTIONS` /
+  `VLM_DFLASH_COCO_IMAGES` at the local mirrors. Used only for the pipeline
+  smoke config (`configs/smoke_coco.yaml`).
+- Mirrors are read-only; the pipeline only ever writes under `runs/`.
 
 ## Verified smoke facts (Qwen2.5-VL-3B, bf16, sdpa)
 

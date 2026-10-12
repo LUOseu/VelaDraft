@@ -3,6 +3,7 @@ algorithm: dflash  # drafter plugin; see vlm_dflash/algorithms/
 # Family-specific values (MRoPE sections, mask id, pixel bounds) are resolved
 # and validated against the target at runtime via the model contract.
 target:
+  model: ${VLM_DFLASH_TARGET:-assets/models/Qwen2.5-VL-3B-Instruct}
   dtype: bfloat16
   attn_implementation: sdpa
   device: cuda:0

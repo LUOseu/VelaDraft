@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this repository in academic work, please cite it as below."
+title: "vlm-dflash: a unified training and evaluation stack for multimodal parallel drafters"
+type: software
+license: Apache-2.0
+version: 0.3.0
+date-released: 2026-10-12
+abstract: >-
+  A training, evaluation and export stack for multimodal speculative drafters
+  (DFlash, DSpark, Domino, JetSpec, DFlash2) on Qwen2.5-VL and Qwen3-VL
+  targets, with staged hidden-state capture, runtime model contracts,
+  provenance gates and a token-exact acceptance gate.
+keywords:
+  - speculative decoding
+  - vision-language models
+  - multimodal
+  - drafter training
+  - Qwen-VL
+authors:
+  - name: "vlm-dflash contributors"

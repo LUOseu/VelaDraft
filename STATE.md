@@ -1,6 +1,15 @@
 # STATE
 
-Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
+Updated: 2026-10-13 (v0.3.0-rc1 prepared; private-review candidate).
+
+**Release freeze: ACTIVE**
+**Target release: v0.3.0**
+
+- Scope is frozen: no new algorithms, targets, video / multi-image, serving
+  runtime or research methods until the release candidate is reviewed. Only
+  bug fixes, docs, packaging, release tooling, benchmark adapters, reduced
+  validation, CI and license/security cleanup are in scope.
+- Release gates: `RELEASE_CHECKLIST.md`; evidence: `RELEASE_VALIDATION.md`.
 
 ## Current stable features
 - Staged pipeline: `prepare -> regen -> capture -> train -> eval` (+ `export`);
@@ -10,17 +19,18 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
 - Verification: `sequential` (bitwise-exact gate), `parallel` /
   `strict_parallel` (experimental throughput; not lossless).
 - Unified CLI (`doctor/train/eval/export`), presets, resume, HF-style export.
-- Algorithm registry with DFlash as the only registered plugin (frozen).
-- DSpark plugin (experimental): Markov logit-bias head + confidence head on
-  the frozen DFlash backbone; `sample_from_anchor` both modes; CPU/synthetic
-  tests green; canonical VLM runs pending (see ALGORITHM_MATRIX.md).
-- Gradient coverage audit + confidence calibration artifacts; namespaced
-  algorithm config; export loader dispatch by algorithm.
+- Algorithm registry with five drafters behind one interface: DFlash (stable
+  frozen reference), DSpark / Domino / JetSpec (validated on the 2K
+  apples-to-apples protocol), DFlash2 (experimental objective; upstream does
+  not publish it). See `ALGORITHM_MATRIX.md`, `SUPPORT_MATRIX.md`, `BENCHMARKS.md`.
+- Gradient coverage audit + per-algorithm calibration/ablation artifacts;
+  namespaced algorithm config; export loader dispatch by algorithm.
 
 ## Experimental
 - Benchmark harness skeleton (`scripts/benchmark.py` + manifests); only the
   scaffold workload (`caption_general`, run's own val split) is runnable;
-  TextVQA/DocVQA/ChartQA manifests pin protocol but have no adapter yet.
+  TextVQA lands with this release; DocVQA/ChartQA pin protocol without an
+  adapter yet.
 - Parallel runtime speedup numbers (see BENCHMARKS.md) — experimental.
 
 ## Latest measured results
@@ -29,11 +39,15 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
 - 3B / 5K-corpus: AL 1.817, 128/128 exact, slots
   `[.482,.210,.080,.030,.011,.005,.001]` (1974 steps, CE 6.84 -> 2.58, peak
   30.0 GB).
-- 8B / 512-corpus: AL 1.322; 8B / 2K: running (suite, started 23:31; ETA
-  ~03:00).
+- 8B / 512-corpus: AL 1.322.
 - 8B / 2K-corpus: AL 1.665, 32/32 exact, slots
   `[.413,.160,.063,.027,.010,.002,.0004]` (1996 kept rows, 1500 steps, final
   loss 2.69, visual-path check passed; speedup 0.81x).
+- Algorithm zoo / 3B / 2K / 128 prompts (sequential, token-exact): DFlash
+  1.630, DSpark 1.735, Domino 1.764, JetSpec 1.599, DFlash2 1.954 (experimental
+  objective; conv/selector ablation 1.798).
+- DFlash frozen-baseline regression after the zoo landed: full 128-prompt
+  re-eval reproduces 1.6298 bit-identically (`tests/reference_dflash/manifest.json`).
 - Runtime probe (32 prompts, bf16): see BENCHMARKS.md.
 
 ## DSpark stage (2026-10-12)
@@ -169,6 +183,43 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
   token-exact (128/128). Machine-readable record:
   `tests/reference_dflash/manifest.json`.
 
+## v0.3.0-rc1 release engineering (2026-10-12/13)
+
+Scope frozen (harden/document/validate/package only). Evidence:
+`RELEASE_VALIDATION.md`; gates: `RELEASE_CHECKLIST.md`.
+
+- Five-minute demo landed: `vlm-dflash demo` (synthetic sample, token-exact
+  eval, random-init baseline or `--drafter <run|ckpt|export>`) and
+  `vlm-dflash train-demo` (full staged loop + tiny training + eval + export).
+  Measured on the A6000: demo 45 s / 8.2 GB; demo --drafter zoo 42 s / 8.5 GB
+  (AL 1.313 vs 1.000); train-demo 3 min 13 s / 8.2 GB (loss 13.0 -> 0.013,
+  eval AL 1.138 vs 1.000, 4/4 token-exact). `--drafter` demos align the
+  sample's image pixel bounds with the drafter's recorded identity and use a
+  drafter-specific run dir (provenance gate unchanged).
+- TextVQA public workload validated: adapter + pinned 128-prompt seed-42
+  subset (`benchmarks/prompts/textvqa_v1.jsonl`, shard/row hashes in
+  `benchmarks/manifests/02_textvqa.json`); DFlash 1.263 / DSpark 1.253 /
+  Domino 1.268 AL, token-exact 128/128 (32 new tokens, sequential);
+  reports under `benchmarks/reports/`.
+- Frozen baseline re-eval on the release commit: **1.6298365840801265**,
+  bit-identical to the frozen reference (128/128 token-exact); 16-prompt
+  release regressions token-exact — DSpark 1.827, Domino 1.854, JetSpec
+  1.661, DFlash2 2.047 (same checkpoints).
+- Qwen3-VL reduced validation (256-row slice, 192 steps, 16-prompt eval,
+  export + reload, all token-exact): DSpark 1.2212, Domino 1.2278, JetSpec
+  1.1185, DFlash2 1.2104 (init 1.000) — SUPPORT_MATRIX Qwen3-VL column
+  upgraded for all four (dflash2 stays experimental by objective).
+- Model zoo: 6 canonical exports with reload self-check
+  (243.8M / 321.6M / 292.9M / 243.8M / 328.5M / 629.2M params).
+- Packaging/CI/hygiene: wheel + sdist build, fresh-venv CLI smoke; CI
+  workflow (CPU tests + package build); issue templates;
+  CONTRIBUTING / SECURITY / CODE_OF_CONDUCT / CITATION.cff; absolute host
+  paths removed from configs/presets/tests/docs; secret / large-file /
+  license / claim audits recorded in `RELEASE_VALIDATION.md`.
+- Tests: 155/155 CPU tests pass; explicit `pyarrow` dependency; manifest
+  prompt paths now expand `${VAR:-default}` (was `expandvars`-broken).
+
+
 ## Known bugs / caveats
 - bf16 capture/training: protocol-reproducible, not bit-identical.
 - `parallel` verification exactness is numerically unreachable with the
@@ -176,7 +227,8 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
   lossless.
 
 ## Blocked / waiting
-- Hugging Face / PyPI publishing: pending release audit (no push before that).
+- Public release / PyPI / Hugging Face publishing: awaits author review of
+  the private v0.3.0-rc1 candidate (no public push before that).
 - Server disk policy in effect: feature stores are pruned once a run is
   recorded ("deterministic to recapture"); the zoo 2K stores live in
   `runs/qwen25vl3b_jetspec_2k/features` (capture-v2 superset), symlinked by
