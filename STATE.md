@@ -31,7 +31,22 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
   30.0 GB).
 - 8B / 512-corpus: AL 1.322; 8B / 2K: running (suite, started 23:31; ETA
   ~03:00).
+- 8B / 2K-corpus: AL 1.665, 32/32 exact, slots
+  `[.413,.160,.063,.027,.010,.002,.0004]` (1996 kept rows, 1500 steps, final
+  loss 2.69, visual-path check passed; speedup 0.81x).
 - Runtime probe (32 prompts, bf16): see BENCHMARKS.md.
+
+## DSpark stage (2026-10-12)
+- `fix(dspark)` head ownership + coverage-audit timing/units + `spec_generate`
+  block window + calibration ragged anchors (bc9c0e6).
+- `fix(eval)` verify-backend parity now forwarded through every algorithm
+  (db7cb8d): DSpark verify runs on the same SDPA backend as `generate()`;
+  `eval_result.json` records `verify_backend_switch_enabled`. COCO smoke
+  re-run: trained + init both token-exact 8/8 (AL 1.123 vs 1.000).
+- DFlash regression check after the eval fix (`dflash_regress8`, 8 prompts):
+  AL 1.766, token-exact.
+- DSpark 2K canonical: features captured (1050 samples, 7.2 GB, replay
+  bitwise, visual-span + downstream change passed); training started 12:59.
 
 ## Registry refactor verification (2026-10-11, no DFlash regression)
 - 61/61 CPU tests green after the refactor.
