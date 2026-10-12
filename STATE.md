@@ -73,6 +73,36 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
 - Exports verified for both algorithms (`--out-dir /tmp/export_*`):
   `method: dspark` / `method: domino` with the head fields in `draft_config`.
 
+## JetSpec stage (2026-10-12, stage 4 of the algorithm zoo)
+- Capture v2 (`capture.store_final_hidden`): stores the target's final hidden
+  state per sample (~+25% storage); feature collate carries it as
+  `final_hidden`. Teacher-signal identity verified on a real sample:
+  `lm_head(hidden_states[-1])` == the target's own logits, max|diff| 0.0.
+- Trainer (`vlm_dflash/jetspec/`): `causal_in_block=True` mask + chunked
+  temperature-scaled forward KL (ported semantics; chunked trainer path equals
+  the logits-in reference within 1e-5) + teacher gather at
+  `label_indices[..., :-1]`; metrics are draft-vs-teacher agreement and
+  acceptance length. 19 new tests (134 total green).
+- First 2K attempt OOM'd (`CUBLAS_STATUS_ALLOC_FAILED`) in the overfit sanity
+  phase: the KD backward retains fp32 log-probabilities of all valid positions
+  (16 samples x 256 anchors -> ~3x17 GB fp32 at [P, vocab]). Fixed by
+  overfit_sanity.num_samples=8 + kd_chunk_size=1024; peak memory 29.7 GB.
+- 2K canonical: 792 steps, KD loss 6.06 -> 3.10 (first/last-10 mean), overfit
+  pass (drop 0.992 / slot0 0.98), coverage 36/36, visual check 6.92 logits diff;
+  peak 29.7 GB, 20.6 min.
+- Serving fidelity (new finding): JetSpec's trained checkpoint relies on its
+  causal in-block factorization. Unmasked shared-runtime serving flips 7.6% of
+  per-slot greedy argmaxes (max |dlogit| 9.0) and loses 0.26 AL. Added
+  `inference_in_block_causal` (draft-config flag; loader forces it for older
+  checkpoints; export records it + a runtime note). Eval: AL 1.599 token-exact
+  128/128 under causal-mask serving vs 1.338 unmasked; per-slot [.408, .137,
+  .040, .011, .003, .001, 0].
+- Interpretation: at this scale/corpus JetSpec (1.599) does not beat the frozen
+  DFlash CE baseline (1.630); uniform soft-distribution weighting costs
+  early-slot accuracy vs decayed hard-label CE. The paper's data-scaling claim
+  is not testable at 2K. Exports verified (`/tmp/export_jetspec_2k`,
+  `/tmp/export_jetspec_smoke`).
+
 ## Registry refactor verification (2026-10-11, no DFlash regression)
 - 61/61 CPU tests green after the refactor.
 - `vlm-dflash doctor --algorithm dflash` reports the registry + metadata.
@@ -97,11 +127,13 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
 - Hugging Face / PyPI publishing: pending release audit.
 
 ## Next highest-value tasks
-1. JetSpec stage: capture v2 (store final hidden state per sample) ->
-   `vlm_dflash/jetspec/` (chunked forward-KL + causal mask + teacher metrics) ->
-   tests -> smoke -> 2K run. Audit and plan: `docs/upstream/jetspec.md`.
-2. DFlash2 stage after JetSpec (experimental training objective; must be
-   labeled Experimental per GOAL §8).
+1. DFlash2 stage (stage 5, last in the zoo order): complete the upstream audit
+   in `docs/upstream/dflash2.md` (sources pinned), then implement local conv +
+   candidate selector; must be labeled Experimental per GOAL §8 and record the
+   full-vocabulary constraint in doctor/config validation/checkpoint contract.
+2. Serving-fidelity follow-ups from the JetSpec stage: decide whether the
+   `inference_in_block_causal` mask path should be exercised by a
+   `strict`-style test on a GPU CI run (currently unit-tested + smoke-tested).
 3. Deterministic benchmark prompt file for `caption_general`; land one public
    dataset adapter (TextVQA first) to move a workload from planned -> validated.
 4. Model cards for released checkpoints (export already emits most fields).

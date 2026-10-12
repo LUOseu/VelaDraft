@@ -128,7 +128,22 @@ class JetSpecAlgorithm(DFlashAlgorithm):
     def load_decoder(self, checkpoint_path, map_location: str = "cpu"):
         from ..jetspec.factory import load_checkpoint
 
-        return load_checkpoint(checkpoint_path, map_location=map_location)
+        draft, checkpoint = load_checkpoint(checkpoint_path, map_location=map_location)
+        # Serve the causal in-block mask the trainer used. New checkpoints carry
+        # this in their draft config; checkpoints written before the field
+        # existed (still JetSpec weights) are corrected here so eval/export
+        # never silently fall back to the non-causal block forward.
+        draft.inference_in_block_causal = True
+        return draft, checkpoint
+
+    def build_inference_module(self, draft_config_dict: dict, attention_backend: str):
+        from ..dflash.draft_model import Qwen3DFlashDraftModel
+
+        model = super().build_inference_module(draft_config_dict, attention_backend)
+        model.inference_in_block_causal = bool(
+            getattr(model, "inference_in_block_causal", False)
+        ) or bool((draft_config_dict.get("dflash_config") or {}).get("inference_in_block_causal", True))
+        return model
 
 
 register(JetSpecAlgorithm())

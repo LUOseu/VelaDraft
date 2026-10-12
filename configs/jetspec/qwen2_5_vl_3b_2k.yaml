@@ -2,7 +2,7 @@ algorithm:
   name: jetspec
   jetspec:
     kd_temperature: 1.0   # softmax temperature T for KL(P_target || Q_draft), loss is T^2-scaled
-    kd_chunk_size: 2048   # teacher-projection chunk (positions per lm_head call); bounds peak memory
+    kd_chunk_size: 1024   # teacher-projection chunk (positions per lm_head call); bounds peak memory
 # Canonical 2K scaling point for JetSpec. Same recipe/data as the DFlash /
 # DSpark / Domino 2K runs, but the feature store is capture-v2
 # (store_final_hidden=true) because the forward-KL teacher logits are projected
@@ -69,7 +69,10 @@ train:
   device: cuda:0
   overfit_sanity:
     enabled: true
-    num_samples: 16
+    # 8 (not 16): the KD backward retains fp32 log-probabilities of every valid
+    # position ([P, vocab]), so 16 samples (~28.7k positions) exceeded memory on
+    # the 48G card during the sanity run; the main loop's micro-batch is 8.
+    num_samples: 8
     steps: 200
     ce_drop: 0.6
     slot0_acc: 0.9

@@ -368,3 +368,40 @@ def test_jetspec_checkpoint_metadata():
     assert meta["loss_decay_gamma"] is None
     decoder = algorithm.build_inference_module(module.draft_model.config.to_dict(), "sdpa")
     assert decoder.mask_token_id == 255
+
+
+# --------------------------------------------------------------------------- #
+# inference-side causal in-block mask (serving fidelity)
+# --------------------------------------------------------------------------- #
+
+def test_inference_block_mask_forbids_future_in_call_columns():
+    import types
+
+    module = _tiny_jetspec_module()
+    module.draft_model.inference_in_block_causal = True
+    target_hidden = torch.zeros(1, 3, HIDDEN)
+    noise_embedding = torch.zeros(1, 4, HIDDEN)
+    cache = types.SimpleNamespace(get_seq_length=lambda: 5)
+    mask = module.draft_model._inference_block_mask(cache, target_hidden, noise_embedding, None)
+    q_len, ctx_len, cache_len = 4, 3, 5
+    assert mask.shape == (1, 1, q_len, cache_len + ctx_len + q_len)
+    block = mask[0, 0, :, cache_len + ctx_len :]
+    for i in range(q_len):
+        for j in range(q_len):
+            value = float(block[i, j])
+            if j <= i:
+                assert value == 0.0, f"in-block past column ({i},{j}) must stay visible"
+            else:
+                assert value < -1e30, f"in-block future column ({i},{j}) must be masked"
+    # Cached prefix and this call's context stay fully visible.
+    assert torch.equal(mask[0, 0, :, : cache_len + ctx_len], torch.zeros(q_len, cache_len + ctx_len))
+    # Flag off -> no mask, i.e. the shared runtime is byte-identical for others.
+    module.draft_model.inference_in_block_causal = False
+    assert module.draft_model._inference_block_mask(cache, target_hidden, noise_embedding, None) is None
+
+
+def test_jetspec_draft_config_and_decoder_serve_causal_mask():
+    algorithm = get_algorithm("jetspec")
+    module = _tiny_jetspec_module()
+    decoder = algorithm.build_inference_module(module.draft_model.config.to_dict(), "sdpa")
+    assert decoder.inference_in_block_causal is True

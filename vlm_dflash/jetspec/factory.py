@@ -32,10 +32,20 @@ def resolve_jetspec_config(cfg: dict) -> dict:
 
 
 def build_draft_config(contract: dict, cfg: dict):
-    """JetSpec uses the unmodified DFlash draft backbone (no new parameters)."""
+    """JetSpec uses the unmodified DFlash draft backbone (no new parameters).
+
+    The only added config field is ``inference_in_block_causal``: it makes the
+    shared decoder serve the checkpoint with the same causal in-block mask the
+    trainer used (training-time mask semantics live in the trainer, not in the
+    architecture).
+    """
     from ..dflash.factory import build_draft_config as build_dflash_draft_config
 
-    return build_dflash_draft_config(contract, cfg)
+    config = build_dflash_draft_config(contract, cfg)
+    dflash_config = dict(getattr(config, "dflash_config", {}) or {})
+    dflash_config["inference_in_block_causal"] = True
+    config.dflash_config = dflash_config
+    return config
 
 
 def build_trainer_module(draft_config, contract: dict, cfg: dict, embed_weight, lm_head_weight=None):

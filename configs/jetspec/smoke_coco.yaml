@@ -2,7 +2,7 @@ algorithm:
   name: jetspec
   jetspec:
     kd_temperature: 1.0
-    kd_chunk_size: 2048
+    kd_chunk_size: 1024
 # Pipeline smoke config: COCO captions (short answers), small slice, short
 # training — proves the full chain runs end to end; not a quality benchmark.
 run:

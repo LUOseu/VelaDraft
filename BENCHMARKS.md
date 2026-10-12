@@ -59,6 +59,8 @@ are the same run recipe with one algorithm knob flipped.
 | DSpark `sample_from_anchor: false` (DFlash-width ablation) | 1.719 | .418 | .170 | .075 | .033 | .016 | .006 | .003 | 128/128 |
 | Domino (correction enabled) | 1.764 | .443 | .180 | .078 | .036 | .016 | .009 | .005 | 128/128 |
 | Domino `enable_correction_head: false` (ablation) | 1.662 | .457 | .148 | .042 | .013 | .002 | .001 | 0 | 128/128 |
+| JetSpec (causal-mask serving, faithful) | 1.599 | .408 | .137 | .040 | .011 | .003 | .001 | 0 | 128/128 |
+| JetSpec (shared runtime, no in-block mask) | 1.338 | .242 | .069 | .020 | .005 | .001 | .0004 | .0002 | 128/128 |
 
 - DSpark decomposition: at the frozen DFlash round width the Markov head alone
   lifts AL 1.630 -> 1.719 (+0.089, deep slots roughly doubled); drafting the
@@ -66,6 +68,17 @@ are the same run recipe with one algorithm knob flipped.
   families relieve the same suffix-acceptance decay the block-parallel drafter
   suffers, and DSpark/Domino per-slot profiles differ (Domino keeps more of
   slot-1 acceptance while gaining deeper), so the two heads are not redundant.
+- JetSpec decomposition: the trained checkpoint relies on its causal in-block
+  factorization. Serving it under the shared runtime's unmasked block forward
+  (the default for every other algorithm) loses **0.26 AL** (1.599 -> 1.338);
+  a diagnostic on one captured sample shows the runtime forward flips 7.6% of
+  the checkpoint's per-slot greedy argmaxes relative to the training mask
+  (max |dlogit| 9.0). Serving with the mask (now the default for JetSpec
+  checkpoints, `inference_in_block_causal`) restores per-slot acceptance to
+  essentially the DFlash profile at this scale. Under the faithful mask JetSpec
+  (1.599) sits just below the frozen DFlash CE baseline (1.630): with uniform
+  soft-distribution weighting and this tiny corpus/step budget, KD does not beat
+  hard-label CE here; the paper's scaling claims are not testable at 2K.
 - Domino ablation: the causal GRU correction is worth +0.102 AL at the same
   window; the disabled run reproduces roughly the DFlash objective on the
   shifted window (its 1.662 vs 1.630 difference reflects the shifted-label

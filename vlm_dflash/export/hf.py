@@ -49,12 +49,26 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
             "num_val": manifest.get("num_val"),
             "rows_sha256": manifest.get("rows_sha256"),
         }
+    method = str(checkpoint.get("algorithm", "dflash"))
+    # Algorithm-specific checkpoint fields (DSpark heads, Domino head knobs,
+    # JetSpec KD settings) are re-emitted so a serving side can inspect them.
+    method_details = checkpoint.get(method) if isinstance(checkpoint.get(method), dict) else None
+    runtime_note = None
+    if method == "jetspec":
+        runtime_note = (
+            "Trained with a causal in-block mask and forward-KL distillation. The paper's "
+            "parallel-tree runtime is not ported: the shared block-parallel decoder serves this "
+            "checkpoint with the same causal in-block mask (per-slot greedy proposals, no tree "
+            "conditioning), which is the closest factorization to training this repo supports."
+        )
     return {
         "format": EXPORT_FORMAT,
         "created": now_iso(),
         # Which drafter algorithm produced these weights (checkpoints written
         # before the tag default to dflash).
-        "method": str(checkpoint.get("algorithm", "dflash")),
+        "method": method,
+        "method_details": method_details,
+        "runtime_note": runtime_note,
         "checkpoint": checkpoint_name,
         "code_commit": _git_commit(),
         "adapter": contract["target"]["model_type"],
@@ -78,12 +92,18 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
             "num_hidden_layers": contract["layers"]["num_draft_layers"],
             "block_size": int(checkpoint["block_size"]),
             "num_anchors": int(checkpoint["num_anchors"]),
-            "loss_decay_gamma": float(checkpoint["loss_decay_gamma"]),
+            "loss_decay_gamma": (
+                None if checkpoint.get("loss_decay_gamma") is None else float(checkpoint["loss_decay_gamma"])
+            ),
             "attention_backend": checkpoint["attention_backend"],
             "mask_token_id": int(checkpoint["mask_token_id"]),
             "target_layer_ids": [int(x) for x in checkpoint["target_layer_ids"]],
             "spatial_rope": rope_cfg,
-            "draft_config": checkpoint["draft_config"],
+            # Effective serving config. JetSpec checkpoints trained before the
+            # flag existed still must be served with the causal in-block mask
+            # (the loader forces it); record that here so a re-server reading
+            # only the export config cannot silently drop it.
+            "draft_config": _serving_draft_config(method, checkpoint["draft_config"]),
         },
         "training": None if train_summary is None else {
             key: train_summary.get(key)
@@ -104,6 +124,17 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
         "provenance_stages": sorted((provenance.get("stages") or {}).keys()),
         "identity": checkpoint.get("identity"),
     }
+
+
+def _serving_draft_config(method: str, draft_config: dict) -> dict:
+    """Draft config as it must be served (algorithm-specific serving-time fields)."""
+    if method != "jetspec":
+        return draft_config
+    config = dict(draft_config)
+    dflash_config = dict(config.get("dflash_config") or {})
+    dflash_config["inference_in_block_causal"] = True
+    config["dflash_config"] = dflash_config
+    return config
 
 
 def render_model_card(export_config: dict) -> str:

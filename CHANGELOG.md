@@ -2,8 +2,31 @@
 
 ## v0.3.0 (in development)
 
-Two algorithm-zoo stages land in this release: DSpark (stage 2) and Domino
-(stage 3).
+Three algorithm-zoo stages land in this release: DSpark (stage 2), Domino
+(stage 3) and JetSpec (stage 4).
+
+### Stage 4: JetSpec (causal block-parallel drafting + forward-KL distillation)
+
+- Capture v2: `capture.store_final_hidden` stores the target's final hidden
+  state per sample (manifest: `stores_final_hidden`); feature collate carries it
+  as the distillation teacher signal. Verified exact: `lm_head(final_hidden)`
+  equals the target's own logits bit-for-bit.
+- `vlm_dflash/jetspec/`: `kd_loss.py` (temperature-scaled forward KL with
+  ignore-index and chunking; ported from the maintainer `KDLoss`),
+  `trainer.py` (`causal_in_block` mask, teacher gather at
+  `label_indices[..., :-1]`, chunked teacher projection through the frozen
+  lm_head, draft-vs-teacher agreement + acceptance metrics), `factory.py`,
+  `algorithms/jetspec.py` plugin + configs. 19 new tests.
+- Serving fidelity: `inference_in_block_causal` draft-config flag makes
+  `spec_generate` serve JetSpec checkpoints with the training causal in-block
+  mask. Measured cost of the mismatched runtime: -0.26 AL (7.6% argmax flips on
+  the 2K checkpoint). Eval JSONs record the effective serving mode; export
+  configs carry the flag and a runtime note (parallel-tree runtime not ported).
+- 2K canonical run: 792 steps, KD loss 6.06 -> 3.10 (first/last-10 mean),
+  overfit sanity pass, coverage 36/36, visual check pass; eval AL 1.599
+  (token-exact 128/128) under causal-mask serving vs 1.338 under the shared
+  runtime. Peak training memory 29.7 GB (KD backward retains fp32
+  log-probabilities; overfit sanity batch reduced to 8).
 
 ### Stage 3: Domino
 

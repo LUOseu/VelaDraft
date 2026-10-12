@@ -1,8 +1,9 @@
 # Upstream audit — JetSpec
 
-Status: **audited; implementation planned** (Stage 4 of the GOAL execution
-order). The audit is complete; implementation is scheduled behind the capture
-extension described below.
+Status: **implemented; validated on Qwen2.5-VL-3B** (Stage 4 of the GOAL
+execution order). The audit below was completed first; implementation landed in
+`vlm_dflash/jetspec/` + `vlm_dflash/algorithms/jetspec.py` on top of the
+capture-v2 extension (see "Implementation record" at the bottom).
 
 ```text
 Paper:                     JetSpec — "Breaking the Scaling Ceiling of Speculative
@@ -90,4 +91,41 @@ Runtime:        NOT ported. Production parallel-tree drafting is unsupported;
    teacher-gather alignment test (teacher position == label-1).
 4. smoke + 2K runs; eval through the shared decoder with the causal mask
    (flagged reference-only) or a documented decision to defer eval numbers.
+```
+
+## Implementation record (2026-10-12)
+
+```text
+Capture v2:  ``capture.store_final_hidden=true`` additionally stores the target's
+             final hidden state (post-final-norm, [S, H] fp16/bf16, ~+25% over
+             the fused context) per sample; the manifest records
+             ``stores_final_hidden``. Old stores load fine for every other
+             algorithm; JetSpec training raises a capture-v2 error on them.
+Teacher:     verified exact - on a real smoke sample, ``lm_head(hidden_states[-1])``
+             equals the target's own output logits bit-for-bit (max|diff| = 0.0,
+             argmax agreement 1.0). The KD teacher is the true target
+             distribution, not an approximation.
+Trainer:     ``JetSpecTrainerModule`` sets ``causal_in_block=True`` (the shared
+             mask builder's causal path) and overrides the scoring seam:
+             teacher hidden gathered at ``label_indices[..., :-1]`` and projected
+             chunk-wise through the frozen lm_head; temperature-scaled forward KL
+             (ported ``kd_loss.py``; chunked trainer path verified equal to the
+             logits-in reference within 1e-5); metrics are draft-vs-teacher
+             agreement and expected acceptance length.
+Unit tests:  17 new tests (KD math/temperature/ignore-index/chunking, causal
+             mask leak test, teacher alignment, fail-loud contracts, chunked-vs-
+             reference loss, overfit, feature-store plumbing, registry/config).
+Smoke:       COCO 64-row slice, shared corpus with the other algorithms'
+             smoke runs; overfit sanity passed, gradient coverage 36/36,
+             drafter visual check passed; eval token-exact (AL 1.123 vs init
+             1.000).
+Runtime:     the shared block-parallel decoder serves JetSpec checkpoints with
+             the training causal in-block mask (``inference_in_block_causal``
+             flag; additive mask hiding the in-call future block columns only).
+             Mask-mismatch diagnostic: smoke ckpt max |dlogit| 0.070 / 0
+             greedy-argmax flips; trained 2K ckpt max 9.0 / 7.6% flips - i.e.
+             the trained model relies on the causal factorization, so eval must
+             serve the mask. The paper's parallel-tree runtime (top-k branch
+             conditioning) is still NOT implemented: proposals are per-slot
+             greedy along a single path, and eval results must say so.
 ```

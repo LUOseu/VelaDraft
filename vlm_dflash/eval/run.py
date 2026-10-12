@@ -269,6 +269,11 @@ def run_checkpoints(
         summary["role"] = (
             "acceptance baseline (random-init drafter)" if "init" in checkpoint_name else "trained drafter"
         )
+        # Serving-time in-block attention actually used by the draft forward
+        # (JetSpec checkpoints serve the causal mask they were trained with).
+        summary["draft_inference_in_block_causal"] = bool(
+            getattr(draft, "inference_in_block_causal", False)
+        )
         sample_wall = summary.get("wall_seconds_per_sample") or 0.0
         summary["speedup_vs_target_only"] = (target_only_wall / sample_wall) if sample_wall > 0 else None
         if strict_parallel_margin is not None:

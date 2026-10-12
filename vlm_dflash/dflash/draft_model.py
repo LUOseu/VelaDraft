@@ -811,6 +811,13 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         self.spatial_rope_enabled = bool(dflash_config.get("spatial_rope_enabled", False))
         self.spatial_rope_mode = str(dflash_config.get("spatial_rope_mode", "gated"))
         self.spatial_rope_interleaved = bool(dflash_config.get("spatial_rope_interleaved", False))
+        # Inference-side in-block attention. JetSpec trains with a block-causal
+        # in-block mask; serving such a checkpoint under the default
+        # (non-causal) block forward measurably changes its proposals. When
+        # this flag is set, spec_generate passes the causal in-block mask so
+        # the served factorization matches training. Default off: every other
+        # algorithm's runtime is byte-identical to before.
+        self.inference_in_block_causal = bool(dflash_config.get("inference_in_block_causal", False))
         spatial_rope_sections = dflash_config.get("spatial_rope_sections", None)
         self.spatial_rope_sections = (
             tuple(int(section) for section in spatial_rope_sections) if spatial_rope_sections is not None else ()
@@ -1228,6 +1235,37 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         return completed_ids[:, 1:]
 
     @torch.inference_mode()
+    def _inference_block_mask(
+        self,
+        past_key_values_draft,
+        target_hidden: torch.Tensor,
+        noise_embedding: torch.Tensor,
+        block_output_ids: torch.Tensor,
+    ):
+        """Causal in-block additive mask for serving a JetSpec checkpoint.
+
+        Training restricts in-block attention to offsets ``j <= i``; the default
+        runtime forward passes no mask (non-causal in-block), which changes
+        ~7.6% of this zoo's JetSpec checkpoint's greedy proposals. The mask
+        built here forbids exactly the in-call future noise columns: the KV
+        layout inside every attention layer is
+        ``[cached past | this call's context | this call's noise block]``, so
+        only the last ``block_size`` columns are restricted. Everything else
+        (the whole cached prefix and the current context) stays visible, as in
+        training. Returns ``None`` when the checkpoint did not train causally.
+        """
+        if not getattr(self, "inference_in_block_causal", False):
+            return None
+        cache_len = int(past_key_values_draft.get_seq_length())
+        q_len = int(noise_embedding.shape[1])
+        kv_len = cache_len + int(target_hidden.shape[1]) + q_len
+        neg = torch.finfo(noise_embedding.dtype).min
+        mask = torch.zeros(1, 1, q_len, kv_len, dtype=noise_embedding.dtype, device=noise_embedding.device)
+        future = torch.triu(torch.ones(q_len, q_len, dtype=torch.bool, device=mask.device), diagonal=1)
+        base = cache_len + int(target_hidden.shape[1])
+        mask[0, 0, :, base : base + q_len] = torch.where(future, neg, torch.zeros((), dtype=mask.dtype, device=mask.device))
+        return mask
+
     def spec_generate(
         self,
         target: nn.Module,
@@ -1646,6 +1684,9 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                 past_key_values=past_key_values_draft,
                 use_cache=True,
                 visual_context=visual_context,
+                attention_mask=self._inference_block_mask(
+                    past_key_values_draft, target_hidden, noise_embedding, block_output_ids
+                ),
             )
             block_output_ids[:, 1:] = self._sample_draft_tokens(
                 target,
