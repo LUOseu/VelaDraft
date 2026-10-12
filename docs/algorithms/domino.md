@@ -16,9 +16,15 @@ Domino extends the frozen DFlash drafter with a **causal correction head**
 
 ## Status
 
-`experimental` (see `ALGORITHM_MATRIX.md` and `SUPPORT_MATRIX.md`): architecture,
-training, unit tests and docs exist; real-VLM smoke / canonical numbers are
-recorded as they land. Nothing here is a performance claim yet.
+`validated` on Qwen2.5-VL-3B (see `ALGORITHM_MATRIX.md`, `SUPPORT_MATRIX.md`):
+architecture, training, unit tests, COCO smoke and the canonical 2K run all
+pass; the checkpoint exports and reloads. Qwen3-VL is untested (no support
+claim). Runtime integration is future work (sequential verification only).
+
+Measured (3B / 2K corpus / 128 prompts, sequential): AL 1.764 vs DFlash 1.630
+at the same protocol, token-exact 128/128; the enabled/disabled ablation puts
+the correction head's contribution at +0.102 AL (`BENCHMARKS.md`, zoo
+scoreboard).
 
 ## Config
 

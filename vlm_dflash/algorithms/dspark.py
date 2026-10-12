@@ -25,9 +25,9 @@ class DSparkAlgorithm(DrafterAlgorithm):
             "per-slot acceptance-confidence head."
         ),
         maturity={
-            "architecture": "experimental",
-            "training": "experimental",
-            "multimodal": "experimental",
+            "architecture": "validated",
+            "training": "validated",
+            "multimodal": "validated",
             "runtime": "experimental",
         },
         references={
@@ -36,7 +36,7 @@ class DSparkAlgorithm(DrafterAlgorithm):
             "algorithm_doc": "docs/algorithms/dspark.md",
         },
         capabilities={"image": True, "multi_image": False, "video": False},
-        targets={"qwen25_vl": "experimental", "qwen3_vl": "experimental"},
+        targets={"qwen25_vl": "validated", "qwen3_vl": "experimental"},
     )
 
     # ------------------------------------------------------------------ #

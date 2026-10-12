@@ -13,13 +13,13 @@ row up to `Documentation` is `DONE` (GOAL §30); otherwise it stays
 | Unit tests | DONE | DONE | DONE (11 tests) | PLANNED | PLANNED |
 | Synthetic overfit (CPU) | DONE | DONE | DONE (overfit test) | PLANNED | PLANNED |
 | Gradient coverage audit | DONE | DONE | DONE (10% audit point) | PLANNED | PLANNED |
-| Real VLM smoke (Qwen2.5-VL-3B) | DONE | DONE (8/8 exact) | RUNNING (smoke) | PLANNED | PLANNED |
-| Visual-path check | DONE | DONE | RUNNING (smoke) | PLANNED | PLANNED |
+| Real VLM smoke (Qwen2.5-VL-3B) | DONE | DONE (8/8 exact) | DONE (8/8 exact) | PLANNED | PLANNED |
+| Visual-path check | DONE | DONE | DONE | PLANNED | PLANNED |
 | Checkpoint save/load | DONE | DONE (roundtrip test) | DONE (eval loads ckpts) | PLANNED | PLANNED |
-| Eval (canonical metrics) | DONE | RUNNING (2K eval) | PLANNED | PLANNED | PLANNED |
-| Export | DONE | DONE (loader dispatch) | PLANNED | PLANNED | PLANNED |
+| Eval (canonical metrics) | DONE | DONE (AL 1.735) | DONE (AL 1.764) | PLANNED | PLANNED |
+| Export | DONE | DONE (verified) | DONE (verified) | PLANNED | PLANNED |
 | Documentation | DONE | DONE | DONE | PLANNED | PLANNED |
-| 2K apples-to-apples benchmark | DONE (baseline) | RUNNING (2K eval) | PLANNED | PLANNED | PLANNED |
+| 2K apples-to-apples benchmark | DONE (baseline) | DONE (+ ablation) | DONE (+ ablation) | PLANNED | PLANNED |
 | Runtime integration | N/A (future) | N/A | N/A | N/A | N/A |
 
 Notes
