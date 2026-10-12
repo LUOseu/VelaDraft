@@ -1,6 +1,6 @@
 # STATE
 
-Updated: 2026-10-11 (v0.2 in development; nothing pushed yet).
+Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
 
 ## Current stable features
 - Staged pipeline: `prepare -> regen -> capture -> train -> eval` (+ `export`);
@@ -11,6 +11,11 @@ Updated: 2026-10-11 (v0.2 in development; nothing pushed yet).
   `strict_parallel` (experimental throughput; not lossless).
 - Unified CLI (`doctor/train/eval/export`), presets, resume, HF-style export.
 - Algorithm registry with DFlash as the only registered plugin (frozen).
+- DSpark plugin (experimental): Markov logit-bias head + confidence head on
+  the frozen DFlash backbone; `sample_from_anchor` both modes; CPU/synthetic
+  tests green; canonical VLM runs pending (see ALGORITHM_MATRIX.md).
+- Gradient coverage audit + confidence calibration artifacts; namespaced
+  algorithm config; export loader dispatch by algorithm.
 
 ## Experimental
 - Benchmark harness skeleton (`scripts/benchmark.py` + manifests); only the

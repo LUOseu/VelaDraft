@@ -10,6 +10,7 @@ truthful, it is the contract for what the repo actually supports.
 | Algorithm | Qwen2.5-VL | Qwen3-VL | Image | Multi-image | Video | Train | Eval | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | dflash | validated | validated | validated | unsupported | unsupported | validated | validated | validated (HF-style) |
+| dspark | experimental | unsupported | experimental | unsupported | unsupported | experimental | experimental | experimental (loader dispatch) |
 
 Algorithm metadata is machine-readable in
 `vlm_dflash/algorithms/<name>.py::<Algorithm>.metadata` and surfaced by

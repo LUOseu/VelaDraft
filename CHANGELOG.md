@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.3.0 (in development)
+
+Algorithm zoo stage 2: DSpark.
+
+Added
+- **DSpark** (`algorithm: dspark`, knobs under `algorithm.dspark`): DFlash
+  backbone + low-rank Markov logit-bias head (vanilla/gated/rnn) + per-slot
+  acceptance-confidence head; semi-autoregressive in-block sampling; upstream
+  default `sample_from_anchor: true` (block_size proposals per round) with the
+  DFlash-compatible `false` mode as a directly comparable ablation. Port notes
+  in `docs/upstream/dspark.md`, usage in `docs/algorithms/dspark.md`.
+- `sample_from_anchor` on the frozen DFlash draft model/trainer (default
+  `false`; DFlash semantics unchanged) so both slot conventions share one
+  verification loop; DSpark checkpoints record the mode.
+- **Gradient coverage audit** (`utils.gradient_coverage_report`): per-group
+  trainable params / params-with-grad / nonzero-grad / grad-norm, logged at
+  step 1 of every training run and written to `train/gradient_coverage.json`.
+- Confidence calibration artifact for confidence-head algorithms
+  (`train/confidence_calibration.json`: BCE, 10-bin ECE, AUROC vs greedy slot
+  acceptance, per-slot predicted/observed acceptance).
+- Namespaced algorithm config (`algorithm: {name: ..., <algorithm>: {...}}`)
+  alongside the legacy string form; export loading now dispatches on the
+  recorded algorithm instead of refusing non-DFlash exports.
+- Upstream audit docs for all five algorithms (`docs/upstream/*.md`) plus
+  `UPSTREAM_AUDIT.md` / `ALGORITHM_MATRIX.md` governance indexes.
+- `configs/dspark/` (2K canonical + COCO smoke).
+
+Changed
+- `DFlashDecayLoss` takes `first_slot` (default 1 = DFlash); the trainer seam
+  `_apply_algorithm_terms` lets algorithms add logit corrections/auxiliary
+  losses without touching the frozen DFlash path.
+
 ## v0.2.0 (in development)
 
 Qwen3-VL support, verification modes, scaling evidence, and the algorithm
