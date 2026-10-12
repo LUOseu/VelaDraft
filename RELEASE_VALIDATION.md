@@ -1,7 +1,7 @@
 # Release validation — vlm-dflash v0.3.0-rc1
 
 Release candidate: `v0.3.0-rc1`
-Git commit: PENDING (recorded at tag time)
+Git commit: `5b1c41b9c5e5498830c0168213db3b3cbac123f6` (release commit; tag `v0.3.0-rc1`)
 Date: 2026-10-12/13
 Host: single GPU node (one RTX A6000 48 GB used at a time)
 
