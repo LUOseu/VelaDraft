@@ -10,6 +10,7 @@ reference. Do not mix experimental parallel-runtime numbers into these tables.
 | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
 | Qwen2.5-VL-3B | 512 | 278 kept | 64 | 1.198 | 1.003 | 64/64 | see eval_result.json |
 | Qwen2.5-VL-3B | 2K | 1050 kept | 128 | 1.630 | 1.003 | 128/128 | .413, .149, .048, .015, .004, .001, 0 |
+| Qwen2.5-VL-3B (dspark) | 2K | 1050 kept | 128 | 1.735 | 1.003 | 128/128 | .432, .173, .075, .034, .015, .007, .003 |
 | Qwen3-VL-8B | 512 | 274 kept | 32 | 1.322 | 1.003 | 32/32 | see eval_result.json |
 | Qwen3-VL-8B | 2K | 1996 kept | 32 | 1.665 | 1.000 | 32/32 | .413, .160, .063, .027, .010, .002, .0004 |
 | Qwen2.5-VL-3B | 5K | 2629 kept | 128 | 1.817 | 1.003 | 128/128 | .482, .210, .080, .030, .011, .005, .001 |
@@ -24,6 +25,17 @@ Notes
 - 8B / 2K: regen kept 1996/2000 rows, capture 1996 samples (visual-path check
   passed), training 1500 steps (resumed from 375), final loss 2.69, slot-0
   teacher-forced accuracy 0.73; eval 32 prompts / 128 tokens, speedup 0.81x.
+- DSpark / 2K: same corpus, features, block size, protocol and eval prompts as
+  the 3B DFlash row (directly comparable). AL 1.735 vs DFlash 1.630; every
+  slot improves and the gain grows with block depth (slot 2: .048 -> .075,
+  slot 3: .015 -> .034, slot 4: .004 -> .015, slot 5: .001 -> .007,
+  slot 6: 0 -> .003) - the semi-autoregressive Markov bias relieves exactly
+  the suffix-acceptance decay the block-parallel drafter suffers. 792 steps,
+  final loss 3.53, overfit sanity + gradient coverage + visual check passed;
+  confidence head calibration BCE 0.590 / ECE 0.048 / AUROC 0.745 (not
+  constant). Speedup vs target-only 0.86x (sequential verification path).
+- DSpark COCO smoke (64 rows, pipeline check only): AL 1.123 vs init 1.000,
+  token-exact 8/8 after the verify-parity fix.
 - `AL = new_tokens / target_verification_steps` (bonus-token-inclusive);
   random-init drafter AL ~1.003 means proposals are almost never accepted.
 
