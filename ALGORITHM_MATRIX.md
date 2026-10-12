@@ -7,7 +7,7 @@ row up to `Documentation` is `DONE` (GOAL §30); otherwise it stays
 
 | Stage | dflash | dspark | domino | jetspec | dflash2 |
 | --- | --- | --- | --- | --- | --- |
-| Upstream audit doc | DONE | DONE | DONE | PLANNED (sources pinned) | PLANNED (sources pinned) |
+| Upstream audit doc | DONE | DONE | DONE | DONE | PLANNED (sources pinned) |
 | Architecture implemented | DONE | DONE | DONE | PLANNED | PLANNED |
 | Loss implemented | DONE | DONE | DONE (dual-logit + curriculum) | PLANNED | PLANNED |
 | Unit tests | DONE | DONE | DONE (11 tests) | PLANNED | PLANNED |
@@ -29,5 +29,8 @@ Notes
   verify-backend parity fix; the 2K canonical run trains + evals now.
 - Domino "Export / Eval / benchmark" rows flip after the smoke + 2K runs;
   its audit is completed in `docs/upstream/domino.md`.
-- JetSpec / DFlash2 sources are pinned in `docs/upstream/*.md` at the commits
-  recorded there; audits complete before implementation starts (GOAL §2).
+- JetSpec's audit is completed in `docs/upstream/jetspec.md`; its architecture
+  stage is gated on capture v2 (store the target's final hidden state so the
+  forward-KL teacher can be computed without target logits on disk).
+- DFlash2 sources are pinned in `docs/upstream/dflash2.md`; its audit completes
+  before implementation starts (GOAL §2).

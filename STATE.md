@@ -97,8 +97,11 @@ Updated: 2026-10-12 (v0.2 + DSpark stage in development; nothing pushed yet).
 - Hugging Face / PyPI publishing: pending release audit.
 
 ## Next highest-value tasks
-1. Record the 8B-2K scaling numbers when the suite finishes; update
-   README/BENCHMARKS (5K already recorded).
-2. Deterministic benchmark prompt file for `caption_general`; land one public
+1. JetSpec stage: capture v2 (store final hidden state per sample) ->
+   `vlm_dflash/jetspec/` (chunked forward-KL + causal mask + teacher metrics) ->
+   tests -> smoke -> 2K run. Audit and plan: `docs/upstream/jetspec.md`.
+2. DFlash2 stage after JetSpec (experimental training objective; must be
+   labeled Experimental per GOAL §8).
+3. Deterministic benchmark prompt file for `caption_general`; land one public
    dataset adapter (TextVQA first) to move a workload from planned -> validated.
-3. Model cards for released checkpoints (export already emits most fields).
+4. Model cards for released checkpoints (export already emits most fields).
