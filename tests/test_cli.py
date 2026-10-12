@@ -27,6 +27,17 @@ def test_all_presets_load():
         assert "spatial_rope_sections" not in cfg["drafter"]
 
 
+def test_preset_pixel_bounds_can_be_overridden_with_null():
+    # Qwen3-VL configs set image_*_pixels: null so a CLI run (which merges a
+    # preset first) resolves the bounds from the processor instead of leaking
+    # the preset's Qwen2.5-VL bounds into contract validation.
+    preset = load_preset("single-gpu-48g")
+    assert preset["target"]["image_min_pixels"] == 200704
+    merged = deep_merge(preset, {"target": {"image_min_pixels": None, "image_max_pixels": None}})
+    assert merged["target"]["image_min_pixels"] is None
+    assert merged["target"]["image_max_pixels"] is None
+
+
 def test_deep_merge_overrides_nested():
     base = {"train": {"lr": 1e-3, "betas": [0.9, 0.95]}, "drafter": {"block_size": 8}}
     override = {"train": {"lr": 2e-3}}

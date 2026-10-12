@@ -16,6 +16,8 @@ target:
   local_files_only: true
   # Pixel bounds: left unset -> resolved from the target processor and recorded
   # in contract.json (Qwen3-VL processor defaults differ from Qwen2.5-VL).
+  image_min_pixels: null
+  image_max_pixels: null
 
 dataset:
   source: llava_instruct
