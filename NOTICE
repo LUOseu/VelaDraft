@@ -14,3 +14,23 @@ Local modifications are limited to import paths and additive per-position
 metrics; see docs/REFERENCE.md for the port notes.
 
 Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Additional notice for the DFlash2 port (v0.3-dev, experimental):
+
+  * vlm_dflash/dflash2/conv.py      (GroupedDynamicCausalConv, ported)
+  * vlm_dflash/dflash2/selector.py  (CandidateSelector, ported)
+  * vlm_dflash/dflash2/loss.py      (selector_training_candidates, ported)
+
+  Source: z-lab/dflash `dflash/model.py` @
+  https://github.com/z-lab/dflash/blob/07ebd93db9f472af339b644bb70221ad8428328a/dflash/model.py
+  (MIT License, Copyright (c) 2026 Z Lab), as vendored by
+  vllm-project/speculators @ 55ebbd5b
+  (`src/speculators/models/dflash2/{model_definitions,metrics}.py`, Apache-2.0).
+
+  Modifications: import paths, type hints, docstrings, and the removal of the
+  upstream model-registry decorators. The convolution math, identity
+  initialization, candidate-set semantics (unary top-K with weakest-candidate
+  replacement of a missing target) and checkpoint key names are unchanged.
+  The DFlash2 training objective is *not* from this source: upstream does not
+  publish one, and this repo implements the maintainer implementation's
+  experimental split objective (see docs/upstream/dflash2.md).

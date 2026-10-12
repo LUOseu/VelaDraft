@@ -274,6 +274,10 @@ def run_checkpoints(
         summary["draft_inference_in_block_causal"] = bool(
             getattr(draft, "inference_in_block_causal", False)
         )
+        # Whether the served draft reranks its proposals with the DFlash2
+        # candidate selector (recorded so a summary alone says which runtime path
+        # produced the numbers).
+        summary["draft_candidate_selector"] = bool(hasattr(draft, "candidate_selector"))
         sample_wall = summary.get("wall_seconds_per_sample") or 0.0
         summary["speedup_vs_target_only"] = (target_only_wall / sample_wall) if sample_wall > 0 else None
         if strict_parallel_margin is not None:

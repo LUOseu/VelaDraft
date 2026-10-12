@@ -797,7 +797,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         super().__init__(config)
         self.config = config
         self.layers = nn.ModuleList(
-            [Qwen3DFlashDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
+            [self._make_decoder_layer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
         dflash_config = getattr(config, "dflash_config", {}) or {}
         self.target_layer_ids = dflash_config.get(
@@ -888,6 +888,10 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         elif self.projector_type is not None:
             raise ValueError(f"Unknown draft projector_type: {self.projector_type}")
         self.post_init()
+
+    def _make_decoder_layer(self, config, layer_idx: int):
+        """Build one draft decoder layer (DFlash2 overrides this to add its local convs)."""
+        return Qwen3DFlashDecoderLayer(config, layer_idx)
 
     @property
     def visual_conditioning_enabled(self) -> bool:

@@ -1,0 +1,96 @@
+algorithm:
+  name: dflash2
+  dflash2:
+    conv_kernel_size: 2      # causal taps of the local dynamic convolution (upstream default)
+    conv_group_size: 16      # hidden channels sharing one dynamic kernel (upstream default)
+    selector_rank: 256       # rank of the candidate-selector factorization (upstream default)
+    selector_top_k: 16       # unary candidates reranked per position (upstream default)
+    selector_loss_alpha: 1.0 # weight of the K-way selector CE (upstream default)
+    kd_chunk_size: 1024      # teacher-projection chunk for the unary forward KL
+# Canonical 2K scaling point for DFlash2 (EXPERIMENTAL objective). Same
+# recipe/data as the DFlash / DSpark / Domino / JetSpec 2K runs, but the feature
+# store must be capture-v2 (store_final_hidden=true): the unary objective is the
+# upstream default forward KL against the target distribution, projected from
+# the target's captured final hidden states, and the selector's hard label is
+# that projection's argmax. gamma 4.0 = upstream DFlash2 default decay.
+run:
+  name: qwen25vl3b_dflash2_2k
+  dir: runs/qwen25vl3b_dflash2_2k
+
+target:
+  model: ${VLM_DFLASH_TARGET:-/home/lyh/vlm-dflash/assets/models/Qwen2.5-VL-3B-Instruct}
+  dtype: bfloat16
+  attn_implementation: sdpa
+  device: cuda:0
+  local_files_only: true
+  image_min_pixels: 200704
+  image_max_pixels: 1003520
+
+dataset:
+  source: llava_instruct
+  annotation: ${VLM_DFLASH_LLAVA_JSON:-/home/dhz/Data/llava_instruct_150k.json}
+  images_dir: ${VLM_DFLASH_COCO_IMAGES:-/home/dhz/Data/COCO-caption/train2017}
+  slice: 2000
+  val_size: 128
+  seed: 42
+  min_answer_chars: 600
+
+regen:
+  max_new_tokens: 160
+  min_response_tokens: 128
+  batch_size: 8
+  temperature: 0.0
+
+capture:
+  seq_length: 2048
+  shard_size: 32
+  dtype: bfloat16
+  store_final_hidden: true   # capture v2: the unary-KL teacher signal
+  visual_path_check: true
+  visual_check_samples: 2
+
+drafter:
+  num_hidden_layers: 3
+  block_size: 8
+  num_anchors: 256
+  loss_decay_gamma: 4.0      # upstream DFlash2 default (fixed exponential decay)
+  mask_token_id: 151669
+  attention_backend: flex_attention
+  spatial_rope_enabled: true
+  spatial_rope_mode: replace
+  spatial_rope_sections: [16, 24, 24]
+
+train:
+  micro_batch_size: 8
+  grad_accumulation_steps: 1
+  num_epochs: 6
+  lr: 6.0e-4
+  betas: [0.9, 0.95]
+  weight_decay: 0.0
+  warmup_ratio: 0.04
+  min_lr_ratio: 0.1
+  max_grad_norm: 1.0
+  log_every_steps: 10
+  seed: 42
+  device: cuda:0
+  overfit_sanity:
+    enabled: true
+    # 8 (not 16): the unary-KL backward retains fp32 log-probabilities of every
+    # valid position, like JetSpec; 8 keeps the sanity run inside 48 GB.
+    num_samples: 8
+    steps: 200
+    ce_drop: 0.6
+    slot0_acc: 0.9
+
+# verification: sequential (generate()-parity, default) | parallel (raw fast
+# path) | strict_parallel (fast path + near-tie guard + parity fallback);
+# eval.strict_parallel_margin is the top-1/top-2 logit gap threshold.
+eval:
+  verification: sequential
+  strict_parallel_margin: 2.0
+  num_prompts: 128
+  max_new_tokens: 128
+  sequential_target_verification: true
+  verify_sdpa_backend: parity
+  parallel_diagnostic_prompts: 16
+  checkpoints: [ckpt_final.pt, ckpt_init.pt]

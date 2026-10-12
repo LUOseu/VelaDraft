@@ -54,6 +54,14 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
     # JetSpec KD settings) are re-emitted so a serving side can inspect them.
     method_details = checkpoint.get(method) if isinstance(checkpoint.get(method), dict) else None
     runtime_note = None
+    if method == "dflash2":
+        runtime_note = (
+            "Experimental DFlash2 port: the conv+selector architecture and checkpoint key names follow "
+            "z-lab/dflash via vllm-project/speculators, but upstream does not publish its training "
+            "objective, so this checkpoint was trained with speculators' experimental split objective "
+            "(unary forward-KL + K-way selector CE) and served by this repo's block decoder "
+            "(one parallel draft forward + a sequential top-K candidate walk)."
+        )
     if method == "jetspec":
         runtime_note = (
             "Trained with a causal in-block mask and forward-KL distillation. The paper's "

@@ -49,6 +49,7 @@ def _load_defaults() -> None:
     from . import dspark as _dspark  # noqa: F401  (self-registers DSparkAlgorithm)
     from . import domino as _domino  # noqa: F401  (self-registers DominoAlgorithm)
     from . import jetspec as _jetspec  # noqa: F401  (self-registers JetSpecAlgorithm)
+    from . import dflash2 as _dflash2  # noqa: F401  (self-registers DFlash2Algorithm)
 
 
 def available_algorithms() -> list[str]:

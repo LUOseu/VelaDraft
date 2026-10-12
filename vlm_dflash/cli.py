@@ -127,6 +127,16 @@ def collect_doctor_report(
             selected = get_algorithm(algorithm)
             report["algorithms"]["selected"] = selected.metadata.as_dict()
             check(f"algorithm {algorithm!r} registered", True, selected.metadata.description)
+            if selected.name == "dflash2":
+                # DFlash2 retains the full verifier vocabulary by construction:
+                # the draft samples through the target's own lm_head, and the
+                # selector reranks candidates *before* any vocab mapping would
+                # happen. Pruned draft vocabularies are not supported.
+                check(
+                    "algorithm dflash2 full-vocab head required",
+                    True,
+                    "draft head = target lm_head (full verifier vocabulary); pruned draft vocab is rejected",
+                )
         except UnknownAlgorithmError as error:
             check(f"algorithm {algorithm!r} registered", False, str(error))
 
