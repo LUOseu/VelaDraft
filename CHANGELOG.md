@@ -5,6 +5,37 @@
 - Repository renamed to `github.com/LUOseu/VelaDraft` (old `vlm-dflash` URLs
   redirect); the distribution name and CLI stay `vlm-dflash`.
 
+### Schema v2: multi-image / multi-turn
+
+- Data schema v2: rows with `image_turns` (or the `vlm-dflash-data-v2`
+  marker) keep the full conversation and a flat `images` list; every image is
+  rendered at the start of the turn it is attached to. v1 rows and every v1
+  record stay byte-compatible (`vlm_dflash/data/schema.py`,
+  `data/sharegpt.py`, `data/prepare.py`).
+- Regen generates each assistant turn greedily conditioned on the
+  previously *generated* turns, stores per-turn ids plus an incremental
+  `full_ids`, and asserts the concatenation against one full-conversation
+  render (fail-loud on chat-template drift). Answers that hit
+  `max_new_tokens` get the primary stop appended (counted as `forced_stop` in
+  `regen_stats.json`).
+- Capture records `image_spans` / `n_images` / per-image expected token
+  counts, `turn_spans` and a multi-segment `loss_mask`; `index.jsonl` rows
+  gain `image_spans` + `n_turns`, manifests gain `schema_version` +
+  `num_multi_turn`. The visual-path swap check, eval prompts, online digest
+  and FeatureDataset/OnlineFeatureDataset pass the new fields through;
+  collate and trainers are unchanged (loss_mask/image_mask were already
+  multi-segment capable).
+- Algorithms declare `multi_image: true`; the support-matrix footnote scopes
+  the evidence.
+- Tests: 14 new CPU tests (`tests/test_wp2_multiturn.py`, 349 total).
+- Recorded evidence: E2 smoke `R-20261014-08` - synthetic 2-image / 2-turn
+  JSONL (16 train + 4 val) through prepare -> regen -> capture ->
+  32-step train -> sequential verify; capture visual swap check passed
+  (512/512 image tokens across two spans, replay bitwise equal) and eval
+  token-exact 4/4 for both `ckpt_final` and `ckpt_init`
+  (`configs/smoke_multiturn.yaml`). Smoke-scale only; no quality or speed
+  claim follows from it.
+
 ### DFlare / DFly (AngelSpec ports)
 
 - New algorithms `dflare` and `dfly`, ported from `Tencent/AngelSpec @

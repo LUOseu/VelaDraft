@@ -183,11 +183,25 @@ own remains fully local.
 
 ## Train on your data
 
-Use a JSONL pool of single-image question/answer pairs. Flat records,
-OpenAI-style `messages`, and ShareGPT/LLaVA `conversations` are supported.
+Use a JSONL pool of question/answer pairs. Flat records, OpenAI-style
+`messages`, and ShareGPT/LLaVA `conversations` are supported.
 
 ```json
 {"id":"sample-001","image":"000001.jpg","question":"Describe this image in detail.","answer":"A red bicycle is parked beside a brick wall."}
+```
+
+Multi-image / multi-turn rows opt into schema v2 with a flat `images` list
+plus `image_turns` (the conversation index each image belongs to, same order
+as `images`); the full conversation is kept and each assistant turn is
+regenerated greedily as teacher-forced history for the next turn:
+
+```json
+{"id":"sample-002","images":["a.jpg","b.jpg"],"image_turns":[0,2],
+ "conversations":[{"from":"human","value":"<image>\nWhat is in the first image?"},
+                  {"from":"gpt","value":"..."},
+                  {"from":"human","value":"<image>\nAnd the second?"},
+                  {"from":"gpt","value":"..."}],
+ "schema":"vlm-dflash-data-v2"}
 ```
 
 A small end-to-end example:
@@ -203,7 +217,8 @@ For the full reference recipe, configure the dataset paths and run
 `vlm-dflash train --config configs/qwen2_5_vl_3b.yaml`. The CLI also supports
 `--algorithm`, `--resume`, and dotted `--set key=value` overrides.
 See the [examples](examples/README.md), [data schema](vlm_dflash/data/schema.py)
-and [reference guide](docs/REFERENCE.md).
+and [reference guide](docs/REFERENCE.md). The multi-turn smoke config is
+`configs/smoke_multiturn.yaml` (data: `scripts/make_wp2_smoke_data.py`).
 
 ### Method-specific configs
 
@@ -290,7 +305,11 @@ speculative decoding must reproduce the target's own greedy tokens exactly
 
 ## Scope
 
-- **Inputs:** one image + text, one turn, greedy decoding.
+- **Inputs:** image(s) + text, single- or multi-turn, greedy decoding. Schema
+  v2 (multiple images per row, images attachable to any user turn) is
+  validated end-to-end for DFlash on the recorded E2 smoke; the other
+  algorithms share the same data path — see the
+  [support matrix](SUPPORT_MATRIX.md) footnote.
 - **Targets:** the two Qwen-VL targets listed above; other families need an
   adapter and validation.
 - **Hardware:** the measured reference is one 48 GB GPU. The 24 GB preset is

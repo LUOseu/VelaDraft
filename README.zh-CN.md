@@ -157,11 +157,24 @@ DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpe
 
 ## 训练自己的数据
 
-使用每行包含一张图片和一对问答的 JSONL 数据池。
+使用每行包含图片与问答的 JSONL 数据池。
 支持扁平字段、OpenAI 风格 `messages` 与 ShareGPT/LLaVA 风格 `conversations`。
 
 ```json
 {"id":"sample-001","image":"000001.jpg","question":"Describe this image in detail.","answer":"A red bicycle is parked beside a brick wall."}
+```
+
+多图 / 多轮行通过 schema v2 启用：扁平的 `images` 列表加 `image_turns`
+（每张图片所属的 conversation 下标，顺序与 `images` 一致）；整段对话会被保留，
+每个 assistant 轮次按 teacher-forced 历史逐轮贪心重生成：
+
+```json
+{"id":"sample-002","images":["a.jpg","b.jpg"],"image_turns":[0,2],
+ "conversations":[{"from":"human","value":"<image>\n第一张图里是什么？"},
+                  {"from":"gpt","value":"..."},
+                  {"from":"human","value":"<image>\n第二张呢？"},
+                  {"from":"gpt","value":"..."}],
+ "schema":"vlm-dflash-data-v2"}
 ```
 
 小规模端到端示例：
@@ -176,6 +189,7 @@ python examples/train_from_jsonl.py \
 完整参考配方：配置数据路径后运行 `vlm-dflash train --config configs/qwen2_5_vl_3b.yaml`。
 CLI 同时支持 `--algorithm`、`--resume` 与 `--set key=value` 覆盖。
 详见[示例](examples/README.md)、[数据 schema](vlm_dflash/data/schema.py)与[参考指南](docs/REFERENCE.md)。
+多轮 smoke 配置为 `configs/smoke_multiturn.yaml`（数据生成：`scripts/make_wp2_smoke_data.py`）。
 
 ### 方法专属 config
 
@@ -253,7 +267,9 @@ README 有意不展示小规模训练数字和算法排名：已记录的运行�
 
 ## 支持范围
 
-- **输入：** 单张图片 + 文本、单轮、贪心解码。
+- **输入：** 图片（一张或多张）+ 文本，单轮或多轮，贪心解码。schema v2（每行
+  多张图片、图片可挂到任意 user 轮次）已在记录的 E2 smoke 上为 DFlash
+  端到端验证；其余算法共用同一数据路径——见[支持矩阵](SUPPORT_MATRIX.md)脚注。
 - **Target：** 上述两种 Qwen-VL 模型；其他家族需要 adapter 和验证。
 - **硬件：** 实测参考为单张 48 GB GPU；24 GB preset 是建议配置，尚未在实际 24 GB 卡上验证。
 - **Serving：** 生产 vLLM/SGLang 集成仍为后续工作；[serving bridge](docs/serving-bridge.md)描述拟议交接方式。
