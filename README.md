@@ -313,8 +313,10 @@ speculative decoding must reproduce the target's own greedy tokens exactly
   validated end-to-end for DFlash on the recorded E2 smoke; the other
   algorithms share the same data path — see the
   [support matrix](SUPPORT_MATRIX.md) footnote.
-- **Targets:** the two Qwen-VL targets listed above; other families need an
-  adapter and validation.
+- **Targets:** the two Qwen-VL targets listed above; SmolVLM2-2.2B-Instruct
+  additionally passed a single-image engineering smoke through the full stack
+  (no release claim - see the [WP6 report](docs/plan/WP6_REPORT.md)); other
+  families need an adapter and validation.
 - **Hardware:** the measured reference is one 48 GB GPU. The 24 GB preset is
   suggested and unvalidated on an actual 24 GB card.
 - **Serving:** no production runtime integration claim. A first bridge to

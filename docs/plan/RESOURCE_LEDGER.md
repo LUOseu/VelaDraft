@@ -5,13 +5,13 @@
 - First-round cap: **8.0 GPU-hours** (plan default; no other budget given).
   1 GPU job at a time; single job <= 2 h wall; <= 2 fix-retries per failing
   debug task.
-- Charged so far: **3.57 GPU-h** (R-20261014-01 0.044 + R-20261014-02 0.002
+- Charged so far: **4.10 GPU-h** (R-20261014-01 0.044 + R-20261014-02 0.002
   + E1 R-20261014-03..05 0.29 + duplicate concurrent E1 set R-20261014-07
   0.26 + zoo re-download validation R-20261014-09 0.04 + E2 R-20261014-08
   0.55, two passes + E3 R-20261014-10 0.15 + E4 R-20261014-11 1.45 + WP4
   measurement R-20261014-12 0.21 + zoo v0.3.2 validation demo R-20261014-13
-  0.02 + WP5 R-20261014-14..16 0.55).
-  Remaining: **4.43 GPU-h**. Shared file between the two concurrent
+  0.02 + WP5 R-20261014-14..16 0.55 + WP6 R-20261014-17 0.53).
+  Remaining: **3.90 GPU-h**. Shared file between the two concurrent
   sessions - re-read before editing.
 - First 0.5 GPU-h is measurement budget (throughput / peak memory / storage);
   the two smoke runs consumed part of it.
@@ -23,7 +23,7 @@
 | E2 WP2 multi-image smoke | 0.5 budgeted -> 0.55 actual (two passes; second pass overran the cap) |
 | E3 WP3 DocVQA/ChartQA validation | 0.7 budgeted -> 0.15 actual |
 | E4/WP7 DFly 2K recipe canonical (+eval) | 1.0 budgeted -> 1.45 actual (overfit sanity + storm-inflated main loop + 3-config eval; recorded) |
-| WP6 non-Qwen DFlash smoke | 1.5 |
+| WP6 non-Qwen DFlash smoke | 1.5 budgeted -> 0.53 actual (R-20261014-17: regen + capture + 32-step train + dual-checkpoint eval + margin probes) |
 | WP5 runtime load test | 1.0 budgeted -> 0.55 actual (R-14 vLLM bridge check 0.11 inc. smoke + R-15 in-repo arms 0.36 + R-16 margin probe 0.08) |
 | Reserve | 2.0 |
 

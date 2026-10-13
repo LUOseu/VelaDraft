@@ -23,6 +23,7 @@ against the plan's first-round budget.
 | R-20261014-14 | 2026-10-14 | WP5 vLLM bridge check: convert the zoo 3B DFlash export to the speculators layout, then a two-phase greedy check (target-only; then `dflash`, 7 spec tokens) on the first 32 rows of the 2K val split, 128 new tokens, bf16, 1 image/row - plus a 2-prompt load smoke | WP5 code (this commit; docs registered in `dd2571f`) | draft `/tmp/wp5/vllm_draft` (36 tensors, weights sha `2383b226...`); target Qwen2.5-VL-3B-Instruct; env `c1vllm` = vLLM 0.22.1 / torch 2.11; GPU0 | 0.11 GPU-h (1 GPU: smoke ~4.1 min + full check ~2.6 min) | **PARTIAL - load path verified, token-exact gate NOT passed**: `DFlashDraftModel` loads, shares target embed_tokens/lm_head ("Detected EAGLE model without its own embed_tokens/lm_head"), aux layers (2, 18, 34) -> internal (1, 17, 33), mask 151669, n_spec 7; smoke exact 2/2 both phases; full run: **token-exact 5/32**, dflash AL **1.4059** (drafts 2796 / draft tokens 19572 / accepted 1135; per-position `[0.280, 0.087, 0.029, 0.009, 0.001, 0, 0]`), wall 17.2 s vs target-only 12.5 s (warmup-dominated diagnostic, not a speed claim). Follow-up probe R-16 attributes the traced flips to bf16 ulp-scale near-ties of the runtime verify path | `/tmp/wp5/bridge_check.json`, `bridge_smoke.json`; logs `recipe-smoke-config/wp5_{smoke,full}.log`; archived `~/recipe-smoke-config/wp5_evidence.tar.gz` (sha `2e2687d9...`) |
 | R-20261014-15 | 2026-10-14 | WP5 in-repo serving-convention comparison on the same 32 prompts (sequential parity, 128 tokens): arm M = canonical `ckpt_final.pt` (MRoPE-replace serving); arm 1D = derived checkpoint with `dflash_config.spatial_rope_enabled=false` (the 1-D convention vLLM's draft path implements) | WP5 code (this commit) | run dir `/tmp/wp5/run_1d` (symlinked data; source run `runs/qwen25vl3b_2k` untouched); target Qwen2.5-VL-3B; GPU2 | 0.36 GPU-h (1 GPU: two eval processes, ~21 min combined device wall) | PASS / measured: both arms **token-exact 32/32**; AL **1.6924** (M) vs **1.6866** (1D), delta 0.006 (~0.3%) - the RoPE convention is NOT the driver of the vLLM AL gap. Per-slot M `[0.435, 0.171, 0.061, 0.019, 0.005, 0.002, 0.001]`, 1D `[0.439, 0.172, 0.060, 0.018, 0.003, 0.0004, 0.0]`. Parallel diagnostic (16 prompts, same JSON): 6/16 exact, every listed flip at margin <= 0.125 | `run_1d/eval/eval_result_wp5_{mrope,1d}.json` (+ samples); logs in `wp5_evidence.tar.gz` |
 | R-20261014-16 | 2026-10-14 | WP5 divergence margin probe: re-derive the first 4 vLLM-vs-repo divergences with the repo target (sequential) and report the target's top1-top2 margin and the vLLM-dflash token's rank | WP5 code (this commit) | `scripts/probe_divergence_margin.py --bridge-json bridge_check.json`; 1 GPU | 0.08 GPU-h (~4.6 min wall; diagnostic added during execution, not pre-registered) | Diagnostic: margins at the traced steps `{0.125, 0.0, 0.125, 0.125}` (bf16 ulp scale); in 3/4 cases the vLLM-dflash token IS the repo target's top-1 (gap 0.0, rank 1) - the runtime *verify* flipped a near-tie, not the draft; in 2/4 (prefix-not-reproduced) the sequences differ earlier than the traced step | `/tmp/wp5/divergence_margins.json` (archived) |
+| R-20261014-17 | 2026-10-14 | WP6 first non-Qwen family end-to-end smoke: SmolVLM2-2.2B-Instruct through prepare -> regen -> capture -> train (32 steps) -> sequential eval | family adapter + hooks `ef07b41`, `0f45fa1`; fixes `31948de`..`93f1cef` (pad clamp, v1 rows, tile-span bridging, tokenizer threading, complete-sentence question) | 16 train + 4 val synthetic single-image rows (`scripts/make_wp6_smoke_data.py`); seq 2048; 17 tiles x 81 = 1377 image tokens/row; mb 4; config `configs/smoke_smolvlm.yaml`; target = SmolVLM2-2.2B-Instruct; 1 GPU | 0.53 GPU-h (train + dual-checkpoint eval + margin probes; cap 1.5) | **PASS (engineering gate)**: regen 16/16 kept; capture image-token check **1377/1377** + `visual_path_check` passed (replay bitwise); train loss 3.66 / acc 0.12 / train AL 1.11; eval token-exact **4/4** on ckpt_final + ckpt_init (AL 1.182 / 1.083); parallel diagnostic 1/2 (flip at a 0.0 margin - same bf16 near-tie class as R-16). No speed claim (first-call kernel compile dominates). Gaps registered: schema-v2 multi-turn template drift, multi-image, online mode untested, smoke-scale only | `a6000xuyang:~/recipe-smoke-config/e6_evidence.tar.gz` (sha256 `750db94ddeb96e24...`); run dir `~/vlm-recipe-smoke/runs/e6/smoke_smolvlm`; report `docs/plan/WP6_REPORT.md` |
 
 ## Reuse sources (not charged; pre-existing plan assets)
 
@@ -36,17 +37,15 @@ against the plan's first-round budget.
 
 ## Planned (registered before launch)
 
-- WP6 launching 2026-10-14: **R-20261014-17** - SmolVLM2-2.2B-Instruct
-  (first non-Qwen family) end-to-end smoke: 16 train + 4 val synthetic
-  single-image rows (`scripts/make_wp6_smoke_data.py`) through prepare ->
-  regen -> capture (seq 2048; 17 tiles x 81 = 1377 image tokens/row) ->
-  train (mb 4, 8 epochs) -> sequential eval 32 tokens on ckpt_final +
-  ckpt_init; config `configs/smoke_smolvlm.yaml`. Success criterion: the
-  pipeline runs end to end, the capture image-token check passes
-  (1377/1377), training summaries are finite, and eval reports token-exact
-  vs the target greedy on the smoke protocol (a low trained AL is fine -
-  this is an engineering gate, not a quality claim). Budget cap: 1.5 GPU-h
-  (devices x wall), 1 GPU at a time.
+- WP6 landed 2026-10-14 04:39-04:47: **R-20261014-17** PASS (engineering
+  gate): SmolVLM2-2.2B-Instruct (first non-Qwen family) through prepare ->
+  regen (16/16 kept) -> capture (image-token check **1377/1377**,
+  `visual_path_check` passed) -> train (32 steps, loss 3.66) -> sequential
+  eval **token-exact 4/4** on ckpt_final + ckpt_init (AL 1.182 / 1.083);
+  parallel diagnostic 1/2 (flip at a 0.0 margin, the R-16 near-tie class).
+  0.53 GPU-h vs the 1.5 cap. Gaps registered (schema-v2 multi-turn template
+  drift, multi-image, online mode untested for this family; smoke-scale
+  only): `docs/plan/WP6_REPORT.md`.
 
 - WP5 landed 2026-10-14 03:20-03:46: **R-20261014-14** (vLLM 0.22.1 bridge
   check - PARTIAL: loads and measures, token-exact gate NOT passed, 5/32),

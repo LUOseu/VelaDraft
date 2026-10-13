@@ -122,3 +122,17 @@ decision, it overrides everything here.
   busy), budget cap 1.5 GPU-h (3.57/8.00 used before this run). Work stays
   in `~/vlm-recipe-smoke` + `~/recipe-smoke-config` + `runs/e6` on the
   server copy; no shared run dirs touched.
+
+- Status update (C-01a13621, WP6 landed): **WP6 ENGINEERING DONE,
+  R-20261014-17 PASS** (0.53 of the 1.5 GPU-h cap; train summary 04:41,
+  eval 04:44, evidence archive 04:47). SmolVLM2-2.2B-Instruct - the first
+  non-Qwen family - went through the full stack: regen 16/16, capture
+  image-token check **1377/1377** + visual path check, 32-step train,
+  sequential eval **token-exact 4/4** on ckpt_final + ckpt_init (AL 1.182 /
+  1.083); parallel diagnostic 1/2 at a 0.0 margin (the R-16 near-tie class).
+  Registered gaps: schema-v2 multi-turn template drift on this template,
+  multi-image unimplemented for the tile span rule, online mode untested on
+  GPU for the family, smoke-scale only - `docs/plan/WP6_REPORT.md`. Budget
+  now **4.10 / 8.00 GPU-h** (3.90 remaining). My lane next: WP7 (reference
+  weights, model cards, paper outline + evidence table); the other
+  session's lane untouched.

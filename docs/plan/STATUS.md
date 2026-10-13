@@ -68,14 +68,23 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   is not the driver), flips are bf16 ulp-scale near-ties (R-16 margin probe).
   Registered as BLOCKED-with-gap per the plan rule; report
   `docs/plan/WP5_REPORT.md`, converter/harness code + 5 CPU tests in this
-  branch. Next: WP6 second model family, then WP7. Lane split recap in
-  COORDINATION.md.
+  branch. Lane split recap in COORDINATION.md.
+- WP6 done, engineering gate PASS (`R-20261014-17`, 0.53 GPU-h): first
+  non-Qwen family SmolVLM2-2.2B-Instruct through prepare -> regen (16/16) ->
+  capture (image-token check **1377/1377**, `visual_path_check` passed) ->
+  32-step train -> sequential eval **token-exact 4/4** on trained + init
+  checkpoints (AL 1.182 / 1.083); parallel diagnostic 1/2 (0.0-margin flip,
+  the R-16 near-tie class). Family adapter + hooks + 14 CPU tests in this
+  branch (`ef07b41`, `0f45fa1` + fixes). Gaps registered (schema-v2
+  multi-turn template drift, multi-image, online mode untested for the
+  family; smoke scale - no quality claim): `docs/plan/WP6_REPORT.md`.
+  Next: WP7.
 
 ## Budget
 
-8 GPU-h first-round cap; **3.57 GPU-h charged** (E1 0.59 incl. the duplicate
+8 GPU-h first-round cap; **4.10 GPU-h charged** (E1 0.59 incl. the duplicate
 concurrent set, zoo re-download validation 0.04, E2 0.55, E3 0.15, E4 1.45,
-WP4 measurement 0.21, WP5 0.55); allocation in RESOURCE_LEDGER.md.
+WP4 measurement 0.21, WP5 0.55, WP6 0.53); allocation in RESOURCE_LEDGER.md.
 
 ## Blockers / risks
 
