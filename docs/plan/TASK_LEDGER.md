@@ -23,7 +23,7 @@ Baseline `9137de0`. Every "done" line points at code/tests/runs, not prose.
 | WP | Deliverable | Status | Evidence |
 | --- | --- | --- | --- |
 | WP0 | Baseline audit, task ledger, budget, capability list | DONE | this directory; CPU suite green (321 tests) |
-| WP1 | DFly staged recipe + reference numeric validation + resume + export metadata | IN_PROGRESS | code `66b595a`, docs `c425850`, smoke `R-20261014-01`; E1 pending |
+| WP1 | DFly staged recipe + reference numeric validation + resume + export metadata | DONE (PR opened for review) | code `66b595a`, docs `c425850`, zoo export entries `6cf8141`, smoke `R-20261014-01`; E1 PASSED twice (`R-20261014-03..06` and the duplicate set `R-20261014-07`, bit-exact select-parity / resume / export metadata) |
 | WP2 | Multi-image / multi-turn: schema v2, data, features, supervision, position protocol | PENDING | - |
 | WP3 | Reuse benchmark harness; DocVQA/ChartQA adapters; training-cost report | PENDING | TextVQA adapter reused; manifests 03/04 planned |
 | WP4 | Batched online capture + at most one profiled I/O optimization + measurement report | PENDING | online capture exists (`target/online.py`) |

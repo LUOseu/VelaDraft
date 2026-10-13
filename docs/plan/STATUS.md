@@ -17,17 +17,23 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
 
 - WP0 done: capability gap table + ledgers below; CPU baseline suite green
   (321 tests collected, all pass; `pytest tests/ -q`).
-- WP1: upstream two-stage DFly recipe implemented on branch
-  `dfly-upstream-recipe` (`66b595a` code+tests, `c425850` docs); CPU suite
-  green. E1 validation PASSED (R-20261014-03..06): controlled_ce select-parity
-  bit-identical, kill+resume bit-identical across the stage boundary, changed
-  `--steps` resume refused, export/checkpoint/model-card metadata chain
-  verified, reload token-exact 4/4. Remaining: push + PR.
+- WP1 done, pushed: upstream two-stage DFly recipe on branch
+  `dfly-upstream-recipe` (`66b595a` code+tests, `c425850` docs, `6cf8141` zoo
+  export entries). E1 validation PASSED (R-20261014-03..06): controlled_ce
+  select-parity bit-identical, kill+resume bit-identical across the stage
+  boundary, changed `--steps` resume refused, export/checkpoint/model-card
+  metadata chain verified, reload token-exact. The other concurrent session's
+  independent E1 set (R-20261014-07) reached the same conclusions bit-exactly.
+  PR opened on the pushed branch for user review.
+- Model Zoo `zoo-v0.3.1` published (six canonical archives + `SHA256SUMS`;
+  DFly archive rebuilt for the ported-recipe note, `code commit` `6cf8141`);
+  README + `docs/zoo` pages + `RELEASE_VALIDATION` updated on this branch.
 - Next after E1: WP2 (multi-image / multi-turn schema v2).
 
 ## Budget
 
-8 GPU-h first-round cap; ~0.05 GPU-h used; allocation in RESOURCE_LEDGER.md.
+8 GPU-h first-round cap; 0.59 GPU-h used (includes the duplicate concurrent
+E1 set); allocation in RESOURCE_LEDGER.md.
 
 ## Blockers / risks
 
@@ -44,6 +50,10 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   concurrently (no failures observed; do not repeat). Push happened; PR /
   further GPU jobs / WP2 design work held until the user rules on which
   session continues.
+  - Update: the other session (`01a13452`) finished its zoo-release work —
+    `zoo-v0.3.1` published and its README / `docs/zoo` / release-evidence
+    commits landed on this branch — and started no further GPU job; E4
+    remains on hold.
 - Shared-server disk: `/home` 100% used (130 GB free, moving). Keep net-new
   artifacts small; prune this plan's own renewable temp files after each job.
 - Recipe training at micro-batch 8 peaked at 46.5 GB on a 48 GB card (~3%

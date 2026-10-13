@@ -13,6 +13,7 @@ against the plan's first-round budget.
 | R-20261014-04 | 2026-10-14 | E1b resume: straight 8-step recipe run vs kill-at-step-6 + `--resume` 8-step (stage boundary 4; kill left `ckpt_last` at step 4, `recipe_stage=1`) | same | same store; mb 8; sanity off | 0.101 GPU-h (straight 173 s; phase1 83 s killed; phase2 108 s) | PASS: all 8 steps bit-identical between straight and resumed runs; resume log reconciled 2 uncommitted rows to `train_log.uncommitted.jsonl`; resume preflight refused `--steps 4` with "Resume plan mismatch: checkpoint planned 8 total steps" (CPU preflight) | `runs/e1/e1_recipe`, `runs/e1/e1_recipe_resume` |
 | R-20261014-05 | 2026-10-14 | E1c export + reload: export `ckpt_final` of both runs; metadata chain; reload eval via `demo --drafter` | same | CPU export + 1 GPU demo job (4 prompts, max 32 tokens) | 0.114 GPU-h (demo 410 s) | PASS: `ckpt.objective_profile=upstream_two_stage` with full `train_recipe` dict; export `config.objective_profile` + model card row + runtime note all stamped; demo reload token-exact 4/4 vs target greedy (AL 1.000 on the 8-step draft, expected) | `runs/e1/export_recipe`, `runs/e1/export_ce_plain`, `runs/demo_dfly_export_recipe` |
 | R-20261014-06 | 2026-10-14 | E1d memory re-measure (inside R-04 runs) | same | same | 0 (shared) | recipe 8-step train peak **28.6 GB** with sanity off (vs 46.5 GB for the R-01 smoke whose overfit sanity dominated the peak); controlled_ce 1-step probe 31.4 GB | `kernels: train_summary.json` |
+| R-20261014-07 | 2026-10-14 | duplicate E1 set from the other concurrent session: select-parity, kill@4 + resume, export + reload + 8-prompt eval | `6cf8141` | same store; slice 64; mb 8; sanity off | 0.26 GPU-h (train 118.7 + 85.1 + 163.8 + 125 + ~125 s; eval/export ~5 min) | PASS, agrees with R-20261014-03..05: select-parity traces bit-exact (`loss [12.3125, 22.0, 20.125, 21.0]`), 8-step kill+resume traces bit-exact (stage sequence `[0,0,0,0,1,1,1,1]`), export reload OK with `objective_profile=upstream_two_stage`, eval token-exact 8/8 (AL 1.133 vs init 1.000) | `~/vlm-recipe-smoke/runs/e1_ce_off`, `e1_ce_on`, `e1_recipe_straight`, `e1_recipe_kill`; `recipe-smoke-config/export_recipe_smoke`, `eval_recipe.log` |
 
 ## Reuse sources (not charged; pre-existing plan assets)
 
@@ -26,8 +27,8 @@ against the plan's first-round budget.
 
 ## Planned (registered before launch)
 
-| Run ID | Job | Success criterion | Budget |
-| --- | --- | --- | --- |
-| R-20261014-03 | `train_recipe: controlled_ce` 4 steps, tiny | loss trace equals no-recipe 4-step run (same seed) within bf16 reproducibility | 0.05 GPU-h |
-| R-20261014-04 | recipe 4-step + resume 8-step, sanity disabled, micro-batch 8 | resume continues with matching stage log; `recipe_stage` consistent | 0.1 GPU-h |
-| R-20261014-05 | export `ckpt_final` -> reload -> tiny eval + metadata check | token-exact smoke; `objective_profile` = recipe name in export | 0.1 GPU-h |
+None outstanding. The three registered E1 runs executed on 2026-10-14 — once
+per concurrent session (R-20261014-03..06 and the duplicate set
+R-20261014-07; the two sets agree bit-exactly). E4 (canonical 2K recipe run)
+is the next registered GPU job and stays on hold until the user rules on the
+concurrent-session question.

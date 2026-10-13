@@ -7,7 +7,7 @@ not by itself constitute paper evidence.
 | # | Candidate claim | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- |
 | C1 | The repo is a reusable, reproducible training infra for VLM block-parallel drafters (7 algorithms, unified train/eval/export) | engineering DONE / paper evidence weak | SUPPORT_MATRIX, RELEASE_VALIDATION, zoo releases | needs the paper-side framing: protocol + cost data |
-| C2 | DFly's ported upstream two-stage recipe is selectable and numerically faithful to upstream loss math | CPU DONE (oracles), GPU smoke only | `tests/test_objectives.py` (formula oracles, chunk invariance); `R-2026-1014-01` (stage switch) | E1 parity/resume/export; then canonical 2K run vs controlled_ce (E4) |
+| C2 | DFly's ported upstream two-stage recipe is selectable and numerically faithful to upstream loss math | CPU DONE + E1 validated (two independent concurrent sets, bit-exact); quality evidence still smoke-scale | `tests/test_objectives.py` (formula oracles, chunk invariance); `R-20261014-01` (stage switch); `R-20261014-03..06` + `R-20261014-07` (select-parity, kill+resume round-trip, export metadata + token-exact reload eval) | canonical 2K run vs controlled_ce (E4) |
 | C3 | Multi-image / multi-turn support with a documented position/supervision protocol | NOT STARTED | - | WP2 |
 | C4 | DocVQA/ChartQA workloads are runnable and reproducible end-to-end | NOT STARTED | - | WP3 |
 | C5 | Batched online capture lowers capture cost measurably | NOT STARTED | - | WP4 measurement report |
