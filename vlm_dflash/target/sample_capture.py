@@ -140,8 +140,12 @@ def forward_and_capture_batch(
     device = next(model.parameters()).device
     lengths = [int(item["full_ids"].numel()) for item in prepared_list]
     max_length = max(lengths)
+    # Some families ship a config pad id from a different vocabulary (e.g.
+    # SmolVLM2's pad_token_id 128002 vs. a 49280-row embedding table). Pad
+    # positions are masked out, so any in-range id is a valid filler.
     pad_token_id = getattr(getattr(model, "config", None), "pad_token_id", None)
-    if pad_token_id is None or int(pad_token_id) < 0:
+    vocab_size = int(model.get_input_embeddings().weight.shape[0])
+    if pad_token_id is None or not 0 <= int(pad_token_id) < vocab_size:
         pad_token_id = 0
     input_ids = torch.full((len(prepared_list), max_length), int(pad_token_id), dtype=torch.long)
     attention_mask = torch.zeros((len(prepared_list), max_length), dtype=torch.long)

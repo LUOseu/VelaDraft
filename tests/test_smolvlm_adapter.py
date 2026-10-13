@@ -247,3 +247,42 @@ def test_adapter_registry_and_model_dispatch():
         config = type("C", (), {"model_type": "smolvlm"})()
 
     assert isinstance(adapter_for_model(_FakeModel()), SmolVLMAdapter)
+
+
+def test_capture_batch_clamps_out_of_range_config_pad_id():
+    """SmolVLM2's config pad id (128002) is outside its 49280-row embedding table.
+
+    Batched capture pads input_ids to the group max; the filler must stay
+    inside the embedding range or the target forward raises on lookup.
+    """
+    from types import SimpleNamespace
+
+    from vlm_dflash.target.sample_capture import forward_and_capture_batch
+
+    class _FakeSmolVLM:
+        config = SimpleNamespace(model_type="smolvlm", pad_token_id=128002)
+
+        def get_input_embeddings(self):
+            return SimpleNamespace(weight=torch.zeros(50, 4))
+
+        def parameters(self):
+            return iter([torch.zeros(1)])
+
+        def __call__(self, **kwargs):
+            input_ids = kwargs["input_ids"]
+            assert int(input_ids.min()) >= 0 and int(input_ids.max()) < 50
+            batch, length = input_ids.shape
+            hidden = [torch.zeros(batch, length, 8, dtype=torch.bfloat16) for _ in range(3)]
+            return SimpleNamespace(hidden_states=hidden)
+
+    prepared = [
+        {"inputs": {}, "full_ids": torch.tensor([1, 3, 3, 4, 5, 6]), "allow_multi_span": False},
+        {"inputs": {}, "full_ids": torch.tensor([1, 3, 3, 4]), "allow_multi_span": False},
+    ]
+    records = forward_and_capture_batch(
+        _FakeSmolVLM(), prepared, [1], image_token_id=3, dtype=torch.float32, merge_size=None
+    )
+    assert records[0]["input_ids"].tolist() == [1, 3, 3, 4, 5, 6]
+    assert records[1]["input_ids"].tolist() == [1, 3, 3, 4]
+    assert records[0]["image_span"] == (1, 2)
+    assert records[0]["position3"].shape == (3, 6)
