@@ -5,12 +5,12 @@
 - First-round cap: **8.0 GPU-hours** (plan default; no other budget given).
   1 GPU job at a time; single job <= 2 h wall; <= 2 fix-retries per failing
   debug task.
-- Charged so far: **1.34 GPU-h** (R-20261014-01 0.044 + R-20261014-02 0.002
+- Charged so far: **2.79 GPU-h** (R-20261014-01 0.044 + R-20261014-02 0.002
   + E1 R-20261014-03..05 0.29 + duplicate concurrent E1 set R-20261014-07
   0.26 + zoo re-download validation R-20261014-09 0.04 + E2 R-20261014-08
-  0.55, two passes + E3 R-20261014-10 0.15). Remaining: **6.66 GPU-h**; E4
-  (in flight, budgeted 1.0) is charged when its row lands. Shared file
-  between the two concurrent sessions - re-read before editing.
+  0.55, two passes + E3 R-20261014-10 0.15 + E4 R-20261014-11 1.45).
+  Remaining: **5.21 GPU-h**. Shared file between the two concurrent
+  sessions - re-read before editing.
 - First 0.5 GPU-h is measurement budget (throughput / peak memory / storage);
   the two smoke runs consumed part of it.
 
@@ -20,7 +20,7 @@
 | WP4 batched-online + profiling | 1.0 |
 | E2 WP2 multi-image smoke | 0.5 budgeted -> 0.55 actual (two passes; second pass overran the cap) |
 | E3 WP3 DocVQA/ChartQA validation | 0.7 budgeted -> 0.15 actual |
-| E4/WP7 DFly 2K recipe canonical (+eval) | 1.0 |
+| E4/WP7 DFly 2K recipe canonical (+eval) | 1.0 budgeted -> 1.45 actual (overfit sanity + storm-inflated main loop + 3-config eval; recorded) |
 | WP6 non-Qwen DFlash smoke | 1.5 |
 | WP5 runtime load test | 1.0 |
 | Reserve | 2.0 |
@@ -35,7 +35,7 @@
 
 | Path | Size | Free | Note |
 | --- | --- | --- | --- |
-| `a6000xuyang:/home` | 15 TB | **61 GB (100% used), drifting down** | shared; 130 GB free at 01:30 (audit), 61 GB at 02:20; a host-wide writeback stall hit the E2 eval ~02:10. Keep net-new small. |
+| `a6000xuyang:/home` | 15 TB | **61 GB (100% used), drifting down** | shared; 130 GB free at 01:30 (audit), 58 GB at 02:52; E4's renewable `ckpt_last.pt` (3.7 GB) pruned 02:55 -> 61 GB. Host-wide writeback stalls hit the E2 eval ~02:10 and slowed E4's train mid-run. Keep net-new small. |
 | `a6000xuyang:/` | 1.8 TB | 53 GB (97%) | system |
 | Local Mac | - | check before large downloads | - |
 
@@ -53,7 +53,7 @@
 | Job | Config | Peak GPU |
 | --- | --- | --- |
 | Recipe (upstream_two_stage) train, sanity off | micro-batch 8, seq 2048 | 28.6 GB / 48 GB |
-| Recipe train + overfit sanity (16 samples) | micro-batch 8, seq 2048 | 46.5 GB / 48 GB |
+| Recipe train + overfit sanity (16 samples) | micro-batch 8, seq 2048 | 46.5 GB / 48 GB (R-01 smoke and the E4 canonical run agree) |
 | controlled_ce train | micro-batch 8 | 31.4 GB (1-step probe) |
 
 Rule: keep recipe micro-batch at 8; use grad accumulation for effective batch.
@@ -64,3 +64,7 @@ Only this plan's registered, reproducible temp artifacts are pruned
 (e.g. `runs/qwen25vl3b_dfly_2k_recipe_smoke/train/ckpt_last.pt` once E1 is
 done and the checkpoint is no longer needed for resume tests). Never touch
 other users' files, baselines or unique checkpoints.
+Applied again on 2026-10-14 02:55: E4's `train/ckpt_last.pt` (3.7 GB,
+renewable) deleted after its eval + export landed; the run's `ckpt_final` /
+`ckpt_init`, the export dir and the small-file evidence
+(`recipe-smoke-config/e4_evidence.tar.gz`) are kept.

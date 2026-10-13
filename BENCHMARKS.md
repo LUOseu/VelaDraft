@@ -198,6 +198,19 @@ are the same run recipe with one algorithm knob flipped.
   sequential speedup 0.79x — the lower AL costs target rounds, peak
   30.2 GB).
 
+- **DFly upstream two-stage recipe (canonical, 792 steps):** AL **1.839** vs
+  1.682 for the controlled_ce record (+0.157, +9.3%) — the highest DFly AL
+  recorded, with every slot above the shared-CE run
+  (`[.440,.207,.103,.051,.024,.014,.007]` vs
+  `[.384,.160,.073,.037,.019,.008,.004]`) and token-exact 128/128 on the
+  same store/seed/step budget; the only knob is `train_recipe:
+  upstream_two_stage` (cold-start fraction 0.5, stage boundary at step 396).
+  Stage evidence: LK/D-PACE loss 8.31 -> 1.25 over steps 1-396; CE 2.00 ->
+  0.98 with e2e TV 0.79 and slot-0 accuracy 0.47 -> 0.67 afterwards; final
+  loss 1.977; sanity passed (drop 0.926, slot0 0.9986). Drafting is slightly
+  cheaper (0.86 s vs 0.94 s per prompt), eval speedup 0.80x. Run details and
+  costs: `docs/plan/RUN_LOG.md` R-20261014-11, `docs/training-costs.md`.
+
 ### AngelSpec ports — Qwen3-VL-8B reduced validation (256-row slice, 192 steps, 16-prompt eval)
 
 Same reduced protocol as the zoo release runs (shared capture-v2 store, 3

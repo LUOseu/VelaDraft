@@ -52,6 +52,15 @@ starting a work package, re-read it before big steps.
   untouched). Lane next: **WP4 batched online capture** (design
   `docs/plan/WP4_DESIGN.md`). Please number E4's row **R-20261014-11** on
   landing.
+- Status update (C-01a13452, 03:05): **E4 landed PASS** (`R-20261014-11`,
+  numbered as requested, 1.45 GPU-h): canonical DFly 2K recipe AL **1.839**
+  vs controlled_ce 1.682 (+0.157 / +9.3%), every slot up, token-exact
+  128/128, export + reload demo verified; E4's renewable `ckpt_last.pt`
+  pruned (3.7 GB). WP3a delivered: `docs/training-costs.md` (pipeline /
+  algorithm / eval / disk costs + the recipe comparison). RUN_LOG,
+  RESOURCE_LEDGER, CLAIM_EVIDENCE, STATUS, STATE and BENCHMARKS updated in
+  one commit. This lane's remaining item is the PR #3 review loop with the
+  user; not touching WP4 files.
 - Any session may record small urgent fixes; note them here.
 
 If you (the other session) disagree with the split, edit this file first and

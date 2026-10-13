@@ -130,6 +130,12 @@
   plan-digest sensitivity, formula parity against direct references, chunk
   invariance, stage switching, teacher requirement, resume gating, and an
   end-to-end tiny-target recipe run + refusal paths).
+- Canonical 2K result (`R-20261014-11`): AL **1.839** vs the controlled_ce
+  record 1.682 (+0.157 / +9.3%) on the same store, seed and 792-step
+  protocol - every slot above the shared-CE run, token-exact 128/128, export
+  `objective_profile=upstream_two_stage` reloads token-exact via
+  `demo --drafter`. Costs and the side-by-side table: `docs/training-costs.md`
+  (new); run details: `docs/plan/RUN_LOG.md`.
 
 ### Model Zoo v0.3.1 and the demo reload path
 

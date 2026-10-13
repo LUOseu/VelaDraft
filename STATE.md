@@ -7,9 +7,11 @@ renamed to `LUOseu/VelaDraft`; DFlare/DFly AngelSpec ports landed behind the
 same interfaces — canonical 2K runs, ablations and Qwen3-VL reduced
 validations recorded; DFly's upstream two-stage recipe (LK / D-PACE cold
 start -> e2e TV) ported as `algorithm.train_recipe` on branch
-`dfly-upstream-recipe` — CPU suite + GPU smoke + eval/export verified,
-canonical run pending; Model Zoo `zoo-v0.3.1` published with six additional
-canonical archives).
+`dfly-upstream-recipe` — CPU suite + GPU smoke + eval/export verified; the
+canonical 2K run landed (R-20261014-11: AL **1.839** vs the controlled_ce
+record 1.682, +0.157 / +9.3%, token-exact 128/128); Model Zoo `zoo-v0.3.1`
+published with six additional canonical archives and re-download-verified
+(R-20261014-09, sha256-identical via mirror)).
 
 **Status: v0.3.1 tagged and pushed** (tag `v0.3.1` at `eb3f314`); **v0.3.2 in
 development — the online target feature source is pushed as `aed7bf8` and
@@ -488,10 +490,12 @@ Scope frozen (harden/document/validate/package only). Evidence:
   so the remaining stage-6 runs need only ~1.5G of net new space each.
 
 ## Next highest-value tasks
-1. Canonical DFly recipe run: `configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml`
-   (2K protocol, ~790 steps) + 128-prompt eval -> the AL comparison vs the
-   shared-CE DFly record (1.682); a capture-v2 5-layer store is already
-   staged (`runs/qwen25vl3b_jetspec_2k/features` superset), ~25 min GPU.
+1. **(Done 2026-10-14)** Canonical DFly recipe run
+   (`configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml`): AL **1.839** vs the
+   shared-CE record 1.682 (+0.157 / +9.3%), every slot up, token-exact
+   128/128, export + reload verified; R-20261014-11, costs in
+   `docs/training-costs.md`. Follow-up only if a publication claim needs it:
+   multi-seed or larger-scale replicate.
 2. DFlash2 objective isolation (only if the 1.954 is quoted as a method
    claim): a `unary_loss: ce` control separates the forward-KL objective axis
    from conv + selector; features and recipe are ready
@@ -502,11 +506,11 @@ Scope frozen (harden/document/validate/package only). Evidence:
    First serving-bridge step is scoped in `docs/serving-bridge.md` (proposal).
 4. Deterministic benchmark prompt file for `caption_general`; land one public
    dataset adapter (TextVQA first) to move a workload from planned -> validated.
-5. Zoo v0.3.1 follow-up: clean-machine re-download of one archive (the dev
-   Mac's egress proxy cannot reach `release-assets.githubusercontent.com`),
-   then extend the `zoo-v0.3.0`-only re-download record in
-   `RELEASE_VALIDATION.md` if the hosting story changes (HF Hub still needs
-   an account decision).
+5. Zoo v0.3.1 follow-up: **(done)** clean re-download validation recorded in
+   `RELEASE_VALIDATION.md` (R-20261014-09: all six archives
+   sha256-identical via the HTTPS mirror, demo reloads token-exact; direct
+   `release-assets` egress stays blocked on both hosts). HF Hub hosting
+   still needs an account decision.
 
 (Done in v0.3.1: Qwen3-VL reduced-scale validation recorded for
 DSpark/Domino/JetSpec/DFlash2 with metadata retagged to `reduced_validation`;

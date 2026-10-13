@@ -42,16 +42,20 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   pinned) against the frozen 3B/2K DFlash checkpoint - DocVQA AL 1.201 /
   ChartQA AL 1.221, both token-exact 128/128 (sequential parity); manifests
   03/04 `validated`; numbers in `BENCHMARKS.md`. Training-cost report
-  (`WP3a`, `docs/training-costs.md`) stays with the other session.
+  (`WP3a`, `docs/training-costs.md`) landed with the other session.
+- E4 done, PASS (`R-20261014-11`, 1.45 GPU-h): canonical DFly 2K
+  `upstream_two_stage` run - AL **1.839** vs the controlled_ce record 1.682
+  (+0.157 / +9.3%), every slot up, token-exact 128/128, export + reload
+  verified; costs in `docs/training-costs.md`, numbers in `BENCHMARKS.md`.
+  Zoo bookkeeping closed out (re-download validation `R-20261014-09`).
 - Next: WP4 batched online capture + profiling (design note in
-  `docs/plan/WP4_DESIGN.md`). Lane split: E4 (in flight on GPU2) + zoo
-  bookkeeping stay with the other session (see COORDINATION.md).
+  `docs/plan/WP4_DESIGN.md`; code landed, measurement report owed). Lane
+  split recap in COORDINATION.md.
 
 ## Budget
 
-8 GPU-h first-round cap; 1.34 GPU-h charged (E1 0.59 incl. the duplicate
-concurrent set, zoo re-download validation 0.04, E2 0.55, E3 0.15); E4
-(canonical 2K recipe) in flight on GPU2 and charged when its row lands;
+8 GPU-h first-round cap; **2.79 GPU-h charged** (E1 0.59 incl. the duplicate
+concurrent set, zoo re-download validation 0.04, E2 0.55, E3 0.15, E4 1.45);
 allocation in RESOURCE_LEDGER.md.
 
 ## Blockers / risks
@@ -71,9 +75,12 @@ allocation in RESOURCE_LEDGER.md.
   session continues.
   - Update (02:20): the other session (`01a13452`) published zoo-v0.3.1
     (`7eab1c4` etc.), clean-machine re-download-verified it (`R-20261014-09`)
-    and launched E4 (canonical DFly 2K recipe) on GPU2 at 01:26 - still in
-    flight. This session finished WP2 + E2 (`R-20261014-08` PASS) on GPU0.
-    The lane split holds; re-read `COORDINATION.md` before the next big step.
+    and launched E4 (canonical DFly 2K recipe) on GPU2 at 01:26. This session
+    finished WP2 + E2 (`R-20261014-08` PASS) on GPU0, then WP3/E3.
+  - Update (03:00): E4 landed PASS (`R-20261014-11`: AL **1.839** vs 1.682,
+    1.45 GPU-h) together with the WP3a cost report and the zoo bookkeeping
+    wrap-up - the other session's lane is complete pending PR #3 review. The
+    lane split holds; re-read `COORDINATION.md` before the next big step.
 - Shared-server disk: `/home` 100% used and drifting down (130 GB free at
   01:30 -> 61 GB at 02:20 after pruning E2's renewable `ckpt_last`; a
   host-wide writeback stall slowed the E2 eval ~5 min). Keep net-new
