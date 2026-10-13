@@ -5,11 +5,12 @@
 - First-round cap: **8.0 GPU-hours** (plan default; no other budget given).
   1 GPU job at a time; single job <= 2 h wall; <= 2 fix-retries per failing
   debug task.
-- Charged so far: **2.79 GPU-h** (R-20261014-01 0.044 + R-20261014-02 0.002
+- Charged so far: **3.00 GPU-h** (R-20261014-01 0.044 + R-20261014-02 0.002
   + E1 R-20261014-03..05 0.29 + duplicate concurrent E1 set R-20261014-07
   0.26 + zoo re-download validation R-20261014-09 0.04 + E2 R-20261014-08
-  0.55, two passes + E3 R-20261014-10 0.15 + E4 R-20261014-11 1.45).
-  Remaining: **5.21 GPU-h**. Shared file between the two concurrent
+  0.55, two passes + E3 R-20261014-10 0.15 + E4 R-20261014-11 1.45 + WP4
+  measurement R-20261014-12 0.21).
+  Remaining: **5.00 GPU-h**. Shared file between the two concurrent
   sessions - re-read before editing.
 - First 0.5 GPU-h is measurement budget (throughput / peak memory / storage);
   the two smoke runs consumed part of it.
@@ -17,7 +18,7 @@
 | Allocation (draft) | GPU-h |
 | --- | --- |
 | E1 WP1 validation (R-20261014-03/04/05) | 0.25 used -> actual 0.29 + 0.26 (duplicate set) |
-| WP4 batched-online + profiling | 1.0 |
+| WP4 batched-online + profiling | 1.0 budgeted -> 0.21 actual (R-20261014-12: A/B 3m13s + 2m41s, two profiling passes) |
 | E2 WP2 multi-image smoke | 0.5 budgeted -> 0.55 actual (two passes; second pass overran the cap) |
 | E3 WP3 DocVQA/ChartQA validation | 0.7 budgeted -> 0.15 actual |
 | E4/WP7 DFly 2K recipe canonical (+eval) | 1.0 budgeted -> 1.45 actual (overfit sanity + storm-inflated main loop + 3-config eval; recorded) |
@@ -55,6 +56,7 @@
 | Recipe (upstream_two_stage) train, sanity off | micro-batch 8, seq 2048 | 28.6 GB / 48 GB |
 | Recipe train + overfit sanity (16 samples) | micro-batch 8, seq 2048 | 46.5 GB / 48 GB (R-01 smoke and the E4 canonical run agree) |
 | controlled_ce train | micro-batch 8 | 31.4 GB (1-step probe) |
+| Online smoke train (batch 1 or capture group 4) | micro-batch 4, seq 1024, 3B target resident | 13.67 GB target-device peak (R-20261014-12; batching moved it +0.004 GB) |
 
 Rule: keep recipe micro-batch at 8; use grad accumulation for effective batch.
 

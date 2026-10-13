@@ -145,10 +145,13 @@ resume (including the placeholder fast-forward) is unaffected.
   `target_samples_total` counts extracted rows (they differ only when
   `online_batch_size > 1`). Fast-forward placeholders stay per-item and never
   consume target work.
-- Measured effect on a registered smoke slice (wall time, counters, target
-  peak for batch 1 vs N) is recorded in `docs/plan/RUN_LOG.md` (WP4 row,
-  `R-20261014-12`). Batching amortizes per-forward host overhead; it does not
-  change the teacher's math.
+- Measured on the registered WP2 smoke slice (`R-20261014-12`,
+  `docs/plan/WP4_MEASUREMENT.md`): 16 synthetic 2-image / 2-turn rows,
+  seq 1024, 4 steps, batch 1 vs capture group 4 - extraction wall
+  2.84 s -> 2.31 s (-18.8%), one forward per 4 rows instead of 16 forwards,
+  target peak unchanged (13.67 GB), step losses bit-identical. Prefill
+  compute dominates on that slice, so the saving is smaller than the 4x call
+  reduction.
 
 ## Exact resume
 
