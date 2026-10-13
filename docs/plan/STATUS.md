@@ -79,6 +79,14 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   multi-turn template drift, multi-image, online mode untested for the
   family; smoke scale - no quality claim): `docs/plan/WP6_REPORT.md`.
   Next: WP7.
+- WP7 done (CPU/docs only, no GPU charge): reference-weights audit (`zoo-v0.3.1`
+  / `zoo-v0.3.2` live; staged recipe tarball sha matches `SHA256SUMS`),
+  model-card audit (9 cards = the README-linked set), fixed-experiment recap,
+  and **`docs/plan/PAPER_OUTLINE.md`** - candidate main line, per-claim
+  evidence table with engineering vs paper-evidence status tracked separately,
+  honest positioning (systems / technical report level today) and the
+  upgrade paths. Report `docs/plan/WP7_REPORT.md`. All work packages now
+  have a terminal state (WP5 = BLOCKED-with-gap per the plan rule).
 
 ## Budget
 
@@ -125,4 +133,5 @@ WP4 measurement 0.21, WP5 0.55, WP6 0.53); allocation in RESOURCE_LEDGER.md.
 ## Pointers
 
 - Task ledger: TASK_LEDGER.md - run log: RUN_LOG.md - budget/disk:
-  RESOURCE_LEDGER.md - claim evidence: CLAIM_EVIDENCE.md
+  RESOURCE_LEDGER.md - claim evidence: CLAIM_EVIDENCE.md - paper outline:
+  PAPER_OUTLINE.md

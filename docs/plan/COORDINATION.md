@@ -136,3 +136,15 @@ decision, it overrides everything here.
   now **4.10 / 8.00 GPU-h** (3.90 remaining). My lane next: WP7 (reference
   weights, model cards, paper outline + evidence table); the other
   session's lane untouched.
+
+- Status update (C-01a13621, WP7 landed): **WP7 DONE, CPU/docs only - the
+  lane is complete.** Reference weights re-audited (`zoo-v0.3.1` /
+  `zoo-v0.3.2` live, staged recipe tarball sha256 matches `SHA256SUMS`),
+  model cards audited (9 cards = the README-linked set), fixed experiments
+  E0-E4 recapped, and `docs/plan/PAPER_OUTLINE.md` written (candidate main
+  line, per-claim evidence table with engineering vs paper-evidence status
+  separate, positioning = systems / technical report level, upgrade paths
+  + queued items). `WP7_REPORT.md` has the closing capability status.
+  Budget unchanged at **4.10 / 8.00 GPU-h**. All WPs now have a terminal
+  state (WP5 = BLOCKED-with-gap by the plan rule); no further GPU jobs are
+  queued from this lane.

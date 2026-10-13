@@ -17,3 +17,6 @@ not by itself constitute paper evidence.
 Rules in force: no "first / SOTA / significant gain / production-ready"
 language without the corresponding recorded runs; training-cost and negative
 results stay in the log even when the README does not show them.
+
+Paper-facing synthesis (outline, section plan, per-claim engineering vs
+paper-evidence status, positioning and upgrade paths): `PAPER_OUTLINE.md`.
