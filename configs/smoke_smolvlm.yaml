@@ -25,9 +25,9 @@ dataset:
 
 regen:
   max_new_tokens: 64
-  # SmolVLM2 answers shape questions tersely (" diamond.<end_of_utterance>");
-  # 2 keeps every non-degenerate answer while still dropping pure-eos rows.
-  min_response_tokens: 2
+  # The draft needs >= block_size + 1 supervised tokens per row; keep answers
+  # of at least 8 tokens (SmolVLM2's answers to the smoke question run 9-19).
+  min_response_tokens: 8
   batch_size: 4
   temperature: 0.0
 
@@ -40,7 +40,9 @@ capture:
 
 drafter:
   num_hidden_layers: 3
-  block_size: 8
+  # block_size 4 needs >= 5 supervised tokens per row, which fits SmolVLM2's
+  # short-but-complete answers; block 8 would need 9+.
+  block_size: 4
   num_anchors: 64
   loss_decay_gamma: 7.0
   # <|reserved_special_token_87|>: a reserved embedding row the chat template

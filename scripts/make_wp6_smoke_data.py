@@ -38,7 +38,10 @@ _COLOR_NAMES = {
     (150, 90, 190): "purple",
     (60, 180, 180): "teal",
 }
-_QUESTION = "What shape is in the image? Answer with its colour and shape in one short sentence."
+# Phrased to elicit a complete-sentence greedy answer from SmolVLM2: the draft
+# needs >= block_size + 1 supervised tokens per row ("What shape..." yields
+# 2-3 token answers that cannot anchor a block).
+_QUESTION = "Describe the image in one complete sentence."
 
 
 def _draw(shape: str, color: tuple[int, int, int], side: int) -> Image.Image:
