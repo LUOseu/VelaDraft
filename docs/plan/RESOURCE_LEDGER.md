@@ -5,12 +5,13 @@
 - First-round cap: **8.0 GPU-hours** (plan default; no other budget given).
   1 GPU job at a time; single job <= 2 h wall; <= 2 fix-retries per failing
   debug task.
-- Charged so far: **3.00 GPU-h** (R-20261014-01 0.044 + R-20261014-02 0.002
+- Charged so far: **3.02 GPU-h** (R-20261014-01 0.044 + R-20261014-02 0.002
   + E1 R-20261014-03..05 0.29 + duplicate concurrent E1 set R-20261014-07
   0.26 + zoo re-download validation R-20261014-09 0.04 + E2 R-20261014-08
   0.55, two passes + E3 R-20261014-10 0.15 + E4 R-20261014-11 1.45 + WP4
-  measurement R-20261014-12 0.21).
-  Remaining: **5.00 GPU-h**. Shared file between the two concurrent
+  measurement R-20261014-12 0.21 + zoo v0.3.2 validation demo R-20261014-13
+  0.02).
+  Remaining: **4.98 GPU-h**. Shared file between the two concurrent
   sessions - re-read before editing.
 - First 0.5 GPU-h is measurement budget (throughput / peak memory / storage);
   the two smoke runs consumed part of it.

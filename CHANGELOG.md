@@ -153,6 +153,12 @@
   5-layer feature store load out of the box (previously refused by the target
   identity gate); `examples/score_pretrained.py` shares the alignment and
   regression tests cover legacy exports.
+- `zoo-v0.3.2` adds the DFly upstream-recipe checkpoint
+  (`qwen25vl-3b-dfly-recipe`, 401 MB, code commit `6ad8500`,
+  `objective_profile=upstream_two_stage`) as the recipe companion to the
+  `zoo-v0.3.1` shared-CE DFly archive; clean re-download verified (sha256,
+  inner checksums 7/7, `load_export`, fresh-dir `demo --drafter` token-exact
+  4/4).
 
 ### Online training: live target feature extraction
 

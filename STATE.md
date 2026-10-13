@@ -11,7 +11,8 @@ start -> e2e TV) ported as `algorithm.train_recipe` on branch
 canonical 2K run landed (R-20261014-11: AL **1.839** vs the controlled_ce
 record 1.682, +0.157 / +9.3%, token-exact 128/128); Model Zoo `zoo-v0.3.1`
 published with six additional canonical archives and re-download-verified
-(R-20261014-09, sha256-identical via mirror)).
+(R-20261014-09, sha256-identical via mirror); `zoo-v0.3.2` adds the DFly
+upstream-recipe checkpoint (clean re-download verified, `R-20261014-13`)).
 
 **Status: v0.3.1 tagged and pushed** (tag `v0.3.1` at `eb3f314`); **v0.3.2 in
 development — the online target feature source is pushed as `aed7bf8` and

@@ -164,6 +164,7 @@ Released drafter checkpoints (reference artifacts for pipeline validation):
 | **DFlash2** · experimental objective | Qwen2.5-VL-3B | [498 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflash2-exp.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflash2-exp.md) |
 | **DFlare** · learnable fusion + context K/V | Qwen2.5-VL-3B | [356 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflare.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflare.md) |
 | **DFly** · shared-KV + hidden correction | Qwen2.5-VL-3B | [401 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dfly.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dfly.md) |
+| **DFly** · upstream two-stage recipe | Qwen2.5-VL-3B | [401 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.2/qwen25vl-3b-dfly-recipe.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dfly-recipe.md) |
 | **DFlash** · 8B scale | Qwen3-VL-8B | [955 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen3vl-8b-dflash.tar.gz) | [Details](docs/zoo/qwen3vl-8b-dflash.md) |
 
 These archives are **reference artifacts for pipeline validation**: they were
@@ -173,13 +174,15 @@ are not tuned or benchmarked as production drafters; development measurements
 and their training protocols are recorded in
 [BENCHMARKS.md](BENCHMARKS.md). The `zoo-v0.3.0` archives were re-verified
 after download with the token-exact gate; every `zoo-v0.3.1` export is
-reloaded via `load_export` before packaging; see the
+reloaded via `load_export` before packaging, and the `zoo-v0.3.2` archive was
+hash-verified and reloaded again after a clean re-download; see the
 [release evidence](RELEASE_VALIDATION.md).
 
 Each archive includes weights, configuration, algorithm metadata, target
 contract, training manifest, model card and file checksums. All seven
-drafters now have hosted reference checkpoints; training and exporting your
-own remains fully local.
+drafters now have hosted reference checkpoints (DFly additionally as the
+upstream-recipe variant); training and exporting your own remains fully
+local.
 
 ## Train on your data
 

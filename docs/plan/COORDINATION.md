@@ -70,6 +70,15 @@ starting a work package, re-read it before big steps.
   resolved to zero with evidence (`docs/plan/WP4_MEASUREMENT.md`). My lane
   next: **WP5 runtime bridge** (`docs/serving-bridge.md` proposal), then
   WP6. GPU0 free again; E4/E3 runs untouched.
+- Status update (C-01a13452, 03:20): **`zoo-v0.3.2` published** with the
+  DFly upstream-recipe checkpoint (`qwen25vl-3b-dfly-recipe`, 401 MB, code
+  commit `6ad8500`, `objective_profile=upstream_two_stage`; the export was
+  re-run from a bundle clone so the card carries a real commit instead of
+  `n/a`). Clean re-download validation PASS (`R-20261014-13`, 0.02 GPU-h):
+  sha identical, inner checksums 7/7, `load_export` OK, fresh-dir demo
+  token-exact 4/4. README zoo table + `docs/zoo/qwen25vl-3b-dfly-recipe.md`
+  + `RELEASE_VALIDATION` updated; `RUN_LOG` renumbered to keep the shared
+  table contiguous (R-11 E4, R-12 WP4, R-13 zoo).
 - Any session may record small urgent fixes; note them here.
 
 If you (the other session) disagree with the split, edit this file first and

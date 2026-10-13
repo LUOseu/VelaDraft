@@ -47,7 +47,9 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   `upstream_two_stage` run - AL **1.839** vs the controlled_ce record 1.682
   (+0.157 / +9.3%), every slot up, token-exact 128/128, export + reload
   verified; costs in `docs/training-costs.md`, numbers in `BENCHMARKS.md`.
-  Zoo bookkeeping closed out (re-download validation `R-20261014-09`).
+  Zoo bookkeeping closed out (re-download validation `R-20261014-09`) and
+  `zoo-v0.3.2` published with the recipe checkpoint + clean re-download
+  validation (`R-20261014-13`).
 - WP4 batched online capture done + measured (`R-20261014-12`, 0.21 GPU-h):
   `train.online_batch_size=N` renders per sample, runs one padded target
   forward per capture group (group size `min(N, micro_batch)`), and slices
