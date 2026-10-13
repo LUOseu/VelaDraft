@@ -10,7 +10,12 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from vlm_dflash.benchmark.adapters import select_indices
+from vlm_dflash.benchmark.adapters import (
+    export_chartqa,
+    export_docvqa,
+    pinned_prompt_manifest,
+    select_indices,
+)
 from vlm_dflash.benchmark.harness import (
     load_workloads,
     resolve_prompt_source,
@@ -100,6 +105,15 @@ def test_textvqa_selection_is_deterministic_and_bounded():
         select_indices(16, 32, seed=42)
 
 
+def test_image_suffix_fails_loud_on_unknown_magic():
+    from vlm_dflash.benchmark.adapters import _image_suffix
+
+    assert _image_suffix(b"\x89PNG\r\n\x1a\nxxx") == ".png"
+    assert _image_suffix(b"\xff\xd8\xffxxx") == ".jpg"
+    with pytest.raises(ValueError, match="image bytes"):
+        _image_suffix(b"GIF89a")
+
+
 def test_load_eval_rows_sharegpt_jsonl(tmp_path):
     data = tmp_path / "data"
     data.mkdir()
@@ -143,3 +157,83 @@ def test_load_eval_rows_relative_path_resolves_against_run_dir(tmp_path):
     )
     assert [row["id"] for row in rows] == ["b"]
     assert media_dir == (run_dir / "images").resolve()
+_PNG = b"\x89PNG\r\n\x1a\n" + b"fixture-png-bytes"
+_JPG = b"\xff\xd8\xff" + b"fixture-jpg-bytes"
+
+
+def _write_table(path: Path, rows: dict[str, list]) -> None:
+    pa = pytest.importorskip("pyarrow")
+    pq = pytest.importorskip("pyarrow.parquet")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(pa.Table.from_pydict(rows), path)
+
+
+def test_export_chartqa_from_fixture(tmp_path):
+    source = tmp_path / "chartqa-src"
+    _write_table(
+        source / "data" / "test-00000-of-00001.parquet",
+        {
+            "type": ["human_test", "human_test", "augmented_test", "human_test", "augmented_test", "human_test"],
+            "question": [f"question {i}?" for i in range(6)],
+            "answer": [str(i) for i in range(6)],
+            "image": [
+                {"bytes": _PNG + bytes([i]), "path": f"chart{i % 2}.png"} for i in range(6)
+            ],
+        },
+    )
+    out = tmp_path / "out"
+    manifest = export_chartqa(source, out, num_prompts=4, seed=42)
+    assert manifest["dataset"] == "lmms-lab/ChartQA"
+    assert manifest["num_rows_in_split"] == 6 and manifest["num_prompts"] == 4
+    prompts = [json.loads(line) for line in (out / "chartqa_v1.jsonl").read_text().splitlines()]
+    assert len(prompts) == 4
+    ids = [row["id"] for row in prompts]
+    assert ids == sorted(ids)
+    assert all(row["images"][0].endswith(".png") for row in prompts)
+    assert all(len(row["conversations"]) == 2 for row in prompts)
+    # Deterministic re-run over the same shard reproduces the same subset/hashes.
+    rerun = export_chartqa(source, tmp_path / "out2", num_prompts=4, seed=42)
+    assert rerun["rows_sha256"] == manifest["rows_sha256"]
+    pinned = pinned_prompt_manifest(manifest)
+    assert {"id", "source_index", "question_sha256", "image_sha256"} <= set(pinned[0])
+    assert "image" not in pinned[0]
+    with pytest.raises(FileNotFoundError, match="ChartQA"):
+        export_chartqa(tmp_path / "missing", out, num_prompts=4, seed=42)
+
+
+def test_export_docvqa_from_fixture(tmp_path):
+    source = tmp_path / "docvqa-src"
+    _write_table(
+        source / "DocVQA" / "validation-00000-of-00006.parquet",
+        {
+            "questionId": ["101", "205", "57", "999"],
+            "question": [f"doc question {i}?" for i in range(4)],
+            "question_types": [["figure/diagram"], ["others"], ["layout"], ["figure/diagram"]],
+            "image": [
+                {"bytes": _PNG + bytes([i]), "path": f"page{i}.png"} for i in range(3)
+            ]
+            + [{"bytes": _JPG, "path": "page3.jpg"}],
+            "docId": [7, 4, 9, 2],
+            "ucsf_document_id": [f"doc{i}" for i in range(4)],
+            "ucsf_document_page_no": [str(i + 1) for i in range(4)],
+            "answers": [["a"], ["b"], ["c"], ["d"]],
+            "data_split": ["val"] * 4,
+        },
+    )
+    out = tmp_path / "out"
+    manifest = export_docvqa(source, out, num_prompts=3, seed=42)
+    assert manifest["config"] == "DocVQA" and manifest["split"] == "validation"
+    assert manifest["num_rows_in_split"] == 4 and manifest["num_prompts"] == 3
+    prompts = [json.loads(line) for line in (out / "docvqa_v1.jsonl").read_text().splitlines()]
+    ids = [row["id"] for row in prompts]
+    # Sorted by numeric questionId (57 < 101 < 999), not by shard order.
+    assert ids == ["docvqa-000057", "docvqa-000101", "docvqa-000999"]
+    suffixes = {row["id"]: row["images"][0].rsplit(".", 1)[1] for row in prompts}
+    assert suffixes["docvqa-000057"] == "png"
+    assert suffixes["docvqa-000999"] == "jpg"
+    rerun = export_docvqa(source, tmp_path / "out2", num_prompts=3, seed=42)
+    assert rerun["rows_sha256"] == manifest["rows_sha256"]
+    pinned = pinned_prompt_manifest(manifest)
+    assert {"id", "question_id", "doc_id", "question_sha256", "image_sha256"} <= set(pinned[0])
+    with pytest.raises(FileNotFoundError, match="DocVQA"):
+        export_docvqa(tmp_path / "missing", out, num_prompts=3, seed=42)

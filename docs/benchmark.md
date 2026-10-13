@@ -31,12 +31,15 @@ python scripts/prepare_benchmark.py --workload textvqa \
     --source <path-to-lmms-lab/textvqa-download> --out benchmarks/data/textvqa
 ```
 
-The adapter writes the images, `textvqa_v1.jsonl` + `meta.json` and a
-`manifest.json` with per-shard and per-row question/image hashes, and
-refreshes the repo-tracked prompt set definition
-`benchmarks/prompts/textvqa_v1.jsonl` (ids + hashes, no image bytes). Re-running
-with the same seed over the same shards reproduces the same subset; validate
-the export against the pinned shard hashes before comparing numbers.
+DocVQA (`lmms-lab/DocVQA` `DocVQA/validation` split) and ChartQA
+(`lmms-lab/ChartQA` test split) use the same command with their own
+`--workload` / `--source` / `--out`; both pin `max_new_tokens=64`. The adapter
+writes the images, `<workload>_v1.jsonl` + `meta.json` and a `manifest.json`
+with per-shard and per-row question/image hashes, and refreshes the
+repo-tracked prompt set definition `benchmarks/prompts/<workload>_v1.jsonl`
+(ids + hashes, no image bytes). Re-running with the same seed over the same
+shards reproduces the same subset; validate the export against the pinned
+shard hashes before comparing numbers.
 
 Fixed protocol for every measured workload:
 

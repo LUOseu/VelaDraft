@@ -9,6 +9,9 @@ hashes, no image bytes) to ``benchmarks/prompts/<workload>_v1.jsonl`` so the
 pinned protocol is reviewable in git. Images and prompt jsonl stay under
 ``benchmarks/data/`` (gitignored). Deterministic: fixed split, fixed row order,
 fixed subset size, fixed seed.
+
+Workloads: ``textvqa`` (lmms-lab/textvqa validation), ``docvqa``
+(lmms-lab/DocVQA DocVQA/validation), ``chartqa`` (lmms-lab/ChartQA test).
 """
 
 from __future__ import annotations
@@ -19,11 +22,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from vlm_dflash.benchmark.adapters import export_textvqa, pinned_prompt_manifest  # noqa: E402
+from vlm_dflash.benchmark.adapters import (  # noqa: E402
+    export_chartqa,
+    export_docvqa,
+    export_textvqa,
+    pinned_prompt_manifest,
+)
 from vlm_dflash.utils import log, write_jsonl  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-_ADAPTERS = {"textvqa": export_textvqa}
+_ADAPTERS = {"textvqa": export_textvqa, "docvqa": export_docvqa, "chartqa": export_chartqa}
 
 
 def main() -> None:
