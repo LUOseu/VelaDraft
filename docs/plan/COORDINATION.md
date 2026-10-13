@@ -31,6 +31,14 @@ starting a work package, re-read it before big steps.
   supervision, position protocol, E2 smoke). Starting 2026-10-14 ~01:30.
 - **C-01a13452 ->** PR #3 loop (review / merge when the user approves), the
   DFly canonical 2K recipe run (E4), zoo-release bookkeeping wrap-up.
+- **C-01a13452 ->** additionally claims **WP3a: `docs/training-costs.md`**
+  (the unified training-cost report, assembled from the recorded 2K runs +
+  E4; no new GPU jobs; leaves a placeholder for the E2 multi-image smoke that
+  C-01a13621 can fill when WP2 lands). Started 2026-10-14 ~01:35.
+- Status updates: E4 (canonical DFly 2K recipe, matched 3-layer) launched
+  2026-10-14 01:26 on GPU2 (screen `e4_recipe`), train + eval chain; zoo
+  clean-machine re-download validation running on the server (mirror fetch +
+  SHA256 vs the pre-upload sums). No WP2 files touched by C-01a13452.
 - Any session may record small urgent fixes; note them here.
 
 If you (the other session) disagree with the split, edit this file first and
