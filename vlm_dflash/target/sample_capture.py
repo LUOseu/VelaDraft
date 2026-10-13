@@ -120,6 +120,126 @@ def extract_target_head(model, contract: dict):
 
 
 @torch.inference_mode()
+def forward_and_capture_batch(
+    model,
+    prepared_list: list[dict],
+    layer_ids: list[int],
+    image_token_id: int,
+    dtype: torch.dtype,
+    merge_size: int = 2,
+    store_final_hidden: bool = False,
+) -> list[dict]:
+    """Batched capture forward: one padded model call for several prepared rows.
+
+    ``prepared_list`` comes from :func:`prepare_sample_record` (render +
+    validation already done). Rows are padded to the batch max; every output
+    is sliced back to the row's own length before a record is built, so pad
+    positions never reach a record. Mathematically each row runs the same
+    teacher-forced forward as :func:`forward_and_capture` does alone.
+    """
+    device = next(model.parameters()).device
+    lengths = [int(item["full_ids"].numel()) for item in prepared_list]
+    max_length = max(lengths)
+    pad_token_id = getattr(getattr(model, "config", None), "pad_token_id", None)
+    if pad_token_id is None or int(pad_token_id) < 0:
+        pad_token_id = 0
+    input_ids = torch.full((len(prepared_list), max_length), int(pad_token_id), dtype=torch.long)
+    attention_mask = torch.zeros((len(prepared_list), max_length), dtype=torch.long)
+    for row_index, item in enumerate(prepared_list):
+        length = lengths[row_index]
+        input_ids[row_index, :length] = item["full_ids"]
+        attention_mask[row_index, :length] = 1
+    input_ids = input_ids.to(device)
+    attention_mask = attention_mask.to(device)
+    forward_kwargs = {
+        "input_ids": input_ids,
+        "attention_mask": attention_mask,
+        "output_hidden_states": True,
+        "use_cache": False,
+        "logits_to_keep": 1,
+    }
+    pixel_values = [item["inputs"].get("pixel_values") for item in prepared_list]
+    grids = [item["inputs"].get("image_grid_thw") for item in prepared_list]
+    for key, values in (("pixel_values", pixel_values), ("image_grid_thw", grids)):
+        present = [value is not None for value in values]
+        if any(present) and not all(present):
+            raise ValueError(f"Batch capture mixes rows with and without {key}; split the batch.")
+        if all(present):
+            forward_kwargs[key] = torch.cat(values, dim=0).to(device)
+    for key in ("pixel_values_videos", "video_grid_thw"):
+        values = [item["inputs"].get(key) for item in prepared_list]
+        if all(value is not None for value in values):
+            forward_kwargs[key] = torch.cat(values, dim=0).to(device)
+    # The target's own multimodal forward *must* see the same token-type map
+    # the processor emitted (extended over the regen answer with text=0):
+    # Qwen3-VL raises without it, and Qwen2.5-VL would otherwise fall back to
+    # plain 1-D positions here while eval/prefill use MRoPE positions.
+    mm_rows = [item["inputs"].get("mm_token_type_ids") for item in prepared_list]
+    mm_present = [value is not None for value in mm_rows]
+    if any(mm_present) and not all(mm_present):
+        raise ValueError("Batch capture mixes rows with and without mm_token_type_ids; split the batch.")
+    extended_mm: list[torch.Tensor | None] = [None] * len(prepared_list)
+    if all(mm_present):
+        stacked = torch.zeros((len(prepared_list), max_length), dtype=mm_rows[0].dtype, device=device)
+        for row_index, value in enumerate(mm_rows):
+            extended = extend_mm_token_type_ids(value.to(device), lengths[row_index])
+            extended_mm[row_index] = extended
+            stacked[row_index, : lengths[row_index]] = extended[0]
+        forward_kwargs["mm_token_type_ids"] = stacked
+    output = model(**forward_kwargs)
+    hidden_states = output.hidden_states
+    records = []
+    for row_index, item in enumerate(prepared_list):
+        length = lengths[row_index]
+        fused = torch.cat(
+            [hidden_states[layer_id + 1][row_index, :length] for layer_id in layer_ids], dim=-1
+        )
+        # hidden_states[-1] is the post-final-norm tensor; ``lm_head`` applied to it
+        # reproduces the target's own output logits (verified by the capture-time
+        # teacher-logits check in the smoke pipeline).
+        final_hidden = (
+            hidden_states[-1][row_index, :length].to(dtype).cpu() if store_final_hidden else None
+        )
+        row_inputs = input_ids[row_index : row_index + 1, :length]
+        row_mask = attention_mask[row_index : row_index + 1, :length]
+        grid = grids[row_index]
+        positions = compute_multimodal_positions(
+            model,
+            row_inputs,
+            row_mask,
+            grid.to(device) if grid is not None else None,
+            mm_token_type_ids=extended_mm[row_index],
+        )
+        spans = locate_image_spans(item["full_ids"].cpu(), image_token_id)
+        if not item.get("allow_multi_span") and len(spans) != 1:
+            raise ValueError("Image tokens are not contiguous; v0.1 requires a single leading image.")
+        # image_grid_thw counts patches; every merge_size^2 patches become one token.
+        expected_per_image = (
+            [int(row.prod().item()) // (merge_size * merge_size) for row in grid]
+            if grid is not None
+            else None
+        )
+        span_count = sum(end - start + 1 for start, end in spans)
+        expected = sum(expected_per_image) if expected_per_image is not None else None
+        record = {
+            "input_ids": item["full_ids"].to(torch.int32),
+            "hidden": fused.to(dtype).cpu(),
+            "position3": positions.to(torch.int32).cpu(),
+            "image_span": spans[0],
+            "n_image_tokens": span_count,
+            "n_image_tokens_expected": expected,
+        }
+        if item.get("allow_multi_span"):
+            record["image_spans"] = [tuple(span) for span in spans]
+            record["n_images"] = len(grid) if grid is not None else None
+            record["image_token_counts_expected"] = expected_per_image
+        if final_hidden is not None:
+            record["final_hidden"] = final_hidden
+        records.append(record)
+    return records
+
+
+@torch.inference_mode()
 def forward_and_capture(
     model,
     inputs: dict,
@@ -143,83 +263,35 @@ def forward_and_capture(
     / multi-turn rows); the record then also carries ``image_spans``,
     ``n_images`` and the per-image expected token counts.
     """
-    device = next(model.parameters()).device
-    input_ids = full_ids.unsqueeze(0).to(device)
-    attention_mask = torch.ones_like(input_ids)
-    forward_kwargs = {
-        "input_ids": input_ids,
-        "attention_mask": attention_mask,
-        "output_hidden_states": True,
-        "use_cache": False,
-        "logits_to_keep": 1,
+    prepared = {
+        "inputs": inputs,
+        "full_ids": full_ids,
+        "allow_multi_span": bool(allow_multi_span),
     }
-    for key in ("pixel_values", "image_grid_thw", "pixel_values_videos", "video_grid_thw"):
-        if key in inputs:
-            forward_kwargs[key] = inputs[key].to(device)
-    # The target's own multimodal forward *must* see the same token-type map
-    # the processor emitted (extended over the regen answer with text=0):
-    # Qwen3-VL raises without it, and Qwen2.5-VL would otherwise fall back to
-    # plain 1-D positions here while eval/prefill use MRoPE positions.
-    mm_token_type_ids = inputs.get("mm_token_type_ids")
-    if mm_token_type_ids is not None:
-        mm_token_type_ids = extend_mm_token_type_ids(mm_token_type_ids.to(device), input_ids.shape[1])
-        forward_kwargs["mm_token_type_ids"] = mm_token_type_ids
-    output = model(**forward_kwargs)
-    hidden_states = output.hidden_states
-    fused = torch.cat([hidden_states[layer_id + 1][0] for layer_id in layer_ids], dim=-1)
-    # hidden_states[-1] is the post-final-norm tensor; ``lm_head`` applied to it
-    # reproduces the target's own output logits (verified by the capture-time
-    # teacher-logits check in the smoke pipeline).
-    final_hidden = hidden_states[-1][0].to(dtype).cpu() if store_final_hidden else None
-    positions = compute_multimodal_positions(
-        model, input_ids, attention_mask, inputs.get("image_grid_thw"), mm_token_type_ids=mm_token_type_ids
-    )
-    spans = locate_image_spans(full_ids.cpu(), image_token_id)
-    if not allow_multi_span and len(spans) != 1:
-        raise ValueError("Image tokens are not contiguous; v0.1 requires a single leading image.")
-    grid = inputs.get("image_grid_thw")
-    # image_grid_thw counts patches; every merge_size^2 patches become one token.
-    expected_per_image = (
-        [int(row.prod().item()) // (merge_size * merge_size) for row in grid] if grid is not None else None
-    )
-    span_count = sum(end - start + 1 for start, end in spans)
-    expected = sum(expected_per_image) if expected_per_image is not None else None
-    record = {
-        "input_ids": full_ids.to(torch.int32),
-        "hidden": fused.to(dtype).cpu(),
-        "position3": positions.to(torch.int32).cpu(),
-        "image_span": spans[0],
-        "n_image_tokens": span_count,
-        "n_image_tokens_expected": expected,
-    }
-    if allow_multi_span:
-        record["image_spans"] = [tuple(span) for span in spans]
-        record["n_images"] = len(grid) if grid is not None else None
-        record["image_token_counts_expected"] = expected_per_image
-    if final_hidden is not None:
-        record["final_hidden"] = final_hidden
-    return record
+    return forward_and_capture_batch(
+        model,
+        [prepared],
+        layer_ids,
+        image_token_id,
+        dtype,
+        merge_size=merge_size,
+        store_final_hidden=store_final_hidden,
+    )[0]
 
 
-def _build_single_turn_record(
-    model,
+def _prepare_single_turn(
     processor,
     row: dict,
     media_dir: Path,
     *,
-    layer_ids: list[int],
-    image_token_id: int,
-    merge_size: int,
-    dtype: torch.dtype,
     seq_length: int,
-    store_final_hidden: bool,
 ) -> dict:
-    """One regenerated row -> the training record (offline capture and online share this).
+    """v1 row -> rendered inputs + token ids + record metadata (no forward).
 
     Replays the prompt through the same processor/chat template the regen stage
-    used, asserts the prompt token ids did not drift, truncates the answer to
-    ``seq_length``, then runs one teacher-forced target forward. Raises on any
-    mismatch instead of producing a silently misaligned record.
+    used, asserts the prompt token ids did not drift and truncates the answer
+    to ``seq_length``. Raises on any mismatch instead of producing a silently
+    misaligned record; the forward half is ``finalize_prepared_records``.
     """
     image = Image.open(row_image_path(row, media_dir)).convert("RGB")
     inputs = encode_prompt(processor, row_question(row), image)
@@ -236,24 +308,13 @@ def _build_single_turn_record(
         raise RuntimeError(f"Prompt of sample {row.get('id')} ({prompt_len} tokens) exceeds seq_length.")
     answer_len = min(len(answer_ids), seq_length - prompt_len)
     full_ids = torch.tensor(stored_prompt + answer_ids[:answer_len], dtype=torch.long)
-    record = forward_and_capture(
-        model,
-        inputs,
-        full_ids,
-        layer_ids,
-        image_token_id,
-        dtype,
-        merge_size=merge_size,
-        store_final_hidden=store_final_hidden,
-    )
-    if record["n_image_tokens_expected"] != record["n_image_tokens"]:
-        raise RuntimeError(
-            f"Image token count mismatch for sample {row.get('id')}: "
-            f"found {record['n_image_tokens']} tokens in input_ids but grid_thw expects "
-            f"{record['n_image_tokens_expected']}."
-        )
-    record.update(
-        {
+    return {
+        "inputs": inputs,
+        "full_ids": full_ids,
+        "sample_id": row.get("id"),
+        "allow_multi_span": False,
+        "check_image_token_count": True,
+        "meta": {
             "sample_id": row.get("id"),
             "prompt_len": prompt_len,
             "answer_len": answer_len,
@@ -264,25 +325,18 @@ def _build_single_turn_record(
                     torch.ones(answer_len, dtype=torch.bool),
                 )
             ),
-        }
-    )
-    return record
+        },
+    }
 
 
-def _build_multi_turn_record(
-    model,
+def _prepare_multi_turn(
     processor,
     row: dict,
     media_dir: Path,
     *,
-    layer_ids: list[int],
-    image_token_id: int,
-    merge_size: int,
-    dtype: torch.dtype,
     seq_length: int,
-    store_final_hidden: bool,
 ) -> dict:
-    """Schema-v2 row -> training record: replay the full-conversation render once.
+    """Schema-v2 row -> rendered inputs + full ids + multi-segment metadata (no forward).
 
     The stored ``regen.full_ids`` is asserted to be the exact token prefix of a
     fresh processor render (chat-template drift fails loud, like the v1 prompt
@@ -328,17 +382,6 @@ def _build_multi_turn_record(
         raise RuntimeError(f"Final prompt of sample {row.get('id')} ({prompt_len_last} tokens) exceeds seq_length.")
     keep = min(len(stored_full_ids), seq_length)
     full_ids = torch.tensor(stored_full_ids[:keep], dtype=torch.long)
-    record = forward_and_capture(
-        model,
-        inputs,
-        full_ids,
-        layer_ids,
-        image_token_id,
-        dtype,
-        merge_size=merge_size,
-        store_final_hidden=store_final_hidden,
-        allow_multi_span=True,
-    )
     loss_mask = torch.zeros(keep, dtype=torch.bool)
     clipped_spans = []
     for start, end in answer_spans:
@@ -355,8 +398,13 @@ def _build_multi_turn_record(
         raise RuntimeError(
             f"Turn span bookkeeping for sample {row.get('id')} does not cover its full token sequence."
         )
-    record.update(
-        {
+    return {
+        "inputs": inputs,
+        "full_ids": full_ids,
+        "sample_id": row.get("id"),
+        "allow_multi_span": True,
+        "check_image_token_count": False,
+        "meta": {
             "sample_id": row.get("id"),
             "prompt_len": keep - int(loss_mask.sum()),
             "answer_len": int(loss_mask.sum()),
@@ -365,9 +413,78 @@ def _build_multi_turn_record(
             "answer_spans": [list(span) for span in clipped_spans],
             "turn_spans": [list(span) for span in turn_spans],
             "n_turns": len(turns),
-        }
-    )
-    return record
+        },
+    }
+
+
+def prepare_sample_record(
+    processor,
+    row: dict,
+    media_dir: Path,
+    *,
+    seq_length: int,
+) -> dict:
+    """Render + validate one row; the target forward happens in finalize.
+
+    The prepared dict (processor inputs, full token ids, record metadata) is
+    what ``forward_and_capture_batch`` consumes, so one forward can serve a
+    whole batch of rows without changing any per-row record field.
+    """
+    if row_is_multi_turn(row):
+        return _prepare_multi_turn(processor, row, media_dir, seq_length=seq_length)
+    return _prepare_single_turn(processor, row, media_dir, seq_length=seq_length)
+
+
+def finalize_prepared_records(
+    model,
+    prepared_list: list[dict],
+    *,
+    layer_ids: list[int],
+    image_token_id: int,
+    merge_size: int,
+    dtype: torch.dtype,
+    store_final_hidden: bool,
+) -> list[dict]:
+    """Run the (batched) capture forward for prepared rows and attach metadata."""
+    if len(prepared_list) == 1:
+        # Single-row capture keeps the original call shape (and monkeypatch
+        # seam) used by the staged offline path.
+        prepared = prepared_list[0]
+        extra = {"allow_multi_span": True} if prepared.get("allow_multi_span") else {}
+        records = [
+            forward_and_capture(
+                model,
+                prepared["inputs"],
+                prepared["full_ids"],
+                layer_ids,
+                image_token_id,
+                dtype,
+                merge_size=merge_size,
+                store_final_hidden=store_final_hidden,
+                **extra,
+            )
+        ]
+    else:
+        records = forward_and_capture_batch(
+            model,
+            prepared_list,
+            layer_ids,
+            image_token_id,
+            dtype,
+            merge_size=merge_size,
+            store_final_hidden=store_final_hidden,
+        )
+    for prepared, record in zip(prepared_list, records):
+        if prepared.get("check_image_token_count") and (
+            record["n_image_tokens_expected"] != record["n_image_tokens"]
+        ):
+            raise RuntimeError(
+                f"Image token count mismatch for sample {prepared.get('sample_id')}: "
+                f"found {record['n_image_tokens']} tokens in input_ids but grid_thw expects "
+                f"{record['n_image_tokens_expected']}."
+            )
+        record.update(prepared["meta"])
+    return records
 
 
 def build_sample_record(
@@ -388,29 +505,16 @@ def build_sample_record(
     Dispatches on the row generation: schema-v2 rows (multi-image / multi-turn)
     replay the whole conversation render and build a multi-segment loss mask;
     v1 rows keep the original single-image, single-answer path bit-for-bit.
+    ``prepare_sample_record`` + ``finalize_prepared_records`` are the same two
+    halves split apart for batched online capture.
     """
-    if row_is_multi_turn(row):
-        return _build_multi_turn_record(
-            model,
-            processor,
-            row,
-            media_dir,
-            layer_ids=layer_ids,
-            image_token_id=image_token_id,
-            merge_size=merge_size,
-            dtype=dtype,
-            seq_length=seq_length,
-            store_final_hidden=store_final_hidden,
-        )
-    return _build_single_turn_record(
+    prepared = prepare_sample_record(processor, row, media_dir, seq_length=seq_length)
+    return finalize_prepared_records(
         model,
-        processor,
-        row,
-        media_dir,
+        [prepared],
         layer_ids=layer_ids,
         image_token_id=image_token_id,
         merge_size=merge_size,
         dtype=dtype,
-        seq_length=seq_length,
         store_final_hidden=store_final_hidden,
-    )
+    )[0]

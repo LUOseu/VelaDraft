@@ -217,15 +217,44 @@ def run_training_loop(
         )
     spatial = bool(getattr(module, "uses_multimodal_position_ids", getattr(module.draft_model, "spatial_rope_enabled", False)))
     generator = torch.Generator().manual_seed(seed)
-    loader = DataLoader(
-        dataset,
-        batch_size=micro_batch,
-        shuffle=shuffle,
-        generator=generator,
-        collate_fn=lambda batch: collate_features(batch, image_token_id),
-        drop_last=False,
-        num_workers=num_workers,
-    )
+    base_fetch_batch = getattr(base_dataset, "fetch_batch", None)
+    if base_fetch_batch is not None and getattr(base_dataset, "batched_capture", False):
+        # Online batched capture: fetch_batch extracts one batch per target
+        # forward while walking the same sampler order as the per-sample path
+        # (see OnlineBatchIterator). Subset wrappers (the overfit-sanity slice)
+        # sample subset-local indices, so map them back to base indices.
+        from ..target.online import OnlineBatchIterator
+
+        subset_wrappers = []
+        node = dataset
+        while node is not base_dataset:
+            subset_wrappers.append(node)
+            node = node.dataset
+
+        def fetch_batch(indices, _wrappers=tuple(subset_wrappers), _base_fetch=base_fetch_batch):
+            mapped = [int(index) for index in indices]
+            for wrapper in _wrappers:
+                mapped = [int(wrapper.indices[item]) for item in mapped]
+            return _base_fetch(mapped)
+
+        loader = OnlineBatchIterator(
+            dataset,
+            lambda records: collate_features(records, image_token_id),
+            batch_size=micro_batch,
+            shuffle=shuffle,
+            generator=generator,
+            fetch_batch=fetch_batch,
+        )
+    else:
+        loader = DataLoader(
+            dataset,
+            batch_size=micro_batch,
+            shuffle=shuffle,
+            generator=generator,
+            collate_fn=lambda batch: collate_features(batch, image_token_id),
+            drop_last=False,
+            num_workers=num_workers,
+        )
     steps_per_epoch = max(1, math.ceil(len(loader) / accumulation))
     if total_steps is None:
         total_steps = steps_per_epoch * epochs

@@ -49,6 +49,23 @@
   frozen 3B/2K DFlash checkpoint - DocVQA AL 1.201, ChartQA AL 1.221, both
   token-exact 128/128 (sequential parity). Numbers in `BENCHMARKS.md`.
 
+### Batched online capture
+
+- `feature_mode=online` gains an opt-in batched capture forward
+  (`train.online_batch_size: N`, default 1 = the per-sample reference path):
+  rows are rendered per sample, one padded target forward serves the batch,
+  and each record keeps its row's own length / spans (padding never reaches a
+  record). The trainer uses an internal iterator that reproduces the
+  per-sample `DataLoader` order (same seeded `RandomSampler` + `BatchSampler`
+  sequence), so enabling batching does not change batch composition.
+- `train_summary.json` / the online manifest now expose
+  `online_batch_size` and `target_samples` / `target_samples_total` next to
+  the forward counters (they diverge only when batching is on); a batch size
+  > 1 is folded into the online source digest so exact resume cannot switch
+  grouping. CPU tests pin batched-vs-per-sample record equality on a tiny
+  Qwen2.5-VL target (single-image + schema-v2 multi-image/multi-turn rows)
+  and DataLoader order parity across epochs.
+
 ### DFlare / DFly (AngelSpec ports)
 
 - New algorithms `dflare` and `dfly`, ported from `Tencent/AngelSpec @
