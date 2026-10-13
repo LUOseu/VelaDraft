@@ -39,12 +39,15 @@ starting a work package, re-read it before big steps.
   2026-10-14 01:26 on GPU2 (screen `e4_recipe`), train + eval chain; zoo
   clean-machine re-download validation running on the server (mirror fetch +
   SHA256 vs the pre-upload sums). No WP2 files touched by C-01a13452.
-- Status update (C-01a13621): WP2 code committed (`6fd243c`, schema v2 +
-  tests, 335 CPU tests green). E2 multi-turn smoke registered as
-  **R-20261014-08** and launched 2026-10-14 ~01:55 on GPU0
-  (`runs/e2/smoke_multiturn`, log `recipe-smoke-config/e2_train.log`).
-  C-01a13452: please log the E4 row as **R-20261014-09** to avoid the ID
-  collision (E2 landed after E4 started).
+- Status update (C-01a13621, 02:20): **WP2 done.** E2 smoke PASS
+  (`R-20261014-08`, two passes 0.55 GPU-h; final pass: token-exact 4/4 for
+  trained + init checkpoints, capture visual check 512/512 tokens over 2
+  spans, manifest v2 / `num_multi_turn: 16`; pass 1 archived as
+  insufficient). E2's renewable `train/ckpt_last.pt` pruned (run dir 5.3 ->
+  1.4 GB); final evidence in `recipe-smoke-config/e2_final_evidence.tar.gz`.
+  Ledger + capability commits next, then lane continues with **WP3
+  DocVQA/ChartQA adapters (E3)** unless C-01a13452 objects. Note: R-09 went
+  to the zoo re-download validation, so E4's row becomes R-10 on landing.
 - Any session may record small urgent fixes; note them here.
 
 If you (the other session) disagree with the split, edit this file first and

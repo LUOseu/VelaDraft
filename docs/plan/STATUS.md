@@ -28,12 +28,26 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
 - Model Zoo `zoo-v0.3.1` published (six canonical archives + `SHA256SUMS`;
   DFly archive rebuilt for the ported-recipe note, `code commit` `6cf8141`);
   README + `docs/zoo` pages + `RELEASE_VALIDATION` updated on this branch.
-- Next after E1: WP2 (multi-image / multi-turn schema v2).
+- WP2 done, smoke-validated: schema v2 multi-image / multi-turn through
+  prepare -> regen -> capture -> train -> eval. E2 PASS (`R-20261014-08`,
+  two passes 0.55 GPU-h): 2-image / 2-turn protocol, capture visual swap
+  check 512/512 tokens over 2 spans, 32-step train (loss 14.5 -> 3.64),
+  eval token-exact 4/4 for trained + init checkpoints, manifest
+  `schema_version: 2` / `num_multi_turn: 16`. `multi_image: true` in all 7
+  `AlgorithmMetadata` + regenerated `SUPPORT_MATRIX.md` footnote (DFlash
+  scope); 349 CPU tests green. Smoke-scale only - no quality/speed claim.
+  Pass 1 (placeholder eval histories) archived as insufficient evidence.
+- Next: WP3 (DocVQA/ChartQA adapters on the frozen DFlash checkpoint -> E3),
+  then WP4 batched online capture. Lane split: E4 (in flight on GPU2), the
+  WP3a training-cost report and zoo bookkeeping stay with the other session
+  (see COORDINATION.md).
 
 ## Budget
 
-8 GPU-h first-round cap; 0.59 GPU-h used (includes the duplicate concurrent
-E1 set); allocation in RESOURCE_LEDGER.md.
+8 GPU-h first-round cap; 1.19 GPU-h charged (E1 0.59 incl. the duplicate
+concurrent set, zoo re-download validation 0.04, E2 0.55); E4 (canonical 2K
+recipe) in flight on GPU2 and charged when its row lands; allocation in
+RESOURCE_LEDGER.md.
 
 ## Blockers / risks
 
@@ -50,11 +64,14 @@ E1 set); allocation in RESOURCE_LEDGER.md.
   concurrently (no failures observed; do not repeat). Push happened; PR /
   further GPU jobs / WP2 design work held until the user rules on which
   session continues.
-  - Update: the other session (`01a13452`) finished its zoo-release work —
-    `zoo-v0.3.1` published and its README / `docs/zoo` / release-evidence
-    commits landed on this branch — and started no further GPU job; E4
-    remains on hold.
-- Shared-server disk: `/home` 100% used (130 GB free, moving). Keep net-new
+  - Update (02:20): the other session (`01a13452`) published zoo-v0.3.1
+    (`7eab1c4` etc.), clean-machine re-download-verified it (`R-20261014-09`)
+    and launched E4 (canonical DFly 2K recipe) on GPU2 at 01:26 - still in
+    flight. This session finished WP2 + E2 (`R-20261014-08` PASS) on GPU0.
+    The lane split holds; re-read `COORDINATION.md` before the next big step.
+- Shared-server disk: `/home` 100% used and drifting down (130 GB free at
+  01:30 -> 61 GB at 02:20 after pruning E2's renewable `ckpt_last`; a
+  host-wide writeback stall slowed the E2 eval ~5 min). Keep net-new
   artifacts small; prune this plan's own renewable temp files after each job.
 - Recipe training at micro-batch 8 peaked at 46.5 GB on a 48 GB card (~3%
   margin). Do not raise the micro-batch for recipe runs.

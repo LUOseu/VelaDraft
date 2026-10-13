@@ -1,9 +1,9 @@
 # WP2 design - multi-image / multi-turn (schema v2)
 
-Owner: C-01a13621 (see COORDINATION.md). Status: design accepted locally,
-implementation in progress. Everything here is incremental on top of the v1
-single-image / single-turn pipeline; all existing feature stores and runs must
-keep loading unchanged.
+Owner: C-01a13621 (see COORDINATION.md). Status: implemented; E2 smoke PASSED
+(`R-20261014-08` - smoke-scale evidence only, see RUN_LOG.md). Everything
+here is incremental on top of the v1 single-image / single-turn pipeline; all
+existing feature stores and runs keep loading unchanged (v1 byte-compatible).
 
 ## Goal
 

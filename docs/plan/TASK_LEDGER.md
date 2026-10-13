@@ -24,7 +24,7 @@ Baseline `9137de0`. Every "done" line points at code/tests/runs, not prose.
 | --- | --- | --- | --- |
 | WP0 | Baseline audit, task ledger, budget, capability list | DONE | this directory; CPU suite green (321 tests) |
 | WP1 | DFly staged recipe + reference numeric validation + resume + export metadata | DONE (PR opened for review) | code `66b595a`, docs `c425850`, zoo export entries `6cf8141`, smoke `R-20261014-01`; E1 PASSED twice (`R-20261014-03..06` and the duplicate set `R-20261014-07`, bit-exact select-parity / resume / export metadata) |
-| WP2 | Multi-image / multi-turn: schema v2, data, features, supervision, position protocol | PENDING | - |
+| WP2 | Multi-image / multi-turn: schema v2, data, features, supervision, position protocol | DONE (smoke-validated) | code `6fd243c` (schema v2 + 14 tests) + `77813cc` (smoke generator/config) + the capability flip; 349 CPU tests green; E2 smoke PASS `R-20261014-08` (2-image / 2-turn, 16+4 rows: regen bookkeeping, capture visual swap check 512/512 tokens over 2 spans, 32-step train, token-exact 4/4 for trained + init checkpoints, manifest `schema_version: 2` / `num_multi_turn: 16`); design + protocol in `WP2_DESIGN.md`. Smoke-scale only; quality evidence is a later item |
 | WP3 | Reuse benchmark harness; DocVQA/ChartQA adapters; training-cost report | PENDING | TextVQA adapter reused; manifests 03/04 planned |
 | WP4 | Batched online capture + at most one profiled I/O optimization + measurement report | PENDING | online capture exists (`target/online.py`) |
 | WP5 | One fixed runtime (SGLang or vLLM) DFlash real deployment loop | PENDING | `docs/serving-bridge.md` proposal scoped the first step |
