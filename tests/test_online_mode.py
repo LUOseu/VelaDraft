@@ -786,24 +786,29 @@ def test_online_batched_fetch_fast_forward_placeholders(monkeypatch, tmp_path):
     assert summary["target_samples_total"] == 3
 
 
+class _OrderRecordDataset(torch.utils.data.Dataset):
+    """Index-only dataset used to pin sampler order; records every batched fetch."""
+
+    def __init__(self, size: int):
+        self.size = size
+        self.fetches: list[list[int]] = []
+
+    def __len__(self) -> int:
+        return self.size
+
+    def __getitem__(self, index):
+        return {"index": torch.tensor([int(index)])}
+
+    def fetch_batch(self, indices):
+        self.fetches.append([int(index) for index in indices])
+        return [self[int(index)] for index in indices]
+
+
 def test_online_batch_iterator_reproduces_dataloader_order():
     """The batched iterator must chunk exactly like the DataLoader it replaces."""
     from torch.utils.data import DataLoader, default_collate
 
     from vlm_dflash.target.online import OnlineBatchIterator
-
-    class _OrderRecordDataset(torch.utils.data.Dataset):
-        def __init__(self, size: int):
-            self.size = size
-
-        def __len__(self) -> int:
-            return self.size
-
-        def __getitem__(self, index):
-            return {"index": torch.tensor([int(index)])}
-
-        def fetch_batch(self, indices):
-            return [self[int(index)] for index in indices]
 
     def index_orders(loader) -> list[list[int]]:
         return [batch["index"].flatten().tolist() for batch in loader]
@@ -829,6 +834,39 @@ def test_online_batch_iterator_reproduces_dataloader_order():
             # Two epochs: the shared generator must advance identically too.
             for _ in range(2):
                 assert index_orders(iterator) == index_orders(reference)
+
+
+def test_online_batch_iterator_splits_training_batches_into_capture_groups():
+    """online_batch_size caps rows per target forward: a batch of 5 with N=2 fetches 2+2+1."""
+    from torch.utils.data import default_collate
+
+    from vlm_dflash.target.online import OnlineBatchIterator
+
+    dataset = _OrderRecordDataset(5)
+    iterator = OnlineBatchIterator(
+        dataset,
+        default_collate,
+        batch_size=5,
+        shuffle=False,
+        generator=torch.Generator().manual_seed(0),
+        capture_batch=2,
+    )
+    batches = [batch["index"].flatten().tolist() for batch in iterator]
+    assert batches == [[0, 1, 2, 3, 4]]
+    assert dataset.fetches == [[0, 1], [2, 3], [4]]
+
+    # A capture group larger than the training batch is capped by the batch.
+    dataset = _OrderRecordDataset(5)
+    iterator = OnlineBatchIterator(
+        dataset,
+        default_collate,
+        batch_size=5,
+        shuffle=False,
+        generator=torch.Generator().manual_seed(0),
+        capture_batch=16,
+    )
+    assert [batch["index"].flatten().tolist() for batch in iterator] == [[0, 1, 2, 3, 4]]
+    assert dataset.fetches == [[0, 1, 2, 3, 4]]
 
 
 class _BatchedFetchDataset(torch.utils.data.Dataset):

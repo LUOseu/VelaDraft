@@ -120,7 +120,9 @@ counted and `train_summary.json` records `resume_fast_forward_batches` and
 By default (`train.online_batch_size: 1`) the online source runs one target
 forward per training row; this stays the reference path. Setting
 `train.online_batch_size: N` (`N > 1`) renders the rows per sample, runs
-**one padded target forward per N rows** and slices each row's record back
+**one padded target forward per N rows** (a training micro-batch larger than
+`N` is split into consecutive capture groups, so the effective group size is
+`min(online_batch_size, micro_batch_size)`) and slices each row's record back
 out of the batch: padding never reaches a record (`input_ids` / `hidden` /
 `loss_mask` / `position3` keep the row's own length; multi-turn rows keep
 their `image_spans`), and multi-image rows concatenate their pixel values /

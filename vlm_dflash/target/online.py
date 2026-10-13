@@ -511,7 +511,7 @@ class OnlineFeatureSource:
             "extraction_wall_seconds_total": total_wall,
             "target_forwards_note": (
                 "target_forwards counts model forward calls; target_samples counts extracted rows. "
-                "They differ when train.online_batch_size > 1 (one forward per batch)."
+                "They differ when train.online_batch_size > 1 (one forward per capture group)."
             ),
             "extraction_wall_seconds_note": (
                 "per-phase counters cover train / overfit sanity / calibration extraction; the "
@@ -557,13 +557,20 @@ class OnlineBatchIterator:
     extracted with one batched target forward via ``dataset.fetch_batch``.
     ``test_online_batch_iterator_reproduces_dataloader_order`` pins the
     equivalence against a real ``DataLoader``.
+
+    ``capture_batch`` (``train.online_batch_size``) caps how many rows share
+    one target forward: a training batch larger than it is split into
+    consecutive capture groups (each fetched with its own padded forward and
+    concatenated back in order), so the effective group size is
+    ``min(online_batch_size, micro_batch_size)``.
     """
 
     def __init__(self, dataset: "OnlineFeatureDataset", collate, *, batch_size: int, shuffle: bool,
-                 generator, fetch_batch=None):
+                 generator, capture_batch: int | None = None, fetch_batch=None):
         self.dataset = dataset
         self.collate = collate
         self.batch_size = max(1, int(batch_size))
+        self.capture_batch = max(1, int(capture_batch) if capture_batch else self.batch_size)
         self.shuffle = bool(shuffle)
         self.generator = generator
         self.num_samples = len(dataset)
@@ -588,4 +595,8 @@ class OnlineBatchIterator:
         else:
             sampler = SequentialSampler(self.dataset)
         for indices in BatchSampler(sampler, self.batch_size, drop_last=False):
-            yield self.collate(self.fetch_batch(list(indices)))
+            indices = list(indices)
+            records: list[dict] = []
+            for start in range(0, len(indices), self.capture_batch):
+                records.extend(self.fetch_batch(indices[start : start + self.capture_batch]))
+            yield self.collate(records)

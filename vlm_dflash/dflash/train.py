@@ -243,6 +243,7 @@ def run_training_loop(
             batch_size=micro_batch,
             shuffle=shuffle,
             generator=generator,
+            capture_batch=int(train_cfg.get("online_batch_size", 1)),
             fetch_batch=fetch_batch,
         )
     else:
