@@ -114,6 +114,48 @@ placeholders — those rows are **not** re-extracted; the new forward passes are
 counted and `train_summary.json` records `resume_fast_forward_batches` and
 `resume_fast_forward_reduced_cost`.
 
+## Exact resume
+
+An "exact" resume means: same mode, algorithm, feature source, identity and
+training plan as the uninterrupted run. Three gates enforce that, all
+read-only until every check passes:
+
+1. **Read-only preflight.** `train --resume` validates before writing
+   anything. A refused resume leaves `config.json`, `ckpt_init.pt` /
+   `ckpt_last.pt` / `ckpt_final.pt`, logs, `provenance.json` and the visual
+   diagnostics byte-identical; a legal resume keeps the original
+   `ckpt_init.pt` (the random-init baseline is never regenerated). The CLI
+   preflight also refuses `--resume --force` (force rebuilds upstream stages,
+   which exact resume must not do) and refuses a run whose upstream stages
+   would have to be rebuilt. It does not load the target: the online digest
+   is derived from the consumed rows and image bytes directly.
+2. **Versioned content digest.** `feature_source_digest` is
+   `vlm-dflash-online-source-digest-v2`: the prompt/answer token ids of every
+   consumed row in order (the exact `--limit` slice), the image bytes
+   (hashed from the files and verified against `data/manifest.json` — a stale
+   manifest is a loud error, never evidence), the extraction settings
+   (seq length, storage dtype, `store_final_hidden`, routed layers, target
+   dtype/attention) and the contract identity (absolute paths excluded). A
+   same-length token edit or a same-size image swap changes the digest; the
+   same content copied to another directory does not. Offline stores use the
+   equivalent `offline_feature_digest` over manifest + index + shard + head
+   bytes.
+3. **Training-plan digest.** `vlm_dflash/training_plan.py` records a versioned
+   digest of the effective, resolved plan in every checkpoint: seed,
+   micro-batch, accumulation, epochs, dataset length (data order), draft
+   dtype, optimizer and schedule settings, drafter architecture knobs and the
+   algorithm-namespaced knobs with defaults filled in. Changing any of them —
+   including shape-compatible ones like the shuffle seed or a loss weight —
+   refuses the resume; device, logging cadence, worker count and checkpoint
+   cadence are deliberately excluded.
+
+Migration policy: checkpoints written before these gates (no recorded plan
+version/digest) are **not** exactly resumable — the extra information cannot
+be reconstructed, and the run refuses instead of re-stamping old checkpoints
+with new digests. Start a new run directory, or retrain. The same applies to
+a checkpoint recorded under an older digest scheme: the version tag is
+compared first and a mismatch is refused rather than compared across schemes.
+
 ## Config requirements
 
 The online source reads the same `capture:` section as the capture stage, so
@@ -137,9 +179,16 @@ JetSpec flags above).
 - A leftover `features/` store in the same run directory is ignored with a log
   note (run with `--mode offline` to use it).
 - `regen/target_data.jsonl` is still required — regen remains the supervision.
-- Resume refuses a mode / algorithm / feature-source-digest / step-plan /
-  identity mismatch. Checkpoints written before this feature (no
-  `feature_mode`) are read as offline.
+- Resume refuses a mode / algorithm / feature-source-digest / training-plan /
+  step-plan / identity mismatch (see *Exact resume*). Checkpoints written
+  before the feature-mode tag (no `feature_mode`) are read as offline.
+- Dtypes: the frozen embed/head handed to the trainer is stored in
+  `capture.dtype` (offline) / the storage dtype (online) and must equal
+  `train.draft_dtype`. The supported storage dtype today is `bfloat16`
+  (`capture.dtype: float16` is refused before training); the target itself
+  keeps its own compute dtype (`target.dtype`) and is never modified.
+  `train_summary.json` records the effective combination in its `dtypes`
+  block.
 - `eval` loads the target for verification either way.
 
 ## Extraction cost accounting
@@ -149,22 +198,34 @@ JetSpec flags above).
 ```json
 "feature_source": {
   "backend": "huggingface",
+  "digest_version": "vlm-dflash-online-source-digest-v2",
   "target_resident_bytes": 7507746816,
-  "extractions": {"train": {"target_forwards": 4, "wall_seconds": 2.87}},
+  "extractions": {"train": {"target_forwards": 4, "wall_seconds": 2.87,
+                            "target_device_peak_gb": 13.1}},
   "target_forwards_total": 4,
   "extraction_wall_seconds_total": 2.87,
   "extraction_wall_seconds_note": "..."
 }
 ```
 
-Per-phase counters cover train / overfit sanity / calibration. The startup
-visual-path check runs a fixed 3 capture forwards **outside** these counters;
-a resumed run does not re-extract fast-forwarded items.
+Per-phase counters cover train / overfit sanity / calibration; each phase also
+records the CUDA peak on the target's device (`target_device_peak_gb`, with a
+note in the summary: on shared devices it includes the trainer's own
+allocations, on split devices it isolates target activations that
+`target_resident_bytes` cannot show). The startup visual-path check runs a
+fixed 3 capture forwards **outside** these counters; a resumed run does not
+re-extract fast-forwarded items and reuses the recorded visual-path check.
 
 ## Validation status
 
-- CPU (dev venv): `tests/test_online_mode.py` (22 tests) plus the full suite
-  green.
+- CPU (dev venv): full suite green (214 tests) including the online review
+  fixes: content-digest v2 (token-value edits, image swaps, path-stability,
+  stale manifests), the training-plan gate (all five algorithms, legacy
+  refusal), resume write-order regressions (online and offline: refused
+  resume byte-identical, legal resume preserving `ckpt_init`), the
+  fp32-target / bf16-storage factory regression plus the mismatched-head
+  refusal, and an exact offline↔online multi-step update-alignment test
+  (fixed teacher/data/init/seed/budget, exact float equality).
 - GPU smoke 1 — Qwen2.5-VL-3B (`runs/online_smoke_qwen25_3b`, CUDA0, 3-row
   demo slice, 4 steps): train OK; live visual check passed (replay bitwise,
   image span and downstream representations changed on swap); gradient
@@ -180,9 +241,47 @@ a resumed run does not re-extract fast-forwarded items.
   `feature_mode=online`. DSpark's post-training calibration ran on the live
   source (`online_target_head_batches`); JetSpec and DFlash2 ran with
   `capture.store_final_hidden=true` supplied through `--set`.
+- Smokes 1-3 are the pre-fix series; the post-fix rerun set (smoke 6) below
+  re-records their paths. Their run dirs were pruned for disk space after the
+  reruns; the numbers they recorded stay quoted here and in the changelog.
 - Resume check: the 3B run resumed from step 3 → 3 fast-forward batches, 1
   extraction forward (instead of re-extracting 4), reduced cost recorded;
   resumed summary wall 5.4 s.
+- GPU smoke 4 — post-review fixes, Qwen2.5-VL-3B (`runs/fix_smoke_online`,
+  CUDA0, 3-row demo slice, 3 steps, batch 1): fresh online run OK (dtype
+  report all bf16, digest v2 recorded, `training_plan_version`/`digest` in
+  every checkpoint, target-device peak 13.65 GB); a resume with a changed
+  seed was refused before any write — `config.json`, `ckpt_init.pt`,
+  `ckpt_last.pt`, logs, `train_summary.json`, `provenance.json` and
+  `online/visual_path_check.json` stayed md5-identical; the legal resume
+  passed the preflight, **reused** the recorded visual-path check, resumed
+  from step 2 (2 fast-forward batches → 1 extraction forward,
+  `resume_fast_forward_reduced_cost=true`), kept `ckpt_init.pt` unchanged,
+  finished step 3, and eval reported `token_exact=True` for both
+  checkpoints; export records `feature_mode=online`.
+- GPU smoke 5 — offline vs online update alignment, 3B, same teacher / data
+  / init / seed / budget (`runs/fix_smoke_align_{offline,online}`):
+  identical per-step losses `[13.25, 16.875, 13.0]` (max |Δloss| = 0.0)
+  and bitwise-identical `ckpt_init.pt` / `ckpt_final.pt`. The feature
+  digests differ by mode as designed (offline `437166daa78a` vs online
+  `6e2051af43b5`) while the training-plan digests are equal
+  (`43140c4fdcc5`): at fixed teacher / data / init / seed / budget the online
+  path reproduces the staged path exactly.
+- GPU smoke 6 - post-fix rerun set (3-row demo slice, 3 steps, batch 1,
+  `runs/fix2_smoke_*`). DFlash / DSpark / Domino (no `store_final_hidden`)
+  each ran train -> token-exact eval -> export with the same source digest
+  `6e2051af43b5`; JetSpec and DFlash2 (`capture.store_final_hidden=true`;
+  JetSpec supplies `drafter.loss_decay_gamma=null` per its algorithm
+  contract) share `6e58321b4579`. Every run reports the all-bf16 dtype
+  record, a `vlm-dflash-training-plan-v1` digest in its checkpoints, and
+  `token_exact=True` on both checkpoints (train-phase target peaks
+  13.7-15.5 GB; DSpark's calibration ran on the live source). Qwen3-VL-8B
+  untied (`runs/fix2_smoke_qwen3_8b`, source digest `9d2712d52448`):
+  train -> token-exact eval -> export OK, target-device peak 33.92 GB.
+  Split devices (`runs/fix2_smoke_split`, target on `cuda:0`, drafter on
+  `cuda:1`): train -> token-exact eval OK; the train-phase target peak is
+  8.02 GB (isolated target allocation) and the source digest equals the
+  single-device run's, confirming the digest is device-independent.
 
 These smokes validate plumbing (token-exactness, provenance, counters). Their
 AL is 1.000 after 4 steps and is **not** a quality result. The recorded

@@ -436,6 +436,84 @@ def stage_digest(
     return sha256_json(stage_digest_payload(cfg, contract, stage, upstream_digest, limit=limit))
 
 
+def _require_stage(run_dir: Path, stage: str, marker: str, digest: str) -> None:
+    """Resume preflight: the upstream stage must exist AND still match its inputs.
+
+    A resume must never quietly rebuild (and thereby change) the data a
+    checkpoint was trained from; a missing marker or a changed inputs digest is
+    refused here, before anything under ``run_dir`` is written.
+    """
+    try:
+        status = stage_status(run_dir, stage, marker, digest, False)
+    except SystemExit as exc:
+        raise SystemExit(
+            f"train --resume: upstream '{stage}' stage was produced from different inputs ({exc}). "
+            "Exact resume needs the original stages; start a new run directory."
+        ) from exc
+    if status != "skip":
+        raise SystemExit(
+            f"train --resume: upstream '{stage}' outputs ({marker}) are missing; cannot resume exactly."
+        )
+
+
+def _preflight_resume(cfg: dict, run_dir: Path, args, feature_mode: str, external_features: Path | None) -> dict:
+    """Read-only exact-resume gate, run before ``cmd_train`` writes anything.
+
+    Verifies the upstream stages, then the mode / algorithm / feature-source
+    digest / training plan / identity of ``train/ckpt_last.pt``. Loading the
+    target is not required (the online digest comes from the consumed rows and
+    image bytes); every failure raises ``SystemExit`` with the run directory
+    untouched.
+    """
+    from .contract import validate_yaml_against_contract
+    from .utils import log, read_json
+
+    ckpt_path = run_dir / "train" / "ckpt_last.pt"
+    if not ckpt_path.exists():
+        raise SystemExit(f"train --resume: no checkpoint at {ckpt_path} to resume from.")
+    contract_path = run_dir / "contract.json"
+    if not contract_path.exists():
+        raise SystemExit(
+            f"train --resume: {contract_path.name} is missing for this run; cannot preflight an exact "
+            "resume. Start a new run directory, or run without --resume."
+        )
+    contract = read_json(contract_path)
+    if contract["target"]["model_path"] != str(Path(cfg["target"]["model"]).resolve()):
+        raise SystemExit(
+            f"train --resume: run directory was created for target {contract['target']['model_path']} "
+            f"but the config points at {cfg['target']['model']}; use a new run directory when switching "
+            "targets."
+        )
+    validate_yaml_against_contract(cfg, contract, "config")
+    limit = args.limit
+    data_digest = stage_digest(cfg, contract, "data", None, limit=limit)
+    _require_stage(run_dir, "data", "data/data.jsonl", data_digest)
+    regen_digest = stage_digest(cfg, contract, "regen", data_digest, limit=limit)
+    _require_stage(run_dir, "regen", "regen/target_data.jsonl", regen_digest)
+    if feature_mode == "offline" and external_features is None:
+        capture_digest = stage_digest(cfg, contract, "capture", regen_digest, limit=limit)
+        _require_stage(run_dir, "capture", "features/index.jsonl", capture_digest)
+    from .dflash.train import preflight_resume
+
+    try:
+        result = preflight_resume(
+            cfg,
+            run_dir,
+            contract,
+            steps=args.steps,
+            limit=limit,
+            features_dir=external_features,
+            feature_mode=feature_mode,
+        )
+    except (ValueError, RuntimeError, FileNotFoundError) as exc:
+        raise SystemExit(f"train --resume: {exc}") from exc
+    log(
+        f"train: resume preflight passed (step {result['step']}/{result['total_steps']}, "
+        f"plan {result['plan_digest'][:12]}, source {result['feature_source_digest'][:12]})"
+    )
+    return result
+
+
 def cmd_train(args) -> int:
     from .contract import ensure_contract
     from .utils import log
@@ -448,10 +526,29 @@ def cmd_train(args) -> int:
             "train: --mode online extracts teacher features live and cannot reuse a captured store; "
             "drop --features (or use --mode offline to reuse one)."
         )
+    if feature_mode == "online":
+        # Rejected before any stage runs (prepare / regen / capture): the target
+        # cannot be copied into DataLoader workers, so the whole run would be
+        # wasted compute.
+        num_workers = int((cfg.get("train") or {}).get("num_workers", 0))
+        if num_workers != 0:
+            raise SystemExit(
+                "train: feature_mode=online extracts target features in the main process and requires "
+                f"train.num_workers=0 (got train.num_workers={num_workers}); the target cannot be copied "
+                "into DataLoader workers."
+            )
     run_dir = resolve_run_dir(cfg, args.run_dir)
+    if args.resume:
+        if args.force:
+            raise SystemExit(
+                "train --resume cannot be combined with --force: --force rebuilds upstream stages, which "
+                "an exact resume must refuse. Drop one of the two flags."
+            )
+        # Read-only preflight before the first write (config.json below): a
+        # rejected resume must leave the original config, checkpoints, logs,
+        # provenance and diagnostics byte-identical.
+        _preflight_resume(cfg, run_dir, args, feature_mode, external_features)
     run_dir.mkdir(parents=True, exist_ok=True)
-    if args.resume and not (run_dir / "train" / "ckpt_last.pt").exists():
-        raise SystemExit(f"train --resume: no checkpoint at {run_dir / 'train' / 'ckpt_last.pt'} to resume from.")
 
     dump_effective_config(cfg, run_dir / "config.json")
     contract = ensure_contract(cfg, run_dir)

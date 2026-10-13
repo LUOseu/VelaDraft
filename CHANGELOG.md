@@ -46,6 +46,75 @@
   fast-forward batches, no re-extraction). Smoke ALs are <=1.09 after 4 steps
   and are not quality results.
 
+### Online review fixes: exact-resume safety, content digests, dtype boundary
+
+Findings from the external review of `aed7bf8` (four confirmed issues), fixed
+before any further online work. No algorithm or protocol changes.
+
+- **Resume preflight is read-only.** `train --resume` now validates the
+  checkpoint (and, for online, the consumed data) *before* writing anything:
+  `config.json` is no longer overwritten before validation, `ckpt_init.pt` is
+  never regenerated (a legal resume keeps the original random-init baseline
+  byte-for-byte), and a refused resume — changed mode/algorithm/plan/source/
+  identity, or rebuilt upstream stages — leaves config, checkpoints, logs,
+  provenance and diagnostics byte-identical. The CLI preflight
+  (`cli._preflight_resume` + `dflash.train.preflight_resume`) also refuses
+  `--resume --force` and legacy runs without stage manifests, and does not
+  need to load the target (the online digest comes from the rows + image
+  bytes directly).
+- **Versioned content digests.** `ONLINE_DIGEST_VERSION`
+  (`vlm-dflash-online-source-digest-v2`) hashes the actual consumed content —
+  per-row prompt/answer token ids in order, the exact `--limit` slice, image
+  bytes (verified against `data/manifest.json`; a stale manifest is a loud
+  error, not evidence) and the extraction settings — so a same-length answer
+  edit or a same-size image swap changes the digest, while the same content
+  copied to another directory keeps its identity. Offline stores get the same
+  treatment (`OFFLINE_DIGEST_VERSION`,
+  `dflash.features.offline_feature_digest` over manifest + index + shard +
+  head bytes).
+- **Training-plan resume gate.** New `vlm_dflash/training_plan.py` records a
+  versioned digest of the effective plan — seed, micro-batch, accumulation,
+  epochs, dataset length, draft dtype, optimizer/schedule settings, drafter
+  architecture knobs and the algorithm-namespaced knobs with resolved
+  defaults — in every checkpoint. Exact resume refuses any change (including
+  shape-compatible ones like seeded shuffles and loss weights) and refuses
+  checkpoints that predate the gate instead of fabricating the missing
+  fields; the migration policy is documented in `docs/online-training.md`.
+- **Dtype boundary.** The online source now hands the trainer embed/head
+  copies in the feature-storage dtype (mirroring `capture.save_target_head`)
+  instead of the target's native dtype, and the training loop refuses any
+  frozen-head/compute-dtype mismatch up front with an actionable error
+  (previously an opaque `expected m1 and m2 to have the same dtype` deep in
+  the first forward). `train_summary.json` records the effective
+  target/storage/drafter/head dtypes (`dtypes` block). Supported combinations
+  are exactly "stored head dtype == `train.draft_dtype`"; `capture.dtype`
+  values the trainer cannot compute in (`float16`) are refused before
+  training.
+- **Cleanup and observability.** The online source is closed on every exit
+  path (success and exceptions); per-phase target-device CUDA peaks
+  (`target_device_peak_gb`) are recorded in the source summary with an
+  explicit note on shared vs split devices; the CLI rejects
+  `feature_mode=online` + `num_workers != 0` before any stage runs; a resumed
+  online run reuses the recorded visual-path check instead of rerunning (and
+  rewriting) it.
+- Tests: new CPU coverage for digest v2 (token-value edits, image swaps,
+  path-stability, stale manifests), the plan gate (field coverage across all
+  five algorithms, legacy refusal), resume write-order regressions (online and
+  offline: refused resume byte-identical, legal resume preserving
+  `ckpt_init`), the real-`build_trainer_module` fp32-target/bf16-storage
+  regression and the mismatched-head refusal, and an exact
+  offline↔online multi-step update-alignment test (fixed teacher/data/init/
+  seed/budget).
+- Post-fix GPU rerun set: all five algorithms, the Qwen3-VL-8B untied head
+  and the split-device path (target `cuda:0` → drafter `cuda:1`) re-ran on
+  the fixed code — train → token-exact eval → export in every run,
+  all-bf16 dtype records, plan digests in every checkpoint, source digests
+  stable across devices and sensitive to extraction settings
+  (`6e2051af43b5` without final hidden, `6e58321b4579` with it; 8B
+  `9d2712d52448`), split-device target peak 8.02 GB isolated, 8B peak
+  33.92 GB. The superseded pre-fix smoke run dirs were pruned for disk
+  space (numbers quoted in this changelog).
+
 ## v0.3.1 (2026-10-13)
 
 Distribution fixes, first-run experience, and the post-publish growth review

@@ -7,7 +7,38 @@ from pathlib import Path
 import torch
 from torch.utils.data import Dataset
 
-from ..utils import read_json, read_jsonl
+from ..utils import read_json, read_jsonl, sha256_file, sha256_json
+
+#: Content digest version for feature stores. Bumping this refuses exact
+#: resume across the change instead of silently comparing digests from two
+#: different schemes (see ``offline_feature_digest``).
+OFFLINE_DIGEST_VERSION = "vlm-dflash-offline-store-digest-v2"
+
+
+def offline_feature_digest(features_dir: str | Path) -> str:
+    """Content digest over everything a training run consumes from a store.
+
+    Covers the actual shard bytes, the index, the frozen head and the
+    content-bearing manifest fields; absolute paths and timestamps stay out so
+    the same store copied to another directory keeps its identity, while a
+    changed shard, swapped head or edited index changes it.
+    """
+    features_dir = Path(features_dir)
+    store = FeatureStore(features_dir)
+    manifest = {key: value for key, value in store.manifest.items() if key != "identity"}
+    identity = dict(store.manifest.get("identity") or {})
+    identity.pop("target_model_path", None)
+    shard_names = sorted({row["shard"] for row in store.rows})
+    return sha256_json(
+        {
+            "version": OFFLINE_DIGEST_VERSION,
+            "manifest": manifest,
+            "identity": identity,
+            "index_sha256": sha256_file(features_dir / "index.jsonl"),
+            "shards": {name: sha256_file(features_dir / name) for name in shard_names},
+            "target_head_sha256": sha256_file(features_dir / "target_head.pt"),
+        }
+    )
 
 
 class FeatureStore:

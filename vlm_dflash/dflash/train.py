@@ -22,8 +22,9 @@ from torch.utils.data import DataLoader, Subset
 
 from ..algorithms import get_algorithm
 from ..provenance import assert_identity, identity_from_contract, record_stage
-from ..utils import ensure_dir, log, set_seed, sha256_json, write_json
-from .features import FeatureDataset, collate_features
+from ..training_plan import PLAN_VERSION, training_plan_digest
+from ..utils import ensure_dir, log, read_json, set_seed, write_json
+from .features import FeatureDataset, collate_features, offline_feature_digest
 
 
 def _make_optimizer_and_scheduler(parameters, train_cfg: dict, total_steps: int):
@@ -162,7 +163,27 @@ def run_training_loop(
     draft_dtype_name = str(train_cfg.get("draft_dtype", "bfloat16"))
     if draft_dtype_name not in ("bfloat16", "float32"):
         raise ValueError(f"train.draft_dtype must be bfloat16 or float32, got {draft_dtype_name!r}.")
-    module.draft_model.to(torch.bfloat16 if draft_dtype_name == "bfloat16" else torch.float32)
+    compute_dtype = torch.bfloat16 if draft_dtype_name == "bfloat16" else torch.float32
+    module.draft_model.to(compute_dtype)
+    # The frozen embedding / output head must run in the *same* dtype as the
+    # draft: they carry the trainable path's input embeddings and logits, so a
+    # mismatch fails deep inside the first forward with an opaque linear-dtype
+    # error (offline stores the head in capture.dtype; the online source casts
+    # its copies to the storage dtype). Supported combinations are exactly
+    # "stored head dtype == train.draft_dtype"; refuse the rest up front.
+    frozen_mismatch = {}
+    for name, holder in (("embed_tokens", getattr(module, "embed_tokens", None)),
+                         ("lm_head", getattr(module, "lm_head", None))):
+        if holder is not None and holder.weight.dtype != compute_dtype:
+            frozen_mismatch[name] = str(holder.weight.dtype).replace("torch.", "")
+    if frozen_mismatch:
+        raise RuntimeError(
+            "Frozen target head dtype mismatch: "
+            + ", ".join(f"{name}={dtype}" for name, dtype in sorted(frozen_mismatch.items()))
+            + f" while train.draft_dtype computes in {draft_dtype_name}. The frozen embedding/output head "
+            "must be stored in the drafter's compute dtype: set train.draft_dtype to the stored dtype, or "
+            "regenerate the features with a matching capture.dtype (offline) / storage dtype (online)."
+        )
     master_parameters = {
         name: parameter.detach().float().clone().requires_grad_(True)
         for name, parameter in module.draft_model.named_parameters()
@@ -441,13 +462,22 @@ def validate_resume_state(
     feature_source_digest: str,
     total_steps: int,
     contract: dict,
+    plan_version: str,
+    plan_digest: str,
 ) -> None:
-    """Refuse resuming across algorithm / feature-mode / data / step-plan changes.
+    """Refuse resuming across algorithm / feature-mode / data / plan changes.
 
     Checkpoints written before the feature-mode tag existed are interpreted as
     offline (the only mode that produced them) and can never be resumed as an
     online run. When the recorded feature-source digest is present it must match
     the current source exactly; nothing here is bypassable.
+
+    Training-plan identity is versioned: a state without a recorded plan
+    version/digest predates this gate and cannot be resumed exactly (fabricating
+    the missing fields would claim an exactness that was never verified), so it
+    is refused with a request to start a new run. A recorded version that does
+    not match the current scheme is refused the same way; the digest is only
+    compared within one scheme.
     """
     if resume_state.get("format") != "vlm-dflash-train-state-v1":
         raise ValueError(f"Unrecognized resume state format: {resume_state.get('format')!r}")
@@ -482,8 +512,96 @@ def validate_resume_state(
             f"Resume plan mismatch: checkpoint planned {planned} total steps, this config computes "
             f"{total_steps}. Re-run with the same --steps / epochs / dataset slice."
         )
+    recorded_plan_version = resume_state.get("training_plan_version")
+    recorded_plan_digest = resume_state.get("training_plan_digest")
+    if recorded_plan_version is None or recorded_plan_digest is None:
+        raise ValueError(
+            "Resume state predates the training-plan gate (no recorded plan version/digest): it cannot "
+            "be resumed exactly. Start a new run directory, or retrain without --resume."
+        )
+    if str(recorded_plan_version) != str(plan_version):
+        raise ValueError(
+            f"Resume plan-version mismatch: checkpoint recorded {recorded_plan_version!r}, this build "
+            f"uses {plan_version!r}. The plan encoding changed; start a new run directory."
+        )
+    if str(recorded_plan_digest) != str(plan_digest):
+        raise ValueError(
+            "Resume training-plan mismatch: the checkpoint was trained with a different effective plan "
+            "(seed / batch geometry / accumulation / epochs / optimizer / schedule / dtype / drafter / "
+            "loss knobs / dataset length). Exact resume requires the original plan; start a new run "
+            "directory or retrain instead."
+        )
     if resume_state.get("identity") is not None:
         assert_identity(identity_from_contract(contract), resume_state["identity"], "resume vs contract")
+
+
+def preflight_resume(
+    cfg: dict,
+    run_dir: str | Path,
+    contract: dict,
+    *,
+    steps: int | None = None,
+    limit: int | None = None,
+    features_dir: str | Path | None = None,
+    feature_mode: str | None = None,
+) -> dict:
+    """Read-only exact-resume gate, meant to run before any artifact is written.
+
+    Computes the current training plan and feature-source digest exactly the
+    way :func:`train_dflash` will, loads ``train/ckpt_last.pt`` and validates it
+    against both. Nothing under ``run_dir`` is modified, so a refused resume
+    leaves the original config, checkpoints, logs, provenance and diagnostics
+    byte-identical. The target model is *not* loaded: the online digest is
+    derived from the consumed rows and image bytes directly.
+    """
+    run_dir = Path(run_dir)
+    mode = str(feature_mode or (cfg.get("train", {}) or {}).get("feature_mode", "offline")).lower()
+    if mode not in ("offline", "online"):
+        raise ValueError(f"train.feature_mode must be 'offline' or 'online', got {mode!r}.")
+    algorithm = get_algorithm(cfg.get("algorithm"))
+    algorithm.validate_config(cfg)
+    if mode == "online":
+        if features_dir is not None:
+            raise ValueError(
+                "feature_mode=online extracts teacher features live and cannot reuse an offline "
+                "feature store."
+            )
+        from ..target.online import load_online_rows, online_source_digest
+
+        rows, media_dir = load_online_rows(run_dir, limit=limit)
+        feature_source_digest = online_source_digest(cfg, contract, rows, media_dir, run_dir)
+        dataset_len = len(rows)
+    else:
+        store_dir = Path(features_dir) if features_dir is not None else run_dir / "features"
+        store = FeatureDataset(store_dir)
+        assert_identity(identity_from_contract(contract), store.store.manifest["identity"], "train vs features")
+        dataset_len = len(store) if limit is None else min(limit, len(store))
+        feature_source_digest = offline_feature_digest(store_dir)
+    resume_path = run_dir / "train" / "ckpt_last.pt"
+    if not resume_path.exists():
+        raise FileNotFoundError(f"no resume checkpoint at {resume_path}.")
+    total_steps = compute_total_steps(dataset_len, cfg.get("train", {}), steps)
+    plan_digest = training_plan_digest(cfg, algorithm.name, dataset_len=dataset_len)
+    resume_state = torch.load(resume_path, map_location="cpu", weights_only=False)
+    validate_resume_state(
+        resume_state,
+        algorithm_name=algorithm.name,
+        mode=mode,
+        feature_source_digest=feature_source_digest,
+        total_steps=total_steps,
+        contract=contract,
+        plan_version=PLAN_VERSION,
+        plan_digest=plan_digest,
+    )
+    return {
+        "mode": mode,
+        "algorithm": algorithm.name,
+        "feature_source_digest": feature_source_digest,
+        "plan_version": PLAN_VERSION,
+        "plan_digest": plan_digest,
+        "total_steps": total_steps,
+        "step": int(resume_state.get("step", 0)),
+    }
 
 
 def train_dflash(
@@ -558,7 +676,20 @@ def train_dflash(
         # visual-path evidence.
         online_pair_path = run_dir / "online" / "swap_pair.pt"
         capture_cfg = cfg.get("capture") or {}
-        if bool(capture_cfg.get("visual_path_check", True)) and len(online_source.rows) >= 2:
+        if resume:
+            # An exact resume reuses the original evidence instead of rerunning
+            # (and rewriting) it: the source digest already pins the same
+            # content, and nothing under run_dir may change before the gate
+            # passes. The recorded check file is only read here.
+            check_path = run_dir / "online" / "visual_path_check.json"
+            if check_path.exists():
+                online_visual_check = read_json(check_path)
+                log("train: feature_mode=online resume; reusing the recorded visual-path check")
+            else:
+                log("train: feature_mode=online resume without a recorded visual-path check; skipping it")
+            if not online_pair_path.exists():
+                online_pair_path = None
+        elif bool(capture_cfg.get("visual_path_check", True)) and len(online_source.rows) >= 2:
             from ..target.visual_check import run_visual_path_check
 
             online_source.set_phase("visual_check")
@@ -585,18 +716,11 @@ def train_dflash(
             dataset = Subset(dataset, list(range(min(limit, len(dataset)))))
         manifest = FeatureDataset(features_dir).store.manifest
         assert_identity(identity_from_contract(contract), manifest["identity"], "train vs features")
-        # Resume/provenance digest: content-only (absolute model paths are audit
-        # info; moving the same checkpoint to another directory must not
-        # invalidate a resume), tagged with the mode it was produced in.
-        source_identity = dict(manifest.get("identity") or {})
-        source_identity.pop("target_model_path", None)
-        feature_source_digest = sha256_json(
-            {
-                **{key: value for key, value in manifest.items() if key != "identity"},
-                "identity": source_identity,
-                "feature_mode": "offline",
-            }
-        )
+        # Resume/provenance digest: content-only over the manifest, index and
+        # shard/head bytes (absolute model paths are audit info; moving the
+        # same store to another directory must not invalidate a resume), and
+        # versioned so a changed digest scheme refuses instead of mis-matching.
+        feature_source_digest = offline_feature_digest(features_dir)
         dataset_factory = lambda: FeatureDataset(features_dir)
         log(
             f"train: features from {features_dir.resolve()} "
@@ -617,162 +741,193 @@ def train_dflash(
             raise RuntimeError("features/target_head.pt records a tied target but also stores a separate lm_head.")
         embed_weight = target_head["embed_tokens"]
 
-    draft_config = algorithm.build_draft_config(contract, cfg)
-    module = algorithm.build_trainer_module(
-        draft_config, contract, cfg, embed_weight, lm_head_weight=lm_head_weight
-    )
-    init_state = {key: value.clone() for key, value in module.draft_model.state_dict().items()}
-
-    train_dir = ensure_dir(run_dir / "train")
-    checkpoint_common = {
-        "format": "vlm-dflash-ckpt-v1",
-        # Which drafter algorithm trained these weights: eval/export hard-fail
-        # when a checkpoint is scored with a different algorithm than it was
-        # trained with (same idea as the head/identity tags below).
-        "algorithm": algorithm.name,
-        **algorithm.checkpoint_metadata(contract, cfg, draft_config),
-        # Which frozen output head the draft logits were trained against. Eval
-        # refuses checkpoints whose head does not match the target's tie state.
-        "head": "tied_embedding" if tied_head else "target_lm_head",
-        "identity": identity_from_contract(contract),
-        # Which feature source trained these weights: resume refuses to mix
-        # modes or data, and eval/export surface the mode.
-        "feature_mode": mode,
-        "feature_source_digest": feature_source_digest,
-        "feature_backend": "huggingface" if online_source is not None else "feature_store",
-        "draft_device": str(device),
-    }
-    if online_source is not None:
-        checkpoint_common["target_device"] = str(online_source.target_device)
-    torch.save({**checkpoint_common, "step": 0, "model": init_state}, train_dir / "ckpt_init.pt")
-
-    total_steps = compute_total_steps(len(dataset), train_cfg, steps)
-    resume_state = None
-    if resume:
-        resume_path = train_dir / "ckpt_last.pt"
-        if not resume_path.exists():
-            raise FileNotFoundError(f"--resume requested but no resume checkpoint at {resume_path}.")
-        resume_state = torch.load(resume_path, map_location="cpu", weights_only=False)
-        validate_resume_state(
-            resume_state,
-            algorithm_name=algorithm.name,
-            mode=mode,
-            feature_source_digest=feature_source_digest,
-            total_steps=total_steps,
-            contract=contract,
+    try:
+        draft_config = algorithm.build_draft_config(contract, cfg)
+        module = algorithm.build_trainer_module(
+            draft_config, contract, cfg, embed_weight, lm_head_weight=lm_head_weight
         )
-        overfit = {"enabled": True, "resumed": True}
-    else:
-        if online_source is not None:
-            online_source.set_phase("overfit")
-        try:
-            overfit = run_overfit_sanity(cfg, contract, dataset_factory, run_dir, device, module, init_state)
-        finally:
-            if online_source is not None:
-                online_source.set_phase("train")
-        module.draft_model.load_state_dict(init_state)
+        init_state = {key: value.clone() for key, value in module.draft_model.state_dict().items()}
 
-    log_path = train_dir / "train_log.jsonl"
-    if log_path.exists() and resume_state is None:
-        log_path.unlink()
-    save_every = int(train_cfg.get("save_every_steps", max(1, total_steps // 4)))
-
-    def write_train_state(state: dict) -> None:
-        tmp_path = train_dir / "ckpt_last.pt.tmp"
-        torch.save({**checkpoint_common, **state}, tmp_path)
-        tmp_path.replace(train_dir / "ckpt_last.pt")
-        log(f"train: wrote resumable checkpoint (step {state['step']}) -> {train_dir / 'ckpt_last.pt'}")
-
-    output = run_training_loop(
-        module,
-        dataset,
-        cfg,
-        contract,
-        device,
-        total_steps=total_steps,
-        seed=seed,
-        shuffle=True,
-        log_path=log_path,
-        resume_state=resume_state,
-        on_checkpoint=write_train_state,
-        save_every=save_every,
-    )
-    torch.save({**checkpoint_common, "step": output["summary"]["steps"], "model": module.draft_model.state_dict()},
-               train_dir / "ckpt_final.pt")
-
-    from .visual_check import check_drafter_visual_dependence
-
-    visual = check_drafter_visual_dependence(cfg, contract, run_dir, device, module, pair_path=online_pair_path)
-    if output.get("gradient_coverage"):
-        write_json(train_dir / "gradient_coverage.json", output["gradient_coverage"])
-    # Algorithm-specific calibration diagnostics (e.g. DSpark's confidence
-    # head): only modules that implement the hook produce an artifact. The
-    # calibration pass reads from the same feature source as training, so an
-    # online run produces it without a staged capture.
-    calibration = None
-    if hasattr(module, "calibration_report"):
-        from torch.utils.data import DataLoader
-
-        calibration_dataset = dataset_factory()
-        calibration_image_token_id = int(contract["tokens"]["image_token_id"])
-        calibration_loader = DataLoader(
-            calibration_dataset,
-            batch_size=int(train_cfg.get("micro_batch_size", 8)),
-            shuffle=False,
-            collate_fn=lambda batch: collate_features(batch, calibration_image_token_id),
-        )
-        if online_source is not None:
-            online_source.set_phase("calibration")
-        try:
-            calibration = module.calibration_report(calibration_loader, device)
-        finally:
-            if online_source is not None:
-                online_source.set_phase("train")
-        if calibration is not None:
-            calibration["source"] = (
-                "online_target_head_batches" if online_source is not None else "train_features_head_batches"
-            )
-            write_json(train_dir / "confidence_calibration.json", calibration)
-            log(f"train: confidence calibration -> {train_dir / 'confidence_calibration.json'}")
-    summary = {
-        **output["summary"],
-        "overfit_sanity": overfit,
-        "visual_dependence": visual,
-        "confidence_calibration": calibration,
-        "feature_mode": mode,
-    }
-    if online_source is not None:
-        summary["feature_source"] = online_source.summary()
-        summary["visual_path_check"] = online_visual_check
-        summary["draft_device"] = str(device)
-    feature_source_record = (
-        online_source.summary()
-        if online_source is not None
-        else {
-            "feature_mode": "offline",
-            "backend": "feature_store",
-            "dir": str(features_dir.resolve()),
-            "external": features_dir.resolve() != (run_dir / "features").resolve(),
-            "format": manifest.get("format"),
-            "num_samples": manifest.get("num_samples"),
-            "seq_length": manifest.get("seq_length"),
-            "storage_dtype": manifest.get("storage_dtype"),
-            "digest": feature_source_digest,
+        train_dir = ensure_dir(run_dir / "train")
+        total_steps = compute_total_steps(len(dataset), train_cfg, steps)
+        plan_digest = training_plan_digest(cfg, algorithm.name, dataset_len=len(dataset))
+        # Effective dtype of every stage of the path, recorded in the summary.
+        # The frozen head must be stored in the drafter's compute dtype; a
+        # mismatch is refused in the training loop with an actionable error.
+        dtype_report = {
+            "feature_storage": manifest.get("storage_dtype"),
+            "target_native": (
+                str(next(online_source.model.parameters()).dtype).replace("torch.", "")
+                if online_source is not None
+                else None
+            ),
+            "drafter_compute": str(train_cfg.get("draft_dtype", "bfloat16")),
+            "frozen_embed": str(module.embed_tokens.weight.dtype).replace("torch.", ""),
+            "frozen_head": str(module.lm_head.weight.dtype).replace("torch.", ""),
         }
-    )
-    write_json(train_dir / "train_summary.json", summary)
-    record_stage(
-        run_dir,
-        "train",
-        {
+        log(f"train: dtypes {dtype_report}")
+        checkpoint_common = {
+            "format": "vlm-dflash-ckpt-v1",
+            # Which drafter algorithm trained these weights: eval/export hard-fail
+            # when a checkpoint is scored with a different algorithm than it was
+            # trained with (same idea as the head/identity tags below).
+            "algorithm": algorithm.name,
+            **algorithm.checkpoint_metadata(contract, cfg, draft_config),
+            # Which frozen output head the draft logits were trained against. Eval
+            # refuses checkpoints whose head does not match the target's tie state.
+            "head": "tied_embedding" if tied_head else "target_lm_head",
             "identity": identity_from_contract(contract),
-            "summary": summary,
-            "code": "vlm_dflash.dflash.train.train_dflash",
+            # Which feature source trained these weights: resume refuses to mix
+            # modes or data, and eval/export surface the mode.
             "feature_mode": mode,
-            "feature_source": feature_source_record,
-        },
-    )
-    if online_source is not None:
-        # Free the teacher once no diagnostic needs it anymore.
-        online_source.close()
-    return summary
+            "feature_source_digest": feature_source_digest,
+            "feature_backend": "huggingface" if online_source is not None else "feature_store",
+            "draft_device": str(device),
+            # Versioned training-plan identity (seed / batch geometry / optimizer /
+            # schedule / dtype / drafter / loss / dataset length): exact resume
+            # refuses checkpoints written under a different plan, or before this
+            # gate existed.
+            "training_plan_version": PLAN_VERSION,
+            "training_plan_digest": plan_digest,
+        }
+        if online_source is not None:
+            checkpoint_common["target_device"] = str(online_source.target_device)
+
+        resume_state = None
+        if resume:
+            # Read-only gate before any write: a refused resume must leave
+            # config / ckpt_init / logs / provenance byte-identical, and a legal
+            # resume keeps the original ckpt_init instead of regenerating it.
+            resume_path = train_dir / "ckpt_last.pt"
+            if not resume_path.exists():
+                raise FileNotFoundError(f"--resume requested but no resume checkpoint at {resume_path}.")
+            resume_state = torch.load(resume_path, map_location="cpu", weights_only=False)
+            validate_resume_state(
+                resume_state,
+                algorithm_name=algorithm.name,
+                mode=mode,
+                feature_source_digest=feature_source_digest,
+                total_steps=total_steps,
+                contract=contract,
+                plan_version=PLAN_VERSION,
+                plan_digest=plan_digest,
+            )
+            overfit = {"enabled": True, "resumed": True}
+        else:
+            torch.save({**checkpoint_common, "step": 0, "model": init_state}, train_dir / "ckpt_init.pt")
+            if online_source is not None:
+                online_source.set_phase("overfit")
+            try:
+                overfit = run_overfit_sanity(cfg, contract, dataset_factory, run_dir, device, module, init_state)
+            finally:
+                if online_source is not None:
+                    online_source.set_phase("train")
+            module.draft_model.load_state_dict(init_state)
+
+        log_path = train_dir / "train_log.jsonl"
+        if log_path.exists() and resume_state is None:
+            log_path.unlink()
+        save_every = int(train_cfg.get("save_every_steps", max(1, total_steps // 4)))
+
+        def write_train_state(state: dict) -> None:
+            tmp_path = train_dir / "ckpt_last.pt.tmp"
+            torch.save({**checkpoint_common, **state}, tmp_path)
+            tmp_path.replace(train_dir / "ckpt_last.pt")
+            log(f"train: wrote resumable checkpoint (step {state['step']}) -> {train_dir / 'ckpt_last.pt'}")
+
+        output = run_training_loop(
+            module,
+            dataset,
+            cfg,
+            contract,
+            device,
+            total_steps=total_steps,
+            seed=seed,
+            shuffle=True,
+            log_path=log_path,
+            resume_state=resume_state,
+            on_checkpoint=write_train_state,
+            save_every=save_every,
+        )
+        torch.save({**checkpoint_common, "step": output["summary"]["steps"], "model": module.draft_model.state_dict()},
+                   train_dir / "ckpt_final.pt")
+
+        from .visual_check import check_drafter_visual_dependence
+
+        visual = check_drafter_visual_dependence(cfg, contract, run_dir, device, module, pair_path=online_pair_path)
+        if output.get("gradient_coverage"):
+            write_json(train_dir / "gradient_coverage.json", output["gradient_coverage"])
+        # Algorithm-specific calibration diagnostics (e.g. DSpark's confidence
+        # head): only modules that implement the hook produce an artifact. The
+        # calibration pass reads from the same feature source as training, so an
+        # online run produces it without a staged capture.
+        calibration = None
+        if hasattr(module, "calibration_report"):
+            from torch.utils.data import DataLoader
+
+            calibration_dataset = dataset_factory()
+            calibration_image_token_id = int(contract["tokens"]["image_token_id"])
+            calibration_loader = DataLoader(
+                calibration_dataset,
+                batch_size=int(train_cfg.get("micro_batch_size", 8)),
+                shuffle=False,
+                collate_fn=lambda batch: collate_features(batch, calibration_image_token_id),
+            )
+            if online_source is not None:
+                online_source.set_phase("calibration")
+            try:
+                calibration = module.calibration_report(calibration_loader, device)
+            finally:
+                if online_source is not None:
+                    online_source.set_phase("train")
+            if calibration is not None:
+                calibration["source"] = (
+                    "online_target_head_batches" if online_source is not None else "train_features_head_batches"
+                )
+                write_json(train_dir / "confidence_calibration.json", calibration)
+                log(f"train: confidence calibration -> {train_dir / 'confidence_calibration.json'}")
+        summary = {
+            **output["summary"],
+            "overfit_sanity": overfit,
+            "visual_dependence": visual,
+            "confidence_calibration": calibration,
+            "feature_mode": mode,
+            "dtypes": dtype_report,
+        }
+        if online_source is not None:
+            summary["feature_source"] = online_source.summary()
+            summary["visual_path_check"] = online_visual_check
+            summary["draft_device"] = str(device)
+        feature_source_record = (
+            online_source.summary()
+            if online_source is not None
+            else {
+                "feature_mode": "offline",
+                "backend": "feature_store",
+                "dir": str(features_dir.resolve()),
+                "external": features_dir.resolve() != (run_dir / "features").resolve(),
+                "format": manifest.get("format"),
+                "num_samples": manifest.get("num_samples"),
+                "seq_length": manifest.get("seq_length"),
+                "storage_dtype": manifest.get("storage_dtype"),
+                "digest": feature_source_digest,
+            }
+        )
+        write_json(train_dir / "train_summary.json", summary)
+        record_stage(
+            run_dir,
+            "train",
+            {
+                "identity": identity_from_contract(contract),
+                "summary": summary,
+                "code": "vlm_dflash.dflash.train.train_dflash",
+                "feature_mode": mode,
+                "feature_source": feature_source_record,
+            },
+        )
+        return summary
+    finally:
+        # Free the teacher on every exit path (success and exceptions), so a
+        # failed or interrupted run does not leave the target resident in-process.
+        if online_source is not None:
+            online_source.close()
