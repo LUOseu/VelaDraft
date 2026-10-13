@@ -1,13 +1,13 @@
 # STATE
 
 Updated: 2026-10-13 (v0.3.2 in development: online target feature source
-pushed; online review fixes applied on top of `aed7bf8`; GitHub repo renamed
-to `LUOseu/VelaDraft`).
+pushed as `aed7bf8`; online review fixes pushed as `1786176`; GitHub repo
+renamed to `LUOseu/VelaDraft`).
 
 **Status: v0.3.1 tagged and pushed** (tag `v0.3.1` at `eb3f314`); **v0.3.2 in
-development — the online target feature source is pushed as `aed7bf8`** (repo
-now `github.com/LUOseu/VelaDraft`; old URLs redirect; distribution and CLI
-stay `vlm-dflash`).
+development — the online target feature source is pushed as `aed7bf8` and
+the review fixes as `1786176`** (repo now `github.com/LUOseu/VelaDraft`; old
+URLs redirect; distribution and CLI stay `vlm-dflash`).
 
 - v0.3.2 scope (so far): `train.feature_mode: offline|online` — live
   teacher-forced extraction from the frozen target in the trainer process
