@@ -115,8 +115,8 @@ offline benchmark numbers as online (see `docs/online-training.md`).
 | --- | --- | --- |
 | caption_general | scaffold | run's own val split (provisional) |
 | textvqa | validated | pinned export (lmms-lab/textvqa validation, 128-prompt seed-42 subset; `benchmarks/prompts/textvqa_v1.jsonl`) |
-| docvqa | planned | protocol pinned, adapter pending |
-| chartqa | planned | protocol pinned, adapter pending |
+| docvqa | validated | pinned export (lmms-lab/DocVQA DocVQA/validation, 128-prompt seed-42 subset; `benchmarks/prompts/docvqa_v1.jsonl`) |
+| chartqa | validated | pinned export (lmms-lab/ChartQA test, 128-prompt seed-42 subset; `benchmarks/prompts/chartqa_v1.jsonl`) |
 """
 
 

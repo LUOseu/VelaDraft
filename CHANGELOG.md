@@ -36,6 +36,19 @@
   (`configs/smoke_multiturn.yaml`). Smoke-scale only; no quality or speed
   claim follows from it.
 
+### DocVQA / ChartQA benchmark adapters
+
+- `scripts/prepare_benchmark.py` gains `--workload docvqa` (`lmms-lab/DocVQA`
+  DocVQA/validation) and `--workload chartqa` (`lmms-lab/ChartQA` test):
+  deterministic 128-prompt seeded exports (seed 42) with per-shard /
+  per-row question/image hashes, pinned prompt set definitions under
+  `benchmarks/prompts/`, images named by content suffix. Adapter export is
+  covered by CPU tests on synthetic parquet fixtures.
+- Manifests `03_docvqa` / `04_chartqa` are `validated`: E3
+  (`R-20261014-10`) ran both 128-prompt / 64-token protocols against the
+  frozen 3B/2K DFlash checkpoint - DocVQA AL 1.201, ChartQA AL 1.221, both
+  token-exact 128/128 (sequential parity). Numbers in `BENCHMARKS.md`.
+
 ### DFlare / DFly (AngelSpec ports)
 
 - New algorithms `dflare` and `dfly`, ported from `Tencent/AngelSpec @

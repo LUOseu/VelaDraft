@@ -254,6 +254,31 @@ path is the correctness reference, not a speed claim. Reproduce with
 then `python scripts/benchmark.py --run-dir runs/qwen25vl3b_2k --workload
 textvqa` (see `docs/benchmark.md`).
 
+## Public workloads: DocVQA and ChartQA (Qwen2.5-VL-3B zoo, pinned exports)
+
+DocVQA (`lmms-lab/DocVQA` DocVQA/validation, 5349 rows) and ChartQA
+(`lmms-lab/ChartQA` test, 2500 rows), 128-prompt seeded subsets (seed 42;
+subset definitions and per-row question/image hashes pinned in
+`benchmarks/prompts/docvqa_v1.jsonl` / `benchmarks/prompts/chartqa_v1.jsonl`,
+protocols in `benchmarks/manifests/03_docvqa.json` / `04_chartqa.json`);
+greedy, `max_new_tokens=64`, `verification: sequential` (token-exact gate);
+frozen 3B/2K DFlash checkpoint (`runs/qwen25vl3b_2k`).
+
+| Workload | AL | acceptance rate | token-exact | per-slot acceptance (1..7) | wall/s | target-only/s |
+| --- | ---: | ---: | --- | --- | ---: | ---: |
+| DocVQA | 1.201 | 1.99% | 128/128 | [.125,.012,.002,0,0,0,0] | 1.02 | 1.06 |
+| ChartQA | 1.221 | 2.36% | 128/128 | [.144,.015,.002,.001,0,0,0] | 0.75 | 0.66 |
+
+Dense-document and chart questions accept less than long-caption datasets
+(short factual answers at a 64-token budget); the two workloads land within
+0.02 AL of each other. Wall-clock speedup vs target-only is 0.89-1.04x on this
+card - the sequential path is the correctness reference, not a speed claim.
+E3 evidence: run `R-20261014-10`, report
+`benchmarks/reports/e3_dflash_docvqa_chartqa.{json,md}`. Reproduce with
+`python scripts/prepare_benchmark.py --workload docvqa --source <download>`
+(then `chartqa`) and `python scripts/benchmark.py --run-dir runs/qwen25vl3b_2k
+--workload docvqa --workload chartqa` (see `docs/benchmark.md`).
+
 ## Reproducibility
 
 - Post-zoo regression (2026-10-12): re-evaluating the frozen 3B-2K DFlash
