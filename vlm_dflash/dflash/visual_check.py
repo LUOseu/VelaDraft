@@ -6,6 +6,13 @@ logits and different block losses; perturbing the image-span feature rows must
 also move them. Anchors are resampled under a fixed seed before every pass, so
 the only difference between passes is the context features. Logits/losses are
 compared in fp32 (the model itself stays in its trained bf16 dtype).
+
+Both passes run the full drafter path the training forward uses -- including the
+algorithm's pre-head hook (``module._correct_draft_hidden``, e.g. DFly's
+TreeFlash correction with teacher-forced previous tokens) -- and report the
+pre-hook ("backbone") and post-hook ("full") logits separately. This is a
+teacher-forced diagnostic over fixed anchors, not a real rollout: the previous
+tokens are gathered from ``input_ids``, never sampled.
 """
 
 from __future__ import annotations
@@ -22,7 +29,16 @@ _MIN_DELTA = 1e-5
 
 
 def draft_block_logits(module, input_ids, loss_mask, hidden, position3):
-    """Draft block logits for one batch; mirrors the trainer forward's prologue."""
+    """Pre- and post-hook draft block logits for one batch.
+
+    Mirrors the trainer forward's prologue (feature slice, fixed-seed anchors,
+    block inputs, MRoPE block positions), then runs the same teacher-forced
+    previous-token / pre-head hook the training forward applies. Returns
+    ``(backbone_logits, full_logits, anchors, keep_mask)``: ``backbone_logits``
+    are the raw backbone output through the frozen LM head, ``full_logits`` the
+    served distribution (DFly's correction included; identical to the backbone
+    for every hook that is the identity, and at correction zero-init).
+    """
     # Superset stores hold more layers than the model consumes; apply the same
     # explicit-id slice the training forward applies before the draft forward.
     hidden = module._select_context_layers(hidden)
@@ -45,7 +61,28 @@ def draft_block_logits(module, input_ids, loss_mask, hidden, position3):
         attention_mask=attention_mask,
         image_mask=None,
     )
-    return module.lm_head(output_hidden), anchors, keep_mask
+    backbone_logits = module.lm_head(output_hidden)
+    bsz, seq_len = input_ids.shape
+    n = anchors.shape[1]
+    bs = int(module.block_size)
+    label_indices, _target_ids, _block_mask = module._build_block_targets(
+        input_ids,
+        loss_mask,
+        anchors,
+        keep_mask,
+        seq_len,
+        label_start=int(getattr(module, "input_shift", 0)),
+    )
+    prev_token_ids = module._teacher_forced_prev_tokens(input_ids, label_indices, n)
+    corrected_hidden = module._correct_draft_hidden(
+        output_hidden,
+        prev_token_ids=prev_token_ids,
+        label_indices=label_indices,
+        bsz=bsz,
+        n=n,
+        bs=bs,
+    )
+    return backbone_logits, module.lm_head(corrected_hidden), anchors, keep_mask
 
 
 def fp32_block_ce(module, logits, input_ids, loss_mask, anchors, keep_mask) -> float:
@@ -103,8 +140,10 @@ def check_drafter_visual_dependence(
 
     module.eval()
     with torch.inference_mode():
-        logits_a, anchors, keep_mask = draft_block_logits(module, input_ids, loss_mask, hidden_a, position3)
-        logits_b, _, _ = draft_block_logits(module, input_ids, loss_mask, hidden_b, position3)
+        backbone_a, logits_a, anchors, keep_mask = draft_block_logits(
+            module, input_ids, loss_mask, hidden_a, position3
+        )
+        backbone_b, logits_b, _, _ = draft_block_logits(module, input_ids, loss_mask, hidden_b, position3)
         torch.manual_seed(_ANCHOR_SEED)
         span = hidden_a[:, span_start : span_end + 1].float()
         # Scale-relative perturbation (half the span's std): large enough that the
@@ -114,29 +153,71 @@ def check_drafter_visual_dependence(
         noise = torch.randn_like(span) * sigma
         perturbed = hidden_a.clone()
         perturbed[:, span_start : span_end + 1] = (span + noise).to(perturbed.dtype)
-        logits_p, _, _ = draft_block_logits(module, input_ids, loss_mask, perturbed, position3)
+        backbone_p, logits_p, _, _ = draft_block_logits(module, input_ids, loss_mask, perturbed, position3)
 
         def ce(logits):
             return fp32_block_ce(module, logits, input_ids, loss_mask, anchors, keep_mask)
 
         loss_a, loss_b, loss_p = ce(logits_a), ce(logits_b), ce(logits_p)
+        backbone_loss_a, backbone_loss_b, backbone_loss_p = (
+            ce(backbone_a),
+            ce(backbone_b),
+            ce(backbone_p),
+        )
         swap_logits_diff = (logits_a.float() - logits_b.float()).abs()
         perturb_logits_diff = (logits_a.float() - logits_p.float()).abs()
+        backbone_swap_diff = (backbone_a.float() - backbone_b.float()).abs()
+        backbone_perturb_diff = (backbone_a.float() - backbone_p.float()).abs()
+        full_vs_backbone = (logits_a.float() - backbone_a.float()).abs()
 
+    correction = getattr(module.draft_model, "hidden_correction", None)
+    correction_delta = getattr(module, "_last_correction_delta_abs_mean", None)
     result = {
-        "swap": {
-            "logits_max_abs_diff": float(swap_logits_diff.max()),
-            "logits_mean_abs_diff": float(swap_logits_diff.mean()),
-            "block_ce_a": loss_a,
-            "block_ce_b": loss_b,
-            "block_ce_delta": abs(loss_a - loss_b),
+        # Teacher-forced pre-head hook: enabled for DFly, identity otherwise.
+        "correction": {
+            "enabled": bool(correction is not None),
+            "applied_in_diagnostic": True,
+            "delta_abs_mean": None if correction_delta is None else float(correction_delta),
         },
-        "perturb_span": {
-            "logits_max_abs_diff": float(perturb_logits_diff.max()),
-            "logits_mean_abs_diff": float(perturb_logits_diff.mean()),
-            "block_ce_a": loss_a,
-            "block_ce_perturbed": loss_p,
-            "block_ce_delta": abs(loss_a - loss_p),
+        # Served distribution: backbone through the correction hook (the path
+        # inference runs; the gate below is decided on these numbers).
+        "full": {
+            "swap": {
+                "logits_max_abs_diff": float(swap_logits_diff.max()),
+                "logits_mean_abs_diff": float(swap_logits_diff.mean()),
+                "block_ce_a": loss_a,
+                "block_ce_b": loss_b,
+                "block_ce_delta": abs(loss_a - loss_b),
+            },
+            "perturb_span": {
+                "logits_max_abs_diff": float(perturb_logits_diff.max()),
+                "logits_mean_abs_diff": float(perturb_logits_diff.mean()),
+                "block_ce_a": loss_a,
+                "block_ce_perturbed": loss_p,
+                "block_ce_delta": abs(loss_a - loss_p),
+            },
+        },
+        # Pre-hook backbone only: kept so a correction that hides a context
+        # insensitivity (or adds one) stays visible in the same report.
+        "backbone": {
+            "swap": {
+                "logits_max_abs_diff": float(backbone_swap_diff.max()),
+                "logits_mean_abs_diff": float(backbone_swap_diff.mean()),
+                "block_ce_a": backbone_loss_a,
+                "block_ce_b": backbone_loss_b,
+                "block_ce_delta": abs(backbone_loss_a - backbone_loss_b),
+            },
+            "perturb_span": {
+                "logits_max_abs_diff": float(backbone_perturb_diff.max()),
+                "logits_mean_abs_diff": float(backbone_perturb_diff.mean()),
+                "block_ce_a": backbone_loss_a,
+                "block_ce_perturbed": backbone_loss_p,
+                "block_ce_delta": abs(backbone_loss_a - backbone_loss_p),
+            },
+        },
+        "full_vs_backbone": {
+            "logits_max_abs_diff": float(full_vs_backbone.max()),
+            "logits_mean_abs_diff": float(full_vs_backbone.mean()),
         },
         "draft_logits_differ": bool(swap_logits_diff.max() > 0),
         "loss_changes_on_swap": bool(abs(loss_a - loss_b) > _MIN_DELTA),
@@ -148,8 +229,9 @@ def check_drafter_visual_dependence(
     write_json(out_path, result)
     log(
         "drafter visual check: "
-        f"logits_diff={result['swap']['logits_max_abs_diff']:.4g} "
-        f"ce_delta_swap={result['swap']['block_ce_delta']:.4g} "
-        f"ce_delta_perturb={result['perturb_span']['block_ce_delta']:.4g} passed={result['passed']}"
+        f"logits_diff={result['full']['swap']['logits_max_abs_diff']:.4g} "
+        f"ce_delta_swap={result['full']['swap']['block_ce_delta']:.4g} "
+        f"ce_delta_perturb={result['full']['perturb_span']['block_ce_delta']:.4g} "
+        f"correction_delta={result['correction']['delta_abs_mean']} passed={result['passed']}"
     )
     return result

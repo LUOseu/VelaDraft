@@ -67,6 +67,8 @@ Rules enforced at build time:
 - `target_hidden_size == hidden_size` (the fusion residual assumes the draft
   width; enforced by the model).
 - `layer_routing` / visual-fusion configs are rejected.
+- The `algorithm.dflare` block uses a bounded schema: unknown keys fail loud
+  with the supported-key list instead of being silently ignored.
 
 Canonical configs:
 

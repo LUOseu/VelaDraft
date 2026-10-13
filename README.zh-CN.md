@@ -26,14 +26,23 @@
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-VelaDraft 将 **DFlash、DSpark、Domino、JetSpec 和 DFlash2** 接入同一套多模态训练流程。
-先让目标 VLM 生成回答并捕获特征，再复用兼容的特征，训练与比较不同 drafter。
+VelaDraft 是面向多模态 block-parallel drafter 的统一训练工具，支持 DFlash、
+DSpark、Domino、JetSpec、DFlash2、DFlare 和 DFly。针对冻结的 Qwen-VL target，
+提供离线特征复用、在线特征提取、断点恢复、逐 token 输出验证和 checkpoint 导出。
 
-- **一次 capture，多种算法复用。** 共享 hidden states、图像区间和位置编码信息。
+DFlare 与 DFly 已集成到 main。当前 DFly 使用共享的 block-CE 训练配方，
+上游两阶段训练配方作为独立能力继续补全。
+
+- **多方法统一接口。** 七种 drafter 共用同一套 `train` / `eval` / `export`
+  命令、checkpoint 格式与验证路径，方法对比建立在同一基底上。
 - **离线 / 在线训练。** 默认离线：训练阶段目标模型不驻留 GPU，直接读取捕获的
   feature store；`--mode online` 在训练过程中从冻结的目标模型实时提取特征。
-- **配对可检查。** 通过运行时 contract 和 provenance 校验目标、processor、features 与 checkpoint。
-- **输出可验证。** Sequential 评测逐 token 对照目标模型的贪心输出，并报告 AL 与各位置接受率。
+- **显式层捕获与兼容复用。** 每次 capture 记录自身持有的目标层有序列表；消费方
+  按显式 layer id 切片，因此同一 store 可供已消费层在其中的多个方法（及不同
+  drafter 深度）复用；缺少的层会直接报错，绝不猜测。
+- **恢复、验证与导出。** 断点恢复在写入前校验解析后的训练计划与特征来源；
+  sequential 评测逐 token 复现目标模型的贪心输出（`token_exact`）并给出各位置
+  接受率；导出产物自描述（权重、配置、model card、校验值）。
 
 ## 快速开始
 
@@ -83,7 +92,7 @@ vlm-dflash train-demo --target "$VLM_DFLASH_TARGET" --steps 80
 ## 流程
 
 <p align="center">
-  <img src="docs/assets/how-it-works.svg" alt="图文数据通过目标模型生成回答与捕获特征。共享特征用于离线训练五种算法之一，再校验输出并导出 checkpoint。" width="1100" />
+  <img src="docs/assets/how-it-works.svg" alt="图文数据通过目标模型生成回答与捕获特征。离线或在线训练从七种算法（DFlash、DSpark、Domino、JetSpec、DFlash2、DFlare、DFly）中选择其一，再校验输出并导出 checkpoint。" width="1100" />
 </p>
 
 将昂贵的目标模型计算与 drafter 训练分开：兼容的捕获特征可供多种算法复用，
@@ -93,33 +102,30 @@ vlm-dflash train-demo --target "$VLM_DFLASH_TARGET" --steps 80
 
 ## 支持的算法
 
-五种算法使用相同的 train、eval 和 export 命令。
+七种算法使用相同的 train、eval 和 export 命令。
 
-| 算法 | Qwen2.5-VL-3B | Qwen3-VL-8B | 状态 | 方法 |
-| --- | --- | --- | --- | --- |
-| [DFlash](docs/algorithms/dflash.md) | 已验证 | 已验证 | **Stable** | 冻结的 block drafter 基线 |
-| [DSpark](docs/algorithms/dspark.md) | 已验证 | 小规模验证 | **Validated** | Markov logit bias + confidence |
-| [Domino](docs/algorithms/domino.md) | 已验证 | 小规模验证 | **Validated** | 因果 GRU 修正 |
-| [JetSpec](docs/algorithms/jetspec.md) | 已验证 | 小规模验证 | **Validated** | 因果块内 mask + forward-KL |
-| [DFlash2](docs/algorithms/dflash2.md) | 已验证 | 小规模验证 | **Experimental** | 局部卷积 + candidate selector |
+| 算法 | 核心机制 | 本仓库训练配方 |
+| --- | --- | --- |
+| [DFlash](docs/algorithms/dflash.md) | 共享 FC context + block drafting | 参考 block CE |
+| [DSpark](docs/algorithms/dspark.md) | Markov logit bias + confidence | CE + 已接入的辅助目标（见方法文档） |
+| [Domino](docs/algorithms/domino.md) | 因果 GRU correction | 已接入的 curriculum 配方 |
+| [JetSpec](docs/algorithms/jetspec.md) | 因果块内 mask + teacher distillation | forward-KL |
+| [DFlash2](docs/algorithms/dflash2.md) | 局部卷积 + candidate selector | 实验性重建目标 |
+| [DFlare](docs/algorithms/dflare.md) | 逐 draft 层融合 + 独立 context K/V | 共享 block CE |
+| [DFly](docs/algorithms/dfly.md) | FC + fusion residual + hidden correction | CE 适配，上游完整配方待接入 |
 
-在研中（AngelSpec 移植，已完成仓库内全流程记录，尚未走发布验证）：
+DFlare 与 DFly 已 **集成到 main**，并在两个 Qwen-VL target 上完成仓库内验证
+（Qwen2.5-VL-3B 全流程、Qwen3-VL-8B 小规模验证）；发布验证状态单独记录在
+[支持矩阵](SUPPORT_MATRIX.md)与[发布验证](RELEASE_VALIDATION.md)中。
 
-| 算法 | Qwen2.5-VL-3B | Qwen3-VL-8B | 状态 | 方法 |
-| --- | --- | --- | --- | --- |
-| [DFlare](docs/algorithms/dflare.md) | 已验证 | 小规模验证 | **Experimental** | 逐 draft 层可学习融合 + 独立 context K/V |
-| [DFly](docs/algorithms/dfly.md) | 已验证 | 小规模验证 | **Experimental** | DFlash 共享 KV 主干 + 融合残差 + hidden-states 修正 |
+DFly 说明：训练使用共享 block-CE 配方（draft config、checkpoint 与导出中记录
+机器可读的 `objective_profile=controlled_ce`）；上游 LK/D-PACE → end-to-end TV
+配方未移植。推理时 block backbone 并行执行，hidden-states correction 与 LM-head
+投影按 slot 顺序、基于此前实际提议的 token 逐个执行——这是已说明的本地适配。
 
-两者共用冻结的 DFlash 训练目标与完全相同的命令。2K 协议下 DFly 达到 AL 1.682
-（深度槽位带来相对 1.630 DFlash 基线的增益），DFlare 为 1.637（与基线持平）。
-DFly 上游的两段式 LK/D-PACE 目标有意未移植（见上游审计文档），引用其数字时必须说明。
-
-Target 分别为 **Qwen2.5-VL-3B-Instruct** 和 **Qwen3-VL-8B-Instruct**。
-小规模验证包含 256 行数据与 16 条评测 prompt。以上状态描述训练与评测覆盖，
-运行时支持单独记录在[支持矩阵](SUPPORT_MATRIX.md)中。
-
-DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpec 的生产 tree runtime 未移植。
-具体实现范围见[算法矩阵](ALGORITHM_MATRIX.md)与[上游审计](UPSTREAM_AUDIT.md)。
+DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpec 的生产 tree runtime
+未移植。各 target 的状态与能力细节见[支持矩阵](SUPPORT_MATRIX.md)、
+[算法矩阵](ALGORITHM_MATRIX.md)与[上游审计](UPSTREAM_AUDIT.md)。
 
 ## 模型下载
 
@@ -160,7 +166,25 @@ python examples/train_from_jsonl.py \
 CLI 同时支持 `--algorithm`、`--resume` 与 `--set key=value` 覆盖。
 详见[示例](examples/README.md)、[数据 schema](vlm_dflash/data/schema.py)与[参考指南](docs/REFERENCE.md)。
 
-### 跨算法复用 capture
+### 方法专属 config
+
+仓库内的 config 是各方法的入口（另有 `configs/dspark`、`configs/domino`、
+`configs/jetspec`、`configs/dflash2`）；请先把 target 与数据路径配置到你的环境——
+它们是配方，不能在没有数据准备的情况下直接执行。
+
+```bash
+# 离线配方
+vlm-dflash train --config configs/dflare/qwen2_5_vl_3b_2k.yaml --run-dir runs/dflare
+vlm-dflash train --config configs/dfly/qwen2_5_vl_3b_2k.yaml --run-dir runs/dfly
+
+# 同一方法，在线提取目标特征
+vlm-dflash train --config configs/dfly/qwen2_5_vl_3b_2k.yaml --mode online --run-dir runs/dfly_online
+
+vlm-dflash eval runs/dfly
+vlm-dflash export runs/dfly
+```
+
+### 跨运行 / 跨方法复用 capture
 
 ```bash
 vlm-dflash train \
@@ -169,11 +193,26 @@ vlm-dflash train \
   --features runs/shared_2k/features --steps 792
 ```
 
-使用与捕获特征对应的数据和兼容 target 设置。
-训练前校验 store 的 identity、manifest 和 target head，复用记录写入 `provenance.json`。
+复用是校验过的，而非默认成立：store 的 target/processor/mask/MRoPE 身份与
+其捕获层有序列表必须与本次运行一致；每个方法按显式 layer id 消费所需层
+（`algorithm.<method>.context_layer_ids` 或 draft routing）。store 缺少被消费的层时
+会直接拒绝并提示重新捕获，绝不静默改切片。请在运行配置中通过
+`drafter.capture_layer_ids` 声明 store 的层列表；drafter 深度与捕获不同的运行，
+只要其消费层包含在内即可复用。复用记录写入 `provenance.json`。
 Canonical 2K capture 占用约 **9.4 GiB** 磁盘。
 
 [对比示例](examples/reuse_features_compare.py)展示一次 capture 后分别训练、评测 DFlash 和 DSpark。
+
+### 从断点恢复
+
+```bash
+vlm-dflash train --config configs/dfly/qwen2_5_vl_3b_2k.yaml --run-dir runs/dfly --resume
+```
+
+`--resume` 会在任何写入之前执行只读预检：特征来源 digest 与解析后的训练计划
+（seed、batch 几何、优化器与 schedule、dtype、drafter 与方法专有参数、数据集长度）
+必须与 checkpoint 完全一致。被拒绝的恢复不会改动 run 目录中的 config、checkpoint、
+log 与 provenance（字节级不变）；合法的恢复从记录的 step 继续，并重放优化器/RNG 状态。
 
 ### 在线训练（实时提取目标特征）
 
@@ -207,16 +246,17 @@ README 有意不展示小规模训练数字和算法排名：已记录的运行�
 - **Target：** 上述两种 Qwen-VL 模型；其他家族需要 adapter 和验证。
 - **硬件：** 实测参考为单张 48 GB GPU；24 GB preset 是建议配置，尚未在实际 24 GB 卡上验证。
 - **Serving：** 生产 vLLM/SGLang 集成仍为后续工作；[serving bridge](docs/serving-bridge.md)描述拟议交接方式。
-- **复现：** 数据与生成协议可复现，bf16 训练不保证 bitwise deterministic；小于 2% 的 AL 差异可能落在运行噪声内。
+- **复现：** 数据与生成协议可复现，bf16 训练不保证 bitwise deterministic；
+  接受指标以测量记录（见[基准结果](#基准结果)）为准。
 
 ## 文档
 
 | 入口 | 链接 |
 | --- | --- |
 | 使用项目 | [环境](docs/env-preflight.md) · [示例](examples/README.md) · [在线训练](docs/online-training.md) · [实测运行](docs/measured-runs.md) |
-| 理解方法 | [算法](docs/algorithms/) · [参考指南](docs/REFERENCE.md) · [上游审计](UPSTREAM_AUDIT.md) |
+| 理解方法 | [算法](docs/algorithms/) · [支持矩阵](SUPPORT_MATRIX.md) · [参考指南](docs/REFERENCE.md) · [上游审计](UPSTREAM_AUDIT.md) |
 | 复现实验 | [基准](BENCHMARKS.md) · [Harness](docs/benchmark.md) · [发布验证](RELEASE_VALIDATION.md) |
-| 扩展项目 | [添加算法](docs/adding_an_algorithm.md) · [支持矩阵](SUPPORT_MATRIX.md) · [贡献指南](CONTRIBUTING.md) |
+| 扩展项目 | [添加算法](docs/adding_an_algorithm.md) · [贡献指南](CONTRIBUTING.md) |
 
 ## 贡献与归属
 
@@ -224,7 +264,8 @@ README 有意不展示小规模训练数字和算法排名：已记录的运行�
 当前 release policy 与验证要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 算法通过 `DrafterAlgorithm` 接入，目标家族通过 `VLMAdapter` 隔离。
 
-Apache-2.0。移植组件保留上游归属，见 [NOTICE](NOTICE)。
+Apache-2.0。移植组件保留上游归属，见 [NOTICE](NOTICE)（含基于 AngelSpec 的
+DFlare/DFly 移植，Apache-2.0 及其列出的第三方 MIT 组件）。
 来源 commit 与实现范围见 [UPSTREAM_AUDIT.md](UPSTREAM_AUDIT.md)；引用信息见 [CITATION.cff](CITATION.cff)。
 
 <sub><strong>为什么叫 Vela？</strong> Vela 意为“船帆”，也是船帆座的名称。

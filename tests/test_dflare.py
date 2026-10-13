@@ -125,7 +125,13 @@ def test_shared_kv_ablation_has_no_target_projections():
 def test_fusion_is_wired_and_receives_gradients():
     module, _ = _tiny_module()
     input_ids, loss_mask, hidden = _tiny_batch()
-    metrics = module(input_ids=input_ids, hidden_states=hidden, loss_mask=loss_mask)
+    # Fixed RNG before every forward: anchor sampling draws from the global
+    # generator, so only a reseeded forward makes the two losses comparable.
+    def forward_loss():
+        torch.manual_seed(1234)
+        return module(input_ids=input_ids, hidden_states=hidden, loss_mask=loss_mask)
+
+    metrics = forward_loss()
     assert torch.isfinite(metrics.loss)
     metrics.loss.backward()
     grads = {name: parameter.grad for name, parameter in module.draft_model.named_parameters()}
@@ -138,12 +144,40 @@ def test_fusion_is_wired_and_receives_gradients():
     # Frozen target head/embed never move.
     assert module.lm_head.weight.requires_grad is False
 
-    # Perturbing the fusion logits must change the loss (fusion actually runs).
+    # Negative control: shifting *every* fusion logit by a constant leaves the
+    # softmax mixture (and therefore the loss) unchanged; the earlier loss
+    # difference in this test came from mixed-up anchors, not from the shift.
     with torch.no_grad():
         module.draft_model.layer_fusion_weights.add_(1.5)
-    torch.manual_seed(0)
-    perturbed = module(input_ids=input_ids, hidden_states=hidden, loss_mask=loss_mask)
-    assert not torch.allclose(perturbed.loss, metrics.loss)
+    shifted = forward_loss()
+    torch.testing.assert_close(shifted.loss, metrics.loss, rtol=1e-6, atol=1e-8)
+    shifted_probabilities = module.draft_model.fusion_probabilities().detach()
+    # Positive control: a single-element change actually moves the mixture.
+    with torch.no_grad():
+        module.draft_model.layer_fusion_weights[0, 0].add_(5.0)
+    assert not torch.allclose(module.draft_model.fusion_probabilities().detach(), shifted_probabilities)
+    perturbed = forward_loss()
+    assert abs(float(perturbed.loss.detach()) - float(metrics.loss.detach())) > 1e-5
+
+
+def test_fusion_mixture_matches_upstream_formula():
+    """Pinned upstream (AngelSpec d3412bed) derivation, independently recomputed:
+    softmax over the layer axis, weighted sum of the per-layer hidden states,
+    then the context norm -- checked against ``_build_layer_contexts``."""
+    module, _ = _tiny_module()
+    model = module.draft_model
+    torch.manual_seed(21)
+    stacked = torch.randn(2, 5, len(CONTEXT), H)
+    contexts = model._build_layer_contexts(stacked)
+    probabilities = torch.softmax(model.layer_fusion_weights.detach().float(), dim=-1)
+    assert len(contexts) == model.config.num_hidden_layers
+    for draft_layer, context in enumerate(contexts):
+        fused = torch.einsum("t,bstd->bsd", probabilities[draft_layer], stacked.float())
+        expected = model.hidden_norm(fused.to(stacked.dtype))
+        torch.testing.assert_close(context, expected)
+    # The distance prior is the documented shallow->shallow / deep->deep one.
+    assert probabilities.shape == (2, len(CONTEXT))
+    assert bool((probabilities[0].argmax() == 0) and (probabilities[1].argmax() == len(CONTEXT) - 1))
 
 
 def test_fixed_fusion_receives_no_gradient():
@@ -163,21 +197,29 @@ def test_fusion_metrics_prefer_fp32_master_and_report_prior_drift():
     base = dict(module.fusion_metrics())
     # Untouched fusion sits exactly on its prior.
     assert base["fusion_prob_l1_drift"] == pytest.approx(0.0, abs=1e-12)
+    assert base["fusion_prob_l1_drift_live"] == pytest.approx(0.0, abs=1e-12)
+    assert base["fusion_weights_source_fp32_master"] == 0.0
     # Attach a fake fp32 master that has moved: the bf16 live parameter cannot
     # show sub-ulp moves, so the diagnostics must follow the master.
     # Row-wise rescaling changes the softmax mixture (a constant shift would not).
     master = torch.nn.Parameter(model.layer_fusion_weights.detach().float().clone() * 0.6)
     model.set_master_parameters({"layer_fusion_weights": master})
     moved = dict(module.fusion_metrics())
+    assert moved["fusion_weights_source_fp32_master"] == 1.0
     assert moved["fusion_weight_abs_mean"] == pytest.approx(float(master.detach().abs().mean()))
     assert moved["fusion_prob_l1_drift"] > 0.0
     assert moved["fusion_entropy_mean"] != pytest.approx(base["fusion_entropy_mean"])
+    # The moved master does not by itself prove the *forward* mixture moved:
+    # the live parameter still sits on the prior, and the report says so.
+    assert moved["fusion_prob_l1_drift_live"] == pytest.approx(0.0, abs=1e-12)
     # Without a master the metrics fall back to the live parameter.
     model._master_fusion_weights = None
     live = dict(module.fusion_metrics())
+    assert live["fusion_weights_source_fp32_master"] == 0.0
     assert live["fusion_weight_abs_mean"] == pytest.approx(
         float(model.layer_fusion_weights.detach().float().abs().mean())
     )
+    assert live["fusion_prob_l1_drift"] == pytest.approx(live["fusion_prob_l1_drift_live"], abs=1e-12)
 
 
 def test_training_loop_attaches_fp32_fusion_master(tmp_path):
@@ -291,4 +333,11 @@ def test_resolve_dflare_config_namespace():
     assert resolved["separate_context_kv"] is True
     default = resolve_dflare_config({"algorithm": "dflare"})
     assert default["context_layer_ids"] is None
+
+
+def test_unknown_dflare_knobs_fail_loud():
+    """Bounded schema: a typo must not silently train a different configuration."""
+    for knobs in ({"fusion_trainble": True}, {"separate_kv": True}, {"context_layers": [1]}):
+        with pytest.raises(ValueError, match="Supported keys"):
+            resolve_dflare_config({"algorithm": {"dflare": knobs}})
 

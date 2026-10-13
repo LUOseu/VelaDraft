@@ -172,6 +172,31 @@ def main() -> None:
             attention_mask=attn_mask,
             image_mask=image_mask,
         )
+        # Same pre-head hook as the training forward (identity for DFlash/DFly
+        # without correction; DFly's TreeFlash correction otherwise), with
+        # teacher-forced previous tokens. Inference applies the correction with
+        # the previously *proposed* tokens instead (documented local
+        # adaptation); this diagnostic keeps the train/eval comparison on the
+        # same conditioning convention.
+        label_indices, _, _ = module._build_block_targets(
+            input_ids_batch,
+            loss_mask_batch,
+            anchor_positions,
+            block_keep_mask,
+            seq_len,
+            label_start=int(module.input_shift),
+        )
+        prev_token_ids = module._teacher_forced_prev_tokens(
+            input_ids_batch, label_indices, anchor_positions.size(1)
+        )
+        train_out = module._correct_draft_hidden(
+            train_out,
+            prev_token_ids=prev_token_ids,
+            label_indices=label_indices,
+            bsz=1,
+            n=anchor_positions.size(1),
+            bs=block_size,
+        )
         train_logits = module.lm_head(train_out)  # [1, N*bs, V]
     print(f"train anchors {anchor_positions.tolist()} keep={block_keep_mask.tolist()}", flush=True)
 
@@ -190,6 +215,20 @@ def main() -> None:
             past_key_values=DynamicCache(),
             use_cache=True,
             image_mask=image_mask[:, :prompt_len],
+        )
+        # Teacher-forced correction for the same-conditioning comparison; the
+        # real inference path corrects slot k with the token proposed at k-1
+        # (see ``Qwen3DFlyDraftModel._sample_draft_tokens``). Block position k
+        # sits at input position prompt_len + k and conditions on the token at
+        # prompt_len + k - 1, matching the trainer's label convention.
+        eval_prev = input_ids_batch[:, prompt_len - 1 : prompt_len + block_size - 1]
+        eval_out = module._correct_draft_hidden(
+            eval_out,
+            prev_token_ids=eval_prev,
+            label_indices=eval_positions[:, -block_size:],
+            bsz=1,
+            n=1,
+            bs=block_size,
         )
         eval_logits = module.lm_head(eval_out)  # [1, bs, V]
 

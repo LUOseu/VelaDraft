@@ -21,7 +21,9 @@ Reference implementation:  angelspec/models/draft/dfly.py
                            configs/vllm_qwen3_8b_dfly.yaml
                            angelspec/models/dflash.py (_compute_lk_loss,
                              _compute_e2e_tv_loss, _dpace_position_weights)
-License:                   MIT (AngelSpec repo LICENSE + file headers)
+License:                   Apache-2.0 (AngelSpec repo LICENSE; the same file
+                           lists its third-party MIT components: specforge,
+                           deepspec, torchspec)
 ```
 
 ## Semantics recorded from the sources

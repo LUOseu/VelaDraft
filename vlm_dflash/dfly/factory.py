@@ -8,11 +8,33 @@ from ..dflare.factory import resolve_context_layer_ids
 
 __all__ = [
     "DEFAULTS",
+    "OBJECTIVE_PROFILE",
+    "UNSUPPORTED_RECIPE_KEYS",
     "build_draft_config",
     "build_trainer_module",
     "load_checkpoint",
     "resolve_dfly_config",
 ]
+
+#: Machine-readable objective of every DFly run in this repo: the shared DFlash
+#: block-CE training profile (anchors + block mask + decayed CE through the
+#: frozen LM head), recorded in the draft config, the checkpoint and the export.
+#: Upstream's two-stage recipe (LK / D-PACE -> end-to-end TV) is not ported.
+OBJECTIVE_PROFILE = "controlled_ce"
+
+#: Upstream recipe knobs this port does not implement; accepting one silently
+#: would train CE while the config claims otherwise, so they fail loud.
+UNSUPPORTED_RECIPE_KEYS = frozenset(
+    {
+        "loss_objective",
+        "lk_loss_weight",
+        "tv_loss",
+        "tv_loss_weight",
+        "two_stage",
+        "d_pace",
+        "d_pace_weight",
+    }
+)
 
 DEFAULTS: dict = {
     # Which captured target layers the base FC + fusion residual consume
@@ -28,13 +50,32 @@ DEFAULTS: dict = {
 
 
 def resolve_dfly_config(cfg: dict) -> dict:
-    """Algorithm-namespaced knobs: ``algorithm.dfly`` (defaults fill gaps)."""
+    """Algorithm-namespaced knobs: ``algorithm.dfly`` (defaults fill gaps).
+
+    Bounded schema: only the supported keys are accepted. Upstream-recipe keys
+    (LK / D-PACE / e2e TV) are rejected explicitly -- this port trains the
+    shared block-CE objective (``objective_profile=controlled_ce``) and must not
+    silently ignore a config that asked for something else.
+    """
     resolved = dict(DEFAULTS)
     algorithm_cfg = cfg.get("algorithm")
     if isinstance(algorithm_cfg, dict):
         block = algorithm_cfg.get("dfly") or {}
         if not isinstance(block, dict):
             raise ValueError("algorithm.dfly must be a mapping of DFly knobs.")
+        unknown = sorted(set(block) - set(DEFAULTS))
+        if unknown:
+            hinted = sorted(set(unknown) & UNSUPPORTED_RECIPE_KEYS)
+            detail = (
+                f" (unsupported upstream-recipe knobs: {', '.join(hinted)}; this port trains the "
+                f"shared block-CE objective, objective_profile={OBJECTIVE_PROFILE!r})"
+                if hinted
+                else ""
+            )
+            raise ValueError(
+                f"algorithm.dfly has unsupported keys {unknown}{detail}. Supported keys: "
+                f"{sorted(DEFAULTS)}."
+            )
         resolved.update(block)
     return resolved
 
@@ -58,6 +99,10 @@ def build_draft_config(contract: dict, cfg: dict):
         {
             "target_layer_ids": context,
             "context_layer_ids": context,
+            # Machine-readable statement that these weights were trained with
+            # the shared block-CE profile (the upstream two-stage recipe is not
+            # implemented); re-read by checkpoints and exports.
+            "objective_profile": OBJECTIVE_PROFILE,
             # DFly keeps DFlash's shared context/draft K/V projections.
             "separate_context_kv": False,
             "sample_from_anchor": False,

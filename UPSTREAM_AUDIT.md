@@ -25,7 +25,8 @@ Pinned commits
   DFlash port was taken from (see `docs/REFERENCE.md`; never imported at
   runtime).
 - `Tencent/AngelSpec` @ `d3412bed231025ea85d35dbf5e0af44f1ac62a5b`
-  (MIT) — upstream for the DFlare / DFly ports.
+  (Apache-2.0; its LICENSE lists third-party MIT components — specforge,
+  deepspec, torchspec) — upstream for the DFlare / DFly ports.
 
 Rule (GOAL §2): no algorithm implementation starts before its audit doc exists
 with concrete source file / commit references — not just conclusions.

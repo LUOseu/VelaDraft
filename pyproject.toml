@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "vlm-dflash"
 dynamic = ["version"]
-description = "A unified training and evaluation stack for multimodal parallel drafters (DFlash, DSpark, Domino, JetSpec, DFlash2)"
+description = "A unified training and evaluation stack for multimodal parallel drafters against frozen Qwen-VL targets"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"

@@ -1618,6 +1618,72 @@ def test_train_dflash_resume_write_order_online(monkeypatch, tmp_path):
     assert (run_dir / "train" / "overfit_sanity.json").read_bytes() == before[run_dir / "train" / "overfit_sanity.json"]
 
 
+def _patch_tiny_fusion_build(monkeypatch, algorithm: str):
+    """Real DFlare/DFly factory over the hand-made tiny draft config."""
+    import vlm_dflash.dflare.factory as dflare_factory
+    import vlm_dflash.dfly.factory as dfly_factory
+
+    factory = dflare_factory if algorithm == "dflare" else dfly_factory
+    monkeypatch.setattr(
+        factory,
+        "build_dflash_draft_config",
+        lambda contract, cfg: _tiny_draft_config(block_size=int(cfg["drafter"]["block_size"])),
+    )
+
+
+_FUSION_RESUME_MUTATIONS = {
+    "dflare": [
+        {"fusion_trainable": False},
+        {"separate_context_kv": False},
+        {"fusion_init": "uniform"},
+        {"context_layer_ids": [1, 0]},
+    ],
+    "dfly": [
+        {"enable_hidden_correction": False},
+        {"hidden_correction_intermediate_size": 64},
+        {"fusion_trainable": False},
+        {"context_layer_ids": [1, 0]},
+    ],
+}
+
+
+@pytest.mark.parametrize("algorithm", ["dflare", "dfly"])
+def test_fusion_resume_refuses_changed_algorithm_knobs_online(monkeypatch, tmp_path, algorithm):
+    """The reproduced P1: a real tiny online checkpoint must refuse every
+    semantic fusion-knob change before writing anything under the run dir."""
+    _model, _processor, contract, run_dir, cfg, _source = _tiny_train_setup(monkeypatch, tmp_path)
+    _patch_tiny_fusion_build(monkeypatch, algorithm)
+    _patch_drafter_visual_check(monkeypatch)
+    cfg["algorithm"] = {"name": algorithm, algorithm: {}}
+    summary = train_dflash(cfg, run_dir, contract, steps=2, feature_mode="online")
+    assert summary["steps"] == 2
+
+    frozen_files = [
+        run_dir / "train" / "ckpt_init.pt",
+        run_dir / "train" / "ckpt_last.pt",
+        run_dir / "train" / "train_log.jsonl",
+        run_dir / "train" / "train_summary.json",
+        run_dir / "provenance.json",
+    ]
+    before = {path: path.read_bytes() for path in frozen_files}
+
+    for mutation in _FUSION_RESUME_MUTATIONS[algorithm]:
+        broken = json.loads(json.dumps(cfg))
+        broken["algorithm"][algorithm].update(mutation)
+        with pytest.raises(ValueError, match="training-plan mismatch"):
+            train_dflash(broken, run_dir, contract, steps=2, resume=True, feature_mode="online")
+        for path, payload in before.items():
+            assert path.read_bytes() == payload, (algorithm, mutation, path)
+
+    # Restating the defaults with the explicit full capture list is a no-op:
+    # null context and an explicit identical list are the same effective plan.
+    equivalent = json.loads(json.dumps(cfg))
+    equivalent["algorithm"][algorithm]["context_layer_ids"] = [0, 1]
+    resumed = train_dflash(equivalent, run_dir, contract, steps=2, resume=True, feature_mode="online")
+    assert resumed["resumed_from_step"] >= 1
+    assert (run_dir / "train" / "ckpt_init.pt").read_bytes() == before[run_dir / "train" / "ckpt_init.pt"]
+
+
 def test_cli_resume_preflight_refuses_before_writing(monkeypatch, tmp_path):
     cfg, contract, run_dir, _summary = _tiny_online_train_run(monkeypatch, tmp_path)
     from vlm_dflash import cli as cli_module
@@ -1909,6 +1975,45 @@ def test_offline_feature_digest_and_offline_resume_write_order(monkeypatch, tmp_
     resumed = train_dflash(cfg, run_dir, contract, steps=2, resume=True, feature_mode="offline")
     assert resumed["resumed_from_step"] >= 1
     assert (run_dir / "train" / "ckpt_init.pt").read_bytes() == before[run_dir / "train" / "ckpt_init.pt"]
+
+
+def test_feature_store_reuse_across_draft_depth(monkeypatch, tmp_path):
+    """Source identity is split from consumer routing: one capture is reusable
+    by a new run whose draft depth/routing differs, while a same-run identity
+    comparison stays strict about it."""
+    from vlm_dflash.provenance import assert_identity
+    from vlm_dflash.target.sample_capture import extract_target_head
+
+    model, processor, contract, run_dir_a, cfg_a, source = _tiny_train_setup(monkeypatch, tmp_path)
+    records = [source.extract(index) for index in range(len(source.rows))]
+    embed_weight, _lm_head_weight, _tied = extract_target_head(model, contract)
+    store = tmp_path / "shared_features"
+    _write_tiny_feature_store(store, contract, records, embed_weight)
+
+    _patch_tiny_draft_build(monkeypatch)
+    first = train_dflash(cfg_a, run_dir_a, contract, steps=1, feature_mode="offline", features_dir=store)
+    assert first["steps"] == 1
+
+    # Same target/processor/mask/MRoPE and the same captured layer list, but a
+    # different consumer routing (draft depth 1 instead of 2).
+    contract_b = json.loads(json.dumps(contract))
+    contract_b["layers"] = {
+        **contract["layers"],
+        "draft_layer_ids": [1],
+        "num_draft_layers": 1,
+        "capture_layer_ids": [0, 1],
+    }
+    assert identity_from_contract(contract)["draft_layer_ids"] != contract_b["layers"]["draft_layer_ids"]
+    # Same-run semantics (resume) still refuse a routing change ...
+    with pytest.raises(IdentityMismatchError):
+        assert_identity(identity_from_contract(contract), identity_from_contract(contract_b), "test")
+    # ... while the feature-store reuse gate accepts the same capture.
+    cfg_b = json.loads(json.dumps(cfg_a))
+    second = train_dflash(
+        cfg_b, tmp_path / "run_b", contract_b, steps=1, feature_mode="offline", features_dir=store
+    )
+    assert second["steps"] == 1
+    assert first["final_loss"] == pytest.approx(second["final_loss"])
 
 
 # --------------------------------------------------------------------------- #

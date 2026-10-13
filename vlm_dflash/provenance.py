@@ -24,6 +24,30 @@ class IdentityMismatchError(RuntimeError):
 # resolved contract fields below.
 AUDIT_ONLY_IDENTITY_KEYS = frozenset({"target_model_path"})
 
+#: Identity keys that define what a feature source *contains*: the frozen
+#: target/processor, the vision-token / MRoPE / mask semantics and the ordered
+#: list of captured target layers (plus the image bounds that shaped the
+#: pixels). Reusing a valid capture is gated on exactly these keys.
+SOURCE_IDENTITY_KEYS = frozenset(
+    {
+        "model_fingerprint",
+        "processor_fingerprint",
+        "mask_token_id",
+        "spatial_rope_sections",
+        "capture_layer_ids",
+        "image_min_pixels",
+        "image_max_pixels",
+    }
+)
+
+#: Identity keys that belong to the *consumer* model (which captured layers a
+#: draft layer taps; i.e. the draft routing/depth). A new run may consume the
+#: same store with a different routing as long as its consumed subset is inside
+#: the store's capture list -- that check lives in the contract / feature-layout
+#: validation, not in the source gate. Exact resume of the *same* run keeps
+#: comparing the full identity.
+CONSUMER_IDENTITY_KEYS = frozenset({"draft_layer_ids"})
+
 
 def provenance_path(run_dir: str | Path) -> Path:
     return Path(run_dir) / "provenance.json"
@@ -88,6 +112,55 @@ def assert_identity(
         raise IdentityMismatchError(
             f"Target identity mismatch ({context}); refusing to continue.\n  {joined}\n"
             "Use a new run directory when switching target model/revision/processor settings."
+        )
+
+
+def source_identity(identity: dict) -> dict:
+    """The feature-source subset of an identity record (legacy-compatible).
+
+    Missing source keys compare as ``None``, so an artifact that records fewer
+    fields than the live contract fails the gate instead of silently skipping
+    the check. ``_with_legacy_capture_layers`` still recovers the true layout
+    for stores written before ``capture_layer_ids`` existed.
+    """
+    identity = _with_legacy_capture_layers(identity)
+    return {key: identity.get(key) for key in SOURCE_IDENTITY_KEYS}
+
+
+def source_identity_from_contract(contract: dict) -> dict:
+    """Feature-source identity subset of the resolved contract."""
+    return source_identity(identity_from_contract(contract))
+
+
+def assert_source_identity(
+    expected: dict, actual: dict, context: str, ignore: frozenset[str] = AUDIT_ONLY_IDENTITY_KEYS
+) -> None:
+    """Gate feature-store reuse on the source identity only.
+
+    The store's content is defined by the captured layers (and the target /
+    processor / mask / MRoPE / image bounds that produced them), not by the
+    consumer's routing: a run whose draft depth differs may reuse the same
+    capture when its consumed layers are a subset of the stored ones (enforced
+    by the feature-layout check) -- rejecting that was a false negative.
+    Consumer identity (``draft_layer_ids``) and exact-resume semantics stay
+    strict in :func:`assert_identity` and the training-plan digest.
+    """
+    expected_source = source_identity(expected)
+    actual_source = source_identity(actual)
+    diffs = []
+    for key in sorted(SOURCE_IDENTITY_KEYS):
+        if key in ignore:
+            continue
+        if expected_source.get(key) != actual_source.get(key):
+            diffs.append(
+                f"{key}: expected={expected_source.get(key)!r} actual={actual_source.get(key)!r}"
+            )
+    if diffs:
+        joined = "\n  ".join(diffs)
+        raise IdentityMismatchError(
+            f"Feature-source identity mismatch ({context}); refusing to reuse the capture.\n  {joined}\n"
+            "Recapture the features for this target/processor/layer list, or point the run at the "
+            "store that matches its contract."
         )
 
 

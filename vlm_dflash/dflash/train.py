@@ -22,8 +22,18 @@ import torch
 from torch.utils.data import DataLoader, Subset
 
 from ..algorithms import get_algorithm
-from ..provenance import assert_identity, identity_from_contract, record_stage
-from ..training_plan import PLAN_VERSION, training_plan_digest
+from ..provenance import (
+    assert_identity,
+    assert_source_identity,
+    identity_from_contract,
+    record_stage,
+)
+from ..training_plan import (
+    FUSION_PLAN_ALGORITHMS,
+    PLAN_VERSION,
+    plan_scheme_version,
+    training_plan_digest,
+)
 from ..utils import ensure_dir, log, read_json, set_seed, write_json
 from .features import FeatureDataset, collate_features, offline_feature_digest
 
@@ -606,6 +616,14 @@ def validate_resume_state(
             "be resumed exactly. Start a new run directory, or retrain without --resume."
         )
     if str(recorded_plan_version) != str(plan_version):
+        if algorithm_name in FUSION_PLAN_ALGORITHMS and str(recorded_plan_version) == PLAN_VERSION:
+            raise ValueError(
+                "Resume plan-version mismatch: this DFlare/DFly checkpoint was written under "
+                f"{PLAN_VERSION!r}, whose digest did not cover the method's fusion knobs (context "
+                "layers / K-V layout / fusion / hidden correction). Its plan cannot be compared "
+                f"against the current {plan_version!r} scheme and is not silently back-filled: start "
+                "a new run directory (or retrain without --resume)."
+            )
         raise ValueError(
             f"Resume plan-version mismatch: checkpoint recorded {recorded_plan_version!r}, this build "
             f"uses {plan_version!r}. The plan encoding changed; start a new run directory."
@@ -660,15 +678,20 @@ def preflight_resume(
     else:
         store_dir = Path(features_dir) if features_dir is not None else run_dir / "features"
         store = FeatureDataset(store_dir)
-        assert_identity(identity_from_contract(contract), store.store.manifest["identity"], "train vs features")
+        assert_source_identity(
+            identity_from_contract(contract), store.store.manifest["identity"], "train vs features"
+        )
         dataset_len = len(store) if limit is None else min(limit, len(store))
         feature_source_digest = offline_feature_digest(store_dir)
     resume_path = run_dir / "train" / "ckpt_last.pt"
     if not resume_path.exists():
         raise FileNotFoundError(f"no resume checkpoint at {resume_path}.")
     total_steps = compute_total_steps(dataset_len, cfg.get("train", {}), steps)
-    plan_digest = training_plan_digest(cfg, algorithm.name, dataset_len=dataset_len)
+    plan_digest = training_plan_digest(
+        cfg, algorithm.name, dataset_len=dataset_len, contract=contract
+    )
     resume_state = torch.load(resume_path, map_location="cpu", weights_only=False)
+    plan_version = plan_scheme_version(algorithm.name)
     validate_resume_state(
         resume_state,
         algorithm_name=algorithm.name,
@@ -676,14 +699,14 @@ def preflight_resume(
         feature_source_digest=feature_source_digest,
         total_steps=total_steps,
         contract=contract,
-        plan_version=PLAN_VERSION,
+        plan_version=plan_version,
         plan_digest=plan_digest,
     )
     return {
         "mode": mode,
         "algorithm": algorithm.name,
         "feature_source_digest": feature_source_digest,
-        "plan_version": PLAN_VERSION,
+        "plan_version": plan_version,
         "plan_digest": plan_digest,
         "total_steps": total_steps,
         "step": int(resume_state.get("step", 0)),
@@ -802,7 +825,7 @@ def train_dflash(
             if limit is not None:
                 dataset = Subset(dataset, list(range(min(limit, len(dataset)))))
             manifest = FeatureDataset(features_dir).store.manifest
-            assert_identity(identity_from_contract(contract), manifest["identity"], "train vs features")
+            assert_source_identity(identity_from_contract(contract), manifest["identity"], "train vs features")
             # Resume/provenance digest: content-only over the manifest, index and
             # shard/head bytes (absolute model paths are audit info; moving the
             # same store to another directory must not invalidate a resume), and
@@ -854,7 +877,10 @@ def train_dflash(
 
         train_dir = ensure_dir(run_dir / "train")
         total_steps = compute_total_steps(len(dataset), train_cfg, steps)
-        plan_digest = training_plan_digest(cfg, algorithm.name, dataset_len=len(dataset))
+        plan_digest = training_plan_digest(
+            cfg, algorithm.name, dataset_len=len(dataset), contract=contract
+        )
+        plan_version = plan_scheme_version(algorithm.name)
         # Effective dtype of every stage of the path, recorded in the summary.
         # The frozen head must be stored in the drafter's compute dtype; a
         # mismatch is refused in the training loop with an actionable error.
@@ -894,7 +920,7 @@ def train_dflash(
             # schedule / dtype / drafter / loss / dataset length): exact resume
             # refuses checkpoints written under a different plan, or before this
             # gate existed.
-            "training_plan_version": PLAN_VERSION,
+            "training_plan_version": plan_version,
             "training_plan_digest": plan_digest,
         }
         if online_source is not None:
@@ -916,7 +942,7 @@ def train_dflash(
                 feature_source_digest=feature_source_digest,
                 total_steps=total_steps,
                 contract=contract,
-                plan_version=PLAN_VERSION,
+                plan_version=plan_version,
                 plan_digest=plan_digest,
             )
             overfit = {"enabled": True, "resumed": True}

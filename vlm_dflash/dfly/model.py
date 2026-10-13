@@ -3,7 +3,8 @@ optional hidden-states correction applied before the frozen LM head.
 
 Ported from AngelSpec ``angelspec/models/draft/dfly.py`` and
 ``angelspec/models/dfly.py`` (commit
-``d3412bed231025ea85d35dbf5e0af44f1ac62a5b``, MIT); see ``docs/upstream/dfly.md``.
+``d3412bed231025ea85d35dbf5e0af44f1ac62a5b``, Apache-2.0); see
+``docs/upstream/dfly.md``.
 
 Per draft layer ``i`` (upstream ``DFlyDraftModel._build_layer_context``)::
 

@@ -1,16 +1,17 @@
 """DFlare draft model: per-draft-layer softmax fusion over captured target layers.
 
 Ported from AngelSpec ``angelspec/models/draft/dflare.py`` (commit
-``d3412bed231025ea85d35dbf5e0af44f1ac62a5b``, MIT) onto this repo's Qwen3-VL
-draft stack; see ``docs/upstream/dflare.md`` for the file-level audit and the
-VLM adaptations (MRoPE, image-token handling, block mask).
+``d3412bed231025ea85d35dbf5e0af44f1ac62a5b``, Apache-2.0) onto this repo's
+Qwen3-VL draft stack; see ``docs/upstream/dflare.md`` for the file-level audit
+and the VLM adaptations (MRoPE, image-token handling, block mask).
 
 Two structural changes over :class:`Qwen3DFlashDraftModel`:
 
 1. ``Qwen3DFlareAttention`` gives the target-context K/V dedicated
    ``k_proj_target`` / ``v_proj_target`` projections (the draft tokens keep the
-   shared ``k_proj`` / ``v_proj``). Upstream DFlare shares one projection for
-   both sources; that ablation is available as ``separate_context_kv=false``.
+   shared ``k_proj`` / ``v_proj``). This matches upstream DFlare; it is DFlash
+   that shares one projection for both sources, and
+   ``separate_context_kv=false`` re-selects that shared-KV ablation here.
 2. ``layer_fusion_weights`` of shape ``[num_draft_layers, num_context_layers]``
    replaces DFlash's single FC context: each draft layer attends to its own
    softmax-weighted mixture of the captured target layers (the fusion is
