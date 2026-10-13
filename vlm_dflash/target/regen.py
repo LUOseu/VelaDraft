@@ -63,7 +63,14 @@ def _regen_single_turn_rows(
             image = Image.open(row_image_path(row, media_dir)).convert("RGB")
             images.append(image)
             texts.append(render_prompt(processor, row_question(row)))
-        inputs = processor(text=texts, images=images, padding=True, return_tensors="pt").to(device)
+        from ..adapters import adapter_for_model
+
+        inputs = processor(
+            text=texts,
+            images=adapter_for_model(model).batch_processor_images(images),
+            padding=True,
+            return_tensors="pt",
+        ).to(device)
         prompt_len = int(inputs["input_ids"].shape[1])
         with torch.inference_mode():
             generated = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)

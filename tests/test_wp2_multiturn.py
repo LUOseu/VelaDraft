@@ -342,6 +342,9 @@ class _FakeChatProcessor:
 
 class _StubLM:
     def __init__(self, replies: list[list[int]]):
+        # The regen batch path resolves the family adapter (image-argument
+        # shaping); the stub stands in for a Qwen-VL target.
+        self.config = SimpleNamespace(model_type="qwen2_5_vl")
         self.generation_config = SimpleNamespace(eos_token_id=_END)
         self.replies = [list(reply) for reply in replies]
         self.calls = 0

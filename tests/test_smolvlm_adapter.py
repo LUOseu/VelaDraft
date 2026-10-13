@@ -286,3 +286,11 @@ def test_capture_batch_clamps_out_of_range_config_pad_id():
     assert records[1]["input_ids"].tolist() == [1, 3, 3, 4]
     assert records[0]["image_span"] == (1, 2)
     assert records[0]["position3"].shape == (3, 6)
+
+
+def test_batch_processor_images_nests_per_text():
+    adapter = SmolVLMAdapter()
+    images = ["a", "b", "c"]
+    assert adapter.batch_processor_images(images) == [["a"], ["b"], ["c"]]
+    # Qwen-VL keeps the flat list (its processor accepts it).
+    assert get_adapter("qwen2_5_vl").batch_processor_images(images) == images

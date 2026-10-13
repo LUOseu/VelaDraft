@@ -165,6 +165,11 @@ class SmolVLMAdapter(VLMAdapter):
         row = torch.arange(length, device=input_ids.device, dtype=torch.long)
         return row.unsqueeze(0).expand(3, -1).contiguous()
 
+    def batch_processor_images(self, images: list) -> list:
+        # SmolVLM's processor matches the number of images in the text against a
+        # nested per-text image list; a flat batch list raises.
+        return [[image] for image in images]
+
     def capture_forward_inputs(self, prepared_list: list[dict], device) -> dict:
         forward_kwargs: dict = {}
         for key in ("pixel_values", "pixel_attention_mask"):

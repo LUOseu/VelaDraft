@@ -300,6 +300,14 @@ class VLMAdapter:
             positions = positions[:, 0, :]
         return positions
 
+    def batch_processor_images(self, images: list) -> list:
+        """Image argument for a multi-row ``processor(text=[...], images=...)`` call.
+
+        Default passes the flat per-row image list (Qwen-VL accepts it);
+        families whose processors demand one nested list per text override this.
+        """
+        return images
+
     # ---- forward plumbing ----------------------------------------------
     def forward_kwargs_from_inputs(self, inputs: dict) -> dict:
         """Pick the family's tensors out of a processor-output dict (eval path)."""
