@@ -603,6 +603,16 @@ def test_capture_multi_image_multi_turn_record(tmp_path):
     assert record["turn_spans"][-1][1] == int(record["input_ids"].numel())
     assert record["position3"].shape == (3, int(record["input_ids"].numel()))
     assert record["hidden"].shape[0] == int(record["input_ids"].numel())
+    # Multi-image MRoPE positions: monotone along the sequence per axis, and
+    # the second image occupies its own spatial block (not collapsed into the
+    # first one) - the invariant the drafter's spatial-RoPE path consumes.
+    positions = record["position3"]
+    # Axes 0/1 (h/w) stream monotonically; the temporal axis legitimately
+    # cycles inside an image block on this fixture.
+    for axis in (0, 1):
+        assert torch.all(positions[axis][1:] >= positions[axis][:-1]), f"axis {axis} not monotone"
+    (start_a, end_a), (start_b, end_b) = record["image_spans"]
+    assert int(positions[0, start_b:].min()) > int(positions[0, start_a : end_a + 1].max())
 
 
 def test_capture_multi_turn_truncates_last_answer(tmp_path):

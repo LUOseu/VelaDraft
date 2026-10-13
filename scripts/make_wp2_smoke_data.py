@@ -3,8 +3,10 @@
 
 Writes ``source.jsonl`` plus an ``images/`` directory of simple coloured
 shapes: every row is a 2-image / 2-turn conversation (image_turns ``[0, 2]``).
-Assistant texts in the jsonl are placeholders - the regen stage replaces them
-with the frozen target's own greedy answers.
+The dataset assistant texts describe the drawn shapes faithfully; the regen
+stage still replaces them with the frozen target's own greedy answers on the
+training split, while the held-out split keeps them as the eval history (so
+multi-turn eval prompts carry a realistic first answer, not a placeholder).
 
 Usage: ``python scripts/make_wp2_smoke_data.py --out data/e2_smoke [--train 16 --val 4]``
 """
@@ -29,7 +31,16 @@ _COLORS = [
 _SHAPES = ("circle", "square", "triangle", "diamond")
 
 _QUESTION_FIRST = "Describe the main shape in the first image in one short sentence."
-_QUESTION_SECOND = "What is the main shape in the second image? One short sentence."
+_QUESTION_SECOND = "Describe the main shape in the second image and mention its colour in one complete sentence."
+
+_COLOR_NAMES = {
+    (196, 60, 60): "red",
+    (60, 140, 196): "blue",
+    (70, 170, 90): "green",
+    (200, 160, 40): "yellow",
+    (150, 90, 190): "purple",
+    (60, 180, 180): "teal",
+}
 
 
 def _draw(shape: str, color: tuple[int, int, int], side: int) -> Image.Image:
@@ -61,14 +72,16 @@ def build(out_dir: Path, train: int, val: int, seed: int, side: int) -> dict:
         names = [f"{sample_id}_a.png", f"{sample_id}_b.png"]
         _draw(shape_a, color_a, side).save(images_dir / names[0])
         _draw(shape_b, color_b, side).save(images_dir / names[1])
+        answer_a = f"The first image shows a {_COLOR_NAMES[color_a]} {shape_a} on a light background."
+        answer_b = f"The second image shows a {_COLOR_NAMES[color_b]} {shape_b} on a light background."
         rows.append(
             {
                 "id": sample_id,
                 "conversations": [
                     {"from": "human", "value": f"<image>\n{_QUESTION_FIRST}"},
-                    {"from": "gpt", "value": "(regenerated)"},
+                    {"from": "gpt", "value": answer_a},
                     {"from": "human", "value": f"<image>\n{_QUESTION_SECOND}"},
-                    {"from": "gpt", "value": "(regenerated)"},
+                    {"from": "gpt", "value": answer_b},
                 ],
                 "images": names,
                 "image_turns": [0, 2],
