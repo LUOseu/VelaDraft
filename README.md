@@ -33,9 +33,10 @@ frozen Qwen-VL targets, with offline feature stores or live target feature
 extraction, resumable training, sequential output verification, and checkpoint
 export.
 
-DFlare and DFly are integrated on main. DFly currently uses the shared block-CE
-training profile; the upstream two-stage training recipe remains a separate
-planned capability.
+DFlare and DFly are integrated on main. DFly defaults to the shared block-CE
+training profile and can select the ported upstream two-stage recipe
+(`algorithm.train_recipe: upstream_two_stage`: LK / D-PACE cold start, then the
+end-to-end TV stage).
 
 - **One interface for every method.** All seven drafters share the same `train` /
   `eval` / `export` commands, checkpoint format and verification path, so method
@@ -129,19 +130,21 @@ All seven methods use the same train, eval and export commands.
 | [JetSpec](docs/algorithms/jetspec.md) | Causal in-block mask + teacher distillation | Forward-KL |
 | [DFlash2](docs/algorithms/dflash2.md) | Local convolutions + candidate selector | Experimental reconstructed objective |
 | [DFlare](docs/algorithms/dflare.md) | Per-draft-layer fusion + dedicated context K/V | Shared block CE |
-| [DFly](docs/algorithms/dfly.md) | FC + fusion residual + hidden correction | CE adaptation; upstream two-stage recipe pending |
+| [DFly](docs/algorithms/dfly.md) | FC + fusion residual + hidden correction | CE (default) or ported upstream two-stage recipe (`train_recipe`) |
 
 DFlare and DFly are **integrated on main** and validated in-repo on both
 Qwen-VL targets (full pipeline on Qwen2.5-VL-3B, reduced validation on
 Qwen3-VL-8B); their release-validation pass is tracked separately in the
 [support matrix](SUPPORT_MATRIX.md) and [release validation](RELEASE_VALIDATION.md).
 
-DFly notes: training runs the shared block-CE profile (`objective_profile=controlled_ce`
-in the draft config, checkpoint and export); upstream's LK/D-PACE → end-to-end TV
-recipe is not ported. At inference the block backbone runs in parallel, while the
-hidden-states correction and the LM-head projection run per slot sequentially,
-conditioned on the previously proposed tokens — the documented local adaptation
-of upstream's train-time-only correction.
+DFly notes: training defaults to the shared block-CE profile
+(`objective_profile=controlled_ce` in the draft config, checkpoint and export);
+setting `algorithm.train_recipe: upstream_two_stage` selects the ported
+LK/D-PACE → end-to-end TV recipe, which requires a capture-v2 store
+(`capture.store_final_hidden=true`). At inference the block backbone runs in
+parallel, while the hidden-states correction and the LM-head projection run per
+slot sequentially, conditioned on the previously proposed tokens — the
+documented local adaptation of upstream's train-time-only correction.
 
 DFlash2 uses an experimental reconstruction of the undisclosed upstream training
 objective, and JetSpec's production tree runtime is not ported. Per-target status

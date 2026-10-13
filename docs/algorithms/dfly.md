@@ -31,29 +31,77 @@ DFly's gain at this scale) and the Qwen3-VL-8B reduced validation (**AL
 from step 1 — unit-tested and re-checked on `ckpt_final.pt` with
 `scripts/diag_gradient_coverage.py`, 42/42); the fusion stays near its prior
 (drift 0.0039).
-**The upstream two-stage objective (LK / D-PACE, e2e TV) is not ported** — see
-"Objective" and `docs/upstream/dfly.md`; DFly runs here train the ported
-architecture with the shared DFlash decayed block CE, and any reported number
-must say so.
+**The upstream two-stage objective (LK / D-PACE, e2e TV) is ported as a
+config-selectable recipe** (`algorithm.train_recipe: upstream_two_stage` — see
+"Objective" and `docs/upstream/dfly.md`). Every number above was produced with
+the default shared DFlash decayed block CE (`objective_profile:
+controlled_ce`), which stays the default; the recipe objective is unit-tested
+and exercised end to end on the tiny fixture, but no canonical GPU recipe run
+is recorded here yet, so any reported number must state which profile produced
+it.
 
 ## Objective (read before citing numbers)
 
-Upstream `vllm_qwen3_8b_dfly.yaml` trains two stages: a cold start on the LK
-(acceptance-rate) distillation loss with D-PACE position weighting
-(`lk_loss_weight: 1.0`, `dpace_alpha: 0.5`, `lk_loss_type: hybrid`, no CE), then
-a final stage on the end-to-end multi-step TV objective
-(`lk_loss_weight: 0.0`, `e2e_tv_loss_weight: 1.0`). **None of these losses are
-implemented in this repo yet**; the trainer uses the same decayed block CE as
-DFlash/DFlare (anchors, block mask, slot conventions unchanged). The gap is
-tracked in `ROADMAP.md`; until it lands, DFly here is an architecture +
-correction port, not an objective reproduction.
+Two objective profiles are selectable; every run is stamped with a
+machine-readable `objective_profile` in the draft config, checkpoint metadata,
+export and model card.
 
-So a config cannot silently claim the upstream recipe: every DFly run is
-stamped with a machine-readable `objective_profile: controlled_ce` (draft
-config, checkpoint metadata, export and model card), and the upstream recipe
-knobs (`loss_objective`, `lk_loss_weight`, `tv_loss`, `tv_loss_weight`,
-`two_stage`, `d_pace`, `d_pace_weight`) are **rejected at build time** with a
-message pointing back at this profile instead of being ignored.
+**Default — `controlled_ce`** (no `algorithm.train_recipe`): the shared decayed
+block CE of DFlash/DFlare (anchors, block mask, slot conventions unchanged).
+All canonical DFly numbers recorded so far use this profile.
+
+**Ported upstream recipe — `algorithm.train_recipe: upstream_two_stage`**
+(`vlm_dflash/objectives.py`; an exact port of the LK / D-PACE / e2e-TV math in
+`angelspec/models/dflash.py` @ `d3412bed`, the MIT-licensed LightSeek loss ops):
+
+1. cold start (`cold_start_fraction` share of the planned optimizer steps,
+   default 0.5): the LK acceptance-rate distillation loss with D-PACE position
+   weighting and **no CE** — `lk_loss_weight: 1.0`, `lk_loss_type: hybrid`,
+   `dpace_alpha: 0.5`, `eta: 3.0`;
+2. final stage: D-PACE-weighted block CE **plus** the end-to-end multi-step TV
+   term (`e2e_tv_loss_weight: 1.0`), which couples the block's accepted-length
+   objective through the prefix product and ignores the decay/reweighting
+   (`valid_mask` only).
+
+```text
+TV = ½·Σ_v|p_v − q_v|          LK_hybrid = λ·KL(p‖q) + (1−λ)·TV,  λ = exp(−η·sg(1−TV))
+w_j = Σ_{t≥j} Π_{s≤t}((1−α)c_s + α),  c_s = sg·exp(−CE_s),  α = dpace_alpha
+L_e2e = 1 − (1/Γ) Σ_{j≤Γ} Π_{i≤j} α_i,  α_i = Σ_v min(p_i,v, q_i,v),  Γ = block_size
+```
+
+Operational contract:
+
+- both stages distill the target distribution, so the run requires
+  `capture.store_final_hidden=true` and a feature store with
+  `stores_final_hidden=true` (same teacher signal as JetSpec/DFlash2); the
+  trainer refuses a source without it up front, and `resume` refuses a
+  checkpoint whose recipe/stage does not match (the recipe is also part of the
+  training-plan digest);
+- the stage boundary is deterministic (`cold_start_fraction × total_steps`) and
+  is logged per step (`recipe_stage`, plus `lk_loss` / `ce_loss` /
+  `e2e_tv_loss` / `e2e_accept_len` components);
+- upstream's raw YAML spellings (`loss_objective`, `lk_loss_weight`,
+  `tv_loss`, `tv_loss_weight`, `two_stage`, `d_pace`, `d_pace_weight`) stay
+  **rejected at build time** under `algorithm.dfly`: the ported recipe is
+  selected through `algorithm.train_recipe` only, so a config cannot describe
+  one run two conflicting ways.
+
+Recipe config example (canonical 2K: `configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml`,
+same data as the matched run; the only differences are the objective and the
+upstream 5-layer context):
+
+```yaml
+algorithm:
+  name: dfly
+  train_recipe: {name: upstream_two_stage, cold_start_fraction: 0.5}
+  dfly:
+    context_layer_ids: [1, 9, 17, 25, 33]
+capture:
+  store_final_hidden: true     # the recipe's teacher signal
+```
+
+A same-identity store captured with final hidden states (e.g. the JetSpec 2K
+store, identical `[1, 9, 17, 25, 33]` capture) can be reused via `--features`.
 
 ## Config
 
@@ -78,7 +126,9 @@ context K/V (`separate_context_kv: true` is rejected with a clear error).
 Canonical configs mirror the DFlare set: `configs/dfly/smoke_coco.yaml`,
 `configs/dfly/qwen2_5_vl_3b_2k.yaml` (matched, `[1, 17, 33]`),
 `configs/dfly/qwen2_5_vl_3b_2k_layers.yaml` (upstream 5-layer context
-`[1, 9, 17, 25, 33]` = `build_target_layer_ids(36, 5)`) and
+`[1, 9, 17, 25, 33]` = `build_target_layer_ids(36, 5)`),
+`configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml` (the two-stage recipe on the
+upstream 5-layer context, capture-v2 store) and
 `configs/dfly/qwen3_vl_8b_reduced.yaml`. Upstream recipe reference
 (`vllm_qwen3_8b_dfly.yaml`): lr 5e-4, min_lr 5e-5, weight decay 0.1, block 16,
 128 anchors, 5 draft layers / 5 target layers of a 4096-wide target.
@@ -128,8 +178,10 @@ documented:
 
 ## Known differences from upstream
 
-See `docs/upstream/dfly.md`: objective = shared CE (upstream two-stage
-LK/D-PACE/e2e-TV not implemented); inference rule = documented adaptation; the
-correction is applied through the repo's pre-head trainer hook instead of the
-model wrapper; staged/online feature stores with explicit layer slicing replace
-the live target forward; the VL MRoPE/image plumbing is this repo's.
+See `docs/upstream/dfly.md`: objective = file-level port of the two-stage
+LK/D-PACE/e2e-TV math, selectable via `algorithm.train_recipe` (default: shared
+CE profile; no canonical GPU recipe run recorded yet); inference rule =
+documented adaptation; the correction is applied through the repo's pre-head
+trainer hook instead of the model wrapper; staged/online feature stores with
+explicit layer slicing replace the live target forward; the VL MRoPE/image
+plumbing is this repo's.

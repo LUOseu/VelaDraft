@@ -15,7 +15,8 @@
   - DFly: DFlash shared-KV layers + FC context + fusion residual + zero-init
     TreeFlash hidden-states correction applied before the frozen LM head
     (`sample_from_anchor=false`); the upstream two-stage LK/D-PACE objective
-    and e2e-TV are **not** ported (documented in `docs/upstream/dfly.md`).
+    and e2e-TV are ported as the config-selectable `algorithm.train_recipe`
+    (see the subsection below; documented in `docs/upstream/dfly.md`).
 - Feature contract: explicit-id layer slicing — one capture superset
   (`[1, 9, 17, 25, 33]`) serves the matched comparison (`[1, 17, 33]`, the
   frozen DFlash routing) and the upstream 5-layer recipe;
@@ -43,6 +44,31 @@
   the hidden-states correction carries +0.113) and Qwen3-VL-8B reduced
   validation (DFlare 1.185, DFly 1.226), all token-exact; numbers in
   `BENCHMARKS.md` and `benchmarks/results/zoo_canonical.{json,csv}`.
+
+### DFly upstream training recipe (LK / D-PACE cold start -> e2e TV)
+
+- New objectives module `vlm_dflash/objectives.py`: exact ports of the
+  AngelSpec / LightSeek loss math after the pinned commit (D-PACE position
+  weights from per-position confidences, LK in `hybrid` and `alpha` forms,
+  the end-to-end multi-step TV term over the block prefix product, per-slot
+  CE), all chunked in fp32 so full-vocab tensors never materialize at once.
+- `algorithm.train_recipe` selects the objective per run (a name or
+  `{name, cold_start_fraction}`); `upstream_two_stage` runs stage 1
+  (LK + D-PACE, no CE) for the configured fraction of the planned steps and
+  stage 2 (D-PACE CE + e2e TV) after it. Default stays the shared decayed
+  block CE (`controlled_ce`), byte-identical plan digests for runs that do
+  not set the key.
+- Teacher signal: recipe stages consume the target's captured final hidden
+  states (`capture.store_final_hidden=true` / `stores_final_hidden=true`);
+  training refuses a source without it up front, checkpoints record the
+  recipe (`train_recipe`, `objective_profile` = recipe name) and exact resume
+  refuses a changed recipe/stage (plan digest + stage gate).
+- Config: `configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml` (two-stage recipe on the
+  upstream 5-layer context; reuses a same-identity capture-v2 store).
+- Tests: `tests/test_objectives.py` (32 tests: bounded resolution schema,
+  plan-digest sensitivity, formula parity against direct references, chunk
+  invariance, stage switching, teacher requirement, resume gating, and an
+  end-to-end tiny-target recipe run + refusal paths).
 
 ### Online training: live target feature extraction
 

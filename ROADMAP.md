@@ -53,8 +53,13 @@ reference algorithm; the other four plug in through the registry.
       Qwen3-VL reduced runs (DFlare 1.185, DFly 1.226) recorded; the
       target-family columns in `SUPPORT_MATRIX.md` are updated (Qwen2.5-VL
       validated, Qwen3-VL reduced validation).
-- [ ] DFly upstream two-stage objective (LK / D-PACE cold start, then e2e TV):
-      not implemented; DFly runs currently train the shared decayed block CE.
+- [x] DFly upstream two-stage objective (LK / D-PACE cold start, then e2e TV):
+      ported as the config-selectable `algorithm.train_recipe:
+      upstream_two_stage` (exact loss math in `vlm_dflash/objectives.py`;
+      CPU-tested for formula parity, stage switching and resume gating, and
+      exercised end to end on the tiny fixture). Runs without `train_recipe`
+      keep the shared decayed block CE; a canonical GPU recipe run and its AL
+      comparison are the next record to land.
 
 ## Later (not on the critical path)
 - DFlash2 objective isolation (`unary_loss: ce` control) if the number is

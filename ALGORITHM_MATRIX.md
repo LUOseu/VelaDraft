@@ -43,7 +43,9 @@ Notes
   conv/selector decomposition. Audit + `what is official / inferred /
   experimental` split: `docs/upstream/dflash2.md`.
 - DFlare / DFly (AngelSpec ports, stage 6): the training objective is the
-  unmodified DFlash block-CE; what changes is the context pathway (DFlare:
+  unmodified DFlash block-CE unless `algorithm.train_recipe` selects the ported
+  upstream two-stage recipe (LK / D-PACE cold start -> e2e TV; DFly only, exact
+  math in `vlm_dflash/objectives.py`); what changes is the context pathway (DFlare:
   learnable per-draft-layer fusion + dedicated context K/V; DFly: DFlash
   shared-KV layers + FC context + fusion residual + zero-initialised
   hidden-states correction). Canonical 2K runs, ablations and Qwen3-VL
@@ -52,6 +54,7 @@ Notes
   context K/V is worth +0.058 while the learned fusion is prior-dominated
   (Δ0.0005 frozen; drift 0.011) — and DFly AL 1.682, where the hidden-states
   correction carries +0.113 (no-correction ablation 1.569). Upstream
-  semantics and the deliberately-not-ported DFly pieces (LK/D-PACE two-stage
-  objective) are documented in `docs/upstream/dflare.md` /
-  `docs/upstream/dfly.md`; protocols in `docs/algorithms/{dflare,dfly}.md`.
+  semantics, the ported DFly two-stage objective and the remaining
+  non-port (the tree/parallel inference correction form) are documented in
+  `docs/upstream/dflare.md` / `docs/upstream/dfly.md`; protocols in
+  `docs/algorithms/{dflare,dfly}.md`.

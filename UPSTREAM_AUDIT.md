@@ -13,7 +13,7 @@ format, what we port, what we change (and why), and the parity level.
 | JetSpec | `docs/upstream/jetspec.md` | — | bb5b34ce | maintainer implementation (training semantics + mask + metrics; runtime not ported) |
 | DFlash2 | `docs/upstream/dflash2.md` | 55ebbd5b | — (has no dflash2 at bb5b34ce) | architecture: maintainer / objective: experimental reconstruction (undisclosed) / runtime: inferred |
 | DFlare | `docs/upstream/dflare.md` | — | — | AngelSpec port @ `d3412bed` (fusion + separate context K/V; shared DFlash objective; inference adaptation documented) |
-| DFly | `docs/upstream/dfly.md` | — | — | AngelSpec port @ `d3412bed` (fusion + hidden correction; LK/D-PACE two-stage objective and e2e-TV not ported — documented) |
+| DFly | `docs/upstream/dfly.md` | — | — | AngelSpec port @ `d3412bed` (fusion + hidden correction; LK/D-PACE two-stage objective and e2e-TV ported as the config-selectable `algorithm.train_recipe` — documented) |
 
 Pinned commits
 

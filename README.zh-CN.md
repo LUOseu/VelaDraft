@@ -30,8 +30,9 @@ VelaDraft 是面向多模态 block-parallel drafter 的统一训练工具，支�
 DSpark、Domino、JetSpec、DFlash2、DFlare 和 DFly。针对冻结的 Qwen-VL target，
 提供离线特征复用、在线特征提取、断点恢复、逐 token 输出验证和 checkpoint 导出。
 
-DFlare 与 DFly 已集成到 main。当前 DFly 使用共享的 block-CE 训练配方，
-上游两阶段训练配方作为独立能力继续补全。
+DFlare 与 DFly 已集成到 main。DFly 默认使用共享的 block-CE 训练配方，
+并可选择已移植的上游两阶段配方（`algorithm.train_recipe: upstream_two_stage`：
+LK / D-PACE 冷启动，随后 end-to-end TV 阶段）。
 
 - **多方法统一接口。** 七种 drafter 共用同一套 `train` / `eval` / `export`
   命令、checkpoint 格式与验证路径，方法对比建立在同一基底上。
@@ -112,16 +113,19 @@ vlm-dflash train-demo --target "$VLM_DFLASH_TARGET" --steps 80
 | [JetSpec](docs/algorithms/jetspec.md) | 因果块内 mask + teacher distillation | forward-KL |
 | [DFlash2](docs/algorithms/dflash2.md) | 局部卷积 + candidate selector | 实验性重建目标 |
 | [DFlare](docs/algorithms/dflare.md) | 逐 draft 层融合 + 独立 context K/V | 共享 block CE |
-| [DFly](docs/algorithms/dfly.md) | FC + fusion residual + hidden correction | CE 适配，上游完整配方待接入 |
+| [DFly](docs/algorithms/dfly.md) | FC + fusion residual + hidden correction | 默认 CE，或选择已移植的上游两阶段配方（`train_recipe`） |
 
 DFlare 与 DFly 已 **集成到 main**，并在两个 Qwen-VL target 上完成仓库内验证
 （Qwen2.5-VL-3B 全流程、Qwen3-VL-8B 小规模验证）；发布验证状态单独记录在
 [支持矩阵](SUPPORT_MATRIX.md)与[发布验证](RELEASE_VALIDATION.md)中。
 
-DFly 说明：训练使用共享 block-CE 配方（draft config、checkpoint 与导出中记录
-机器可读的 `objective_profile=controlled_ce`）；上游 LK/D-PACE → end-to-end TV
-配方未移植。推理时 block backbone 并行执行，hidden-states correction 与 LM-head
-投影按 slot 顺序、基于此前实际提议的 token 逐个执行——这是已说明的本地适配。
+DFly 说明：训练默认使用共享 block-CE 配方（draft config、checkpoint 与导出中
+记录机器可读的 `objective_profile=controlled_ce`）；设置
+`algorithm.train_recipe: upstream_two_stage` 可选择已移植的 LK/D-PACE →
+end-to-end TV 两阶段配方（需要 capture-v2 特征存储，
+`capture.store_final_hidden=true`）。推理时 block backbone 并行执行，
+hidden-states correction 与 LM-head 投影按 slot 顺序、基于此前实际提议的 token
+逐个执行——这是已说明的本地适配。
 
 DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpec 的生产 tree runtime
 未移植。各 target 的状态与能力细节见[支持矩阵](SUPPORT_MATRIX.md)、

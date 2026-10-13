@@ -1,10 +1,11 @@
 # Upstream audit — DFly
 
 Status: **audited; architecture + hidden-states correction + trainer port landed.
-The upstream two-stage objective (LK / D-PACE, e2e TV) is NOT implemented in this
-repo — see "What we do not port" below.** DFly runs here train the ported
-architecture with the shared DFlash decayed block CE, and that is stated wherever
-DFly numbers are reported.
+The upstream two-stage objective (LK / D-PACE, e2e TV) is now ported as the
+config-selectable ``algorithm.train_recipe: upstream_two_stage`` (exact loss math
+in ``vlm_dflash/objectives.py``; see item (5) below). DFly runs without
+``train_recipe`` keep the shared DFlash decayed block CE, and every reported
+number states which objective profile produced it.**
 
 ```text
 Paper / design:            AngelSpec: Towards Real-World High Performance Inference
@@ -103,20 +104,36 @@ What we change:
   (4) Ablation-only switches (not upstream): enable_hidden_correction=false
       (isolates the correction; upstream default is true), fusion_trainable=false,
       fusion_init="uniform".
+  (5) The upstream loss recipe is ported as a config-selectable objective:
+      ``algorithm.train_recipe: upstream_two_stage`` runs the LK / D-PACE cold
+      start (no CE) and then the D-PACE-weighted CE + end-to-end multi-step TV
+      stage — an exact port of angelspec/models/dflash.py's _compute_lk_loss /
+      _compute_e2e_tv_loss / _dpace_position_weights, chunked in fp32 (see
+      vlm_dflash/objectives.py; test oracles in tests/test_objectives.py). Both
+      stages consume the target's final hidden states, so a recipe run requires
+      capture.store_final_hidden=true, exactly like JetSpec / DFlash2. The
+      stage boundary is this repo's ``cold_start_fraction`` knob (fraction of
+      the planned optimizer steps in stage 1); the stage is part of the plan
+      digest and of the resume gate. Without ``train_recipe`` the run keeps the
+      shared decayed block CE (objective_profile=controlled_ce).
 What we do NOT port:
-  (5) The upstream loss recipe. This repo's objective stays the shared decayed
-      block CE; LK / D-PACE position weighting / e2e TV are not implemented, so
-      DFly runs here are "architecture + correction with the DFlash objective",
-      not the upstream two-stage recipe. No config in this repo silently claims
-      the LK objective; the missing recipe is listed as future work in
-      docs/algorithms/dfly.md and ROADMAP.md.
+  (6) The tree/speculative parallel form of the inference correction (item (2)
+      defines this repo's sequential serving rule), upstream checkpoints, and
+      upstream's raw recipe YAML spellings — loss_objective / lk_loss_weight /
+      tv_loss / tv_loss_weight / two_stage / d_pace / d_pace_weight stay
+      rejected under algorithm.dfly so one config cannot describe one run two
+      conflicting ways; select the ported recipe through algorithm.train_recipe
+      instead (item (5)).
 Why we change: the repo's single contract (registered algorithms, staged/online
                features, unified checkpoints, one shared CE objective pipeline)
                must hold for every algorithm; the ported architecture and
                correction math are unchanged.
 Parity level:  architecture + correction = file-level port against the pinned
-               commit; objective = adapted (CE only); inference = documented
-               adaptation. Not verified against upstream checkpoints.
+               commit; objective = file-level port of the LK / D-PACE / e2e-TV
+               math, selectable via algorithm.train_recipe, with the shared CE
+               profile as the default; inference = documented adaptation. Not
+               verified against upstream checkpoints, and no canonical GPU
+               recipe run is recorded yet.
 ```
 
 Local code: `vlm_dflash/dfly/model.py` (FC + fusion residual + correction),
