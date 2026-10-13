@@ -20,10 +20,12 @@ algorithm:
 # runs/qwen25vl3b_dfly_2k run, so the only difference is the training objective
 # (shared decayed CE vs the upstream two-stage LK -> e2e-TV schedule) plus the
 # upstream 5-layer context. Prepare with: data/regen symlinked to
-# runs/qwen25vl3b_2k (same dataset seed), features captured here with
-# drafter.capture_layer_ids below and capture.store_final_hidden=true. A
-# same-identity store captured with final hidden states (e.g. the JetSpec 2K
-# store, identical [1, 9, 17, 25, 33] capture) can be reused via --features.
+# runs/qwen25vl3b_2k (same dataset seed); capture here with
+# drafter.capture_layer_ids below + capture.store_final_hidden=true (no stored
+# 5-layer capture carries final hidden states yet), then train with --features.
+# For the matched 3-layer comparison against the existing controlled_ce
+# baseline (context [1, 17, 33]), reuse the JetSpec 2K store via --features -
+# see qwen2_5_vl_3b_2k_recipe_matched.yaml.
 run:
   name: qwen25vl3b_dfly_2k_recipe
   dir: runs/qwen25vl3b_dfly_2k_recipe
