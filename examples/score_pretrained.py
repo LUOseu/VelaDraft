@@ -19,10 +19,10 @@ from vlm_dflash.config import apply_overrides, dump_effective_config, resolve_ru
 from vlm_dflash.contract import ensure_contract
 from vlm_dflash.data.prepare import build_dataset
 from vlm_dflash.demo import (
+    align_config_with_drafter,
     attach_drafter,
     build_demo_config,
     detect_drafter_algorithm,
-    drafter_identity,
     write_demo_source,
 )
 from vlm_dflash.eval.run import evaluate
@@ -53,10 +53,7 @@ def main() -> int:
         steps=0,
         source_desc="synthetic sample (examples/score_pretrained.py)",
     )
-    identity = drafter_identity(args.drafter)
-    for key in ("image_min_pixels", "image_max_pixels"):
-        if identity.get(key) is not None:
-            cfg["target"][key] = int(identity[key])
+    align_config_with_drafter(cfg, detect_drafter_algorithm(args.drafter) or "dflash", args.drafter)
     cfg = apply_overrides(cfg, None)
     dump_effective_config(cfg, run_dir / "config.json")
     contract = ensure_contract(cfg, run_dir)

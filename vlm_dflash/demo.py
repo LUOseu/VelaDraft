@@ -11,10 +11,12 @@ model-zoo directory to score real weights.
 target-native regen -> hidden-state capture -> tiny training -> eval -> export
 -- so a fresh clone can prove the complete multimodal pipeline end to end.
 
-When ``--drafter`` points at a checkpoint trained with different image pixel
-bounds than the demo defaults, the demo aligns its target-side bounds with the
-drafter's recorded identity so the provenance gate accepts the pair, and uses a
-drafter-specific run directory (the frozen contract must not be overloaded).
+When ``--drafter`` points at a checkpoint trained with different target-side
+settings than the demo defaults (image pixel bounds, a larger feature-store
+capture layer list, or an explicit context subset), the demo adopts the
+drafter's recorded values so the provenance gate accepts the pair and the draft
+model rebuilds with its trained shapes, and uses a drafter-specific run
+directory (the frozen contract must not be overloaded).
 """
 
 from __future__ import annotations
@@ -305,6 +307,86 @@ def drafter_run_suffix(drafter_path: str | Path) -> str:
     return name[:-3] if name.endswith(".pt") else name
 
 
+def drafter_recorded_layers(drafter_path: str | Path) -> dict:
+    """Recorded layer routing of a drafter (run dir, export dir or .pt file).
+
+    Returns ``target_layer_ids`` (the consumed context subset) and
+    ``capture_layer_ids`` (the training store's captured layer list); fields an
+    artifact does not record come back as ``None`` (legacy exports recorded only
+    the draft routing).
+    """
+    import torch
+
+    from .utils import read_json
+
+    path = Path(drafter_path).expanduser().resolve()
+    if not path.exists():
+        raise SystemExit(f"--drafter {path} does not exist.")
+    if path.is_dir():
+        run_checkpoint = path / "train" / "ckpt_final.pt"
+        export_config = path / "config.json"
+        if run_checkpoint.exists():
+            meta = torch.load(run_checkpoint, map_location="cpu", weights_only=False)
+        elif export_config.exists() and (path / "model.safetensors").exists():
+            drafter = read_json(export_config).get("drafter") or {}
+            return {
+                "target_layer_ids": drafter.get("target_layer_ids"),
+                "capture_layer_ids": drafter.get("capture_layer_ids"),
+            }
+        else:
+            raise SystemExit(
+                f"--drafter {path} is a directory but has neither train/ckpt_final.pt "
+                "nor an exported config.json + model.safetensors."
+            )
+    elif path.suffix == ".pt":
+        meta = torch.load(path, map_location="cpu", weights_only=False)
+    else:
+        raise SystemExit(
+            "--drafter must be a run directory, a .pt checkpoint file or an exported zoo directory."
+        )
+    return {
+        "target_layer_ids": meta.get("target_layer_ids"),
+        "capture_layer_ids": meta.get("capture_layer_ids"),
+    }
+
+
+def align_config_with_drafter(cfg: dict, algorithm_name: str, drafter_path: str | Path) -> None:
+    """Adopt a drafter's recorded target-side settings into a fresh demo config.
+
+    A fresh demo config follows algorithm defaults, which can disagree with a
+    drafter trained on a feature store with a larger capture layer list (e.g.
+    the 5-layer 2K DFlare/DFly runs) or with an explicit context subset: the
+    target identity gate would refuse the pair, and the fusion algorithms would
+    rebuild their layer fusion with the wrong shape. Adopt the recorded values
+    verbatim — image pixel bounds, ``drafter.capture_layer_ids`` and, for the
+    fusion algorithms, ``algorithm.<name>.context_layer_ids`` — so the recorded
+    export runs through the normal demo path unchanged.
+    """
+    identity = drafter_identity(drafter_path)
+    recorded = drafter_recorded_layers(drafter_path)
+    for key in ("image_min_pixels", "image_max_pixels"):
+        value = identity.get(key)
+        if value is not None:
+            cfg["target"][key] = int(value)
+    capture = recorded.get("capture_layer_ids") or identity.get("capture_layer_ids")
+    if capture:
+        cfg["drafter"]["capture_layer_ids"] = [int(layer) for layer in capture]
+    context = recorded.get("target_layer_ids")
+    if context and algorithm_name in ("dflare", "dfly"):
+        raw_algorithm = cfg.get("algorithm")
+        if isinstance(raw_algorithm, str):
+            algorithm_cfg = {"name": raw_algorithm}
+        elif isinstance(raw_algorithm, dict):
+            algorithm_cfg = dict(raw_algorithm)
+        else:
+            algorithm_cfg = {}
+        algorithm_cfg[algorithm_name] = {
+            **(algorithm_cfg.get(algorithm_name) or {}),
+            "context_layer_ids": [int(layer) for layer in context],
+        }
+        cfg["algorithm"] = algorithm_cfg
+
+
 def _algorithm_name(value) -> str | None:
     """Normalize a config/checkpoint ``algorithm`` field (string or {name: ...})."""
     if isinstance(value, str) and value.strip():
@@ -358,7 +440,7 @@ def detect_drafter_algorithm(drafter_path: str | Path) -> str | None:
     return None
 
 
-def _demo_setup(args, kind: str, *, target_overrides: dict | None = None, run_name_suffix: str | None = None):
+def _demo_setup(args, kind: str, *, run_name_suffix: str | None = None):
     """Shared setup: resolve target/run dir, generate the sample, write config + contract."""
     from .algorithms import get_algorithm
     from .contract import ensure_contract
@@ -410,9 +492,8 @@ def _demo_setup(args, kind: str, *, target_overrides: dict | None = None, run_na
         steps=int(getattr(args, "steps", 0)),
         source_desc=source_desc,
     )
-    for key, value in (target_overrides or {}).items():
-        if value is not None:
-            cfg["target"][key] = int(value)
+    if kind == "demo" and getattr(args, "drafter", None):
+        align_config_with_drafter(cfg, algorithm.name, args.drafter)
     cfg = apply_overrides(cfg, getattr(args, "set_list", None))
     dump_effective_config(cfg, run_dir / "config.json")
     contract = ensure_contract(cfg, run_dir)
@@ -458,17 +539,9 @@ def run_demo(args) -> int:
             args.algorithm = detected
             log(f"demo: --drafter records algorithm={detected}; evaluating with it (pass --algorithm to override)")
 
-    target_overrides: dict[str, int] = {}
-    run_name_suffix = None
-    if getattr(args, "drafter", None):
-        identity = drafter_identity(args.drafter)
-        for key in ("image_min_pixels", "image_max_pixels"):
-            value = identity.get(key)
-            if value is not None:
-                target_overrides[key] = int(value)
-        run_name_suffix = drafter_run_suffix(args.drafter)
+    run_name_suffix = drafter_run_suffix(args.drafter) if getattr(args, "drafter", None) else None
     cfg, contract, algorithm, run_dir, source_desc = _demo_setup(
-        args, "demo", target_overrides=target_overrides, run_name_suffix=run_name_suffix
+        args, "demo", run_name_suffix=run_name_suffix
     )
     train_dir = ensure_dir(run_dir / "train")
     if getattr(args, "drafter", None):

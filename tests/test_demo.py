@@ -11,10 +11,12 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from vlm_dflash.demo import (
+    align_config_with_drafter,
     build_demo_config,
     checkpoint_from_export,
     detect_drafter_algorithm,
     drafter_identity,
+    drafter_recorded_layers,
     drafter_run_suffix,
     write_demo_source,
 )
@@ -181,6 +183,73 @@ def test_drafter_run_suffix_separates_contracts(tmp_path):
     export_dir = _tiny_export(tmp_path)
     assert drafter_run_suffix(export_dir) == export_dir.name
     assert drafter_run_suffix(export_dir / "train" / "ckpt_final.pt") == "ckpt_final"
+
+
+def _demo_cfg(tmp_path, algorithm="dflash"):
+    return build_demo_config(
+        target="/models/Qwen2.5-VL-3B-Instruct",
+        algorithm=algorithm,
+        run_dir=tmp_path / "runs" / "demo",
+        pool_path=tmp_path / "pool.jsonl",
+        images_dir=tmp_path / "images",
+        num_train=4,
+        num_val=4,
+        num_prompts=4,
+        max_new_tokens=32,
+        steps=0,
+        source_desc="unit",
+    )
+
+
+def test_drafter_recorded_layers_reads_export_run_and_pt(tmp_path):
+    export_dir = _tiny_export(tmp_path)
+    run_dir = tmp_path / "run"
+    assert drafter_recorded_layers(export_dir) == {
+        "target_layer_ids": [0, 1],
+        "capture_layer_ids": [0, 1],
+    }
+    # the raw run checkpoint records the consumed layers; the training store's
+    # capture list is resolved by the export (legacy ckpts leave it None)
+    from_pt = drafter_recorded_layers(run_dir / "train" / "ckpt_final.pt")
+    assert from_pt == {"target_layer_ids": [0, 1], "capture_layer_ids": None}
+    assert drafter_recorded_layers(run_dir) == from_pt
+
+
+def test_align_config_with_drafter_adopts_recorded_layers(tmp_path):
+    export_dir = _tiny_export(tmp_path)
+
+    dflash_cfg = _demo_cfg(tmp_path)
+    align_config_with_drafter(dflash_cfg, "dflash", export_dir)
+    assert dflash_cfg["target"]["image_min_pixels"] == 100
+    assert dflash_cfg["target"]["image_max_pixels"] == 200
+    assert dflash_cfg["drafter"]["capture_layer_ids"] == [0, 1]
+    # dflash-family routing is contract-derived; no algorithm context knob
+    assert dflash_cfg["algorithm"] == "dflash"
+
+    dfly_cfg = _demo_cfg(tmp_path, algorithm="dfly")
+    align_config_with_drafter(dfly_cfg, "dfly", export_dir)
+    assert dfly_cfg["drafter"]["capture_layer_ids"] == [0, 1]
+    assert dfly_cfg["algorithm"]["name"] == "dfly"  # string form upgraded in place
+    assert dfly_cfg["algorithm"]["dfly"]["context_layer_ids"] == [0, 1]
+
+
+def test_align_config_with_drafter_leaves_capture_free_exports_alone(tmp_path):
+    export = tmp_path / "legacy"
+    export.mkdir()
+    (export / "config.json").write_text(
+        json.dumps(
+            {
+                "drafter": {"target_layer_ids": [0, 1]},
+                "identity": {"image_min_pixels": 100, "image_max_pixels": 200},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (export / "model.safetensors").write_bytes(b"")
+    cfg = _demo_cfg(tmp_path)
+    align_config_with_drafter(cfg, "dflash", export)
+    assert "capture_layer_ids" not in cfg["drafter"]
+    assert cfg["target"]["image_min_pixels"] == 100
 
 
 def test_detect_drafter_algorithm_reads_export_and_run_metadata(tmp_path):
