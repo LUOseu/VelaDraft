@@ -10,10 +10,10 @@ import torch
 from PIL import Image
 
 from ..algorithms import get_algorithm
-from ..data.sharegpt import load_sharegpt, row_image_path, row_question
+from ..data.sharegpt import load_sharegpt, row_image_path, row_image_paths, row_is_multi_turn, row_question
 from ..provenance import assert_identity, identity_from_contract, record_stage
 from ..target.load import load_target
-from ..target.prompts import encode_prompt
+from ..target.prompts import encode_prompt, messages_from_row, render_conversation
 from ..utils import ensure_dir, log, write_json, write_jsonl
 from .accept import summarize_samples
 from .equivalence import sequences_equal
@@ -160,8 +160,23 @@ def prepare_prompts(model, processor, rows, media_dir, *, max_new_tokens: int, d
     log(f"{label}: target-only greedy on {len(rows)} prompts")
     prompts = []
     for row in rows:
-        image = Image.open(row_image_path(row, media_dir)).convert("RGB")
-        inputs = encode_prompt(processor, row_question(row), image)
+        if row_is_multi_turn(row):
+            # Multi-turn prompt: everything up to (and including) the last user
+            # turn, with the dataset's own earlier assistant text as history.
+            conversations = row["conversations"]
+            last_human = max(
+                index
+                for index, turn in enumerate(conversations)
+                if str(turn.get("from", "")).lower() in ("human", "user")
+            )
+            messages, image_indices = messages_from_row(row, upto=last_human + 1)
+            image_paths = row_image_paths(row, media_dir)
+            images = [Image.open(image_paths[position]).convert("RGB") for position in image_indices]
+            text = render_conversation(processor, messages, add_generation_prompt=True)
+            inputs = processor(text=[text], images=images, return_tensors="pt")
+        else:
+            image = Image.open(row_image_path(row, media_dir)).convert("RGB")
+            inputs = encode_prompt(processor, row_question(row), image)
         inputs = {key: value.to(device) for key, value in inputs.items()}
         started = time.perf_counter()
         with torch.inference_mode():

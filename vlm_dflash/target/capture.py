@@ -26,6 +26,7 @@ from .sample_capture import (
     extract_target_head,
     forward_and_capture,
     locate_image_span,
+    locate_image_spans,
     storage_dtype,
 )
 
@@ -35,6 +36,7 @@ __all__ = [
     "extend_mm_token_type_ids",
     "forward_and_capture",
     "locate_image_span",
+    "locate_image_spans",
     "run_capture",
     "save_target_head",
     "storage_dtype",
@@ -92,6 +94,7 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
     index_rows, shard_buffer = [], []
     shard_number = 0
     truncated = 0
+    multi_turn = 0
 
     def flush_shard() -> None:
         nonlocal shard_buffer, shard_number
@@ -100,18 +103,20 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
         path = features_dir / f"shard_{shard_number:03d}.pt"
         torch.save({"samples": shard_buffer}, path)
         for offset, record in enumerate(shard_buffer):
-            index_rows.append(
-                {
-                    "sample_id": record["sample_id"],
-                    "shard": path.name,
-                    "shard_index": offset,
-                    "seq_len": int(record["input_ids"].numel()),
-                    "prompt_len": record["prompt_len"],
-                    "answer_len": record["answer_len"],
-                    "image_span": list(record["image_span"]),
-                    "n_image_tokens": record["n_image_tokens"],
-                }
-            )
+            entry = {
+                "sample_id": record["sample_id"],
+                "shard": path.name,
+                "shard_index": offset,
+                "seq_len": int(record["input_ids"].numel()),
+                "prompt_len": record["prompt_len"],
+                "answer_len": record["answer_len"],
+                "image_span": list(record["image_span"]),
+                "n_image_tokens": record["n_image_tokens"],
+            }
+            if record.get("image_spans"):
+                entry["image_spans"] = [list(span) for span in record["image_spans"]]
+                entry["n_turns"] = int(record.get("n_turns", 1))
+            index_rows.append(entry)
         shard_buffer = []
         shard_number += 1
 
@@ -131,6 +136,8 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
         )
         if record["truncated"]:
             truncated += 1
+        if record.get("n_turns", 1) > 1 or len(record.get("image_spans") or [1]) > 1:
+            multi_turn += 1
         shard_buffer.append(record)
         if len(shard_buffer) >= shard_size:
             flush_shard()
@@ -143,11 +150,13 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
 
     manifest = {
         "format": "vlm-dflash-features-v1",
+        "schema_version": 2 if multi_turn else 1,
         "identity": identity_from_contract(contract),
         "seq_length": seq_length,
         "storage_dtype": str(dtype).replace("torch.", ""),
         "num_samples": len(index_rows),
         "num_truncated": truncated,
+        "num_multi_turn": multi_turn,
         "draft_layer_ids": layer_ids,
         "capture_layer_ids": layer_ids,
         "hidden_size": hidden_size,

@@ -7,9 +7,9 @@ from pathlib import Path
 import torch
 from PIL import Image
 
-from ..data.sharegpt import row_answer, row_image_path, row_question
+from ..data.sharegpt import row_image_path, row_image_paths, row_is_multi_turn, row_question
 from ..utils import ensure_dir, log, write_json
-from .prompts import encode_prompt
+from .prompts import encode_conversation, encode_prompt, messages_from_row
 from .sample_capture import forward_and_capture
 
 
@@ -68,16 +68,42 @@ def run_visual_path_check(
     min_downstream_changed = int(cfg_check.get("min_downstream_changed", 16))
     min_span_cosine_drop = float(cfg_check.get("min_span_cosine_drop", 1e-3))
 
-    def capture_sample(row: dict, image) -> dict:
-        inputs = encode_prompt(processor, row_question(row), image)
+    def capture_sample(row: dict, images) -> dict:
+        """Capture one row with the provided image(s); v2 rows take a list of PIL images."""
+        if row_is_multi_turn(row):
+            turns = row["regen"]["turns"]
+            assistant_indices = [
+                index
+                for index, turn in enumerate(row.get("conversations") or [])
+                if str(turn.get("from", "")).lower() in ("gpt", "assistant", "model")
+            ]
+            overrides = {msg_index: turn["answer_text"] for msg_index, turn in zip(assistant_indices, turns)}
+            messages, _ = messages_from_row(row, assistant_overrides=overrides)
+            inputs = encode_conversation(processor, messages, list(images))
+            full_ids = torch.tensor([int(token) for token in row["regen"]["full_ids"]], dtype=torch.long)
+            return forward_and_capture(
+                model, inputs, full_ids, layer_ids, image_token_id, dtype, merge_size=merge_size, allow_multi_span=True
+            )
+        inputs = encode_prompt(processor, row_question(row), images)
         prompt_ids = row["regen"]["prompt_ids"]
         full_ids = torch.tensor(prompt_ids + row["regen"]["answer_ids"], dtype=torch.long)
         return forward_and_capture(model, inputs, full_ids, layer_ids, image_token_id, dtype, merge_size=merge_size)
 
     base_row = rows[0]
     swap_row = rows[1] if len(rows) > 1 else rows[0]
-    image_a = Image.open(row_image_path(base_row, media_dir)).convert("RGB")
-    image_b = Image.open(row_image_path(swap_row, media_dir)).convert("RGB").resize(image_a.size, Image.BICUBIC)
+    multi_turn = row_is_multi_turn(base_row)
+    if multi_turn:
+        base_paths = row_image_paths(base_row, media_dir)
+        swap_paths = row_image_paths(swap_row, media_dir)
+        image_a = [Image.open(path).convert("RGB") for path in base_paths]
+        image_b = [
+            Image.open(swap_paths[index % len(swap_paths)]).convert("RGB").resize(image_a[index].size, Image.BICUBIC)
+            for index in range(len(image_a))
+        ]
+    else:
+        image_a = Image.open(row_image_path(base_row, media_dir)).convert("RGB")
+        swap_image = Image.open(row_image_paths(swap_row, media_dir)[0]).convert("RGB")
+        image_b = swap_image.resize(image_a.size, Image.BICUBIC)
 
     sample_a = capture_sample(base_row, image_a)
     replay = capture_sample(base_row, image_a)
@@ -120,21 +146,31 @@ def run_visual_path_check(
     }
     write_json(check_path, result)
     if token_count_match:
+        if multi_turn:
+            keep = int(sample_a["input_ids"].numel())
+            loss_mask = torch.zeros(keep, dtype=torch.bool)
+            for start, end in base_row["regen"]["answer_spans"]:
+                loss_mask[min(int(start), keep) : min(int(end), keep)] = True
+        else:
+            loss_mask = torch.cat(
+                (
+                    torch.zeros(len(base_row["regen"]["prompt_ids"]), dtype=torch.bool),
+                    torch.ones(len(base_row["regen"]["answer_ids"]), dtype=torch.bool),
+                )
+            )
+        pair_payload = {
+            "format": "vlm-dflash-swap-pair-v1",
+            "input_ids": sample_a["input_ids"],
+            "loss_mask": loss_mask,
+            "position3": sample_a["position3"],
+            "image_span": list(span),
+            "hidden_a": sample_a["hidden"],
+            "hidden_b": swap["hidden"],
+        }
+        if multi_turn:
+            pair_payload["image_spans"] = [list(value) for value in sample_a["image_spans"]]
         torch.save(
-            {
-                "format": "vlm-dflash-swap-pair-v1",
-                "input_ids": sample_a["input_ids"],
-                "loss_mask": torch.cat(
-                    (
-                        torch.zeros(len(base_row["regen"]["prompt_ids"]), dtype=torch.bool),
-                        torch.ones(len(base_row["regen"]["answer_ids"]), dtype=torch.bool),
-                    )
-                ),
-                "position3": sample_a["position3"],
-                "image_span": list(span),
-                "hidden_a": sample_a["hidden"],
-                "hidden_b": swap["hidden"],
-            },
+            pair_payload,
             pair_path,
         )
     log(f"visual_path_check: passed={passed} replay_bitwise={bitwise_equal} span_changed={span_changed} "

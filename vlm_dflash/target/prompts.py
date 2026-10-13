@@ -1,6 +1,19 @@
-"""Prompt rendering shared by regen, capture and eval (single code path)."""
+"""Prompt rendering shared by regen, capture and eval (single code path).
+
+Two shapes exist: :func:`render_prompt` / :func:`encode_prompt` for v1 rows
+(single image, single question - byte-identical to the original pipeline) and
+:func:`messages_from_row` / :func:`render_conversation` / :func:`encode_conversation`
+for schema-v2 rows (multi-image, multi-turn). The v2 renderer places each
+turn's images at the START of that turn's content (in ``images`` order) and
+strips the ``<image>`` placeholders from the text, which is exactly the v1
+layout for single-image rows.
+"""
 
 from __future__ import annotations
+
+
+_HUMAN_ROLES = ("human", "user")
+_GPT_ROLES = ("gpt", "assistant", "model")
 
 
 def strip_image_placeholder(question: str) -> str:
@@ -25,3 +38,68 @@ def encode_prompt(processor, question: str, image) -> dict:
     """Tokenize + preprocess one image-text prompt; returns processor tensors."""
     text = render_prompt(processor, question)
     return processor(text=[text], images=[image], return_tensors="pt")
+
+
+def messages_from_row(
+    row: dict,
+    *,
+    assistant_overrides: dict[int, str] | None = None,
+    upto: int | None = None,
+) -> tuple[list[dict], list[int]]:
+    """Build HF chat messages for a schema-v2 row.
+
+    Returns ``(messages, image_indices)`` where ``image_indices`` are positions
+    into ``row["images"]`` for every image attached to a turn included in
+    ``messages`` (appearance order). ``assistant_overrides`` replaces the text
+    of specific assistant turns by conversation index (regen uses the generated
+    text as teacher-forced history); ``upto`` truncates the conversation.
+    """
+    conversations = row.get("conversations") or []
+    if not conversations:
+        raise ValueError(f"Row {row.get('id')!r} has no conversations.")
+    images = row.get("images") or []
+    if isinstance(images, str):
+        images = [images]
+    image_turns = row.get("image_turns")
+    if image_turns is None:
+        image_turns = [0] * len(images)
+    if len(image_turns) != len(images):
+        raise ValueError(
+            f"Row {row.get('id')!r} has {len(images)} image(s) but {len(image_turns)} image_turns entr(ies)."
+        )
+    per_turn: dict[int, list[int]] = {}
+    for position, turn in enumerate(image_turns):
+        per_turn.setdefault(int(turn), []).append(position)
+    limit = len(conversations) if upto is None else min(int(upto), len(conversations))
+    messages: list[dict] = []
+    image_indices: list[int] = []
+    for index, turn in enumerate(conversations[:limit]):
+        role = str(turn.get("from", "")).lower()
+        text = str(turn.get("value", ""))
+        if role in _HUMAN_ROLES:
+            parts: list[dict] = []
+            for position in per_turn.get(index, []):
+                parts.append({"type": "image"})
+                image_indices.append(position)
+            stripped = strip_image_placeholder(text)
+            if stripped or not parts:
+                parts.append({"type": "text", "text": stripped})
+            messages.append({"role": "user", "content": parts})
+        elif role in _GPT_ROLES:
+            if assistant_overrides is not None and index in assistant_overrides:
+                text = assistant_overrides[index]
+            messages.append({"role": "assistant", "content": text})
+        else:
+            raise ValueError(f"Row {row.get('id')!r} has unsupported role {role!r} at turn {index}.")
+    return messages, image_indices
+
+
+def render_conversation(processor, messages: list[dict], *, add_generation_prompt: bool = False) -> str:
+    """Chat-template text for a (possibly truncated) conversation."""
+    return processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=add_generation_prompt)
+
+
+def encode_conversation(processor, messages: list[dict], images: list, *, add_generation_prompt: bool = False) -> dict:
+    """Tokenize + preprocess a conversation; ``images`` in the messages' appearance order."""
+    text = render_conversation(processor, messages, add_generation_prompt=add_generation_prompt)
+    return processor(text=[text], images=list(images), return_tensors="pt")

@@ -40,7 +40,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import Dataset
 
-from ..data.sharegpt import load_sharegpt, row_image_path
+from ..data.sharegpt import load_sharegpt, row_image_paths
 from ..provenance import identity_from_contract
 from ..utils import read_json, sha256_file, sha256_json
 from .load import load_target
@@ -54,16 +54,18 @@ ONLINE_DIGEST_VERSION = "vlm-dflash-online-source-digest-v2"
 
 
 def _manifest_image_hashes(run_dir: Path) -> dict[str, str]:
-    """``id -> image_sha256`` from the data stage, when the manifest exists."""
+    """``id -> image_sha256`` (or the per-image list for multi-image rows) from the data stage."""
     path = Path(run_dir) / "data" / "manifest.json"
     if not path.exists():
         return {}
     manifest = read_json(path)
-    return {
-        str(row.get("id")): str(row["image_sha256"])
-        for row in manifest.get("rows", [])
-        if row.get("image_sha256")
-    }
+    out: dict = {}
+    for row in manifest.get("rows", []):
+        if row.get("image_sha256_list"):
+            out[str(row.get("id"))] = [str(value) for value in row["image_sha256_list"]]
+        elif row.get("image_sha256"):
+            out[str(row.get("id"))] = str(row["image_sha256"])
+    return out
 
 
 def load_online_rows(run_dir: str | Path, limit: int | None = None) -> tuple[list[dict], Path]:
@@ -97,27 +99,47 @@ def online_source_digest(cfg: dict, contract: dict, rows: list[dict], media_dir,
     recorded_hashes = _manifest_image_hashes(run_dir)
     content = []
     for row in rows:
-        image_path = row_image_path(row, Path(media_dir))
-        if not image_path.exists():
-            raise FileNotFoundError(
-                f"feature_mode=online: image for row {row.get('id')!r} is missing ({image_path}); "
-                "re-run the prepare/regen stages or point the run at the original media directory."
-            )
-        image_sha256 = sha256_file(image_path)
+        image_paths = row_image_paths(row, Path(media_dir))
+        image_hashes = []
+        for image_path in image_paths:
+            if not image_path.exists():
+                raise FileNotFoundError(
+                    f"feature_mode=online: image for row {row.get('id')!r} is missing ({image_path}); "
+                    "re-run the prepare/regen stages or point the run at the original media directory."
+                )
+            image_hashes.append(sha256_file(image_path))
         recorded = recorded_hashes.get(str(row.get("id")))
-        if recorded is not None and recorded != image_sha256:
-            raise RuntimeError(
-                f"feature_mode=online: image bytes for row {row.get('id')!r} no longer match "
-                "data/manifest.json (the staged data changed after prepare). Re-run prepare/regen "
-                "or start a new run directory."
+        if recorded is not None:
+            expected = [recorded] if isinstance(recorded, str) else list(recorded)
+            if expected != image_hashes:
+                raise RuntimeError(
+                    f"feature_mode=online: image bytes for row {row.get('id')!r} no longer match "
+                    "data/manifest.json (the staged data changed after prepare). Re-run prepare/regen "
+                    "or start a new run directory."
+                )
+        regen = row["regen"]
+        if "turns" in regen:
+            content.append(
+                {
+                    "turns": [
+                        {
+                            "prompt_ids": [int(token) for token in turn["prompt_ids"]],
+                            "answer_ids": [int(token) for token in turn["answer_ids"]],
+                        }
+                        for turn in regen["turns"]
+                    ],
+                    "full_ids": [int(token) for token in regen["full_ids"]],
+                    "image_sha256": image_hashes,
+                }
             )
-        content.append(
-            {
-                "prompt_ids": [int(token) for token in row["regen"]["prompt_ids"]],
-                "answer_ids": [int(token) for token in row["regen"]["answer_ids"]],
-                "image_sha256": image_sha256,
-            }
-        )
+        else:
+            content.append(
+                {
+                    "prompt_ids": [int(token) for token in regen["prompt_ids"]],
+                    "answer_ids": [int(token) for token in regen["answer_ids"]],
+                    "image_sha256": image_hashes[0],
+                }
+            )
     identity = identity_from_contract(contract)
     identity.pop("target_model_path", None)
     return sha256_json(
@@ -216,6 +238,11 @@ class OnlineFeatureDataset(Dataset):
         }
         if record.get("final_hidden") is not None:
             out["final_hidden"] = record["final_hidden"].detach().clone()
+        if record.get("image_spans") is not None:
+            out["image_spans"] = [tuple(span) for span in record["image_spans"]]
+            out["n_turns"] = int(record.get("n_turns", 1))
+        if record.get("turn_spans") is not None:
+            out["turn_spans"] = [tuple(span) for span in record["turn_spans"]]
         return out
 
 

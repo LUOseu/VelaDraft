@@ -22,8 +22,8 @@ from pathlib import Path
 import torch
 from PIL import Image
 
-from ..data.sharegpt import row_answer, row_image_path, row_question
-from .prompts import encode_prompt
+from ..data.sharegpt import row_image_path, row_image_paths, row_is_multi_turn, row_question
+from .prompts import encode_conversation, encode_prompt, messages_from_row
 
 
 def storage_dtype(name: str) -> torch.dtype:
@@ -70,6 +70,27 @@ def locate_image_span(input_ids: torch.Tensor, image_token_id: int) -> tuple[int
     return start, end, int(matches.numel())
 
 
+def locate_image_spans(input_ids: torch.Tensor, image_token_id: int) -> list[tuple[int, int]]:
+    """All contiguous image-token runs, ``(start, end_inclusive)`` in appearance order.
+
+    One run per group of consecutive ``<image>`` parts (images attached to the
+    same turn render back to back); multi-turn rows produce several runs.
+    """
+    matches = (input_ids == image_token_id).nonzero().flatten().tolist()
+    if not matches:
+        raise ValueError("No image tokens found in the sequence.")
+    spans: list[tuple[int, int]] = []
+    start = previous = matches[0]
+    for position in matches[1:]:
+        if position == previous + 1:
+            previous = position
+            continue
+        spans.append((start, previous))
+        start = previous = position
+    spans.append((start, previous))
+    return spans
+
+
 def extract_target_head(model, contract: dict):
     """Resolve the frozen embed/head pair the draft trainer must consume.
 
@@ -108,6 +129,7 @@ def forward_and_capture(
     dtype: torch.dtype,
     merge_size: int = 2,
     store_final_hidden: bool = False,
+    allow_multi_span: bool = False,
 ) -> dict:
     """One capture forward; returns the sample record consumed by training.
 
@@ -116,6 +138,10 @@ def forward_and_capture(
     objectives (JetSpec, DFlash2) project to full-vocab teacher logits at
     training time. Old feature stores do not have this field; those trainers
     fail loud on them instead of silently training against the wrong teacher.
+
+    ``allow_multi_span`` admits several contiguous image-token runs (multi-image
+    / multi-turn rows); the record then also carries ``image_spans``,
+    ``n_images`` and the per-image expected token counts.
     """
     device = next(model.parameters()).device
     input_ids = full_ids.unsqueeze(0).to(device)
@@ -148,24 +174,34 @@ def forward_and_capture(
     positions = compute_multimodal_positions(
         model, input_ids, attention_mask, inputs.get("image_grid_thw"), mm_token_type_ids=mm_token_type_ids
     )
-    span_start, span_end, span_count = locate_image_span(full_ids.cpu(), image_token_id)
+    spans = locate_image_spans(full_ids.cpu(), image_token_id)
+    if not allow_multi_span and len(spans) != 1:
+        raise ValueError("Image tokens are not contiguous; v0.1 requires a single leading image.")
     grid = inputs.get("image_grid_thw")
     # image_grid_thw counts patches; every merge_size^2 patches become one token.
-    expected = int(grid.prod().item()) // (merge_size * merge_size) if grid is not None else None
+    expected_per_image = (
+        [int(row.prod().item()) // (merge_size * merge_size) for row in grid] if grid is not None else None
+    )
+    span_count = sum(end - start + 1 for start, end in spans)
+    expected = sum(expected_per_image) if expected_per_image is not None else None
     record = {
         "input_ids": full_ids.to(torch.int32),
         "hidden": fused.to(dtype).cpu(),
         "position3": positions.to(torch.int32).cpu(),
-        "image_span": (span_start, span_end),
+        "image_span": spans[0],
         "n_image_tokens": span_count,
         "n_image_tokens_expected": expected,
     }
+    if allow_multi_span:
+        record["image_spans"] = [tuple(span) for span in spans]
+        record["n_images"] = len(grid) if grid is not None else None
+        record["image_token_counts_expected"] = expected_per_image
     if final_hidden is not None:
         record["final_hidden"] = final_hidden
     return record
 
 
-def build_sample_record(
+def _build_single_turn_record(
     model,
     processor,
     row: dict,
@@ -231,3 +267,150 @@ def build_sample_record(
         }
     )
     return record
+
+
+def _build_multi_turn_record(
+    model,
+    processor,
+    row: dict,
+    media_dir: Path,
+    *,
+    layer_ids: list[int],
+    image_token_id: int,
+    merge_size: int,
+    dtype: torch.dtype,
+    seq_length: int,
+    store_final_hidden: bool,
+) -> dict:
+    """Schema-v2 row -> training record: replay the full-conversation render once.
+
+    The stored ``regen.full_ids`` is asserted to be the exact token prefix of a
+    fresh processor render (chat-template drift fails loud, like the v1 prompt
+    replay), every answer span is validated against its stored answer ids, and
+    ``loss_mask`` becomes the union of the (clipped) answer spans.
+    """
+    conversations = row.get("conversations") or []
+    regen = row.get("regen") or {}
+    turns = regen.get("turns")
+    if not turns:
+        raise RuntimeError(f"Multi-turn row {row.get('id')!r} has no regen['turns']; re-run the regen stage.")
+    assistant_indices = [
+        index
+        for index, turn in enumerate(conversations)
+        if str(turn.get("from", "")).lower() in ("gpt", "assistant", "model")
+    ]
+    if len(assistant_indices) != len(turns):
+        raise RuntimeError(
+            f"Row {row.get('id')!r} has {len(assistant_indices)} assistant turn(s) but {len(turns)} regenerated turn(s)."
+        )
+    overrides = {msg_index: turn["answer_text"] for msg_index, turn in zip(assistant_indices, turns)}
+    image_paths = row_image_paths(row, media_dir)
+    messages, image_indices = messages_from_row(row, assistant_overrides=overrides)
+    images = [Image.open(image_paths[position]).convert("RGB") for position in image_indices]
+    inputs = encode_conversation(processor, messages, images, add_generation_prompt=False)
+    stored_full_ids = [int(token) for token in regen["full_ids"]]
+    fresh_prompt = inputs["input_ids"][0].tolist()
+    if fresh_prompt[: len(stored_full_ids)] != stored_full_ids:
+        raise RuntimeError(
+            f"Prompt token drift between regen and capture for sample {row.get('id')}: "
+            "the chat template or processor changed between stages."
+        )
+    answer_spans = [tuple(int(value) for value in span) for span in regen["answer_spans"]]
+    if len(answer_spans) != len(turns):
+        raise RuntimeError(f"Row {row.get('id')!r} has {len(turns)} turn(s) but {len(answer_spans)} answer span(s).")
+    for turn, span in zip(turns, answer_spans):
+        if stored_full_ids[span[0] : span[1]] != [int(token) for token in turn["answer_ids"]]:
+            raise RuntimeError(
+                f"Answer span mismatch for sample {row.get('id')}: stored answer ids do not match full_ids."
+            )
+    prompt_len_last = len(turns[-1]["prompt_ids"])
+    if prompt_len_last + 8 > seq_length:
+        raise RuntimeError(f"Final prompt of sample {row.get('id')} ({prompt_len_last} tokens) exceeds seq_length.")
+    keep = min(len(stored_full_ids), seq_length)
+    full_ids = torch.tensor(stored_full_ids[:keep], dtype=torch.long)
+    record = forward_and_capture(
+        model,
+        inputs,
+        full_ids,
+        layer_ids,
+        image_token_id,
+        dtype,
+        merge_size=merge_size,
+        store_final_hidden=store_final_hidden,
+        allow_multi_span=True,
+    )
+    loss_mask = torch.zeros(keep, dtype=torch.bool)
+    clipped_spans = []
+    for start, end in answer_spans:
+        start, end = min(start, keep), min(end, keep)
+        if end > start:
+            loss_mask[start:end] = True
+        clipped_spans.append((start, end))
+    turn_spans, start = [], 0
+    for turn in turns:
+        end = len(turn["prompt_ids"]) + len(turn["answer_ids"])
+        turn_spans.append((min(start, keep), min(end, keep)))
+        start = end
+    if start != len(stored_full_ids):
+        raise RuntimeError(
+            f"Turn span bookkeeping for sample {row.get('id')} does not cover its full token sequence."
+        )
+    record.update(
+        {
+            "sample_id": row.get("id"),
+            "prompt_len": keep - int(loss_mask.sum()),
+            "answer_len": int(loss_mask.sum()),
+            "truncated": keep < len(stored_full_ids),
+            "loss_mask": loss_mask,
+            "answer_spans": [list(span) for span in clipped_spans],
+            "turn_spans": [list(span) for span in turn_spans],
+            "n_turns": len(turns),
+        }
+    )
+    return record
+
+
+def build_sample_record(
+    model,
+    processor,
+    row: dict,
+    media_dir: Path,
+    *,
+    layer_ids: list[int],
+    image_token_id: int,
+    merge_size: int,
+    dtype: torch.dtype,
+    seq_length: int,
+    store_final_hidden: bool,
+) -> dict:
+    """One regenerated row -> the training record (offline capture and online share this).
+
+    Dispatches on the row generation: schema-v2 rows (multi-image / multi-turn)
+    replay the whole conversation render and build a multi-segment loss mask;
+    v1 rows keep the original single-image, single-answer path bit-for-bit.
+    """
+    if row_is_multi_turn(row):
+        return _build_multi_turn_record(
+            model,
+            processor,
+            row,
+            media_dir,
+            layer_ids=layer_ids,
+            image_token_id=image_token_id,
+            merge_size=merge_size,
+            dtype=dtype,
+            seq_length=seq_length,
+            store_final_hidden=store_final_hidden,
+        )
+    return _build_single_turn_record(
+        model,
+        processor,
+        row,
+        media_dir,
+        layer_ids=layer_ids,
+        image_token_id=image_token_id,
+        merge_size=merge_size,
+        dtype=dtype,
+        seq_length=seq_length,
+        store_final_hidden=store_final_hidden,
+    )
