@@ -65,7 +65,7 @@
   refuses a changed recipe/stage (plan digest + stage gate).
 - Config: `configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml` (two-stage recipe on the
   upstream 5-layer context; reuses a same-identity capture-v2 store).
-- Tests: `tests/test_objectives.py` (32 tests: bounded resolution schema,
+- Tests: `tests/test_objectives.py` (36 tests: bounded resolution schema,
   plan-digest sensitivity, formula parity against direct references, chunk
   invariance, stage switching, teacher requirement, resume gating, and an
   end-to-end tiny-target recipe run + refusal paths).

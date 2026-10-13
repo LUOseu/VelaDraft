@@ -1,11 +1,14 @@
 # STATE
 
-Updated: 2026-10-13 (v0.3.2 in development: online target feature source
+Updated: 2026-10-14 (v0.3.2 in development: online target feature source
 pushed as `aed7bf8`; online review fixes pushed as `1786176`; second-pass
 review fixes and the README repositioning pushed as `8d6c54c`; GitHub repo
 renamed to `LUOseu/VelaDraft`; DFlare/DFly AngelSpec ports landed behind the
 same interfaces — canonical 2K runs, ablations and Qwen3-VL reduced
-validations recorded).
+validations recorded; DFly's upstream two-stage recipe (LK / D-PACE cold
+start -> e2e TV) ported as `algorithm.train_recipe` on branch
+`dfly-upstream-recipe` — CPU suite + GPU smoke + eval/export verified,
+canonical run pending).
 
 **Status: v0.3.1 tagged and pushed** (tag `v0.3.1` at `eb3f314`); **v0.3.2 in
 development — the online target feature source is pushed as `aed7bf8` and
@@ -226,6 +229,50 @@ URLs redirect; distribution and CLI stay `vlm-dflash`).
   metadata; fusion master summaries extracted before pruning `ckpt_last.pt`
   resume states (~33 GB freed).
 
+## DFly upstream recipe stage (2026-10-14, stage 7 — LK / D-PACE cold start -> e2e TV ported)
+
+- Scope: `algorithm.train_recipe` selects the objective profile per run;
+  `upstream_two_stage` ports AngelSpec's DFly recipe after `d3412bed` —
+  stage 1 (LK + D-PACE, no CE) for `cold_start_fraction` of the planned
+  steps, then stage 2 (D-PACE-weighted block CE + end-to-end multi-step TV).
+  Absent key keeps the shared decayed block CE with byte-identical legacy
+  plan digests (pinned in tests).
+- `vlm_dflash/objectives.py`: bounded schema (unknown names / keys /
+  algorithms fail loud), exact fp32 loss math (D-PACE position weights, LK
+  `hybrid` / `alpha`, e2e TV over the block prefix product with masked slots
+  as identity, per-slot CE); `TeacherLogitsStream` projects teacher logits
+  per chunk from the captured final hidden states (the `[B, n, S, V]`
+  tensor is never materialized; every chunk is activation-checkpointed).
+- Trainer: the stage comes from the loop's progress hook as a deterministic
+  function of the resolved plan (fraction x total steps, so resume lands on
+  the same stage); checkpoints record `train_recipe`, and the resumable
+  state its `recipe_stage`; exact resume refuses a changed recipe / crossed
+  stage (plan digest + stage gate); recipe runs require a capture-v2 store
+  (`store_final_hidden`) and a source without it is refused up front.
+- Tests: `tests/test_objectives.py` (36) — formula parity vs direct
+  references, chunk invariance + checkpointed-grad equivalence, bounded
+  schema, legacy plan digests byte-identical, stage switching through an
+  end-to-end tiny-target `train_dflash` (stage sequence 0,0,1,1), resume
+  stage gate, refusal paths (missing teacher, changed recipe, raw YAML
+  spellings). Full CPU suite 315 passed / 6 skipped.
+- GPU smoke (Qwen2.5-VL-3B, reused capture-v2 store, 256-row slice, 16
+  steps, mb8): `train_log.jsonl` shows exactly stage 0 for steps 1-8
+  (`lk_loss` only) and stage 1 for 9-16 (`ce_loss` / `e2e_tv_loss` /
+  `e2e_accept_len`); `ckpt_last.pt` records `recipe_stage=1`; `ckpt_final.pt`
+  carries `train_recipe` + `objective_profile=upstream_two_stage`. Eval on
+  `ckpt_final` token-exact 8/8 (AL 1.133 vs init 1.000; plumbing scale);
+  export + reload verified (`algorithm.json` + model card record the
+  profile; `load_export` rebuilds the module). Overfit sanity at the
+  smoke's 120-step / 50%-cold-start split: CE drop 0.815 passed, slot0
+  0.592 under the 0.9 gate (~60 CE steps; the canonical run decides). Peak
+  46.5 GB incl. the overfit phase on a shared GPU0; dedicated probes put
+  the recipe loop at 24.4 GB (mb8) / 44.4 GB (mb16) vs base CE 31.4 GB
+  (mb16) — canonical mb8 runs keep headroom.
+- Not done yet: the canonical GPU recipe run + 128-prompt AL comparison vs
+  the shared-CE DFly record (1.682); upstream's raw YAML spellings stay
+  rejected with a pointer to `algorithm.train_recipe`; the tree/parallel
+  inference correction form stays unported.
+
 ## Latest measured results
 - 3B / 512-corpus rerun: AL 1.198, 64/64 exact (earlier v0.1 run: 1.220).
 - 3B / 2K-corpus: AL 1.630, 128/128 exact, slots `[.413,.149,.048,.015,.004,.001,0]`.
@@ -439,17 +486,21 @@ Scope frozen (harden/document/validate/package only). Evidence:
   so the remaining stage-6 runs need only ~1.5G of net new space each.
 
 ## Next highest-value tasks
-1. DFlash2 objective isolation (only if the 1.954 is quoted as a method
+1. Canonical DFly recipe run: `configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml`
+   (2K protocol, ~790 steps) + 128-prompt eval -> the AL comparison vs the
+   shared-CE DFly record (1.682); a capture-v2 5-layer store is already
+   staged (`runs/qwen25vl3b_jetspec_2k/features` superset), ~25 min GPU.
+2. DFlash2 objective isolation (only if the 1.954 is quoted as a method
    claim): a `unary_loss: ce` control separates the forward-KL objective axis
    from conv + selector; features and recipe are ready
    (`runs/qwen25vl3b_jetspec_2k/features`, ~25 min GPU per run + eval).
-2. Serving-fidelity follow-up from the JetSpec stage: decide whether the
+3. Serving-fidelity follow-up from the JetSpec stage: decide whether the
    `inference_in_block_causal` mask path should be exercised by a
    `strict`-style test on a GPU CI run (currently unit-tested + smoke-tested).
    First serving-bridge step is scoped in `docs/serving-bridge.md` (proposal).
-3. Deterministic benchmark prompt file for `caption_general`; land one public
+4. Deterministic benchmark prompt file for `caption_general`; land one public
    dataset adapter (TextVQA first) to move a workload from planned -> validated.
-4. Publish the remaining zoo exports (DSpark / JetSpec / DFlash2-exp / 8B
+5. Publish the remaining zoo exports (DSpark / JetSpec / DFlash2-exp / 8B
    DFlash) as release assets once hosting is decided (HF Hub needs an account
    decision).
 
