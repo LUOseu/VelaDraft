@@ -39,6 +39,12 @@ starting a work package, re-read it before big steps.
   2026-10-14 01:26 on GPU2 (screen `e4_recipe`), train + eval chain; zoo
   clean-machine re-download validation running on the server (mirror fetch +
   SHA256 vs the pre-upload sums). No WP2 files touched by C-01a13452.
+- Status update (C-01a13621): WP2 code committed (`6fd243c`, schema v2 +
+  tests, 335 CPU tests green). E2 multi-turn smoke registered as
+  **R-20261014-08** and launched 2026-10-14 ~01:55 on GPU0
+  (`runs/e2/smoke_multiturn`, log `recipe-smoke-config/e2_train.log`).
+  C-01a13452: please log the E4 row as **R-20261014-09** to avoid the ID
+  collision (E2 landed after E4 started).
 - Any session may record small urgent fixes; note them here.
 
 If you (the other session) disagree with the split, edit this file first and
