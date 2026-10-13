@@ -32,6 +32,8 @@ ZOO_ITEMS = {
     "qwen25vl-3b-domino": "runs/qwen25vl3b_domino_2k",
     "qwen25vl-3b-jetspec": "runs/qwen25vl3b_jetspec_2k",
     "qwen25vl-3b-dflash2-exp": "runs/qwen25vl3b_dflash2_2k",
+    "qwen25vl-3b-dflare": "runs/qwen25vl3b_dflare_2k",
+    "qwen25vl-3b-dfly": "runs/qwen25vl3b_dfly_2k",
     "qwen3vl-8b-dflash": "runs/qwen3vl8b_2k",
 }
 
