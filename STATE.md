@@ -2,8 +2,8 @@
 
 Updated: 2026-10-13 (v0.3.2 in development: online target feature source
 pushed as `aed7bf8`; online review fixes pushed as `1786176`; second-pass
-review fixes committed locally (not yet pushed); GitHub repo renamed to
-`LUOseu/VelaDraft`).
+review fixes and the README repositioning pushed as `8d6c54c`; GitHub repo
+renamed to `LUOseu/VelaDraft`).
 
 **Status: v0.3.1 tagged and pushed** (tag `v0.3.1` at `eb3f314`); **v0.3.2 in
 development — the online target feature source is pushed as `aed7bf8` and
@@ -129,7 +129,7 @@ URLs redirect; distribution and CLI stay `vlm-dflash`).
   digests are equal (`43140c4fdcc5`) — the online path reproduces the staged
   path exactly at fixed teacher/data/init/seed/budget.
 
-### Second review fixes (on top of `1786176`, 2026-10-13, not yet pushed)
+### Second review fixes (on top of `1786176`, 2026-10-13, pushed as `8d6c54c`)
 
 - Fixed the four P2 boundary findings from the external second-pass review of
   main `4e9a538`. No plan-version bump: loss normalization, the step budget
