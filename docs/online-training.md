@@ -117,7 +117,7 @@ counted and `train_summary.json` records `resume_fast_forward_batches` and
 ## Exact resume
 
 An "exact" resume means: same mode, algorithm, feature source, identity and
-training plan as the uninterrupted run. Three gates enforce that, all
+training plan as the uninterrupted run. Four gates enforce that, all
 read-only until every check passes:
 
 1. **Read-only preflight.** `train --resume` validates before writing
@@ -148,6 +148,16 @@ read-only until every check passes:
    including shape-compatible ones like the shuffle seed or a loss weight —
    refuses the resume; device, logging cadence, worker count and checkpoint
    cadence are deliberately excluded.
+4. **Committed-progress log reconciliation.** Before the replay appends
+   anything, `train_log.jsonl` is trimmed back to the checkpoint's committed
+   `step` (recorded in `ckpt_last.pt`). Rows past it — including a
+   half-written final line from an interrupted write — are preserved as
+   `train_log.uncommitted.jsonl` (a recovery artifact), so a resumed run
+   keeps unique, ordered log steps instead of duplicating the replay tail
+   (`[1,2,3]` resumed at step 2 ends `[1,2,3,4,...]`, not `[1,2,3,3,...]`).
+   A run that completes writes its final resumable state to `ckpt_last.pt`
+   (`step == total_steps`), so an exact resume of a finished run replays
+   zero steps and leaves the log untouched.
 
 Migration policy: checkpoints written before these gates (no recorded plan
 version/digest) are **not** exactly resumable — the extra information cannot
@@ -182,6 +192,22 @@ JetSpec flags above).
 - Resume refuses a mode / algorithm / feature-source-digest / training-plan /
   step-plan / identity mismatch (see *Exact resume*). Checkpoints written
   before the feature-mode tag (no `feature_mode`) are read as offline.
+- Resume follows the run's real dependency chain: `--features` resumes check
+  the data stage plus store digest / plan / identity and never demand
+  `regen`/`capture` outputs an external-store run never produced; online and
+  internal-offline resumes additionally require regen (and capture for
+  offline). A refused resume still leaves every original file byte-identical.
+- Resource cleanup covers startup: any failure after the target became
+  resident — source init, manifest access, the startup visual check, trainer
+  build, training or calibration — closes the source (idempotent;
+  partially-constructed instances are closed by the constructor itself) and
+  drops the model/processor/embed/head references, then re-raises the
+  original error unchanged.
+- The shared loop's stall guard counts valid micro-batches (successful
+  forward + backward), not optimizer steps: with a small dataset and a large
+  accumulation window one optimizer step may legitimately span several
+  epochs. Three consecutive epochs with zero valid supervision (every batch
+  raising `NoValidAnchorsError`) still stop the run.
 - Dtypes: the frozen embed/head handed to the trainer is stored in
   `capture.dtype` (offline) / the storage dtype (online) and must equal
   `train.draft_dtype`. The supported storage dtype today is `bfloat16`
@@ -226,6 +252,14 @@ re-extract fast-forwarded items and reuses the recorded visual-path check.
   fp32-target / bf16-storage factory regression plus the mismatched-head
   refusal, and an exact offline↔online multi-step update-alignment test
   (fixed teacher/data/init/seed/budget, exact float equality).
+- CPU (second-pass review fixes): 8 new regressions — pending accumulation
+  across epochs is not a stall while zero supervision still stops the run; a
+  cross-epoch interrupted resume reproduces the uninterrupted loss sequence
+  exactly; log reconciliation trims uncommitted tails and half-written
+  lines; an interrupted-run resume keeps log steps unique and a
+  completed-run resume is a zero-replay no-op; visual-check and constructor
+  failures both close the online source exactly once; the CLI preflight
+  dependency chain for `--features`. Full CPU suite 222 passed (was 214).
 - GPU smoke 1 — Qwen2.5-VL-3B (`runs/online_smoke_qwen25_3b`, CUDA0, 3-row
   demo slice, 4 steps): train OK; live visual check passed (replay bitwise,
   image span and downstream representations changed on swap); gradient
@@ -282,6 +316,25 @@ re-extract fast-forwarded items and reuses the recorded visual-path check.
   `cuda:1`): train -> token-exact eval OK; the train-phase target peak is
   8.02 GB (isolated target allocation) and the source digest equals the
   single-device run's, confirming the digest is device-independent.
+- GPU smoke 7 — second-review fixes, Qwen2.5-VL-3B online interrupted
+  resume (`runs/fix3_resume_online`, 3-row demo slice, 6 steps, micro-batch
+  1, `save_every_steps=2`): the run was SIGKILLed right after step 3 was
+  logged (state: log `[1,2,3]`, `ckpt_last.pt` at step 2). Resume passed
+  the preflight and reconciled the log — the 1 uncommitted row moved to
+  `train_log.uncommitted.jsonl` — then replayed steps 3-6: final log
+  `[1,2,3,4,5,6]` unique and ordered, the replayed step-3 loss identical to
+  its pre-kill value (13.0), and completion wrote the final resumable state
+  (`ckpt_last.pt` step 6). A second resume of the finished run replayed
+  zero steps and left the log byte-identical (md5 unchanged). Eval was
+  `token_exact=True` for both `ckpt_final.pt` and `ckpt_init.pt`
+  (sequential verification) with `checkpoint_feature_modes = online`; plan
+  digest `43140c4fdcc5`.
+- The 8B untied, distillation and split-device paths are untouched by the
+  second-pass fixes and were not re-run for this set; their most recent
+  records are in smoke 6 above. The external `--features` resume regression
+  is covered by a CPU CLI regression (fresh external-store run → preflight
+  consults only the `data` stage → negative case still refuses) rather than
+  a GPU rerun.
 
 These smokes validate plumbing (token-exactness, provenance, counters). Their
 AL is 1.000 after 4 steps and is **not** a quality result. The recorded

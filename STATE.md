@@ -1,8 +1,9 @@
 # STATE
 
 Updated: 2026-10-13 (v0.3.2 in development: online target feature source
-pushed as `aed7bf8`; online review fixes pushed as `1786176`; GitHub repo
-renamed to `LUOseu/VelaDraft`).
+pushed as `aed7bf8`; online review fixes pushed as `1786176`; second-pass
+review fixes committed locally (not yet pushed); GitHub repo renamed to
+`LUOseu/VelaDraft`).
 
 **Status: v0.3.1 tagged and pushed** (tag `v0.3.1` at `eb3f314`); **v0.3.2 in
 development — the online target feature source is pushed as `aed7bf8` and
@@ -127,6 +128,47 @@ URLs redirect; distribution and CLI stay `vlm-dflash`).
   (offline `437166daa78a`, online `6e2051af43b5`) while the training-plan
   digests are equal (`43140c4fdcc5`) — the online path reproduces the staged
   path exactly at fixed teacher/data/init/seed/budget.
+
+### Second review fixes (on top of `1786176`, 2026-10-13, not yet pushed)
+
+- Fixed the four P2 boundary findings from the external second-pass review of
+  main `4e9a538`. No plan-version bump: loss normalization, the step budget
+  and the training trajectory are unchanged (the loop only changed *when it
+  gives up*, what it logs and what it cleans up).
+  1. **Accumulation stall guard** (`dflash/train.py::run_training_loop`):
+     stall counting now tracks valid micro-batches (successful forward +
+     backward) instead of optimizer steps, so a small dataset with a large
+     accumulation window (reproduced: 1 sample, accum 4) no longer
+     false-stalls on the third epoch; three full epochs with zero valid
+     supervision still stop with an explicit message. Budget semantics
+     (`ceil(len/accumulation)` planned per epoch, cross-epoch accumulation)
+     documented on `compute_total_steps`.
+  2. **Resume log reconciliation** (`_reconcile_train_log`, `train_dflash`):
+     rows past the checkpoint's committed step (incl. a half-written JSON
+     line) are preserved as `train_log.uncommitted.jsonl` before the replay
+     appends — resuming `[1,2,3]` at step 2 ends `[1,2,3,4,...]`, no
+     duplicates; a completed run now persists its final resumable state
+     (`ckpt_last.pt`, `step == total_steps`) so a later exact resume of a
+     finished run replays zero steps.
+  3. **Startup cleanup**: the online `try/finally` now wraps source
+     construction and all startup stages (init, manifest access, visual
+     check); `OnlineFeatureSource.close()` is idempotent, handles
+     partially-constructed instances (constructor failure → close → re-raise)
+     and drops model/processor/embed/head references.
+  4. **External-store resume**: `cli._preflight_resume` mirrors `cmd_train`
+     for the three feature sources — `--features` resumes require only the
+     data stage (plus store digest / plan / identity); online and
+     internal-offline runs still require regen (+ capture for offline).
+     Fixes the offline regression the first preflight introduced.
+- Evidence: 8 new CPU regressions; full CPU suite 222 passed (was 214).
+  GPU smoke 7 (`runs/fix3_resume_online`, 3B online, 6 steps, SIGKILL after
+  step 3): interrupted state log `[1,2,3]` / ckpt step 2 → resume moved the
+  uncommitted row to `train_log.uncommitted.jsonl`, replayed steps 3-6
+  (final log `[1..6]` unique, replayed step-3 loss = pre-kill 13.0),
+  completion wrote the final state (ckpt step 6); a second resume replayed
+  zero steps, log md5 unchanged; eval `token_exact=True` for
+  `ckpt_final` / `ckpt_init`, feature modes online; plan digest
+  `43140c4fdcc5`.
 
 ## Latest measured results
 - 3B / 512-corpus rerun: AL 1.198, 64/64 exact (earlier v0.1 run: 1.220).

@@ -225,6 +225,23 @@ class OnlineFeatureSource:
     backend = "huggingface"
 
     def __init__(self, cfg: dict, contract: dict, run_dir: str | Path, limit: int | None = None):
+        # Defaults first, then the real body: ``close()`` must be safe even
+        # when construction fails partway (the except below releases a
+        # partially built source instead of leaving the target referenced).
+        self._closed = False
+        self.model = None
+        self.processor = None
+        self.embed_weight = None
+        self.lm_head_weight = None
+        self.stats: dict[str, dict] = {}
+        self._peak_open = False
+        try:
+            self._init(cfg, contract, run_dir, limit=limit)
+        except BaseException:
+            self.close()
+            raise
+
+    def _init(self, cfg: dict, contract: dict, run_dir: str | Path, limit: int | None = None) -> None:
         run_dir = Path(run_dir)
         rows, media_dir = load_online_rows(run_dir, limit=limit)
         self.run_dir = run_dir
@@ -271,9 +288,7 @@ class OnlineFeatureSource:
 
         self.train_device = str((cfg.get("train") or {}).get("device", "cuda:0"))
         self.phase = "train"
-        self.stats: dict[str, dict] = {}
         self.digest_value = online_source_digest(cfg, contract, self.rows, self.media_dir, self.run_dir)
-        self._peak_open = False
         self._reset_target_peak()
         self._open_peak_window()
 
@@ -283,12 +298,16 @@ class OnlineFeatureSource:
             torch.cuda.reset_peak_memory_stats(self.target_device)
 
     def _close_peak_window(self) -> None:
-        if not self._peak_open or self.target_device.type != "cuda":
+        # Tolerates partially-constructed instances (no target loaded yet).
+        if not getattr(self, "_peak_open", False):
+            return
+        self._peak_open = False
+        target_device = getattr(self, "target_device", None)
+        if target_device is None or target_device.type != "cuda":
             return
         entry = self.stats.setdefault(self.phase, {"target_forwards": 0, "wall_seconds": 0.0})
-        peak = torch.cuda.max_memory_allocated(self.target_device) / 1e9
+        peak = torch.cuda.max_memory_allocated(target_device) / 1e9
         entry["target_device_peak_gb"] = max(float(entry.get("target_device_peak_gb", 0.0)), float(peak))
-        self._peak_open = False
 
     def _open_peak_window(self) -> None:
         if self.target_device.type == "cuda":
@@ -378,6 +397,19 @@ class OnlineFeatureSource:
         }
 
     def close(self) -> None:
+        """Release the target, processor and frozen head copies; idempotent.
+
+        Tolerates partially-constructed instances (the constructor calls this
+        when loading fails after the target became resident). Dropping these
+        references is what lets the GC reclaim the teacher; ``empty_cache`` is
+        deliberately not relied on, because it cannot free objects that are
+        still referenced.
+        """
+        if getattr(self, "_closed", False):
+            return
+        self._closed = True
         self._close_peak_window()
         self.model = None
         self.processor = None
+        self.embed_weight = None
+        self.lm_head_weight = None

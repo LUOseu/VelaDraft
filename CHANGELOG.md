@@ -115,6 +115,63 @@ before any further online work. No algorithm or protocol changes.
   33.92 GB. The superseded pre-fix smoke run dirs were pruned for disk
   space (numbers quoted in this changelog).
 
+### Second review fixes: accumulation stall guard, log reconciliation, startup cleanup, external-store resume
+
+Findings from the external second-pass review of `4e9a538` (four P2 boundary
+issues), fixed without touching the training recipe: loss normalization, the
+step budget and the training trajectory are unchanged, so no plan-version
+bump was needed.
+
+- **Accumulation is progress, not a stall.** The shared loop's stall guard
+  counted optimizer steps, so a legal configuration whose accumulation
+  window spans epochs (e.g. 1 sample, `grad_accumulation_steps=4`) raised
+  "no progress" on the third epoch although every micro-batch had produced
+  gradients. The guard now counts valid micro-batches (forward + backward)
+  and only stalls after three full epochs with zero valid supervision; the
+  error message says exactly that. The budget/loss semantics
+  (`ceil(len/accumulation)` planned per epoch, accumulation carried across
+  epoch boundaries, every optimizer step averaging exactly `accumulation`
+  micro-batches) are documented on `compute_total_steps` and unchanged.
+- **Resume reconciles the train log with the checkpoint.** Rows past the
+  checkpoint's committed step — including a half-written JSON line — are
+  preserved as `train_log.uncommitted.jsonl` (a recovery artifact) before
+  the replay appends, so resuming a `[1,2,3]` log with a step-2 checkpoint
+  ends with unique ordered steps instead of `[1,2,3,3]`. A run that
+  completes now also writes its final resumable state to `ckpt_last.pt`
+  (`step == total_steps`), so a later exact resume of a finished run
+  replays zero steps instead of re-emitting the logged tail.
+- **Startup failures now run the cleanup path.** The online resource guard
+  previously started after the source was constructed; an exception during
+  source init, manifest access or the startup visual check left the target
+  referenced. The `try/finally` now wraps source construction and all
+  startup stages; `OnlineFeatureSource.close()` is idempotent, tolerates
+  partially-constructed instances (the constructor closes on failure) and
+  drops the model/processor/embed/head references (`empty_cache` is
+  deliberately not relied on).
+- **`--features` resumes follow the real dependency chain.**
+  `cli._preflight_resume` now mirrors `cmd_train`: external-store resumes
+  check the data stage plus store digest/plan/identity and no longer demand
+  `regen`/`capture` outputs that an `--features` run never produced (offline
+  regression from the first preflight); online and internal-offline resumes
+  still require regen (and capture for offline).
+- Tests: 8 new CPU regressions — pending accumulation across epochs is not a
+  stall while zero supervision still stops; cross-epoch interrupted resume
+  float-aligns with the uninterrupted run; log reconciliation with
+  uncommitted tails and half lines; interrupted-run resume keeps log steps
+  unique and a completed-run resume is a no-op; visual-check failure and
+  constructor failure both close the online source exactly once; the CLI
+  preflight dependency chain for `--features`. Full CPU suite green (222
+  passed, was 214).
+- GPU smoke (second-review set, Qwen2.5-VL-3B online,
+  `runs/fix3_resume_online`): SIGKILLed after step 3 was logged (log
+  `[1,2,3]`, checkpoint at step 2). Resume reconciled the log (1
+  uncommitted row preserved as `train_log.uncommitted.jsonl`), replayed
+  steps 3-6 with unique ordered entries (replayed step-3 loss identical to
+  the pre-kill value), and the completed run wrote its final resumable
+  state (`ckpt_last.pt` step 6); a second resume replayed zero steps with
+  the log byte-identical, and eval was `token_exact=True` on both
+  `ckpt_final.pt` and `ckpt_init.pt` (feature mode recorded as online).
+
 ## v0.3.1 (2026-10-13)
 
 Distribution fixes, first-run experience, and the post-publish growth review

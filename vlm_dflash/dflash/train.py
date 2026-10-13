@@ -13,6 +13,7 @@ visual-dependence check.
 
 from __future__ import annotations
 
+import json
 import math
 import time
 from pathlib import Path
@@ -48,7 +49,16 @@ def _make_optimizer_and_scheduler(parameters, train_cfg: dict, total_steps: int)
 
 
 def compute_total_steps(dataset_len: int, train_cfg: dict, steps: int | None = None) -> int:
-    """Planned optimizer steps (mirrors the loop's own loader arithmetic)."""
+    """Planned optimizer steps (mirrors the loop's own loader arithmetic).
+
+    The budget counts ``ceil(len(loader) / accumulation)`` per epoch while the
+    loop accumulates micro-batches *across* epoch boundaries; when the loader
+    length is not divisible by the accumulation window a run therefore may
+    consume slightly more than ``num_epochs`` loader passes to reach the
+    budget. The loop's loss normalization is unchanged by this: every
+    optimizer step averages exactly ``accumulation`` micro-batches, partial
+    tail windows included.
+    """
     micro_batch = int(train_cfg.get("micro_batch_size", 8))
     accumulation = max(1, int(train_cfg.get("grad_accumulation_steps", 1)))
     epochs = int(train_cfg.get("num_epochs", 6))
@@ -65,6 +75,46 @@ def _clone_tree(value):
     if isinstance(value, (list, tuple)):
         return type(value)(_clone_tree(item) for item in value)
     return value
+
+
+def _reconcile_train_log(log_path: Path, committed_step: int) -> None:
+    """Trim ``train_log.jsonl`` back to the checkpoint's committed progress.
+
+    Rows past ``committed_step`` were written after the last resumable
+    checkpoint; the resumed run replays exactly those steps, so appending to
+    the untouched log would duplicate them (``[1, 2, 3]`` -> ``[1, 2, 3, 3]``).
+    Uncommitted rows are preserved as a recovery artifact
+    (``train_log.uncommitted.jsonl``) instead of being deleted, and a
+    truncated final line from an interrupted write counts as uncommitted too.
+    """
+    if not log_path.exists():
+        return
+    text = log_path.read_text(encoding="utf-8")
+    kept: list[str] = []
+    uncommitted: list[str] = []
+    for raw in text.splitlines(keepends=True):
+        if not raw.strip():
+            continue
+        try:
+            step = int(json.loads(raw)["step"])
+        except Exception:
+            uncommitted.append(raw if raw.endswith("\n") else raw + "\n")
+            continue
+        (kept if step <= committed_step else uncommitted).append(
+            raw if raw.endswith("\n") else raw + "\n"
+        )
+    payload = "".join(kept)
+    if payload != text:
+        tmp_path = log_path.with_name(log_path.name + ".tmp")
+        tmp_path.write_text(payload, encoding="utf-8")
+        tmp_path.replace(log_path)
+    if uncommitted:
+        recovery_path = log_path.with_name("train_log.uncommitted.jsonl")
+        recovery_path.write_text("".join(uncommitted), encoding="utf-8")
+        log(
+            f"train: reconciled train log to committed step {committed_step} "
+            f"({len(uncommitted)} uncommitted rows -> {recovery_path.name})"
+        )
 
 
 def _unwrap_subset(dataset):
@@ -250,7 +300,12 @@ def run_training_loop(
         if skip_begin is not None:
             base_dataset.end_fast_forward()
     while step < total_steps:
-        progressed = False
+        # Epochs may end before the accumulation window is full: with a small
+        # dataset, one optimizer step can span several epochs. The stall guard
+        # below therefore tracks *valid micro-batches* (a successful forward +
+        # backward that deposited gradient), not optimizer steps — a pending
+        # accumulation window is progress, not a stall.
+        valid_micro = 0
         for batch in iterator:
             batch = {key: value for key, value in batch.items() if key != "lengths"}
             batch = {key: value.to(device) if torch.is_tensor(value) else value for key, value in batch.items()}
@@ -275,6 +330,7 @@ def run_training_loop(
             except skippable_errors:
                 skipped_batches += 1
                 continue
+            valid_micro += 1
             loss = metrics.loss
             if not torch.isfinite(loss):
                 nan_seen = True
@@ -334,12 +390,9 @@ def run_training_loop(
                 if metrics.pos_correct is not None and metrics.pos_count is not None:
                     row["slot0_accuracy"] = float(metrics.pos_correct[0] / metrics.pos_count[0].clamp_min(1))
                 history.append(row)
-                progressed = True
                 if log_path is not None:
                     with open(log_path, "a", encoding="utf-8") as fh:
-                        import json as _json
-
-                        fh.write(_json.dumps(row) + "\n")
+                        fh.write(json.dumps(row) + "\n")
                 if log_every and step % log_every == 0:
                     log(f"step {step}/{total_steps} loss={row['loss']:.4f} acc={row['accuracy']:.3f} "
                         f"al={row['accept_len']:.2f}")
@@ -360,15 +413,35 @@ def run_training_loop(
                 if step >= total_steps:
                     break
         iterator = iter(loader)
-        if not progressed:
+        if valid_micro == 0:
             stall_epochs += 1
             if stall_epochs >= 3:
                 raise RuntimeError(
-                    "Training made no progress for 3 full epochs (all batches raised NoValidAnchorsError); "
-                    "check that loss_mask covers at least block_size+1 tokens per sample."
+                    "Training saw no valid supervision for 3 full epochs (every batch raised "
+                    "NoValidAnchorsError); check that loss_mask covers at least block_size+1 tokens per sample."
                 )
         else:
             stall_epochs = 0
+
+    if on_checkpoint is not None:
+        # Persist the completed run as the resumable state: a later exact
+        # resume of a finished run has zero steps left to replay instead of
+        # re-emitting the already-logged tail. (Interrupted runs keep their
+        # last mid-run checkpoint; the log reconciliation in the caller keeps
+        # that replay duplicate-free.)
+        on_checkpoint(
+            gather_train_state(
+                module,
+                master_parameters,
+                optimizer,
+                scheduler,
+                step=step,
+                micro_step=micro_step,
+                skipped_batches=skipped_batches,
+                history=history,
+                steps_total_planned=total_steps,
+            )
+        )
 
     losses = [row["loss"] for row in history]
     window = max(1, len(losses) // 10)
@@ -393,7 +466,15 @@ def run_training_loop(
             torch.cuda.get_device_name(device) if device.type == "cuda" else None
         ),
     }
-    return {"summary": summary, "history": history, "gradient_coverage": gradient_coverage}
+    return {
+        "summary": summary,
+        "history": history,
+        "gradient_coverage": gradient_coverage,
+        # Final counters for the completed-run resumable state written by the
+        # caller (a later exact resume then has nothing left to replay).
+        "micro_step": micro_step,
+        "skipped_batches": skipped_batches,
+    }
 
 
 def run_overfit_sanity(cfg: dict, contract: dict, dataset_factory, run_dir: Path, device, module, init_state) -> dict:
@@ -649,99 +730,99 @@ def train_dflash(
     online_source = None
     online_pair_path = None
     online_visual_check = None
-    if mode == "online":
-        num_workers = int(train_cfg.get("num_workers", 0))
-        if num_workers != 0:
-            raise ValueError(
-                f"feature_mode=online extracts target features in the main process and requires "
-                f"train.num_workers=0 (got train.num_workers={num_workers})."
-            )
-        from ..target.online import OnlineFeatureSource
-
-        online_source = OnlineFeatureSource(cfg, contract, run_dir, limit=limit)
-        dataset = online_source.dataset()
-        dataset_factory = online_source.dataset
-        manifest = online_source.manifest()
-        embed_weight = online_source.embed_weight
-        lm_head_weight = online_source.lm_head_weight
-        tied_head = online_source.tied_head
-        feature_source_digest = online_source.digest()
-        log(
-            f"train: feature_mode=online (live {online_source.backend} target on "
-            f"{online_source.target_device}; {manifest['num_samples']} samples, "
-            f"seq {manifest['seq_length']}; target resident for the whole run)"
-        )
-        # Fresh swap pair for this run (never a leftover staged capture's):
-        # the same live model that trains the drafter also produces the
-        # visual-path evidence.
-        online_pair_path = run_dir / "online" / "swap_pair.pt"
-        capture_cfg = cfg.get("capture") or {}
-        if resume:
-            # An exact resume reuses the original evidence instead of rerunning
-            # (and rewriting) it: the source digest already pins the same
-            # content, and nothing under run_dir may change before the gate
-            # passes. The recorded check file is only read here.
-            check_path = run_dir / "online" / "visual_path_check.json"
-            if check_path.exists():
-                online_visual_check = read_json(check_path)
-                log("train: feature_mode=online resume; reusing the recorded visual-path check")
-            else:
-                log("train: feature_mode=online resume without a recorded visual-path check; skipping it")
-            if not online_pair_path.exists():
-                online_pair_path = None
-        elif bool(capture_cfg.get("visual_path_check", True)) and len(online_source.rows) >= 2:
-            from ..target.visual_check import run_visual_path_check
-
-            online_source.set_phase("visual_check")
-            try:
-                online_visual_check = run_visual_path_check(
-                    cfg,
-                    run_dir,
-                    contract,
-                    online_source.model,
-                    online_source.processor,
-                    online_source.rows,
-                    online_source.media_dir,
-                    online_source.dtype,
-                    limit=min(int(capture_cfg.get("visual_check_samples", 2)), len(online_source.rows)),
-                    check_path=run_dir / "online" / "visual_path_check.json",
-                    pair_path=online_pair_path,
-                )
-            finally:
-                online_source.set_phase("train")
-    else:
-        features_dir = Path(features_dir) if features_dir is not None else run_dir / "features"
-        dataset = FeatureDataset(features_dir)
-        if limit is not None:
-            dataset = Subset(dataset, list(range(min(limit, len(dataset)))))
-        manifest = FeatureDataset(features_dir).store.manifest
-        assert_identity(identity_from_contract(contract), manifest["identity"], "train vs features")
-        # Resume/provenance digest: content-only over the manifest, index and
-        # shard/head bytes (absolute model paths are audit info; moving the
-        # same store to another directory must not invalidate a resume), and
-        # versioned so a changed digest scheme refuses instead of mis-matching.
-        feature_source_digest = offline_feature_digest(features_dir)
-        dataset_factory = lambda: FeatureDataset(features_dir)
-        log(
-            f"train: features from {features_dir.resolve()} "
-            f"({manifest.get('num_samples')} samples, seq {manifest.get('seq_length')}, "
-            f"{manifest.get('storage_dtype')}, format {manifest.get('format')})"
-        )
-        target_head = torch.load(features_dir / "target_head.pt", map_location="cpu", weights_only=False)
-        if target_head["model_fingerprint"] != contract["target"]["model_fingerprint"]:
-            raise RuntimeError("features/target_head.pt was produced from a different target fingerprint.")
-        tied_head = bool(target_head.get("tie_word_embeddings", True))
-        lm_head_weight = target_head.get("lm_head")
-        if not tied_head and lm_head_weight is None:
-            raise RuntimeError(
-                "features/target_head.pt has no untied lm_head weight (captured before the head fix). "
-                "Re-run capture_features so training uses the same output head as inference."
-            )
-        if tied_head and lm_head_weight is not None:
-            raise RuntimeError("features/target_head.pt records a tied target but also stores a separate lm_head.")
-        embed_weight = target_head["embed_tokens"]
-
     try:
+        if mode == "online":
+            num_workers = int(train_cfg.get("num_workers", 0))
+            if num_workers != 0:
+                raise ValueError(
+                    f"feature_mode=online extracts target features in the main process and requires "
+                    f"train.num_workers=0 (got train.num_workers={num_workers})."
+                )
+            from ..target.online import OnlineFeatureSource
+
+            online_source = OnlineFeatureSource(cfg, contract, run_dir, limit=limit)
+            dataset = online_source.dataset()
+            dataset_factory = online_source.dataset
+            manifest = online_source.manifest()
+            embed_weight = online_source.embed_weight
+            lm_head_weight = online_source.lm_head_weight
+            tied_head = online_source.tied_head
+            feature_source_digest = online_source.digest()
+            log(
+                f"train: feature_mode=online (live {online_source.backend} target on "
+                f"{online_source.target_device}; {manifest['num_samples']} samples, "
+                f"seq {manifest['seq_length']}; target resident for the whole run)"
+            )
+            # Fresh swap pair for this run (never a leftover staged capture's):
+            # the same live model that trains the drafter also produces the
+            # visual-path evidence.
+            online_pair_path = run_dir / "online" / "swap_pair.pt"
+            capture_cfg = cfg.get("capture") or {}
+            if resume:
+                # An exact resume reuses the original evidence instead of rerunning
+                # (and rewriting) it: the source digest already pins the same
+                # content, and nothing under run_dir may change before the gate
+                # passes. The recorded check file is only read here.
+                check_path = run_dir / "online" / "visual_path_check.json"
+                if check_path.exists():
+                    online_visual_check = read_json(check_path)
+                    log("train: feature_mode=online resume; reusing the recorded visual-path check")
+                else:
+                    log("train: feature_mode=online resume without a recorded visual-path check; skipping it")
+                if not online_pair_path.exists():
+                    online_pair_path = None
+            elif bool(capture_cfg.get("visual_path_check", True)) and len(online_source.rows) >= 2:
+                from ..target.visual_check import run_visual_path_check
+
+                online_source.set_phase("visual_check")
+                try:
+                    online_visual_check = run_visual_path_check(
+                        cfg,
+                        run_dir,
+                        contract,
+                        online_source.model,
+                        online_source.processor,
+                        online_source.rows,
+                        online_source.media_dir,
+                        online_source.dtype,
+                        limit=min(int(capture_cfg.get("visual_check_samples", 2)), len(online_source.rows)),
+                        check_path=run_dir / "online" / "visual_path_check.json",
+                        pair_path=online_pair_path,
+                    )
+                finally:
+                    online_source.set_phase("train")
+        else:
+            features_dir = Path(features_dir) if features_dir is not None else run_dir / "features"
+            dataset = FeatureDataset(features_dir)
+            if limit is not None:
+                dataset = Subset(dataset, list(range(min(limit, len(dataset)))))
+            manifest = FeatureDataset(features_dir).store.manifest
+            assert_identity(identity_from_contract(contract), manifest["identity"], "train vs features")
+            # Resume/provenance digest: content-only over the manifest, index and
+            # shard/head bytes (absolute model paths are audit info; moving the
+            # same store to another directory must not invalidate a resume), and
+            # versioned so a changed digest scheme refuses instead of mis-matching.
+            feature_source_digest = offline_feature_digest(features_dir)
+            dataset_factory = lambda: FeatureDataset(features_dir)
+            log(
+                f"train: features from {features_dir.resolve()} "
+                f"({manifest.get('num_samples')} samples, seq {manifest.get('seq_length')}, "
+                f"{manifest.get('storage_dtype')}, format {manifest.get('format')})"
+            )
+            target_head = torch.load(features_dir / "target_head.pt", map_location="cpu", weights_only=False)
+            if target_head["model_fingerprint"] != contract["target"]["model_fingerprint"]:
+                raise RuntimeError("features/target_head.pt was produced from a different target fingerprint.")
+            tied_head = bool(target_head.get("tie_word_embeddings", True))
+            lm_head_weight = target_head.get("lm_head")
+            if not tied_head and lm_head_weight is None:
+                raise RuntimeError(
+                    "features/target_head.pt has no untied lm_head weight (captured before the head fix). "
+                    "Re-run capture_features so training uses the same output head as inference."
+                )
+            if tied_head and lm_head_weight is not None:
+                raise RuntimeError("features/target_head.pt records a tied target but also stores a separate lm_head.")
+            embed_weight = target_head["embed_tokens"]
+
         draft_config = algorithm.build_draft_config(contract, cfg)
         module = algorithm.build_trainer_module(
             draft_config, contract, cfg, embed_weight, lm_head_weight=lm_head_weight
@@ -825,8 +906,13 @@ def train_dflash(
             module.draft_model.load_state_dict(init_state)
 
         log_path = train_dir / "train_log.jsonl"
-        if log_path.exists() and resume_state is None:
-            log_path.unlink()
+        if resume_state is None:
+            if log_path.exists():
+                log_path.unlink()
+        else:
+            # Exact-resume gate passed: make the log reflect the checkpoint's
+            # committed progress before the replay appends new rows.
+            _reconcile_train_log(log_path, int(resume_state["step"]))
         save_every = int(train_cfg.get("save_every_steps", max(1, total_steps // 4)))
 
         def write_train_state(state: dict) -> None:

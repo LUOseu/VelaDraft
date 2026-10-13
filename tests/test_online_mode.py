@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from vlm_dflash.cli import build_parser, build_train_config, resolve_feature_mode
 from vlm_dflash.dflash.features import FeatureDataset, collate_features, offline_feature_digest
 from vlm_dflash.dflash.train import (
+    _reconcile_train_log,
     preflight_resume,
     run_training_loop,
     train_dflash,
@@ -1908,3 +1909,312 @@ def test_offline_feature_digest_and_offline_resume_write_order(monkeypatch, tmp_
     resumed = train_dflash(cfg, run_dir, contract, steps=2, resume=True, feature_mode="offline")
     assert resumed["resumed_from_step"] >= 1
     assert (run_dir / "train" / "ckpt_init.pt").read_bytes() == before[run_dir / "train" / "ckpt_init.pt"]
+
+
+# --------------------------------------------------------------------------- #
+# Second-review boundary fixes
+# --------------------------------------------------------------------------- #
+
+def _accum_items(count: int = 4, seq: int = 32, hidden: int = 128, seed: int = 0) -> list[dict]:
+    """Anchor-valid batch items for the tiny trainer module (fused hidden)."""
+    generator = torch.Generator().manual_seed(seed)
+    items = []
+    for _ in range(count):
+        ids = torch.arange(seq) % 200 + 10
+        mask = torch.ones(seq)
+        mask[:8] = 0.0
+        items.append(
+            {
+                "input_ids": ids,
+                "loss_mask": mask,
+                "hidden": torch.randn(seq, hidden, generator=generator) * 0.2,
+                "position3": torch.arange(seq).repeat(3, 1),
+                "image_span": (0, 0),
+                "sample_id": "tiny",
+            }
+        )
+    return items
+
+
+def _accum_cfg(**overrides) -> dict:
+    cfg = {
+        "train": {
+            "micro_batch_size": 1,
+            "grad_accumulation_steps": 4,
+            "num_epochs": 1,
+            "lr": 1e-3,
+            "log_every_steps": 0,
+            "max_grad_norm": 1.0,
+            "warmup_ratio": 0.1,
+            "min_lr_ratio": 0.1,
+            "draft_dtype": "float32",
+        }
+    }
+    for key, value in overrides.items():
+        cfg["train"][key] = value
+    return cfg
+
+
+def test_pending_accumulation_across_epochs_is_not_a_stall():
+    """One legal sample + accumulation=4: the first optimizer step spans four
+    epochs; pending (gradient-bearing) micro-batches are progress, so the
+    stall guard must not fire before the window fills."""
+    module = _tiny_dflash_module()
+    output = run_training_loop(
+        module,
+        _FastForwardDataset(_accum_items(1)),
+        _accum_cfg(),
+        {"tokens": {"image_token_id": 999999}},
+        torch.device("cpu"),
+        total_steps=1,
+        seed=0,
+        shuffle=False,
+        log_path=None,
+    )
+    assert output["summary"]["steps"] == 1
+    assert [row["step"] for row in output["history"]] == [1]
+
+
+def test_no_valid_supervision_still_stalls():
+    """The stall guard must still stop truly empty epochs (all batches raising
+    NoValidAnchorsError), independent of the accumulation bookkeeping."""
+    items = _accum_items(1)
+    items[0]["loss_mask"] = torch.zeros_like(items[0]["loss_mask"])
+    with pytest.raises(RuntimeError, match="no valid supervision"):
+        run_training_loop(
+            _tiny_dflash_module(),
+            _FastForwardDataset(items),
+            _accum_cfg(),
+            {"tokens": {"image_token_id": 999999}},
+            torch.device("cpu"),
+            total_steps=1,
+            seed=0,
+            shuffle=False,
+            log_path=None,
+        )
+
+
+def test_resume_replays_across_epoch_boundaries_exactly():
+    """5 samples, micro-batch=2, accumulation=3: steps straddle epoch
+    boundaries; a resume from a mid-run checkpoint must reproduce the
+    uninterrupted remaining losses exactly (CPU float equality)."""
+    cfg = _accum_cfg(micro_batch_size=2, grad_accumulation_steps=3)
+    contract = {"tokens": {"image_token_id": 999999}}
+    states: dict[int, dict] = {}
+
+    def sink(state: dict) -> None:
+        states[int(state["step"])] = state
+
+    baseline = run_training_loop(
+        _tiny_dflash_module(),
+        _FastForwardDataset(_accum_items(5)),
+        cfg,
+        contract,
+        torch.device("cpu"),
+        total_steps=3,
+        seed=0,
+        shuffle=False,
+        log_path=None,
+        resume_state=None,
+        on_checkpoint=sink,
+        save_every=1,
+    )
+    baseline_losses = [row["loss"] for row in baseline["history"]]
+    assert len(baseline_losses) == 3 and 2 in states
+
+    resumed = run_training_loop(
+        _tiny_dflash_module(),
+        _FastForwardDataset(_accum_items(5)),
+        cfg,
+        contract,
+        torch.device("cpu"),
+        total_steps=3,
+        seed=0,
+        shuffle=False,
+        log_path=None,
+        resume_state=states[2],
+        on_checkpoint=None,
+        save_every=1,
+    )
+    resumed_losses = [row["loss"] for row in resumed["history"]]
+    assert resumed["summary"]["resumed_from_step"] == 2
+    assert [row["step"] for row in resumed["history"]] == [1, 2, 3]
+    assert resumed_losses[:2] == baseline_losses[:2]
+    assert resumed_losses[2] == baseline_losses[2]
+
+
+def test_reconcile_train_log_moves_uncommitted_tail_and_half_lines(tmp_path):
+    log_path = tmp_path / "train_log.jsonl"
+    log_path.write_text(
+        '{"step": 1, "loss": 1.0}\n{"step": 2, "loss": 2.0}\n{"step": 3, "loss": 3.0}\n',
+        encoding="utf-8",
+    )
+    _reconcile_train_log(log_path, 2)
+    kept = [json.loads(line)["step"] for line in log_path.read_text(encoding="utf-8").splitlines()]
+    recovery = tmp_path / "train_log.uncommitted.jsonl"
+    moved = [json.loads(line)["step"] for line in recovery.read_text(encoding="utf-8").splitlines()]
+    assert kept == [1, 2] and moved == [3]
+
+    # A truncated final line (interrupted write) is uncommitted too.
+    with log_path.open("a", encoding="utf-8") as fh:
+        fh.write('{"step": 3')
+    _reconcile_train_log(log_path, 2)
+    assert [json.loads(line)["step"] for line in log_path.read_text(encoding="utf-8").splitlines()] == [1, 2]
+    assert recovery.read_text(encoding="utf-8").strip() == '{"step": 3'
+
+
+def test_interrupted_run_resume_keeps_log_steps_unique(monkeypatch, tmp_path):
+    """Reproduces the [1, 2, 3] -> [1, 2, 3, 3] report: an interrupted run
+    whose log already contains a step the checkpoint does not cover. The
+    resumed run must keep the log unique and ordered, with the replayed tail
+    preserved as a recovery artifact."""
+    import vlm_dflash.dflash.train as train_module
+
+    model, processor, contract, run_dir, cfg, _source = _tiny_train_setup(monkeypatch, tmp_path)
+    _patch_tiny_draft_build(monkeypatch)
+    _patch_drafter_visual_check(monkeypatch)
+
+    original = train_module.gather_train_state
+    calls = {"n": 0}
+
+    def flaky(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 3:  # step-1 and step-2 checkpoints, then the final state
+            raise RuntimeError("injected interruption before the final resumable write")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(train_module, "gather_train_state", flaky)
+    with pytest.raises(RuntimeError, match="injected interruption"):
+        train_dflash(cfg, run_dir, contract, steps=3, feature_mode="online")
+    monkeypatch.setattr(train_module, "gather_train_state", original)
+
+    log_path = run_dir / "train" / "train_log.jsonl"
+    steps_before = [json.loads(line)["step"] for line in log_path.read_text(encoding="utf-8").splitlines()]
+    assert steps_before == [1, 2, 3]
+    ckpt_before = torch.load(run_dir / "train" / "ckpt_last.pt", map_location="cpu", weights_only=False)
+    assert ckpt_before["step"] == 2
+
+    resumed = train_dflash(cfg, run_dir, contract, steps=3, resume=True, feature_mode="online")
+    assert resumed["steps"] == 3 and resumed["resumed_from_step"] == 2
+    steps_after = [json.loads(line)["step"] for line in log_path.read_text(encoding="utf-8").splitlines()]
+    assert steps_after == [1, 2, 3]
+    recovery = run_dir / "train" / "train_log.uncommitted.jsonl"
+    assert [json.loads(line)["step"] for line in recovery.read_text(encoding="utf-8").splitlines()] == [3]
+
+    # The completed run records its final resumable state: repeating the
+    # resume is a no-op and leaves the log untouched.
+    ckpt_done = torch.load(run_dir / "train" / "ckpt_last.pt", map_location="cpu", weights_only=False)
+    assert ckpt_done["step"] == 3
+    again = train_dflash(cfg, run_dir, contract, steps=3, resume=True, feature_mode="online")
+    assert again["steps"] == 3 and again["resumed_from_step"] == 3
+    assert [json.loads(line)["step"] for line in log_path.read_text(encoding="utf-8").splitlines()] == [1, 2, 3]
+
+
+def test_visual_check_failure_closes_online_source(monkeypatch, tmp_path):
+    """A failure during online startup (before the trainer exists) must still
+    release the target: close() is called exactly once and drops its refs."""
+    model, processor, contract, run_dir, cfg, _source = _tiny_train_setup(monkeypatch, tmp_path)
+    _patch_tiny_draft_build(monkeypatch)
+    cfg["capture"]["visual_path_check"] = True
+
+    closed = []
+    original_close = online_module.OnlineFeatureSource.close
+
+    def counting_close(self):
+        closed.append(self)
+        original_close(self)
+
+    monkeypatch.setattr(online_module.OnlineFeatureSource, "close", counting_close)
+
+    import vlm_dflash.target.visual_check as visual_check_module
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("injected visual-check failure")
+
+    monkeypatch.setattr(visual_check_module, "run_visual_path_check", boom)
+    with pytest.raises(RuntimeError, match="injected visual-check failure"):
+        train_dflash(cfg, run_dir, contract, steps=1, feature_mode="online")
+    assert len(closed) == 1
+    source = closed[0]
+    assert source.model is None and source.processor is None
+    assert source.embed_weight is None and source.lm_head_weight is None
+
+
+def test_online_source_constructor_failure_closes_partial_state(monkeypatch, tmp_path):
+    model, processor, contract, run_dir, cfg, _source = _tiny_train_setup(monkeypatch, tmp_path)
+    closed = []
+    original_close = online_module.OnlineFeatureSource.close
+
+    def counting_close(self):
+        closed.append(self)
+        original_close(self)
+
+    monkeypatch.setattr(online_module.OnlineFeatureSource, "close", counting_close)
+    original_extract = online_module.extract_target_head
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("injected head-extraction failure")
+
+    monkeypatch.setattr(online_module, "extract_target_head", boom)
+    with pytest.raises(RuntimeError, match="injected head-extraction failure"):
+        online_module.OnlineFeatureSource(cfg, contract, run_dir)
+    assert len(closed) == 1
+    assert closed[0].model is None and closed[0].processor is None
+
+    # close() is idempotent on a healthy source too, and the released refs
+    # include the frozen embedding/head copies handed to the trainer.
+    monkeypatch.setattr(online_module, "extract_target_head", original_extract)
+    source = online_module.OnlineFeatureSource(cfg, contract, run_dir)
+    source.close()
+    source.close()
+    assert source.model is None and source.processor is None
+    assert source.embed_weight is None and source.lm_head_weight is None
+
+
+def test_cli_resume_preflight_external_features_dependency_chain(monkeypatch, tmp_path):
+    """--features runs never build regen/capture; the resume preflight must
+    check only the stages the run actually owns (data) plus the store digest
+    and training plan."""
+    import vlm_dflash.cli as cli_module
+    from vlm_dflash.target.sample_capture import extract_target_head
+
+    model, processor, contract, run_dir, cfg, source = _tiny_train_setup(monkeypatch, tmp_path)
+    records = [source.extract(index) for index in range(len(source.rows))]
+    embed_weight, _lm_head_weight, _tied = extract_target_head(model, contract)
+    store = tmp_path / "shared_store"
+    _write_tiny_feature_store(store, contract, records, embed_weight)
+
+    _patch_tiny_draft_build(monkeypatch)
+    _patch_drafter_visual_check(monkeypatch)
+    summary = train_dflash(cfg, run_dir, contract, steps=2, feature_mode="offline", features_dir=store)
+    assert summary["steps"] == 2
+    # --features runs record no regen/capture *stage manifests* (cmd_train
+    # skips those stages); the preflight must not demand them.
+    assert not (run_dir / "regen" / "stage_manifest.json").exists()
+    assert not (run_dir / "capture" / "stage_manifest.json").exists()
+
+    recorded_contract = json.loads(json.dumps(contract))
+    recorded_contract["layers"]["block_size"] = int(cfg["drafter"]["block_size"])
+    (run_dir / "contract.json").write_text(json.dumps(recorded_contract), encoding="utf-8")
+    (run_dir / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+    args = SimpleNamespace(limit=None, steps=2, force=False)
+
+    consulted = []
+
+    def fake_stage_status(run_dir_, stage, marker, digest, force):
+        consulted.append(stage)
+        return "skip"
+
+    monkeypatch.setattr(cli_module, "stage_status", fake_stage_status)
+    result = cli_module._preflight_resume(cfg, run_dir, args, "offline", store)
+    assert result["mode"] == "offline" and result["total_steps"] == 2
+    assert consulted == ["data"], f"preflight must not require regen/capture for --features: {consulted}"
+
+    # Without --features the same run is internal-offline and *does* require
+    # the regen stage it never built: the negative case still refuses.
+    def regen_missing(run_dir_, stage, marker, digest, force):
+        return "skip" if stage == "data" else "run"
+
+    monkeypatch.setattr(cli_module, "stage_status", regen_missing)
+    with pytest.raises(SystemExit, match="regen"):
+        cli_module._preflight_resume(cfg, run_dir, SimpleNamespace(limit=None, steps=2, force=False), "offline", None)

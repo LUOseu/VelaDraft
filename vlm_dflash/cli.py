@@ -486,13 +486,18 @@ def _preflight_resume(cfg: dict, run_dir: Path, args, feature_mode: str, externa
         )
     validate_yaml_against_contract(cfg, contract, "config")
     limit = args.limit
+    # Stage dependencies follow the feature source actually used by the run
+    # (mirroring cmd_train): online and internal-offline builds own their
+    # regen stage; `--features <store>` runs never built regen/capture, so
+    # demanding them here would wrongly reject a legal external-store resume.
     data_digest = stage_digest(cfg, contract, "data", None, limit=limit)
     _require_stage(run_dir, "data", "data/data.jsonl", data_digest)
-    regen_digest = stage_digest(cfg, contract, "regen", data_digest, limit=limit)
-    _require_stage(run_dir, "regen", "regen/target_data.jsonl", regen_digest)
-    if feature_mode == "offline" and external_features is None:
-        capture_digest = stage_digest(cfg, contract, "capture", regen_digest, limit=limit)
-        _require_stage(run_dir, "capture", "features/index.jsonl", capture_digest)
+    if external_features is None:
+        regen_digest = stage_digest(cfg, contract, "regen", data_digest, limit=limit)
+        _require_stage(run_dir, "regen", "regen/target_data.jsonl", regen_digest)
+        if feature_mode == "offline":
+            capture_digest = stage_digest(cfg, contract, "capture", regen_digest, limit=limit)
+            _require_stage(run_dir, "capture", "features/index.jsonl", capture_digest)
     from .dflash.train import preflight_resume
 
     try:
