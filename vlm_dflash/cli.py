@@ -376,6 +376,11 @@ def stage_digest_payload(
     # Audit-only fields never change the outputs: the same checkpoint copied to
     # another directory must keep cached stages reusable.
     identity.pop("target_model_path", None)
+    # ``capture_layer_ids`` is captured-content-defining only when it differs
+    # from the draft routing; dropping the default keeps stage digests written
+    # before the field existed reusable (their capture list was the routing).
+    if identity.get("capture_layer_ids") == identity.get("draft_layer_ids"):
+        identity.pop("capture_layer_ids", None)
     payload = {
         "stage": stage,
         "config": cfg.get(key, {}),

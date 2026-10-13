@@ -103,6 +103,17 @@ vlm-dflash train-demo --target "$VLM_DFLASH_TARGET" --steps 80
 | [JetSpec](docs/algorithms/jetspec.md) | 已验证 | 小规模验证 | **Validated** | 因果块内 mask + forward-KL |
 | [DFlash2](docs/algorithms/dflash2.md) | 已验证 | 小规模验证 | **Experimental** | 局部卷积 + candidate selector |
 
+在研中（AngelSpec 移植，已完成仓库内全流程记录，尚未走发布验证）：
+
+| 算法 | Qwen2.5-VL-3B | Qwen3-VL-8B | 状态 | 方法 |
+| --- | --- | --- | --- | --- |
+| [DFlare](docs/algorithms/dflare.md) | 已验证 | 小规模验证 | **Experimental** | 逐 draft 层可学习融合 + 独立 context K/V |
+| [DFly](docs/algorithms/dfly.md) | 已验证 | 小规模验证 | **Experimental** | DFlash 共享 KV 主干 + 融合残差 + hidden-states 修正 |
+
+两者共用冻结的 DFlash 训练目标与完全相同的命令。2K 协议下 DFly 达到 AL 1.682
+（深度槽位带来相对 1.630 DFlash 基线的增益），DFlare 为 1.637（与基线持平）。
+DFly 上游的两段式 LK/D-PACE 目标有意未移植（见上游审计文档），引用其数字时必须说明。
+
 Target 分别为 **Qwen2.5-VL-3B-Instruct** 和 **Qwen3-VL-8B-Instruct**。
 小规模验证包含 256 行数据与 16 条评测 prompt。以上状态描述训练与评测覆盖，
 运行时支持单独记录在[支持矩阵](SUPPORT_MATRIX.md)中。

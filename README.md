@@ -119,6 +119,20 @@ All five methods use the same train, eval and export commands.
 | [JetSpec](docs/algorithms/jetspec.md) | Validated | Reduced validation | **Validated** | Causal in-block mask + forward-KL |
 | [DFlash2](docs/algorithms/dflash2.md) | Validated | Reduced validation | **Experimental** | Local convolutions + candidate selector |
 
+In development (AngelSpec ports; full in-repo coverage recorded, no release
+pass yet):
+
+| Algorithm | Qwen2.5-VL-3B | Qwen3-VL-8B | Status | Method |
+| --- | --- | --- | --- | --- |
+| [DFlare](docs/algorithms/dflare.md) | Validated | Reduced validation | **Experimental** | Learnable per-draft-layer fusion + dedicated context K/V |
+| [DFly](docs/algorithms/dfly.md) | Validated | Reduced validation | **Experimental** | DFlash shared-KV backbone + fusion residual + hidden-states correction |
+
+Both share the frozen DFlash training objective and the same commands. On the
+2K protocol, DFly reaches AL 1.682 (deep slots carry the gain over the 1.630
+DFlash baseline) and DFlare 1.637 (baseline parity). DFly's two-stage
+LK/D-PACE objective is deliberately not ported (see the upstream audit), so
+its numbers must be quoted with that caveat.
+
 Target names refer to **Qwen2.5-VL-3B-Instruct** and **Qwen3-VL-8B-Instruct**.
 Reduced validation covers a 256-row slice and 16-prompt evaluation. Status
 reflects the recorded training/evaluation coverage; runtime support is listed

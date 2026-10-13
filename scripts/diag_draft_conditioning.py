@@ -29,10 +29,11 @@ from transformers.cache_utils import DynamicCache
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from vlm_dflash.adapters import adapter_for_model
+from vlm_dflash.algorithms import get_algorithm
 from vlm_dflash.config import apply_overrides, load_config, resolve_run_dir
 from vlm_dflash.contract import ensure_contract
 from vlm_dflash.data.sharegpt import load_sharegpt, row_answer, row_image_path, row_question
-from vlm_dflash.dflash.factory import build_draft_config, build_trainer_module
+from vlm_dflash.dflash.factory import build_trainer_module
 from vlm_dflash.target.capture import forward_and_capture
 from vlm_dflash.target.load import load_target
 from vlm_dflash.target.prompts import encode_prompt
@@ -59,7 +60,15 @@ def main() -> None:
     block_size = int(cfg["drafter"]["block_size"])
     mask_token_id = int(cfg["drafter"]["mask_token_id"])
     image_token_id = int(contract["tokens"]["image_token_id"])
-    layer_ids = [int(layer) for layer in contract["layers"]["draft_layer_ids"]]
+    # Extract exactly the layers the algorithm's draft model consumes (the
+    # routing for DFlash; the explicit context list for DFlare/DFly).
+    algorithm = get_algorithm(str(cfg.get("algorithm", "dflash")))
+    draft_config = algorithm.build_draft_config(contract, cfg)
+    dflash_config = dict(getattr(draft_config, "dflash_config", {}) or {})
+    layer_ids = [
+        int(layer)
+        for layer in (dflash_config.get("context_layer_ids") or contract["layers"]["draft_layer_ids"])
+    ]
     merge_size = int(contract["image"]["merge_size"])
 
     model, processor = load_target(cfg, contract)
@@ -116,7 +125,6 @@ def main() -> None:
 
     # ---- draft / trainer module ----
     target_head = torch.load(run_dir / "features" / "target_head.pt", map_location="cpu", weights_only=False)
-    draft_config = build_draft_config(contract, cfg)
     module = build_trainer_module(
         draft_config, contract, cfg, target_head["embed_tokens"], lm_head_weight=target_head.get("lm_head")
     )

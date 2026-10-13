@@ -38,6 +38,33 @@ def test_contract_resolves_qwen25vl3b():
     assert contract["image"]["min_tokens"] == 256
 
 
+def test_contract_capture_superset_and_fusion_context():
+    # A superset capture with an explicit context subset resolves.
+    defaults = dict(
+        DEFAULTS,
+        capture_layer_ids=[1, 9, 17, 25, 33],
+        algorithm_context_layer_ids=[1, 9, 17, 25, 33],
+    )
+    contract = resolve_contract(MODEL, defaults)
+    assert contract["layers"]["capture_layer_ids"] == [1, 9, 17, 25, 33]
+    assert contract["layers"]["capture_layer_ids_source"] == "explicit drafter.capture_layer_ids"
+    # A consumed layer outside the capture fails loud.
+    bad = dict(DEFAULTS, capture_layer_ids=[1, 9, 17, 25, 33], algorithm_context_layer_ids=[1, 5, 9])
+    with pytest.raises(ContractError, match="superset"):
+        resolve_contract(MODEL, bad)
+    # Fusion algorithms do not consume the draft routing, so a capture that
+    # covers their context list is enough even when the routing is elsewhere.
+    fusion = dict(
+        DEFAULTS,
+        draft_num_hidden_layers=7,
+        capture_layer_ids=[1, 5, 9, 13, 17],
+        algorithm_context_layer_ids=[1, 5, 9, 13, 17],
+    )
+    contract = resolve_contract(MODEL, fusion)
+    assert contract["layers"]["draft_layer_ids"] == [1, 6, 12, 17, 22, 28, 33]
+    assert contract["layers"]["capture_layer_ids"] == [1, 5, 9, 13, 17]
+
+
 QWEN3_MODEL = os.environ.get("VLM_DFLASH_TEST_MODEL_QWEN3VL", "assets/models/Qwen3-VL-8B-Instruct")
 
 QWEN3_DEFAULTS = {

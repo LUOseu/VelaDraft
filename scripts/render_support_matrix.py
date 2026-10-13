@@ -52,8 +52,10 @@ COLUMNS = [
 
 FOOTNOTES = """\
 - "Train" is the training maturity: DFlash2 trains with an experimental
-  objective reconstruction (upstream objective undisclosed); everything else
-  is validated.
+  objective reconstruction (upstream objective undisclosed) and DFly trains
+  the ported architecture with the shared DFlash objective (upstream's
+  two-stage LK/D-PACE -> e2e-TV recipe is not ported; see
+  `docs/upstream/dfly.md`); everything else is validated.
 - JetSpec eval numbers are validated with its causal in-block mask (its
   parallel-tree production runtime is not ported); every algorithm's runtime
   story is sequential token-exact verification only.

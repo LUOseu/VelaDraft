@@ -28,6 +28,28 @@ def _git_commit() -> str | None:
         return None
 
 
+def _capture_layer_ids(checkpoint: dict, contract: dict) -> list:
+    """Feature-store layer list to record in the export config.
+
+    Priority: the checkpoint's own record (new runs), the contract's capture
+    list, the contract's draft routing, and finally the checkpoint's target
+    layer list (legacy artifacts captured exactly the draft routing).
+    """
+
+    layers = contract.get("layers", {})
+    for candidate in (
+        checkpoint.get("capture_layer_ids"),
+        layers.get("capture_layer_ids"),
+        layers.get("draft_layer_ids"),
+        checkpoint.get("target_layer_ids"),
+    ):
+        if candidate:
+            return list(candidate)
+    raise KeyError(
+        "cannot determine capture_layer_ids: checkpoint and contract both lack layer routing."
+    )
+
+
 def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -> dict:
     from ..algorithms import get_algorithm
 
@@ -116,6 +138,14 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
             "attention_backend": checkpoint["attention_backend"],
             "mask_token_id": int(checkpoint["mask_token_id"]),
             "target_layer_ids": [int(x) for x in checkpoint["target_layer_ids"]],
+            # Ordered layer list the training features were captured with; a
+            # serving stack re-extracting context layers must honor it (the
+            # consumed subset is listed per method in ``method_details``).
+            # Legacy artifacts default to the draft routing (= the checkpoint's
+            # ``target_layer_ids``), which is what they captured.
+            "capture_layer_ids": [
+                int(x) for x in _capture_layer_ids(checkpoint, contract)
+            ],
             "spatial_rope": rope_cfg,
             # Effective serving config. JetSpec checkpoints trained before the
             # flag existed still must be served with the causal in-block mask

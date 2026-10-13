@@ -228,6 +228,12 @@ class DFlashTrainerModule(nn.Module):
         # Smallest visible-prefix length variable-prefix training samples (and the
         # slice point of its loss); single source of truth for both methods.
         self._min_prefix = min(2, block_size - 1)
+        # Feature-store layout (configured by the training script once the
+        # store/source manifest is known; see ``configure_feature_layout``).
+        # ``None`` keeps the legacy behavior: the batch's ``hidden`` already is
+        # the concatenation of the layers this module consumes.
+        self.capture_layer_ids: list[int] | None = None
+        self.capture_hidden_size: int | None = None
 
         # Block-wise decay-weighted CE for the fixed-anchor objective.
         # ``normalize="mean"`` gives a local per-micro-batch decay-weighted mean;
@@ -246,6 +252,69 @@ class DFlashTrainerModule(nn.Module):
 
         # Per-block offset constant (block_size,) for label gathering / position ids.
         self.register_buffer("_block_offsets", torch.arange(block_size).view(1, 1, -1), persistent=False)
+
+    # ------------------------------------------------------------------ #
+    # feature layout
+    # ------------------------------------------------------------------ #
+
+    def consumed_layer_ids(self) -> list[int]:
+        """Ordered target layers this module feeds to its draft model.
+
+        Base DFlash consumes the draft model's routed layers; fusion methods
+        (DFlare/DFly) consume their explicit context list. Both are absolute
+        target layer indices, so the feature store can be sliced by identity.
+        """
+        model = self.draft_model
+        context_ids = getattr(model, "context_layer_ids", None)
+        if context_ids is not None:
+            return [int(layer) for layer in context_ids]
+        return [int(layer) for layer in getattr(model, "target_layer_ids")]
+
+    def configure_feature_layout(self, capture_layer_ids, hidden_size: int | None = None) -> None:
+        """Record the feature store's layer layout (ordered ids + per-layer width).
+
+        Called by the training script with the manifest/source layout. The
+        module then slices every batch's concatenated ``hidden`` to the layers
+        it consumes -- by explicit layer id, never by guessing the layout from
+        the tensor shape. Refuses stores that lack any consumed layer instead
+        of silently training on the wrong context.
+        """
+        capture = [int(layer) for layer in capture_layer_ids]
+        if len(set(capture)) != len(capture):
+            raise ValueError(f"capture_layer_ids {capture} contain duplicates; cannot slice a store safely.")
+        needed = self.consumed_layer_ids()
+        missing = [layer for layer in needed if layer not in capture]
+        if missing:
+            raise ValueError(
+                f"algorithm {type(self).__name__} needs target layers {needed}, but the feature source "
+                f"holds {capture} (missing {missing}). Recapture with drafter.capture_layer_ids set to a "
+                "superset of the method's layers."
+            )
+        expected_hidden = int(getattr(self.draft_model.config, "target_hidden_size",
+                                      self.draft_model.config.hidden_size))
+        if hidden_size is not None and int(hidden_size) != expected_hidden:
+            raise ValueError(
+                f"feature store hidden size {int(hidden_size)} disagrees with the draft's expected "
+                f"target hidden size {expected_hidden}."
+            )
+        self.capture_layer_ids = capture
+        self.capture_hidden_size = int(hidden_size) if hidden_size is not None else expected_hidden
+
+    def _select_context_layers(self, hidden: torch.Tensor) -> torch.Tensor:
+        """[B, S, len(capture)*H] -> [B, S, len(consumed)*H] in consumed order."""
+        if self.capture_layer_ids is None:
+            return hidden
+        from .features import select_capture_layers
+
+        expected_width = len(self.capture_layer_ids) * int(self.capture_hidden_size)
+        if hidden.shape[-1] != expected_width:
+            raise ValueError(
+                f"batch hidden width {hidden.shape[-1]} does not match the feature layout "
+                f"len(capture_layer_ids)={len(self.capture_layer_ids)} * hidden_size="
+                f"{int(self.capture_hidden_size)} = {expected_width}; the store and its manifest disagree "
+                "(recapture the features)."
+            )
+        return select_capture_layers(hidden, self.capture_layer_ids, self.consumed_layer_ids())
 
     def _sample_anchor_positions(
         self,
@@ -559,6 +628,42 @@ class DFlashTrainerModule(nn.Module):
         """
         return logits, None, None
 
+    def _teacher_forced_prev_tokens(
+        self, input_ids: torch.Tensor, label_indices: torch.Tensor, n: int
+    ) -> torch.Tensor:
+        """Ground-truth token immediately before each supervised position.
+
+        Args:
+            input_ids: ``[B, S]`` context token ids.
+            label_indices: ``[B, N, block_size]`` positions the block shadows.
+            n: Number of anchor slots (``label_indices.size(1)``).
+
+        Returns:
+            Long tensor ``[B, N, block_size]``; ``input_ids[label - 1]`` with the
+            first context position clamped (its slot is never supervised).
+        """
+        prev_indices = (label_indices - 1).clamp(min=0)
+        return torch.gather(input_ids.unsqueeze(1).expand(-1, n, -1), 2, prev_indices)
+
+    def _correct_draft_hidden(
+        self,
+        output_hidden: torch.Tensor,
+        *,
+        prev_token_ids: torch.Tensor,
+        label_indices: torch.Tensor,
+        bsz: int,
+        n: int,
+        bs: int,
+    ) -> torch.Tensor:
+        """Pre-head hidden-state hook.
+
+        Base DFlash (and the logit-space subclasses DSpark/Domino) return the
+        tensor unchanged. DFly overrides this to add its TreeFlash correction
+        conditioned on the teacher-forced previous token, so the correction
+        runs before the frozen LM head exactly like at inference.
+        """
+        return output_hidden
+
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -651,18 +756,6 @@ class DFlashTrainerModule(nn.Module):
                 dim=-1,
             )
 
-        output_hidden = self.draft_model(
-            position_ids=full_position_ids,
-            multimodal_position_ids=full_multimodal_position_ids,
-            noise_embedding=noise_embedding,
-            target_hidden=hidden_states,
-            attention_mask=dflash_attn_mask,
-            image_mask=image_mask,
-        )
-        # A tensor-parallel target's lm_head is column-parallel and returns
-        # vocab-sharded (DTensor) logits; gather to a full tensor for the loss.
-        logits = _to_full_tensor(self.lm_head(output_hidden))
-
         n = anchor_positions.size(1)
         bs = self.block_size
 
@@ -675,6 +768,34 @@ class DFlashTrainerModule(nn.Module):
             seq_len,
             label_start=self.input_shift,
         )
+
+        output_hidden = self.draft_model(
+            position_ids=full_position_ids,
+            multimodal_position_ids=full_multimodal_position_ids,
+            noise_embedding=noise_embedding,
+            target_hidden=self._select_context_layers(hidden_states),
+            attention_mask=dflash_attn_mask,
+            image_mask=image_mask,
+        )
+        # Pre-head hidden-state hook (identity for DFlash/DSpark/Domino; DFly
+        # applies its optional TreeFlash correction here, before the LM head).
+        # The previous token of each slot is teacher-forced from the context:
+        # slot k's target sits at ``label_indices[..., k]``, so the token right
+        # before it is ``input_ids[label_indices - 1]``. Slot 0 (unsupervised in
+        # the DFlash convention) clamps to position 0 like the label gather.
+        prev_token_ids = self._teacher_forced_prev_tokens(input_ids, label_indices, n)
+        output_hidden = self._correct_draft_hidden(
+            output_hidden,
+            prev_token_ids=prev_token_ids,
+            label_indices=label_indices,
+            bsz=bsz,
+            n=n,
+            bs=bs,
+        )
+        # A tensor-parallel target's lm_head is column-parallel and returns
+        # vocab-sharded (DTensor) logits; gather to a full tensor for the loss.
+        logits = _to_full_tensor(self.lm_head(output_hidden))
+
         # Algorithm seam: logit correction (e.g. DSpark's Markov bias) plus any
         # auxiliary objective (e.g. the DSpark confidence BCE). The base DFlash
         # implementation is the identity; see ``algorithms/dspark.py``.

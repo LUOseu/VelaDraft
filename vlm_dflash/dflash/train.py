@@ -265,6 +265,11 @@ def run_training_loop(
             f"train: resumed from step {step} "
             f"(micro_step={micro_step}, skipped={skipped_batches}, history_rows={len(history)})"
         )
+    # Let modules whose diagnostics should reflect the optimizer trajectory (not
+    # the bf16 live parameter) hold a reference to their fp32 master copies.
+    attach_master_parameters = getattr(module.draft_model, "set_master_parameters", None)
+    if attach_master_parameters is not None:
+        attach_master_parameters(master_parameters)
     stall_epochs = 0
     gradient_coverage: dict | None = None
     # Algorithms with a curriculum (Domino) can declare that their heads only
@@ -827,6 +832,24 @@ def train_dflash(
         module = algorithm.build_trainer_module(
             draft_config, contract, cfg, embed_weight, lm_head_weight=lm_head_weight
         )
+        # Feature layout (ordered capture layers + per-layer width) is a property of
+        # the store/source, and it must agree with the frozen contract before any
+        # batch is sliced. Consumers pick explicit layer subsets by id; nothing is
+        # inferred from tensor shapes.
+        from ..contract import contract_capture_layer_ids
+        from ..dflash.features import capture_layer_layout
+
+        contract_capture = contract_capture_layer_ids(contract)
+        store_capture, store_hidden_size = capture_layer_layout(
+            manifest, contract_hidden_size=int(contract["text"]["hidden_size"])
+        )
+        if store_capture != contract_capture:
+            raise RuntimeError(
+                f"feature source holds layers {store_capture} but the frozen contract declares "
+                f"capture_layer_ids {contract_capture}; set drafter.capture_layer_ids to the store's list "
+                "(or recapture) before training."
+            )
+        module.configure_feature_layout(store_capture, store_hidden_size)
         init_state = {key: value.clone() for key, value in module.draft_model.state_dict().items()}
 
         train_dir = ensure_dir(run_dir / "train")
@@ -858,6 +881,9 @@ def train_dflash(
             # refuses checkpoints whose head does not match the target's tie state.
             "head": "tied_embedding" if tied_head else "target_lm_head",
             "identity": identity_from_contract(contract),
+            # The ordered layer list the training features were captured with (the
+            # draft's consumed subset is ``target_layer_ids`` / method context ids).
+            "capture_layer_ids": contract_capture_layer_ids(contract),
             # Which feature source trained these weights: resume refuses to mix
             # modes or data, and eval/export surface the mode.
             "feature_mode": mode,

@@ -59,7 +59,9 @@ def run_visual_path_check(
     pair_path = Path(pair_path) if pair_path is not None else run_dir / "features" / "swap_pair.pt"
     ensure_dir(check_path.parent)
     ensure_dir(pair_path.parent)
-    layer_ids = [int(layer) for layer in contract["layers"]["draft_layer_ids"]]
+    from ..contract import contract_capture_layer_ids
+
+    layer_ids = contract_capture_layer_ids(contract)
     image_token_id = int(contract["tokens"]["image_token_id"])
     merge_size = int(contract["image"]["merge_size"])
     cfg_check = cfg.get("capture", {}).get("visual_check", {})
