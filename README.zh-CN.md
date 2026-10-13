@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>面向 Qwen-VL 的多模态并行草稿模型训练工具。</strong><br />
-  通过同一条流水线，训练、比较和导出五种 drafter 算法。
+  带上你的图文数据，针对冻结目标模型训练草稿模型，并逐 token 验证输出——训练、恢复、评测、导出。
 </p>
 
 <p align="center">
@@ -17,7 +17,7 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="#模型下载">模型下载</a> ·
   <a href="#训练自己的数据">训练</a> ·
-  <a href="#基准结果">基准结果</a> ·
+  <a href="#基准结果">基准与历史记录</a> ·
   <a href="#文档">文档</a> ·
   <a href="https://github.com/LUOseu/VelaDraft/blob/main/CONTRIBUTING.md">参与贡献</a>
 </p>
@@ -69,7 +69,7 @@ vlm-dflash demo --target "$VLM_DFLASH_TARGET" --drafter qwen25vl-3b-dflash
 Demo 会生成少量示例图片、打印回答，并报告 **接受长度、各位置接受率和 token 一致性**。
 无需训练或下载外部数据集；目标模型需要提前准备。下载时间取决于网络，实测执行时间见[验证记录](RELEASE_VALIDATION.md)。
 
-省略 `--drafter` 可运行随机初始化的接受率基线（AL ≈1.00）。
+省略 `--drafter` 可运行随机初始化的接受率基线。
 
 ### 体验完整训练流程
 
@@ -114,13 +114,15 @@ DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpe
 
 已发布的 **Qwen2.5-VL-3B-Instruct** drafter：
 
-| Drafter | AL¹ | 下载 | Model card |
-| --- | ---: | --- | --- |
-| **DFlash** · 冻结基线 | 1.630 | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash.md) |
-| **Domino** · GRU 修正 | 1.764 | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [详情](docs/zoo/qwen25vl-3b-domino.md) |
+| Drafter | 下载 | Model card |
+| --- | --- | --- |
+| **DFlash** · 冻结块草稿参考实现 | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash.md) |
+| **Domino** · GRU 修正 | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [详情](docs/zoo/qwen25vl-3b-domino.md) |
 
-¹ 下方 canonical 2K 协议。AL 是接受指标，不是墙钟加速倍数。
-两个 export 均在下载后重新通过 token-exact gate；见[发布证据](RELEASE_VALIDATION.md)。
+这些权重是**流水线验证用的参考产物**：按已记录的开发协议训练，用于跑通
+`训练 → 评测 → 导出`、集成工作和输出一致性检查，并非面向生产调优或充分训练的 drafter；
+它们产生的接受指标属于开发期测量，与训练协议及其余运行一并记录在
+[BENCHMARKS.md](BENCHMARKS.md)。两个 export 均在下载后重新通过 token-exact gate；见[发布证据](RELEASE_VALIDATION.md)。
 
 每个压缩包包括权重、配置、算法 metadata、target contract、training manifest、model card 与文件校验值。
 其他算法可在本地训练并导出，当前未托管其 canonical checkpoints。
@@ -178,31 +180,15 @@ offline。详见[在线训练指南](docs/online-training.md)。
 
 ## 基准结果
 
-**Qwen2.5-VL-3B-Instruct · 2K 训练数据 · block size 8 · 128 prompts ·
-128 new tokens · 贪心解码 · sequential verification · 单张 RTX A6000。**
+所有性能测量（接受长度、各位置接受率、耗时、token-exact 结果与
+ablation）都保存在开发记录中：[BENCHMARKS.md](BENCHMARKS.md)、
+[RELEASE_VALIDATION.md](RELEASE_VALIDATION.md) 与 [docs/measured-runs.md](docs/measured-runs.md)。
+README 有意不展示小规模训练数字和算法排名：已记录的运行是同一配方下的
+流水线/协议证据，不是对方法质量或墙钟加速的声明。
 
-| 算法 | AL | Token-exact | Drafter 参数量 | 训练时间² |
-| --- | ---: | --- | ---: | ---: |
-| DFlash | 1.630 | 128/128 | 243.8M | 9.8 min |
-| DSpark | 1.735 | 128/128 | 321.6M | 11.8 min |
-| Domino | 1.764 | 128/128 | 292.9M | 12.9 min |
-| JetSpec | 1.599 | 128/128 | 243.8M | 20.6 min |
-| DFlash2³ | 1.954 | 128/128 | 328.5M | 22.7 min |
-
-² Capture 完成后的 drafter 训练时间，不含数据准备、目标回答生成和 capture。
-³ 实验性训练目标重建。
-
-这些是同一协议下的对比，不代表上游方法的通用排名。
-冻结结果：[JSON](benchmarks/results/zoo_canonical.json) / [CSV](benchmarks/results/zoo_canonical.csv)。
-各位置接受率、显存、ablation 与更多运行记录见 [BENCHMARKS.md](BENCHMARKS.md)。
-
-固定 **TextVQA** workload 上，DFlash / DSpark / Domino 的 AL 为
-1.263 / 1.253 / 1.268，均为 128/128 token-exact。
-这里评测投机接受行为与输出一致性，标准答案 VQA 准确率是另一个指标；见[benchmark 指南](docs/benchmark.md)。
-
-**运行成本：** 当前 sequential 参考运行相对 target-only 为 0.81–0.87×。
-Parallel verification 仍属实验路径，在 bf16 下可能出现输出差异。
-时间与一致性结果共同记录在[验证模式说明](docs/verification-modes.md)中。
+项目在任何规模下都验证的是**正确性**：sequential 投机解码必须逐 token
+精确复现目标模型自己的贪心输出（`token_exact`），并提供各位置接受率记账。
+详见[验证模式说明](docs/verification-modes.md)。
 
 ## 支持范围
 

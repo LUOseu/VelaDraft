@@ -172,6 +172,19 @@ bump was needed.
   the log byte-identical, and eval was `token_exact=True` on both
   `ckpt_final.pt` and `ckpt_init.pt` (feature mode recorded as online).
 
+### README repositioning (docs only)
+
+- `README.md` / `README.zh-CN.md` now present the project as training
+  infrastructure: the first screen keeps the support matrix (targets, five
+  algorithms, offline/online, resume, eval, export) and the correctness
+  evidence (token-exact gates, frozen-target identity, export reload); the
+  small-scale AL numbers, the per-algorithm ranking table and the runtime
+  speedup figures are no longer displayed there. All historical results stay
+  unmodified in `BENCHMARKS.md` / `RELEASE_VALIDATION.md` /
+  `docs/measured-runs.md`, which the README links to; Model Zoo entries are
+  labelled reference/validation artifacts. No claim is made about the causes
+  of smoke-scale acceptance numbers.
+
 ## v0.3.1 (2026-10-13)
 
 Distribution fixes, first-run experience, and the post-publish growth review

@@ -4,7 +4,8 @@
 
 <p align="center">
   <strong>Multimodal parallel drafter training for Qwen-VL.</strong><br />
-  Train, compare and export five drafting algorithms through one shared pipeline.
+  Bring image-text data, train a block drafter against a frozen target, and
+  verify its output token-exactly &mdash; train, resume, evaluate, export.
 </p>
 
 <p align="center">
@@ -17,7 +18,7 @@
   <a href="#quickstart">Quickstart</a> ·
   <a href="#model-zoo">Model Zoo</a> ·
   <a href="#train-on-your-data">Training</a> ·
-  <a href="#benchmarks">Benchmarks</a> ·
+  <a href="#benchmarks">Benchmarks &amp; history</a> ·
   <a href="#documentation">Documentation</a> ·
   <a href="https://github.com/LUOseu/VelaDraft/blob/main/CONTRIBUTING.md">Contributing</a>
 </p>
@@ -82,7 +83,7 @@ The demo generates a small image sample, prints the answers, and reports
 external dataset is needed. Download time depends on the network; measured
 execution times are in the [validation record](RELEASE_VALIDATION.md).
 
-Omit `--drafter` to run the random-init acceptance baseline (AL ≈1.00).
+Omit `--drafter` to run the random-init acceptance baseline.
 
 ### Try the whole training loop
 
@@ -132,14 +133,19 @@ See the [algorithm matrix](ALGORITHM_MATRIX.md) and
 
 Released checkpoints for **Qwen2.5-VL-3B-Instruct**:
 
-| Drafter | AL¹ | Download | Model card |
-| --- | ---: | --- | --- |
-| **DFlash** · frozen reference | 1.630 | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflash.md) |
-| **Domino** · GRU correction | 1.764 | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [Details](docs/zoo/qwen25vl-3b-domino.md) |
+| Drafter | Download | Model card |
+| --- | --- | --- |
+| **DFlash** · frozen block reference | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflash.md) |
+| **Domino** · GRU correction | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [Details](docs/zoo/qwen25vl-3b-domino.md) |
 
-¹ Canonical 2K protocol below. AL is an acceptance metric, not a wall-clock
-speedup. Both released exports were re-verified after download with the
-token-exact gate; see the [release evidence](RELEASE_VALIDATION.md).
+These archives are **reference artifacts for pipeline validation**: they were
+trained under the recorded development protocol and are meant for exercising
+`train → eval → export`, integration work and output-agreement checks. They
+are not tuned or benchmarked as production drafters, and their acceptance
+numbers are development measurements — recorded, with the training protocol
+and all other runs, in [BENCHMARKS.md](BENCHMARKS.md). Both exports were
+re-verified after download with the token-exact gate; see the
+[release evidence](RELEASE_VALIDATION.md).
 
 Each archive includes weights, configuration, algorithm metadata, target
 contract, training manifest, model card and file checksums. Other algorithms
@@ -204,34 +210,18 @@ instead of once). `--features` reuse is offline-only. See the
 
 ## Benchmarks
 
-**Qwen2.5-VL-3B-Instruct · 2K training corpus · block size 8 · 128 prompts ·
-128 new tokens · greedy · sequential verification · one RTX A6000.**
+Performance measurements — acceptance length, per-slot acceptance, timing,
+token-exactness and ablations — live in the development record:
+[BENCHMARKS.md](BENCHMARKS.md), [RELEASE_VALIDATION.md](RELEASE_VALIDATION.md)
+and [docs/measured-runs.md](docs/measured-runs.md). The README intentionally
+does not surface small-scale training numbers or an algorithm ranking: the
+recorded runs are plumbing/protocol evidence under one shared recipe, not a
+claim about method quality or wall-clock speedup.
 
-| Algorithm | AL | Token-exact | Drafter params | Training time² |
-| --- | ---: | --- | ---: | ---: |
-| DFlash | 1.630 | 128/128 | 243.8M | 9.8 min |
-| DSpark | 1.735 | 128/128 | 321.6M | 11.8 min |
-| Domino | 1.764 | 128/128 | 292.9M | 12.9 min |
-| JetSpec | 1.599 | 128/128 | 243.8M | 20.6 min |
-| DFlash2³ | 1.954 | 128/128 | 328.5M | 22.7 min |
-
-² Drafter training after feature capture; excludes data preparation, response
-generation and capture. ³ Experimental objective reconstruction.
-
-These are comparisons under the shared protocol, not a general ranking of
-upstream methods. Frozen results: [JSON](benchmarks/results/zoo_canonical.json)
-/ [CSV](benchmarks/results/zoo_canonical.csv). Per-slot acceptance, VRAM,
-ablations and further runs are in [BENCHMARKS.md](BENCHMARKS.md).
-
-On the pinned **TextVQA** workload, DFlash / DSpark / Domino reach AL
-1.263 / 1.253 / 1.268, with 128/128 token-exact prompts. This measures
-speculative acceptance and agreement; standard-answer VQA accuracy is a
-separate metric. See the [benchmark guide](docs/benchmark.md).
-
-**Runtime:** current sequential reference runs measure 0.81–0.87× versus
-target-only on the reference card. Parallel verification is experimental and
-can diverge in bf16. Full timing and agreement results are recorded together
-in [verification modes](docs/verification-modes.md).
+What the project does verify at every scale is **correctness**: sequential
+speculative decoding must reproduce the target's own greedy tokens exactly
+(`token_exact`), together with per-slot acceptance accounting. See
+[verification modes](docs/verification-modes.md).
 
 ## Scope
 
