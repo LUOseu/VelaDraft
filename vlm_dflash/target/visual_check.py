@@ -82,12 +82,29 @@ def run_visual_path_check(
             inputs = encode_conversation(processor, messages, list(images))
             full_ids = torch.tensor([int(token) for token in row["regen"]["full_ids"]], dtype=torch.long)
             return forward_and_capture(
-                model, inputs, full_ids, layer_ids, image_token_id, dtype, merge_size=merge_size, allow_multi_span=True
+                model,
+                inputs,
+                full_ids,
+                layer_ids,
+                image_token_id,
+                dtype,
+                merge_size=merge_size,
+                allow_multi_span=True,
+                tokenizer=getattr(processor, "tokenizer", None),
             )
         inputs = encode_prompt(processor, row_question(row), images)
         prompt_ids = row["regen"]["prompt_ids"]
         full_ids = torch.tensor(prompt_ids + row["regen"]["answer_ids"], dtype=torch.long)
-        return forward_and_capture(model, inputs, full_ids, layer_ids, image_token_id, dtype, merge_size=merge_size)
+        return forward_and_capture(
+            model,
+            inputs,
+            full_ids,
+            layer_ids,
+            image_token_id,
+            dtype,
+            merge_size=merge_size,
+            tokenizer=getattr(processor, "tokenizer", None),
+        )
 
     base_row = rows[0]
     swap_row = rows[1] if len(rows) > 1 else rows[0]

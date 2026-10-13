@@ -90,7 +90,14 @@ def main() -> None:
 
     with torch.inference_mode():
         record = forward_and_capture(
-            model, inputs, full_ids, layer_ids, image_token_id, dtype, merge_size=merge_size
+            model,
+            inputs,
+            full_ids,
+            layer_ids,
+            image_token_id,
+            dtype,
+            merge_size=merge_size,
+            tokenizer=getattr(processor, "tokenizer", None),
         )
     hidden = record["hidden"].to(device=device, dtype=torch.bfloat16)
     position3 = record["position3"].to(device=device, dtype=torch.long)
