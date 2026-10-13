@@ -2,7 +2,9 @@
 """Generate the synthetic single-image dataset used by the WP6 family smoke.
 
 Writes ``source.jsonl`` plus an ``images/`` directory of simple coloured shapes:
-every row is a single-image / single-turn conversation (image_turns ``[0]``).
+every row is a single-image / single-turn conversation in the v1 row format
+(no ``image_turns`` / schema-v2 marker - the schema-v2 multi-turn regen path
+has a family-specific template restriction for SmolVLM, see the WP6 report).
 The described shapes/colours are faithful, but the regen stage still replaces
 the training-split answers with the frozen target's own greedy answers; the
 held-out split keeps the written answers as eval history.
@@ -76,8 +78,6 @@ def build(out_dir: Path, train: int, val: int, seed: int, side: int) -> dict:
                     {"from": "gpt", "value": answer},
                 ],
                 "images": [name],
-                "image_turns": [0],
-                "schema": "vlm-dflash-data-v2",
             }
         )
     with (out_dir / "source.jsonl").open("w", encoding="utf-8") as handle:
