@@ -32,7 +32,13 @@ class AlgorithmMetadata:
 
     ``maturity`` values should be one of ``stable``/``validated``/
     ``experimental``/``architecture-only``/``unsupported``; ``targets`` maps
-    target families (``qwen25_vl``, ``qwen3_vl``) to those same states.
+    target families (``qwen25_vl``, ``qwen3_vl``) to those same states plus
+    ``reduced_validation`` (full pipeline recorded on that family at a
+    reduced protocol -- smaller slice/prompt budget; see
+    ``RELEASE_VALIDATION.md``). Maturity describes how trustworthy the
+    algorithm is, ``targets`` how far the pipeline is validated per family,
+    and ``capabilities`` what the implementation supports at all -- keep the
+    three axes separate and derived from recorded runs.
     """
 
     name: str

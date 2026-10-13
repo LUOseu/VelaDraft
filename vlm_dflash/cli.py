@@ -17,11 +17,12 @@ import argparse
 import json
 import re
 import sys
+from importlib import resources as importlib_resources
 from pathlib import Path
 
+from . import __version__
 from .config import apply_overrides, dump_effective_config, load_config, resolve_run_dir
 
-_PRESETS_DIR = Path(__file__).resolve().parents[1] / "presets"
 _PRESET_NAMES = ("smoke", "single-gpu-24g", "single-gpu-48g")
 
 
@@ -30,15 +31,25 @@ _PRESET_NAMES = ("smoke", "single-gpu-24g", "single-gpu-48g")
 # --------------------------------------------------------------------------- #
 
 def load_preset(name_or_path: str) -> dict:
+    """Load a preset by name (packaged resource) or by YAML path.
+
+    The three named presets ship inside the wheel
+    (``vlm_dflash/presets/*.yaml``); any existing filesystem path is loaded
+    as-is for custom presets.
+    """
     candidate = Path(name_or_path)
-    if not candidate.exists():
-        candidate = _PRESETS_DIR / f"{name_or_path}.yaml"
-    if not candidate.exists():
-        raise FileNotFoundError(
-            f"Preset {name_or_path!r} not found (looked for {name_or_path}.yaml in {_PRESETS_DIR}); "
-            f"known presets: {', '.join(_PRESET_NAMES)}."
-        )
-    return load_config(candidate)
+    if candidate.exists():
+        return load_config(candidate)
+    name = candidate.stem if candidate.suffix in (".yaml", ".yml") else name_or_path
+    if name in _PRESET_NAMES:
+        with importlib_resources.as_file(
+            importlib_resources.files("vlm_dflash") / "presets" / f"{name}.yaml"
+        ) as path:
+            return load_config(path)
+    raise FileNotFoundError(
+        f"Preset {name_or_path!r} not found; known presets: {', '.join(_PRESET_NAMES)} "
+        "(or pass a path to a YAML file)."
+    )
 
 
 def deep_merge(base: dict, override: dict) -> dict:
@@ -76,14 +87,19 @@ def _load_run_config(run_dir: Path, config_path: str | None) -> dict:
 # --------------------------------------------------------------------------- #
 
 def _parse_constraints() -> dict[str, str]:
-    path = Path(__file__).resolve().parents[1] / "constraints-tested.txt"
+    """Read the tested version pins shipped inside the package."""
+    try:
+        text = (
+            importlib_resources.files("vlm_dflash") / "resources" / "constraints-tested.txt"
+        ).read_text(encoding="utf-8")
+    except (FileNotFoundError, ModuleNotFoundError):
+        return {}
     pins: dict[str, str] = {}
-    if path.exists():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            line = line.split("#", 1)[0].strip()
-            if "==" in line:
-                name, version = line.split("==", 1)
-                pins[name.strip().lower()] = version.strip()
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        if "==" in line:
+            name, version = line.split("==", 1)
+            pins[name.strip().lower()] = version.strip()
     return pins
 
 
@@ -302,8 +318,94 @@ def build_train_config(args) -> dict:
     return apply_overrides(cfg, args.set_list)
 
 
-def _stage_present(run_dir: Path, relative: str) -> bool:
-    return (run_dir / relative).exists()
+def _stage_manifest_path(run_dir: Path, stage: str) -> Path:
+    return run_dir / stage / "stage_manifest.json"
+
+
+def _dataset_file_fingerprint(cfg: dict) -> dict:
+    """Size/mtime of the local dataset files a stage will read (cheap staleness check)."""
+    dataset = cfg.get("dataset", {})
+    out: dict = {}
+    for key in ("path", "annotation"):
+        value = dataset.get(key)
+        if not value or not isinstance(value, str) or "${" in value:
+            continue
+        path = Path(value).expanduser()
+        if path.exists():
+            stat = path.stat()
+            out[key] = {"size": stat.st_size, "mtime": int(stat.st_mtime)}
+    return out
+
+
+def stage_digest_payload(
+    cfg: dict, contract: dict, stage: str, upstream_digest: str | None, limit: int | None = None
+) -> dict:
+    """The inputs that decide a cached stage's outputs (config subset + upstream + target)."""
+    from .provenance import identity_from_contract
+
+    key = {"data": "dataset", "regen": "regen", "capture": "capture"}[stage]
+    identity = identity_from_contract(contract)
+    # Audit-only fields never change the outputs: the same checkpoint copied to
+    # another directory must keep cached stages reusable.
+    identity.pop("target_model_path", None)
+    payload = {
+        "stage": stage,
+        "config": cfg.get(key, {}),
+        "limit": limit,
+        "target_identity": identity,
+        "upstream_digest": upstream_digest,
+    }
+    if stage == "data":
+        payload["dataset_files"] = _dataset_file_fingerprint(cfg)
+    return payload
+
+
+def stage_status(run_dir: Path, stage: str, marker: str, digest: str, force: bool) -> str:
+    """Decide whether a cached stage can be reused: 'run' or 'skip'.
+
+    Outputs with a missing or mismatching recorded inputs digest are refused
+    before any expensive compute (no silent reuse of stale artifacts).
+    """
+    present = (run_dir / marker).exists()
+    if force or not present:
+        return "run"
+    manifest_path = _stage_manifest_path(run_dir, stage)
+    if not manifest_path.exists():
+        raise SystemExit(
+            f"train: stage '{stage}' has outputs at {run_dir / marker} but no recorded inputs digest "
+            f"({manifest_path.name} is missing - the run predates stage manifests). "
+            "Rerun with --force to rebuild the stage, or use a new run directory."
+        )
+    recorded = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if recorded.get("inputs_digest") != digest:
+        raise SystemExit(
+            f"train: stage '{stage}' was produced from different inputs (recorded digest "
+            f"{(recorded.get('inputs_digest') or '?')[:12]} != current {digest[:12]}); refusing to "
+            "silently reuse it. Rerun with --force to rebuild, or use a new run directory."
+        )
+    return "skip"
+
+
+def write_stage_manifest(run_dir: Path, stage: str, payload: dict, digest: str) -> None:
+    from .utils import now_iso
+
+    manifest = {
+        "stage": stage,
+        "inputs_digest": digest,
+        "payload": payload,
+        "recorded_at": now_iso(),
+    }
+    path = _stage_manifest_path(run_dir, stage)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def stage_digest(
+    cfg: dict, contract: dict, stage: str, upstream_digest: str | None, limit: int | None = None
+) -> str:
+    from .utils import sha256_json
+
+    return sha256_json(stage_digest_payload(cfg, contract, stage, upstream_digest, limit=limit))
 
 
 def cmd_train(args) -> int:
@@ -320,31 +422,65 @@ def cmd_train(args) -> int:
     contract = ensure_contract(cfg, run_dir)
 
     limit = args.limit
+    external_features = Path(args.features).expanduser().resolve() if args.features else None
+    if external_features is not None:
+        for required in ("index.jsonl", "manifest.json"):
+            if not (external_features / required).exists():
+                raise SystemExit(
+                    f"train: --features {external_features} is not a captured feature store "
+                    f"({required} missing)."
+                )
 
-    if args.force or not _stage_present(run_dir, "data/data.jsonl"):
+    data_digest = stage_digest(cfg, contract, "data", None, limit=limit)
+    if stage_status(run_dir, "data", "data/data.jsonl", data_digest, args.force) == "run":
         from .data.prepare import build_dataset
 
         build_dataset(cfg, run_dir / "data", limit=limit)
+        write_stage_manifest(
+            run_dir, "data", stage_digest_payload(cfg, contract, "data", None, limit=limit), data_digest
+        )
     else:
-        log("train: data stage present, skipping (use --force to rebuild)")
+        log("train: data stage present with unchanged inputs, skipping (use --force to rebuild)")
 
-    if args.force or not _stage_present(run_dir, "regen/target_data.jsonl"):
-        from .target.regen import run_regen
-
-        run_regen(cfg, run_dir, contract, limit=limit)
+    if external_features is not None:
+        log(f"train: --features {external_features}; regen + capture stages skipped (reuse recorded in provenance)")
     else:
-        log("train: regen stage present, skipping (use --force to rerun)")
+        regen_digest = stage_digest(cfg, contract, "regen", data_digest, limit=limit)
+        if stage_status(run_dir, "regen", "regen/target_data.jsonl", regen_digest, args.force) == "run":
+            from .target.regen import run_regen
 
-    if args.force or not _stage_present(run_dir, "features/index.jsonl"):
-        from .target.capture import run_capture
+            run_regen(cfg, run_dir, contract, limit=limit)
+            write_stage_manifest(
+                run_dir, "regen", stage_digest_payload(cfg, contract, "regen", data_digest, limit=limit), regen_digest
+            )
+        else:
+            log("train: regen stage present with unchanged inputs, skipping (use --force to rerun)")
 
-        run_capture(cfg, run_dir, contract, limit=limit)
-    else:
-        log("train: capture stage present, skipping (use --force to recapture)")
+        capture_digest = stage_digest(cfg, contract, "capture", regen_digest, limit=limit)
+        if stage_status(run_dir, "capture", "features/index.jsonl", capture_digest, args.force) == "run":
+            from .target.capture import run_capture
+
+            run_capture(cfg, run_dir, contract, limit=limit)
+            write_stage_manifest(
+                run_dir,
+                "capture",
+                stage_digest_payload(cfg, contract, "capture", regen_digest, limit=limit),
+                capture_digest,
+            )
+        else:
+            log("train: capture stage present with unchanged inputs, skipping (use --force to recapture)")
 
     from .dflash.train import train_dflash
 
-    summary = train_dflash(cfg, run_dir, contract, steps=args.steps, limit=limit, resume=args.resume)
+    summary = train_dflash(
+        cfg,
+        run_dir,
+        contract,
+        steps=args.steps,
+        limit=limit,
+        resume=args.resume,
+        features_dir=external_features,
+    )
     log(f"train: done with steps={summary['steps']} final_loss={summary['final_loss']}")
     return 0
 
@@ -426,6 +562,7 @@ def cmd_train_demo(args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vlm-dflash", description=__doc__)
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     doctor = sub.add_parser("doctor", help="preflight environment + target model contract")
@@ -439,7 +576,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     def add_demo_args(parser: argparse.ArgumentParser, *, with_steps: bool) -> None:
         parser.add_argument("--target", default=None, help="local target model directory (or set VLM_DFLASH_TARGET)")
-        parser.add_argument("--algorithm", default="dflash", help="drafter algorithm name (registered)")
+        parser.add_argument(
+            "--algorithm",
+            default=None,
+            help="drafter algorithm name (registered; default: dflash, or the --drafter's recorded algorithm)",
+        )
         parser.add_argument("--dataset", default=None, help="multimodal jsonl pool to use instead of the synthetic sample")
         parser.add_argument("--images-dir", default=None, help="image root for --dataset (default: its sibling meta.json)")
         parser.add_argument("--images", type=int, default=8, help="synthetic sample size (>= 2)")
@@ -482,6 +623,14 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--steps", type=int, default=None)
     train.add_argument("--force", action="store_true", help="rebuild completed stages")
     train.add_argument("--resume", action="store_true", help="continue training from train/ckpt_last.pt")
+    train.add_argument(
+        "--features",
+        default=None,
+        help=(
+            "reuse an existing captured feature store (directory with index.jsonl + manifest.json); "
+            "skips regen + capture so several algorithms can train from one capture"
+        ),
+    )
     train.add_argument("--set", dest="set_list", action="append", default=[], help="dotted key=value override")
     train.set_defaults(func=cmd_train)
 

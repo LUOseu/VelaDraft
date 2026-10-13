@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vlm-dflash"
-version = "0.3.0"
+dynamic = ["version"]
 description = "A unified training and evaluation stack for multimodal parallel drafters (DFlash, DSpark, Domino, JetSpec, DFlash2)"
 readme = "README.md"
 license = "Apache-2.0"
@@ -23,7 +23,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Exact combination validated on the reference cluster; see constraints-tested.txt.
+# Exact combination validated on the reference cluster; also shipped as
+# vlm_dflash/resources/constraints-tested.txt inside the wheel.
 tested = [
     "torch==2.10.0",
     "torchvision==0.25.0",
@@ -43,11 +44,15 @@ vlm-dflash = "vlm_dflash.cli:main"
 [tool.setuptools.packages.find]
 include = ["vlm_dflash*"]
 
+[tool.setuptools.dynamic]
+version = {attr = "vlm_dflash.__version__"}
+
+[tool.setuptools.package-data]
+vlm_dflash = ["presets/*.yaml", "resources/*.txt"]
+
 [tool.pytest.ini_options]
 markers = [
     "integration: requires the real target model (set VLM_DFLASH_TEST_MODEL to a local dir)",
 ]
 addopts = "-q"
 
-# Tested version combination (cluster, 2026-10):
-#   torch==2.10.0 (cu128), transformers==5.12.1, datasets==4.2.0

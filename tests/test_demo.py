@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from vlm_dflash.demo import (
     build_demo_config,
     checkpoint_from_export,
+    detect_drafter_algorithm,
     drafter_identity,
     drafter_run_suffix,
     write_demo_source,
@@ -180,3 +181,22 @@ def test_drafter_run_suffix_separates_contracts(tmp_path):
     export_dir = _tiny_export(tmp_path)
     assert drafter_run_suffix(export_dir) == export_dir.name
     assert drafter_run_suffix(export_dir / "train" / "ckpt_final.pt") == "ckpt_final"
+
+
+def test_detect_drafter_algorithm_reads_export_and_run_metadata(tmp_path):
+    export = tmp_path / "export"
+    export.mkdir()
+    (export / "algorithm.json").write_text(json.dumps({"algorithm": "domino"}), encoding="utf-8")
+    assert detect_drafter_algorithm(export) == "domino"
+
+    config_only = tmp_path / "config_export"
+    config_only.mkdir()
+    (config_only / "config.json").write_text(json.dumps({"method": "dspark"}), encoding="utf-8")
+    assert detect_drafter_algorithm(config_only) == "dspark"
+
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / "config.json").write_text(json.dumps({"algorithm": {"name": "jetspec"}}), encoding="utf-8")
+    assert detect_drafter_algorithm(run) == "jetspec"
+
+    assert detect_drafter_algorithm(tmp_path / "missing") is None

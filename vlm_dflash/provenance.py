@@ -18,6 +18,13 @@ class IdentityMismatchError(RuntimeError):
     """Raised when an artifact's target identity differs from the live one."""
 
 
+# Recorded for audit, but not part of the equality gate: the same model copied
+# to another directory (same fingerprints) is the same target. Real model
+# changes are caught by model_fingerprint / processor_fingerprint and the
+# resolved contract fields below.
+AUDIT_ONLY_IDENTITY_KEYS = frozenset({"target_model_path"})
+
+
 def provenance_path(run_dir: str | Path) -> Path:
     return Path(run_dir) / "provenance.json"
 
@@ -39,17 +46,30 @@ def record_stage(run_dir: str | Path, stage: str, payload: dict) -> dict:
     return prov
 
 
-def identity_diff(expected: dict, actual: dict) -> list[str]:
-    """Return human-readable differences between two identity records."""
+def identity_diff(
+    expected: dict, actual: dict, ignore: frozenset[str] = AUDIT_ONLY_IDENTITY_KEYS
+) -> list[str]:
+    """Return human-readable differences between two identity records.
+
+    Keys in ``ignore`` (audit-only, e.g. the local model path) never fail the
+    gate; identity is decided by content fingerprints and resolved contract
+    fields. Note the model fingerprint covers config/generation/index content
+    plus weight shard names/sizes -- it identifies a checkpoint layout, not a
+    byte-for-byte hash of the weights.
+    """
     diffs = []
     for key in sorted(set(expected) | set(actual)):
+        if key in ignore:
+            continue
         if expected.get(key) != actual.get(key):
             diffs.append(f"{key}: expected={expected.get(key)!r} actual={actual.get(key)!r}")
     return diffs
 
 
-def assert_identity(expected: dict, actual: dict, context: str) -> None:
-    diffs = identity_diff(expected, actual)
+def assert_identity(
+    expected: dict, actual: dict, context: str, ignore: frozenset[str] = AUDIT_ONLY_IDENTITY_KEYS
+) -> None:
+    diffs = identity_diff(expected, actual, ignore=ignore)
     if diffs:
         joined = "\n  ".join(diffs)
         raise IdentityMismatchError(
@@ -59,7 +79,12 @@ def assert_identity(expected: dict, actual: dict, context: str) -> None:
 
 
 def identity_from_contract(contract: dict) -> dict:
-    """Canonical identity subset used for all stage gates."""
+    """Canonical identity subset used for all stage gates.
+
+    ``target_model_path`` is recorded for audit but excluded from the equality
+    gate (see :data:`AUDIT_ONLY_IDENTITY_KEYS`); moving the same checkpoint to
+    a new directory must not invalidate a run.
+    """
     return {
         "target_model_path": contract["target"]["model_path"],
         "model_fingerprint": contract["target"]["model_fingerprint"],

@@ -46,8 +46,10 @@ class JetSpecAlgorithm(DFlashAlgorithm):
             "multi_image": False,
             "video": False,
             "parallel_tree_runtime": False,
+            "eval": True,
+            "export": True,
         },
-        targets={"qwen25_vl": "validated", "qwen3_vl": "untested"},
+        targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
     )
 
     def validate_config(self, cfg: dict) -> None:

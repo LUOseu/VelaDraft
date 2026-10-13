@@ -35,8 +35,8 @@ class DSparkAlgorithm(DrafterAlgorithm):
             "port_notes": "docs/upstream/dspark.md",
             "algorithm_doc": "docs/algorithms/dspark.md",
         },
-        capabilities={"image": True, "multi_image": False, "video": False},
-        targets={"qwen25_vl": "validated", "qwen3_vl": "experimental"},
+        capabilities={"image": True, "multi_image": False, "video": False, "eval": True, "export": True},
+        targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
     )
 
     # ------------------------------------------------------------------ #

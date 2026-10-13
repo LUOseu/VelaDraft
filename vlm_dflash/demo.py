@@ -305,6 +305,59 @@ def drafter_run_suffix(drafter_path: str | Path) -> str:
     return name[:-3] if name.endswith(".pt") else name
 
 
+def _algorithm_name(value) -> str | None:
+    """Normalize a config/checkpoint ``algorithm`` field (string or {name: ...})."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if isinstance(value, dict):
+        name = value.get("name")
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    return None
+
+
+def detect_drafter_algorithm(drafter_path: str | Path) -> str | None:
+    """Best-effort read of the algorithm a drafter was trained/exported with.
+
+    Lets ``demo --drafter <export dir>`` follow the checkpoint's own algorithm
+    instead of assuming the CLI default (scoring a Domino export as DFlash used
+    to fail loudly, which is correct but a usability trap).
+    """
+    from .utils import read_json
+
+    path = Path(drafter_path).expanduser().resolve()
+    if not path.exists():
+        return None
+    try:
+        if path.is_dir():
+            algorithm_json = path / "algorithm.json"
+            if algorithm_json.exists():
+                data = read_json(algorithm_json)
+                name = _algorithm_name(data.get("algorithm")) if isinstance(data, dict) else None
+                if name:
+                    return name
+            config_json = path / "config.json"
+            if config_json.exists():
+                config = read_json(config_json)
+                name = _algorithm_name(config.get("method")) or _algorithm_name(config.get("algorithm"))
+                if name:
+                    return name
+            run_checkpoint = path / "train" / "ckpt_final.pt"
+            if run_checkpoint.exists():
+                import torch
+
+                meta = torch.load(run_checkpoint, map_location="cpu", weights_only=False)
+                return _algorithm_name(meta.get("algorithm"))
+        elif path.suffix == ".pt":
+            import torch
+
+            meta = torch.load(path, map_location="cpu", weights_only=False)
+            return _algorithm_name(meta.get("algorithm"))
+    except Exception:
+        return None
+    return None
+
+
 def _demo_setup(args, kind: str, *, target_overrides: dict | None = None, run_name_suffix: str | None = None):
     """Shared setup: resolve target/run dir, generate the sample, write config + contract."""
     from .algorithms import get_algorithm
@@ -398,6 +451,12 @@ def _print_report(result: dict, run_dir: Path, drafter_desc: str, source_desc: s
 def run_demo(args) -> int:
     """``vlm-dflash demo``: token-exact eval on the tiny sample; no training."""
     from .eval.run import evaluate
+
+    if getattr(args, "drafter", None) and not getattr(args, "algorithm", None):
+        detected = detect_drafter_algorithm(args.drafter)
+        if detected:
+            args.algorithm = detected
+            log(f"demo: --drafter records algorithm={detected}; evaluating with it (pass --algorithm to override)")
 
     target_overrides: dict[str, int] = {}
     run_name_suffix = None

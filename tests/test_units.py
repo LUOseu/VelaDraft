@@ -85,6 +85,19 @@ def test_identity_gate_raises():
     assert_identity(a, dict(a), "test")
 
 
+def test_identity_gate_ignores_target_model_path():
+    """Same checkpoint in a new directory is the same target; content changes still fail."""
+    a = {"target_model_path": "/models/a", "model_fingerprint": "x", "mask_token_id": 1}
+    moved = {**a, "target_model_path": "/models/b"}
+    assert_identity(a, moved, "test")
+    # legacy records without the field compare fine too (union diff skips it)
+    legacy = {"model_fingerprint": "x", "mask_token_id": 1}
+    assert_identity(legacy, moved, "test")
+    changed = {**moved, "model_fingerprint": "y"}
+    with pytest.raises(IdentityMismatchError):
+        assert_identity(a, changed, "test")
+
+
 def test_validate_yaml_against_contract():
     contract = {
         "mask": {"token_id": 151669},

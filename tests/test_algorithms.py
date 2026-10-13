@@ -126,6 +126,41 @@ def test_checkpoint_algorithm_mismatch_is_rejected():
         check_checkpoint_algorithm("ckpt_final.pt", {"algorithm": "dspark"}, algorithm)
 
 
+TARGET_STATES = {
+    "stable",
+    "validated",
+    "reduced_validation",
+    "experimental",
+    "architecture-only",
+    "unsupported",
+}
+
+
+@pytest.mark.parametrize("name", available_algorithms())
+def test_metadata_target_states_use_the_documented_vocabulary(name):
+    metadata = get_algorithm(name).metadata
+    for family, state in metadata.targets.items():
+        assert state in TARGET_STATES, f"{name}.targets[{family}] = {state!r}"
+    for axis, state in metadata.maturity.items():
+        assert state in {"stable", "validated", "experimental", "architecture-only", "unsupported"}, (
+            f"{name}.maturity[{axis}] = {state!r}"
+        )
+
+
+def test_support_matrix_renders_from_algorithm_metadata():
+    """SUPPORT_MATRIX.md must not drift from the machine-readable metadata."""
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location(
+        "render_support_matrix", root / "scripts" / "render_support_matrix.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    rendered = module.render()
+    assert (root / "SUPPORT_MATRIX.md").read_text(encoding="utf-8") == rendered
+
+
 @pytest.mark.parametrize("name", available_algorithms())
 def test_verify_backend_switch_reaches_shared_inference_engine(name):
     """The evaluator's verify_sdpa_backend setting must bind every algorithm.

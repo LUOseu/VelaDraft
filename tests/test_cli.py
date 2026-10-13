@@ -27,6 +27,132 @@ def test_all_presets_load():
         assert "spatial_rope_sections" not in cfg["drafter"]
 
 
+def test_presets_load_from_the_package_anywhere(tmp_path, monkeypatch):
+    """Packaged presets must resolve from CWD-independent package resources.
+
+    Regression: the presets used to be loaded from a repo-relative directory,
+    so an installed wheel could not find them (`train --preset smoke` raised
+    FileNotFoundError from site-packages).
+    """
+    monkeypatch.chdir(tmp_path)
+    for name in ("smoke", "single-gpu-24g", "single-gpu-48g"):
+        cfg = load_preset(name)
+        assert cfg["drafter"]["block_size"] == 8
+    # a filesystem path still wins for custom presets
+    custom = tmp_path / "custom.yaml"
+    custom.write_text("target: {model: /models/x}\ndrafter: {block_size: 4}\n", encoding="utf-8")
+    assert load_preset(str(custom))["drafter"]["block_size"] == 4
+    with pytest.raises(FileNotFoundError, match="known presets"):
+        load_preset("no-such-preset")
+
+
+def test_tested_constraints_are_packaged():
+    from vlm_dflash.cli import _parse_constraints
+
+    pins = _parse_constraints()
+    assert pins, "constraints-tested.txt must ship inside the package"
+    assert "torch" in pins and "transformers" in pins
+
+
+def test_version_flag_and_single_version_source(capsys):
+    import importlib.metadata as md
+
+    from vlm_dflash import __version__
+
+    parser = build_parser()
+    with pytest.raises(SystemExit) as excinfo:
+        parser.parse_args(["--version"])
+    assert excinfo.value.code == 0
+    assert capsys.readouterr().out.strip() == f"vlm-dflash {__version__}"
+    try:
+        dist_version = md.version("vlm-dflash")
+    except md.PackageNotFoundError:
+        pytest.skip("vlm-dflash is not installed as a distribution here")
+    assert dist_version == __version__
+
+
+def _train_args(tmp_path, *extra):
+    parser = build_parser()
+    return parser.parse_args(
+        [
+            "train",
+            "--target", "/models/Qwen2.5-VL-3B-Instruct",
+            "--dataset", str(tmp_path / "data.jsonl"),
+            *extra,
+        ]
+    )
+
+
+def _fake_contract() -> dict:
+    return {
+        "target": {"model_path": "/models/x", "model_fingerprint": "mf", "processor_fingerprint": "pf"},
+        "mask": {"token_id": 151669},
+        "rope": {"sections": [16, 24, 24]},
+        "layers": {"draft_layer_ids": [1, 12, 23]},
+        "image": {"min_pixels": 200704, "max_pixels": 1003520},
+    }
+
+
+def test_cmd_train_refuses_invalid_features_dir(monkeypatch, tmp_path):
+    import vlm_dflash.cli as cli
+    import vlm_dflash.contract as contract_module
+
+    cfg = {
+        "target": {"model": "/models/x"},
+        "dataset": {"source": "jsonl", "path": "d.jsonl"},
+        "run": {"name": "x", "dir": str(tmp_path / "run")},
+    }
+    monkeypatch.setattr(cli, "build_train_config", lambda args: cfg)
+    monkeypatch.setattr(contract_module, "ensure_contract", lambda cfg, run_dir: _fake_contract())
+
+    args = _train_args(tmp_path, "--features", str(tmp_path / "missing_features"))
+    with pytest.raises(SystemExit, match="not a captured feature store"):
+        cli.cmd_train(args)
+
+
+def test_cmd_train_reuses_external_features_and_skips_regen_capture(monkeypatch, tmp_path):
+    import vlm_dflash.cli as cli
+    import vlm_dflash.contract as contract_module
+    import vlm_dflash.data.prepare as prepare_module
+    import vlm_dflash.dflash.train as train_module
+    import vlm_dflash.target.capture as capture_module
+    import vlm_dflash.target.regen as regen_module
+
+    features = tmp_path / "shared_features"
+    features.mkdir()
+    (features / "index.jsonl").write_text("", encoding="utf-8")
+    (features / "manifest.json").write_text("{}", encoding="utf-8")
+
+    run_dir = tmp_path / "run"
+    cfg = {
+        "target": {"model": "/models/x"},
+        "dataset": {"source": "jsonl", "path": "d.jsonl"},
+        "run": {"name": "x", "dir": str(run_dir)},
+    }
+    monkeypatch.setattr(cli, "build_train_config", lambda args: cfg)
+    monkeypatch.setattr(contract_module, "ensure_contract", lambda cfg, run_dir: _fake_contract())
+
+    calls: dict = {}
+    monkeypatch.setattr(prepare_module, "build_dataset", lambda cfg, out, limit=None: calls.setdefault("data", True))
+    monkeypatch.setattr(
+        regen_module, "run_regen", lambda *a, **k: (_ for _ in ()).throw(AssertionError("regen must not run"))
+    )
+    monkeypatch.setattr(
+        capture_module, "run_capture", lambda *a, **k: (_ for _ in ()).throw(AssertionError("capture must not run"))
+    )
+
+    def fake_train(cfg, run_dir, contract, steps=None, limit=None, resume=False, features_dir=None):
+        calls["features_dir"] = str(features_dir)
+        return {"steps": 1, "final_loss": 1.0}
+
+    monkeypatch.setattr(train_module, "train_dflash", fake_train)
+
+    args = _train_args(tmp_path, "--features", str(features))
+    assert cli.cmd_train(args) == 0
+    assert calls["data"] is True
+    assert calls["features_dir"] == str(features.resolve())
+
+
 def test_preset_pixel_bounds_can_be_overridden_with_null():
     # Qwen3-VL configs set image_*_pixels: null so a CLI run (which merges a
     # preset first) resolves the bounds from the processor instead of leaking

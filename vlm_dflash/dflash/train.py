@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader, Subset
 
 from ..algorithms import get_algorithm
 from ..provenance import assert_identity, identity_from_contract, record_stage
-from ..utils import ensure_dir, log, set_seed, write_json
+from ..utils import ensure_dir, log, set_seed, sha256_json, write_json
 from .features import FeatureDataset, collate_features
 
 
@@ -384,14 +384,36 @@ def run_overfit_sanity(cfg: dict, contract: dict, features_dir: Path, run_dir: P
     return result
 
 
-def train_dflash(cfg: dict, run_dir: str | Path, contract: dict, steps: int | None = None, limit: int | None = None, resume: bool = False) -> dict:
+def train_dflash(
+    cfg: dict,
+    run_dir: str | Path,
+    contract: dict,
+    steps: int | None = None,
+    limit: int | None = None,
+    resume: bool = False,
+    features_dir: str | Path | None = None,
+) -> dict:
+    """Train a drafter from a captured feature store.
+
+    ``features_dir`` defaults to ``run_dir/features``; passing an explicit
+    store lets several algorithms train from one capture (same target, same
+    protocol). The store's identity, manifest and target head are verified
+    against the live contract before any training, and the reuse is recorded
+    in ``provenance.json`` (directory, sample count, seq length, dtype and a
+    digest of the store manifest).
+    """
     run_dir = Path(run_dir)
-    features_dir = run_dir / "features"
+    features_dir = Path(features_dir) if features_dir is not None else run_dir / "features"
     dataset = FeatureDataset(features_dir)
     if limit is not None:
         dataset = Subset(dataset, list(range(min(limit, len(dataset)))))
     manifest = FeatureDataset(features_dir).store.manifest
     assert_identity(identity_from_contract(contract), manifest["identity"], "train vs features")
+    log(
+        f"train: features from {features_dir.resolve()} "
+        f"({manifest.get('num_samples')} samples, seq {manifest.get('seq_length')}, "
+        f"{manifest.get('storage_dtype')}, format {manifest.get('format')})"
+    )
 
     algorithm = get_algorithm(cfg.get("algorithm"))
     algorithm.validate_config(cfg)
@@ -515,6 +537,22 @@ def train_dflash(cfg: dict, run_dir: str | Path, contract: dict, steps: int | No
         "confidence_calibration": calibration,
     }
     write_json(train_dir / "train_summary.json", summary)
-    record_stage(run_dir, "train", {"identity": identity_from_contract(contract), "summary": summary,
-                                    "code": "vlm_dflash.dflash.train.train_dflash"})
+    record_stage(
+        run_dir,
+        "train",
+        {
+            "identity": identity_from_contract(contract),
+            "summary": summary,
+            "code": "vlm_dflash.dflash.train.train_dflash",
+            "features": {
+                "dir": str(features_dir.resolve()),
+                "external": features_dir.resolve() != (run_dir / "features").resolve(),
+                "format": manifest.get("format"),
+                "num_samples": manifest.get("num_samples"),
+                "seq_length": manifest.get("seq_length"),
+                "storage_dtype": manifest.get("storage_dtype"),
+                "manifest_digest": sha256_json(manifest),
+            },
+        },
+    )
     return summary

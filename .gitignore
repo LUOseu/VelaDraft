@@ -3,6 +3,9 @@ runs/
 __pycache__/
 .venv/
 assets/
+# except repo-tracked docs assets (pipeline diagram)
+!docs/assets/
+!docs/assets/**
 *.log
 .pytest_cache/
 logs/

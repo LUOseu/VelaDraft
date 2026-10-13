@@ -46,9 +46,27 @@ jobs:
           /tmp/fresh/bin/pip install --upgrade pip
           /tmp/fresh/bin/pip install torch==2.10.0 torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cpu
           /tmp/fresh/bin/pip install dist/*.whl
-      - name: CLI smoke
+      - name: Wheel ships its packaged resources
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          expected = [
+              "vlm_dflash/presets/smoke.yaml",
+              "vlm_dflash/presets/single-gpu-24g.yaml",
+              "vlm_dflash/presets/single-gpu-48g.yaml",
+              "vlm_dflash/resources/constraints-tested.txt",
+          ]
+          missing = [name for name in expected if name not in names]
+          assert not missing, f"wheel is missing packaged resources: {missing}"
+          print("wheel resources OK")
+          PY
+      - name: CLI smoke (repo off the path)
         run: |
           cd /tmp
+          /tmp/fresh/bin/vlm-dflash --version
           /tmp/fresh/bin/vlm-dflash --help
           /tmp/fresh/bin/vlm-dflash doctor --help
           /tmp/fresh/bin/vlm-dflash demo --help
@@ -56,6 +74,23 @@ jobs:
           /tmp/fresh/bin/vlm-dflash train --help
           /tmp/fresh/bin/vlm-dflash eval --help
           /tmp/fresh/bin/vlm-dflash export --help
+      - name: Packaged presets + constraints load from the install
+        run: |
+          cd /tmp
+          /tmp/fresh/bin/python - <<'PY'
+          import importlib.metadata as md
+
+          from vlm_dflash import __version__
+          from vlm_dflash.cli import _parse_constraints, load_preset
+
+          assert md.version("vlm-dflash") == __version__, (md.version("vlm-dflash"), __version__)
+          for name in ("smoke", "single-gpu-24g", "single-gpu-48g"):
+              cfg = load_preset(name)
+              assert cfg["drafter"]["block_size"] == 8, name
+          pins = _parse_constraints()
+          assert pins.get("torch") and pins.get("transformers"), pins
+          print("packaged resources OK:", __version__, len(pins), "pins")
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: dist
