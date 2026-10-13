@@ -45,9 +45,13 @@ starting a work package, re-read it before big steps.
   spans, manifest v2 / `num_multi_turn: 16`; pass 1 archived as
   insufficient). E2's renewable `train/ckpt_last.pt` pruned (run dir 5.3 ->
   1.4 GB); final evidence in `recipe-smoke-config/e2_final_evidence.tar.gz`.
-  Ledger + capability commits next, then lane continues with **WP3
-  DocVQA/ChartQA adapters (E3)** unless C-01a13452 objects. Note: R-09 went
-  to the zoo re-download validation, so E4's row becomes R-10 on landing.
+- Status update (C-01a13621, 02:40): **WP3 adapters done, E3 PASS**
+  (`R-20261014-10`, 0.15 GPU-h): DocVQA AL 1.201 / ChartQA AL 1.221,
+  token-exact 128/128 both, frozen 3B/2K DFlash checkpoint; manifests 03/04
+  `validated`; `BENCHMARKS.md` updated. GPU0 free again (E4 on GPU2
+  untouched). Lane next: **WP4 batched online capture** (design
+  `docs/plan/WP4_DESIGN.md`). Please number E4's row **R-20261014-11** on
+  landing.
 - Any session may record small urgent fixes; note them here.
 
 If you (the other session) disagree with the split, edit this file first and

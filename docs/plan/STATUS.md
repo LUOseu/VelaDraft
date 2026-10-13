@@ -37,17 +37,22 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   `AlgorithmMetadata` + regenerated `SUPPORT_MATRIX.md` footnote (DFlash
   scope); 349 CPU tests green. Smoke-scale only - no quality/speed claim.
   Pass 1 (placeholder eval histories) archived as insufficient evidence.
-- Next: WP3 (DocVQA/ChartQA adapters on the frozen DFlash checkpoint -> E3),
-  then WP4 batched online capture. Lane split: E4 (in flight on GPU2), the
-  WP3a training-cost report and zoo bookkeeping stay with the other session
-  (see COORDINATION.md).
+- WP3 adapters done + E3 PASS (`R-20261014-10`, 0.15 GPU-h): DocVQA +
+  ChartQA pinned 128-prompt exports (seed-42 subsets, shard/row hashes
+  pinned) against the frozen 3B/2K DFlash checkpoint - DocVQA AL 1.201 /
+  ChartQA AL 1.221, both token-exact 128/128 (sequential parity); manifests
+  03/04 `validated`; numbers in `BENCHMARKS.md`. Training-cost report
+  (`WP3a`, `docs/training-costs.md`) stays with the other session.
+- Next: WP4 batched online capture + profiling (design note in
+  `docs/plan/WP4_DESIGN.md`). Lane split: E4 (in flight on GPU2) + zoo
+  bookkeeping stay with the other session (see COORDINATION.md).
 
 ## Budget
 
-8 GPU-h first-round cap; 1.19 GPU-h charged (E1 0.59 incl. the duplicate
-concurrent set, zoo re-download validation 0.04, E2 0.55); E4 (canonical 2K
-recipe) in flight on GPU2 and charged when its row lands; allocation in
-RESOURCE_LEDGER.md.
+8 GPU-h first-round cap; 1.34 GPU-h charged (E1 0.59 incl. the duplicate
+concurrent set, zoo re-download validation 0.04, E2 0.55, E3 0.15); E4
+(canonical 2K recipe) in flight on GPU2 and charged when its row lands;
+allocation in RESOURCE_LEDGER.md.
 
 ## Blockers / risks
 
