@@ -70,6 +70,23 @@
   invariance, stage switching, teacher requirement, resume gating, and an
   end-to-end tiny-target recipe run + refusal paths).
 
+### Model Zoo v0.3.1 and the demo reload path
+
+- `zoo-v0.3.1` publishes six canonical archives (DSpark, JetSpec, DFlash2-exp,
+  DFlare, DFly on Qwen2.5-VL-3B; DFlash 8B on Qwen3-VL-8B) plus `SHA256SUMS`;
+  the README zoo table and the per-archive pages under `docs/zoo/` link them
+  as reference artifacts for pipeline validation.
+- Clean re-download verification: all six archives re-fetched from the public
+  release URL are sha256-identical to the upload set and their inner
+  `checksums.json` verify; the DFly and DFlare archives reload through
+  `demo --drafter` in fresh directories, token-exact 4/4 vs target-only
+  greedy (see `RELEASE_VALIDATION.md`).
+- Fix: `demo --drafter` now adopts the drafter's recorded capture layer list
+  and, for DFlare/DFly, the consumed context subset, so exports trained on a
+  5-layer feature store load out of the box (previously refused by the target
+  identity gate); `examples/score_pretrained.py` shares the alignment and
+  regression tests cover legacy exports.
+
 ### Online training: live target feature extraction
 
 - `train --mode online` (`--mode` / `--feature-mode` alias; config
