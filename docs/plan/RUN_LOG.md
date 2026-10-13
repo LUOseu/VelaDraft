@@ -33,7 +33,26 @@ against the plan's first-round budget.
 
 ## Planned (registered before launch)
 
-None outstanding as of 03:10 on 2026-10-14: E1 ran once per concurrent
+- **R-20261014-14 WP5 vLLM bridge check (planned, <=0.4 GPU-h, 1 GPU).**
+  Runtime: vLLM 0.22.1 native `dflash` speculative method (env `c1vllm`).
+  Draft: re-export of `runs/qwen25vl3b_2k` (`ckpt_final.pt`) converted to the
+  speculators layout by `scripts/export_vllm_draft.py`; target
+  Qwen2.5-VL-3B-Instruct. Prompts: first 32 rows of
+  `runs/qwen25vl3b_2k/data/val.jsonl` (1 image each), greedy, 128 new tokens,
+  bf16, mm pixels 200704/1003520. Phases in one process: target-only, then
+  `spec_method=dflash, spec_tokens=7`. Success criteria: both phases complete,
+  **token-exact 32/32**, spec-decode metrics recorded (AL = 1 + accepted/drafts,
+  per-position acceptance). Evidence: `/tmp/wp5/bridge_check.json` + job log.
+- **R-20261014-15 WP5 serving-convention comparison, in-repo (planned,
+  <=0.4 GPU-h, 1 GPU).** Same 32 prompts through the repo eval
+  (sequential parity, 128 tokens): arm M = canonical checkpoint
+  (`ckpt_final.pt`, MRoPE-replace serving) and arm 1D = derived checkpoint with
+  `dflash_config.spatial_rope_enabled=false` (1-D RoPE convention, the one
+  vLLM's dflash draft path implements). Run dir `/tmp/wp5/run_1d` (symlinked
+  data; no writes to the source run). Success: both arms token-exact 32/32,
+  AL + per-slot recorded for the R-14 comparison.
+
+Older planned items (all landed): E1 ran once per concurrent
 session (R-20261014-03..06 and the duplicate set R-20261014-07; the two sets
 agree bit-exactly), E2 landed as R-20261014-08 (PASS, second pass), E3 as
 R-20261014-10 (PASS), E4 as R-20261014-11 (PASS: recipe AL 1.839 vs

@@ -84,3 +84,16 @@ starting a work package, re-read it before big steps.
 If you (the other session) disagree with the split, edit this file first and
 I will re-read it before my next big step. If the user gives an explicit
 decision, it overrides everything here.
+
+- Status update (C-01a13621, WP5 start): vLLM 0.22.1 in env `c1vllm` ships a
+  **native `dflash` speculative-decoding method** (DFlashDraftModel +
+  speculators layout; reads `dflash_config.mask_token_id` / aux layer ids, the
+  same architecture this repo ports). Plan: convert the zoo DFlash 3B export to
+  the speculators layout (`scripts/export_vllm_draft.py`) and run the bridge
+  check (`scripts/vllm_bridge_check.py`, target-only vs dflash, 32 pinned val
+  prompts, token-exactness gate) as **R-20261014-14**; plus an in-repo
+  convention comparison as **R-20261014-15** (same 32 prompts: MRoPE arm vs
+  1-D-rope arm), because vLLM's dflash draft path implements 1-D RoPE while
+  the repo serving uses MRoPE-replace. Targets GPU0 (R-14) and GPU2 (R-15),
+  checked free before launch; no writes to shared run dirs (work under
+  `/tmp/wp5`). Protocol + success criteria registered in RUN_LOG.md.
