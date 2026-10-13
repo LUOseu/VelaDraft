@@ -5,14 +5,14 @@
 - First-round cap: **8.0 GPU-hours** (plan default; no other budget given).
   1 GPU job at a time; single job <= 2 h wall; <= 2 fix-retries per failing
   debug task.
-- Charged so far: **0.046 GPU-h** (R-20261014-01 0.044 + R-20261014-02
-  0.002). Remaining: **7.95 GPU-h**.
+- Charged so far: **0.33 GPU-h** (R-20261014-01 0.044 + R-20261014-02 0.002
+  + E1 R-20261014-03..05 0.29). Remaining: **7.67 GPU-h**.
 - First 0.5 GPU-h is measurement budget (throughput / peak memory / storage);
   the two smoke runs consumed part of it.
 
 | Allocation (draft) | GPU-h |
 | --- | --- |
-| E1 WP1 validation (R-20261014-03/04/05) | 0.25 |
+| E1 WP1 validation (R-20261014-03/04/05) | 0.25 used -> actual 0.29 |
 | WP4 batched-online + profiling | 1.0 |
 | E2 WP2 multi-image smoke | 0.5 |
 | E3 WP3 DocVQA/ChartQA validation | 0.7 |
@@ -48,7 +48,8 @@
 
 | Job | Config | Peak GPU |
 | --- | --- | --- |
-| Recipe (upstream_two_stage) train | micro-batch 8, seq 2048 | 46.5 GB / 48 GB |
+| Recipe (upstream_two_stage) train, sanity off | micro-batch 8, seq 2048 | 28.6 GB / 48 GB |
+| Recipe train + overfit sanity (16 samples) | micro-batch 8, seq 2048 | 46.5 GB / 48 GB |
 | controlled_ce train | micro-batch 8 | 31.4 GB (1-step probe) |
 
 Rule: keep recipe micro-batch at 8; use grad accumulation for effective batch.

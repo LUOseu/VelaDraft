@@ -18,10 +18,11 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
 - WP0 done: capability gap table + ledgers below; CPU baseline suite green
   (321 tests collected, all pass; `pytest tests/ -q`).
 - WP1: upstream two-stage DFly recipe implemented on branch
-  `dfly-upstream-recipe` (`66b595a` code+tests, `c425850` docs); 16-step GPU
-  smoke recorded (`R-20261014-01`); CPU suite green. Remaining: E1 validation
-  (controlled_ce select-parity, resume round-trip, export metadata, peak-memory
-  re-measure), then push + PR.
+  `dfly-upstream-recipe` (`66b595a` code+tests, `c425850` docs); CPU suite
+  green. E1 validation PASSED (R-20261014-03..06): controlled_ce select-parity
+  bit-identical, kill+resume bit-identical across the stage boundary, changed
+  `--steps` resume refused, export/checkpoint/model-card metadata chain
+  verified, reload token-exact 4/4. Remaining: push + PR.
 - Next after E1: WP2 (multi-image / multi-turn schema v2).
 
 ## Budget
