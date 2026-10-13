@@ -14,6 +14,8 @@ from dataclasses import dataclass
 
 import torch
 
+from ..contract import ContractError
+
 def _mapping_value(source, key):
     """Read ``key`` from a dict-like or attribute-like source (SizeDict etc.)."""
     if isinstance(source, dict):
@@ -34,6 +36,17 @@ class AdapterInfo:
     model_types: tuple[str, ...]
     model_class: str
     notes: str = ""
+    # Position semantics: "mrope" families expose ``compute_3d_position_ids``
+    # and a ``mrope_section`` in their rope parameters; "1d" families use plain
+    # sequence positions for the whole (multimodal) sequence.
+    position_mode: str = "mrope"
+    # Image-token semantics: "grid" families derive the image-token count from
+    # a ``image_grid_thw`` patch grid; "tiles" families emit a fixed number of
+    # tokens per vision tile.
+    image_token_mode: str = "grid"
+    # Processor-output tensors forwarded to the target forward / generation
+    # calls (plus attention_mask, which is always forwarded when present).
+    forward_input_keys: tuple[str, ...] = ("pixel_values", "image_grid_thw", "mm_token_type_ids")
 
 
 class VLMAdapter:
@@ -121,6 +134,113 @@ class VLMAdapter:
         if tokenizer is not None:
             tokenizer.padding_side = "left"
 
+    # ---- special tokens / mask policy ----------------------------------
+    def resolve_tokens(self, tokenizer, config, text_config) -> dict[str, int | None]:
+        """Family special tokens, validated against the target config.
+
+        The default implements the Qwen-VL set; families override with their own
+        token names and cross-checks. Only ``image_token_id`` is consumed by the
+        pipeline stages; the rest is recorded in the contract for provenance.
+        """
+
+        def tid(token: str) -> int:
+            value = tokenizer.convert_tokens_to_ids(token)
+            if value is None or value < 0:
+                raise ContractError(f"Tokenizer does not define required special token {token!r}.")
+            return int(value)
+
+        tokens = {
+            "image_token_id": tid("<|image_pad|>"),
+            "vision_start_token_id": tid("<|vision_start|>"),
+            "vision_end_token_id": tid("<|vision_end|>"),
+            "im_start_token_id": tid("<|im_start|>"),
+            "im_end_token_id": tid("<|im_end|>"),
+            "endoftext_token_id": tid("<|endoftext|>"),
+        }
+        for cfg_key in ("image_token_id", "vision_start_token_id", "vision_end_token_id"):
+            cfg_value = getattr(text_config, cfg_key, None)
+            if cfg_value is None and text_config is not config:
+                cfg_value = getattr(config, cfg_key, None)
+            if cfg_value is not None and int(cfg_value) != tokens[cfg_key]:
+                raise ContractError(
+                    f"Token config disagrees with tokenizer for {cfg_key}: "
+                    f"config={cfg_value} tokenizer={tokens[cfg_key]}"
+                )
+        return tokens
+
+    def review_mask_token(self, token_str: str | None) -> str:
+        """Accept or reject the resolved mask-token string; returns the policy note.
+
+        Default policy (MRoPE families): the mask must resolve to *no* tokenizer
+        token at all, i.e. live on an embedding row the tokenizer can never
+        emit. Families may override when their checkpoints reserve explicit
+        never-emitted special rows instead.
+        """
+        if token_str is not None:
+            raise ContractError(
+                f"mask_token_id resolves to tokenizer token {token_str!r}; "
+                "the mask must live on a reserved embedding row that the tokenizer can never emit. "
+                "Pick an id >= tokenizer.vocab_size."
+            )
+        return "reserved embedding row outside tokenizer vocabulary"
+
+    # ---- rope -----------------------------------------------------------
+    def resolve_rope(self, config, text_config, head_dim: int, defaults: dict) -> dict:
+        """Resolve the target's rope/position configuration.
+
+        Returns a dict with ``type``, ``mode`` (``"mrope"`` or ``"1d"``),
+        ``sections`` (``None`` for 1-D families), ``interleaved`` and ``source``.
+        The default implements the Qwen MRoPE contract; 1-D families override.
+        """
+        rope, rope_source = None, None
+        for holder, holder_name, attr in (
+            (text_config, "text_config", "rope_parameters"),
+            (text_config, "text_config", "rope_scaling"),
+            (config, "config", "rope_scaling"),
+            (config, "config", "rope_parameters"),
+        ):
+            value = getattr(holder, attr, None)
+            if isinstance(value, dict) and value:
+                rope, rope_source = value, f"{holder_name}.{attr}"
+                break
+        if not isinstance(rope, dict):
+            raise ContractError("Target config has no rope_scaling/rope_parameters mapping.")
+        sections = rope.get("mrope_section")
+        if sections is None:
+            raise ContractError("Target config rope scaling has no mrope_section.")
+        sections = [int(s) for s in sections]
+        default_sections = defaults.get("spatial_rope_sections")
+        if default_sections is not None and [int(s) for s in default_sections] != sections:
+            raise ContractError(
+                f"YAML spatial_rope_sections {default_sections} disagree with target mrope_section {sections}."
+            )
+        if 2 * sum(sections) != head_dim:
+            raise ContractError(
+                f"mrope_section {sections} doubled sum must equal head_dim {head_dim} for spatial-rope DFlash."
+            )
+        interleaved = bool(rope.get("mrope_interleaved", False))
+        default_interleaved = defaults.get("spatial_rope_interleaved")
+        if default_interleaved is not None and bool(default_interleaved) != interleaved:
+            raise ContractError(
+                f"YAML spatial_rope_interleaved {bool(default_interleaved)} disagrees with target "
+                f"mrope_interleaved {interleaved}."
+            )
+        if interleaved:
+            half = head_dim // 2
+            for axis in (1, 2):
+                if 3 * sections[axis] > half:
+                    raise ContractError(
+                        f"Interleaved MRoPE needs 3*mrope_section[axis] <= head_dim/2; axis {axis} has "
+                        f"3*{sections[axis]} > {half}."
+                    )
+        return {
+            "type": rope.get("type") or rope.get("rope_type"),
+            "mode": "mrope",
+            "sections": sections,
+            "interleaved": interleaved,
+            "source": f"target {rope_source}.mrope_section + mrope_interleaved (absent = False)",
+        }
+
     # ---- multimodal position ids ---------------------------------------
     def call_position_builder(self, model, **kwargs):
         """Call the target's own ``compute_3d_position_ids`` with only supported kwargs.
@@ -179,4 +299,53 @@ class VLMAdapter:
         if positions.dim() == 3:
             positions = positions[:, 0, :]
         return positions
+
+    # ---- forward plumbing ----------------------------------------------
+    def forward_kwargs_from_inputs(self, inputs: dict) -> dict:
+        """Pick the family's tensors out of a processor-output dict (eval path)."""
+        kwargs = {
+            key: inputs[key]
+            for key in self.info.forward_input_keys
+            if inputs.get(key) is not None
+        }
+        if inputs.get("attention_mask") is not None:
+            kwargs["attention_mask"] = inputs["attention_mask"]
+        return kwargs
+
+    def capture_forward_inputs(self, prepared_list: list[dict], device) -> dict:
+        """Family image tensors for a batched capture forward (rows already padded).
+
+        The default implements the Qwen-VL layout (grids, video tensors); other
+        families override with their own processor outputs. The token-type map
+        stays in the capture stage because the per-row position derivation
+        consumes it too.
+        """
+        forward_kwargs: dict = {}
+        pixel_values = [item["inputs"].get("pixel_values") for item in prepared_list]
+        grids = [item["inputs"].get("image_grid_thw") for item in prepared_list]
+        for key, values in (("pixel_values", pixel_values), ("image_grid_thw", grids)):
+            present = [value is not None for value in values]
+            if any(present) and not all(present):
+                raise ValueError(f"Batch capture mixes rows with and without {key}; split the batch.")
+            if all(present):
+                forward_kwargs[key] = torch.cat(values, dim=0).to(device)
+        for key in ("pixel_values_videos", "video_grid_thw"):
+            values = [item["inputs"].get(key) for item in prepared_list]
+            if all(value is not None for value in values):
+                forward_kwargs[key] = torch.cat(values, dim=0).to(device)
+        return forward_kwargs
+
+    def expected_image_token_counts(self, inputs: dict, *, merge_size: int | None) -> list[int] | None:
+        """Per-image expected image-token counts for one processor row (or None).
+
+        Grid families derive the count from the patch grid; tile families
+        override with their fixed tokens-per-tile convention. ``None`` means the
+        family cannot predict the count and consumers skip the check.
+        """
+        grid = inputs.get("image_grid_thw")
+        if grid is None:
+            return None
+        if merge_size is None:
+            raise ValueError("merge_size is required to derive image-token counts from a patch grid.")
+        return [int(row.prod().item()) // (merge_size * merge_size) for row in grid]
 

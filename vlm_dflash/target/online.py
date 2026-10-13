@@ -340,7 +340,7 @@ class OnlineFeatureSource:
         self.layer_ids = contract_capture_layer_ids(contract)
         self.hidden_size = int(contract["text"]["hidden_size"])
         self.image_token_id = int(contract["tokens"]["image_token_id"])
-        self.merge_size = int(contract["image"]["merge_size"])
+        self.merge_size = contract["image"].get("merge_size")
         self.fused_hidden_size = len(self.layer_ids) * int(contract["text"]["hidden_size"])
         # Rows per batched capture forward; 1 is the per-sample reference path.
         self.online_batch_size = max(1, int((cfg.get("train") or {}).get("online_batch_size", 1) or 1))

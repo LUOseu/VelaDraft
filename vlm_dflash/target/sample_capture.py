@@ -126,7 +126,7 @@ def forward_and_capture_batch(
     layer_ids: list[int],
     image_token_id: int,
     dtype: torch.dtype,
-    merge_size: int = 2,
+    merge_size: int | None = None,
     store_final_hidden: bool = False,
 ) -> list[dict]:
     """Batched capture forward: one padded model call for several prepared rows.
@@ -158,34 +158,28 @@ def forward_and_capture_batch(
         "use_cache": False,
         "logits_to_keep": 1,
     }
-    pixel_values = [item["inputs"].get("pixel_values") for item in prepared_list]
-    grids = [item["inputs"].get("image_grid_thw") for item in prepared_list]
-    for key, values in (("pixel_values", pixel_values), ("image_grid_thw", grids)):
-        present = [value is not None for value in values]
-        if any(present) and not all(present):
-            raise ValueError(f"Batch capture mixes rows with and without {key}; split the batch.")
-        if all(present):
-            forward_kwargs[key] = torch.cat(values, dim=0).to(device)
-    for key in ("pixel_values_videos", "video_grid_thw"):
-        values = [item["inputs"].get(key) for item in prepared_list]
-        if all(value is not None for value in values):
-            forward_kwargs[key] = torch.cat(values, dim=0).to(device)
+    from ..adapters import adapter_for_model
+
+    adapter = adapter_for_model(model)
+    forward_kwargs.update(adapter.capture_forward_inputs(prepared_list, device))
     # The target's own multimodal forward *must* see the same token-type map
     # the processor emitted (extended over the regen answer with text=0):
     # Qwen3-VL raises without it, and Qwen2.5-VL would otherwise fall back to
-    # plain 1-D positions here while eval/prefill use MRoPE positions.
-    mm_rows = [item["inputs"].get("mm_token_type_ids") for item in prepared_list]
-    mm_present = [value is not None for value in mm_rows]
-    if any(mm_present) and not all(mm_present):
-        raise ValueError("Batch capture mixes rows with and without mm_token_type_ids; split the batch.")
+    # plain 1-D positions here while eval/prefill use MRoPE positions. Families
+    # that do not consume the map (tile-encoded processors) skip this entirely.
     extended_mm: list[torch.Tensor | None] = [None] * len(prepared_list)
-    if all(mm_present):
-        stacked = torch.zeros((len(prepared_list), max_length), dtype=mm_rows[0].dtype, device=device)
-        for row_index, value in enumerate(mm_rows):
-            extended = extend_mm_token_type_ids(value.to(device), lengths[row_index])
-            extended_mm[row_index] = extended
-            stacked[row_index, : lengths[row_index]] = extended[0]
-        forward_kwargs["mm_token_type_ids"] = stacked
+    if "mm_token_type_ids" in adapter.info.forward_input_keys:
+        mm_rows = [item["inputs"].get("mm_token_type_ids") for item in prepared_list]
+        mm_present = [value is not None for value in mm_rows]
+        if any(mm_present) and not all(mm_present):
+            raise ValueError("Batch capture mixes rows with and without mm_token_type_ids; split the batch.")
+        if all(mm_present):
+            stacked = torch.zeros((len(prepared_list), max_length), dtype=mm_rows[0].dtype, device=device)
+            for row_index, value in enumerate(mm_rows):
+                extended = extend_mm_token_type_ids(value.to(device), lengths[row_index])
+                extended_mm[row_index] = extended
+                stacked[row_index, : lengths[row_index]] = extended[0]
+            forward_kwargs["mm_token_type_ids"] = stacked
     output = model(**forward_kwargs)
     hidden_states = output.hidden_states
     records = []
@@ -202,7 +196,7 @@ def forward_and_capture_batch(
         )
         row_inputs = input_ids[row_index : row_index + 1, :length]
         row_mask = attention_mask[row_index : row_index + 1, :length]
-        grid = grids[row_index]
+        grid = item["inputs"].get("image_grid_thw")
         positions = compute_multimodal_positions(
             model,
             row_inputs,
@@ -213,12 +207,9 @@ def forward_and_capture_batch(
         spans = locate_image_spans(item["full_ids"].cpu(), image_token_id)
         if not item.get("allow_multi_span") and len(spans) != 1:
             raise ValueError("Image tokens are not contiguous; v0.1 requires a single leading image.")
-        # image_grid_thw counts patches; every merge_size^2 patches become one token.
-        expected_per_image = (
-            [int(row.prod().item()) // (merge_size * merge_size) for row in grid]
-            if grid is not None
-            else None
-        )
+        # Grid families: image_grid_thw counts patches and every merge_size^2
+        # patches become one token; tile families report tiles x fixed length.
+        expected_per_image = adapter.expected_image_token_counts(item["inputs"], merge_size=merge_size)
         span_count = sum(end - start + 1 for start, end in spans)
         expected = sum(expected_per_image) if expected_per_image is not None else None
         record = {
@@ -231,7 +222,7 @@ def forward_and_capture_batch(
         }
         if item.get("allow_multi_span"):
             record["image_spans"] = [tuple(span) for span in spans]
-            record["n_images"] = len(grid) if grid is not None else None
+            record["n_images"] = len(grid) if grid is not None else len(spans)
             record["image_token_counts_expected"] = expected_per_image
         if final_hidden is not None:
             record["final_hidden"] = final_hidden
@@ -247,7 +238,7 @@ def forward_and_capture(
     layer_ids: list[int],
     image_token_id: int,
     dtype: torch.dtype,
-    merge_size: int = 2,
+    merge_size: int | None = None,
     store_final_hidden: bool = False,
     allow_multi_span: bool = False,
 ) -> dict:
@@ -441,7 +432,7 @@ def finalize_prepared_records(
     *,
     layer_ids: list[int],
     image_token_id: int,
-    merge_size: int,
+    merge_size: int | None,
     dtype: torch.dtype,
     store_final_hidden: bool,
 ) -> list[dict]:
@@ -495,7 +486,7 @@ def build_sample_record(
     *,
     layer_ids: list[int],
     image_token_id: int,
-    merge_size: int,
+    merge_size: int | None,
     dtype: torch.dtype,
     seq_length: int,
     store_final_hidden: bool,

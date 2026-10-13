@@ -63,7 +63,7 @@ def run_visual_path_check(
 
     layer_ids = contract_capture_layer_ids(contract)
     image_token_id = int(contract["tokens"]["image_token_id"])
-    merge_size = int(contract["image"]["merge_size"])
+    merge_size = contract["image"].get("merge_size")
     cfg_check = cfg.get("capture", {}).get("visual_check", {})
     min_downstream_changed = int(cfg_check.get("min_downstream_changed", 16))
     min_span_cosine_drop = float(cfg_check.get("min_span_cosine_drop", 1e-3))

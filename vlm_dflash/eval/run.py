@@ -9,6 +9,7 @@ from pathlib import Path
 import torch
 from PIL import Image
 
+from ..adapters import adapter_for_model
 from ..algorithms import get_algorithm
 from ..data.sharegpt import load_sharegpt, row_image_path, row_image_paths, row_is_multi_turn, row_question
 from ..provenance import assert_identity, identity_from_contract, record_stage
@@ -223,6 +224,7 @@ def run_checkpoints(
     opt-in and never mixed into correctness tables).
     """
     device = next(model.parameters()).device
+    eval_adapter = adapter_for_model(model)
     if stop_ids is None:
         stop_ids = set(_stops(model))
     sequential_verification = verification == "sequential"
@@ -243,13 +245,7 @@ def run_checkpoints(
         log(f"{label}: speculative greedy with {checkpoint_name} ({verification})")
         for entry in prompts:
             inputs = entry["inputs"]
-            target_kwargs = {
-                "pixel_values": inputs.get("pixel_values"),
-                "image_grid_thw": inputs.get("image_grid_thw"),
-                "attention_mask": inputs["attention_mask"],
-                "mm_token_type_ids": inputs.get("mm_token_type_ids"),
-            }
-            target_kwargs = {key: value for key, value in target_kwargs.items() if value is not None}
+            target_kwargs = eval_adapter.forward_kwargs_from_inputs(inputs)
             started = time.perf_counter()
             with torch.inference_mode():
                 output_ids, stats = draft.spec_generate(
@@ -509,10 +505,11 @@ def _run_parallel_diagnostic(
     mismatches = []
     exact = 0
     algorithm.configure_verify_backend(True)
+    diag_adapter = adapter_for_model(model)
     try:
         for entry in prompts[:num_prompts]:
             inputs = entry["inputs"]
-            target_kwargs = {key: inputs[key] for key in ("pixel_values", "image_grid_thw", "attention_mask", "mm_token_type_ids") if key in inputs}
+            target_kwargs = diag_adapter.forward_kwargs_from_inputs(inputs)
             scores = None
             with torch.inference_mode():
                 scored = model.generate(

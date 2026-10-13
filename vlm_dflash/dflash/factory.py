@@ -39,7 +39,11 @@ def build_draft_config(contract: dict, cfg: dict):
         "target_layer_ids": [int(layer) for layer in contract["layers"]["draft_layer_ids"]],
         "spatial_rope_enabled": bool(drafter.get("spatial_rope_enabled", True)),
         "spatial_rope_mode": str(drafter.get("spatial_rope_mode", "replace")),
-        "spatial_rope_sections": [int(section) for section in contract["rope"]["sections"]],
+        "spatial_rope_sections": (
+            [int(section) for section in contract["rope"]["sections"]]
+            if contract["rope"].get("sections") is not None
+            else None
+        ),
         "spatial_rope_interleaved": bool(contract["rope"].get("interleaved", False)),
         "visual_num_query_tokens": 0,
     }

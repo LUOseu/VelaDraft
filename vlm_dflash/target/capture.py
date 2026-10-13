@@ -86,7 +86,7 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
     layer_ids = contract_capture_layer_ids(contract)
     hidden_size = int(contract["text"]["hidden_size"])
     image_token_id = int(contract["tokens"]["image_token_id"])
-    merge_size = int(contract["image"]["merge_size"])
+    merge_size = contract["image"].get("merge_size")
     store_final_hidden = bool(cap_cfg.get("store_final_hidden", False))
 
     model, processor = load_target(cfg, contract)
