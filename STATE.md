@@ -8,7 +8,8 @@ same interfaces — canonical 2K runs, ablations and Qwen3-VL reduced
 validations recorded; DFly's upstream two-stage recipe (LK / D-PACE cold
 start -> e2e TV) ported as `algorithm.train_recipe` on branch
 `dfly-upstream-recipe` — CPU suite + GPU smoke + eval/export verified,
-canonical run pending).
+canonical run pending; Model Zoo `zoo-v0.3.1` published with six additional
+canonical archives).
 
 **Status: v0.3.1 tagged and pushed** (tag `v0.3.1` at `eb3f314`); **v0.3.2 in
 development — the online target feature source is pushed as `aed7bf8` and
@@ -469,8 +470,9 @@ Scope frozen (harden/document/validate/package only). Evidence:
 ## Blocked / waiting
 - PyPI publishing and Hugging Face Hub hosting: not done; the code is public
   (`github.com/LUOseu/VelaDraft`) and the Model Zoo weights are hosted as the
-  `zoo-v0.3.0` GitHub release. Do not write PyPI/HF instructions that do not
-  exist yet.
+  `zoo-v0.3.0` (DFlash, Domino) and `zoo-v0.3.1` (DSpark, JetSpec,
+  DFlash2-exp, DFlare, DFly, 8B DFlash) GitHub releases. Do not write
+  PyPI/HF instructions that do not exist yet.
 - Server disk policy in effect: feature stores are pruned once a run is
   recorded ("deterministic to recapture"); the zoo 2K stores live in
   `runs/qwen25vl3b_jetspec_2k/features` (capture-v2 superset), symlinked by
@@ -500,9 +502,11 @@ Scope frozen (harden/document/validate/package only). Evidence:
    First serving-bridge step is scoped in `docs/serving-bridge.md` (proposal).
 4. Deterministic benchmark prompt file for `caption_general`; land one public
    dataset adapter (TextVQA first) to move a workload from planned -> validated.
-5. Publish the remaining zoo exports (DSpark / JetSpec / DFlash2-exp / 8B
-   DFlash) as release assets once hosting is decided (HF Hub needs an account
-   decision).
+5. Zoo v0.3.1 follow-up: clean-machine re-download of one archive (the dev
+   Mac's egress proxy cannot reach `release-assets.githubusercontent.com`),
+   then extend the `zoo-v0.3.0`-only re-download record in
+   `RELEASE_VALIDATION.md` if the hosting story changes (HF Hub still needs
+   an account decision).
 
 (Done in v0.3.1: Qwen3-VL reduced-scale validation recorded for
 DSpark/Domino/JetSpec/DFlash2 with metadata retagged to `reduced_validation`;

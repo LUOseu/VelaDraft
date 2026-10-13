@@ -153,26 +153,33 @@ and capability details are in the [support matrix](SUPPORT_MATRIX.md), the
 
 ## Model Zoo
 
-Released checkpoints for **Qwen2.5-VL-3B-Instruct**:
+Released drafter checkpoints (reference artifacts for pipeline validation):
 
-| Drafter | Download | Model card |
-| --- | --- | --- |
-| **DFlash** · frozen block reference | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflash.md) |
-| **Domino** · GRU correction | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [Details](docs/zoo/qwen25vl-3b-domino.md) |
+| Drafter | Target | Download | Model card |
+| --- | --- | --- | --- |
+| **DFlash** · frozen block reference | Qwen2.5-VL-3B | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflash.md) |
+| **Domino** · GRU correction | Qwen2.5-VL-3B | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [Details](docs/zoo/qwen25vl-3b-domino.md) |
+| **DSpark** · Markov + confidence head | Qwen2.5-VL-3B | [487 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dspark.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dspark.md) |
+| **JetSpec** · forward-KL distillation | Qwen2.5-VL-3B | [370 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-jetspec.tar.gz) | [Details](docs/zoo/qwen25vl-3b-jetspec.md) |
+| **DFlash2** · experimental objective | Qwen2.5-VL-3B | [498 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflash2-exp.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflash2-exp.md) |
+| **DFlare** · learnable fusion + context K/V | Qwen2.5-VL-3B | [356 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflare.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflare.md) |
+| **DFly** · shared-KV + hidden correction | Qwen2.5-VL-3B | [401 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dfly.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dfly.md) |
+| **DFlash** · 8B scale | Qwen3-VL-8B | [955 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen3vl-8b-dflash.tar.gz) | [Details](docs/zoo/qwen3vl-8b-dflash.md) |
 
 These archives are **reference artifacts for pipeline validation**: they were
 trained under the recorded development protocol and are meant for exercising
 `train → eval → export`, integration work and output-agreement checks. They
-are not tuned or benchmarked as production drafters, and their acceptance
-numbers are development measurements — recorded, with the training protocol
-and all other runs, in [BENCHMARKS.md](BENCHMARKS.md). Both exports were
-re-verified after download with the token-exact gate; see the
+are not tuned or benchmarked as production drafters; development measurements
+and their training protocols are recorded in
+[BENCHMARKS.md](BENCHMARKS.md). The `zoo-v0.3.0` archives were re-verified
+after download with the token-exact gate; every `zoo-v0.3.1` export is
+reloaded via `load_export` before packaging; see the
 [release evidence](RELEASE_VALIDATION.md).
 
 Each archive includes weights, configuration, algorithm metadata, target
-contract, training manifest, model card and file checksums. Other algorithms
-can be trained and exported locally; their canonical checkpoints are not
-currently hosted.
+contract, training manifest, model card and file checksums. All seven
+drafters now have hosted reference checkpoints; training and exporting your
+own remains fully local.
 
 ## Train on your data
 

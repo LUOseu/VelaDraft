@@ -133,20 +133,27 @@ DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpe
 
 ## 模型下载
 
-已发布的 **Qwen2.5-VL-3B-Instruct** drafter：
+已发布的 drafter 参考 checkpoint：
 
-| Drafter | 下载 | Model card |
-| --- | --- | --- |
-| **DFlash** · 冻结块草稿参考实现 | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash.md) |
-| **Domino** · GRU 修正 | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [详情](docs/zoo/qwen25vl-3b-domino.md) |
+| Drafter | Target | 下载 | Model card |
+| --- | --- | --- | --- |
+| **DFlash** · 冻结块草稿参考实现 | Qwen2.5-VL-3B | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash.md) |
+| **Domino** · GRU 修正 | Qwen2.5-VL-3B | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [详情](docs/zoo/qwen25vl-3b-domino.md) |
+| **DSpark** · Markov + confidence head | Qwen2.5-VL-3B | [487 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dspark.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dspark.md) |
+| **JetSpec** · forward-KL 蒸馏 | Qwen2.5-VL-3B | [370 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-jetspec.tar.gz) | [详情](docs/zoo/qwen25vl-3b-jetspec.md) |
+| **DFlash2** · 实验性训练目标 | Qwen2.5-VL-3B | [498 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflash2-exp.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash2-exp.md) |
+| **DFlare** · 可学习融合 + 专属 context K/V | Qwen2.5-VL-3B | [356 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflare.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflare.md) |
+| **DFly** · 共享 KV + hidden 修正 | Qwen2.5-VL-3B | [401 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dfly.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dfly.md) |
+| **DFlash** · 8B 规模 | Qwen3-VL-8B | [955 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen3vl-8b-dflash.tar.gz) | [详情](docs/zoo/qwen3vl-8b-dflash.md) |
 
 这些权重是**流水线验证用的参考产物**：按已记录的开发协议训练，用于跑通
-`训练 → 评测 → 导出`、集成工作和输出一致性检查，并非面向生产调优或充分训练的 drafter；
-它们产生的接受指标属于开发期测量，与训练协议及其余运行一并记录在
-[BENCHMARKS.md](BENCHMARKS.md)。两个 export 均在下载后重新通过 token-exact gate；见[发布证据](RELEASE_VALIDATION.md)。
+`训练 → 评测 → 导出`、集成工作和输出一致性检查，并非面向生产调优的 drafter；
+开发期测量与训练协议一并记录在 [BENCHMARKS.md](BENCHMARKS.md)。
+`zoo-v0.3.0` 的两个 export 在下载后重新通过 token-exact gate；`zoo-v0.3.1`
+的每个 export 在打包前均通过 `load_export` 重载校验；见[发布证据](RELEASE_VALIDATION.md)。
 
 每个压缩包包括权重、配置、算法 metadata、target contract、training manifest、model card 与文件校验值。
-其他算法可在本地训练并导出，当前未托管其 canonical checkpoints。
+七种 drafter 现在都有托管的参考 checkpoint；本地训练与导出不受影响。
 
 ## 训练自己的数据
 
