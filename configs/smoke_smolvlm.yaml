@@ -25,7 +25,9 @@ dataset:
 
 regen:
   max_new_tokens: 64
-  min_response_tokens: 8
+  # SmolVLM2 answers shape questions tersely (" diamond.<end_of_utterance>");
+  # 2 keeps every non-degenerate answer while still dropping pure-eos rows.
+  min_response_tokens: 2
   batch_size: 4
   temperature: 0.0
 
