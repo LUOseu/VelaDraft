@@ -6,7 +6,7 @@ hacks). They need a local Qwen2.5-VL-3B-Instruct checkout and one CUDA GPU.
 ## Score a released drafter (no training)
 
 ```bash
-curl -L -O https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
+curl -L -O https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
 tar xzf qwen25vl-3b-dflash.tar.gz
 python examples/score_pretrained.py \
     --target /path/to/Qwen2.5-VL-3B-Instruct --drafter qwen25vl-3b-dflash

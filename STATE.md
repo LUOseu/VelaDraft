@@ -1,11 +1,12 @@
 # STATE
 
-Updated: 2026-10-13 (v0.3.2 in development: online target feature source;
-v0.3.1 tagged and pushed).
+Updated: 2026-10-13 (v0.3.2 in development: online target feature source
+pushed; GitHub repo renamed to `LUOseu/VelaDraft`).
 
-**Status: v0.3.1 tagged and pushed** (`github.com/LUOseu/vlm-dflash`, tag
-`v0.3.1` at `eb3f314`, main `05460a2`); **v0.3.2 in development — the online
-target feature source is committed locally, not yet pushed**.
+**Status: v0.3.1 tagged and pushed** (tag `v0.3.1` at `eb3f314`); **v0.3.2 in
+development — the online target feature source is pushed as `aed7bf8`** (repo
+now `github.com/LUOseu/VelaDraft`; old URLs redirect; distribution and CLI
+stay `vlm-dflash`).
 
 - v0.3.2 scope (so far): `train.feature_mode: offline|online` — live
   teacher-forced extraction from the frozen target in the trainer process
@@ -261,7 +262,7 @@ Scope frozen (harden/document/validate/package only). Evidence:
 
 ## Blocked / waiting
 - PyPI publishing and Hugging Face Hub hosting: not done; the code is public
-  (`github.com/LUOseu/vlm-dflash`) and the Model Zoo weights are hosted as the
+  (`github.com/LUOseu/VelaDraft`) and the Model Zoo weights are hosted as the
   `zoo-v0.3.0` GitHub release. Do not write PyPI/HF instructions that do not
   exist yet.
 - Server disk policy in effect: feature stores are pruned once a run is

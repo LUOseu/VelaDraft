@@ -20,7 +20,7 @@ benchmark adapters, reduced validation, CI, security/license cleanup only.
 - [x] Large-file audit (`find . -type f -size +20M`)
 - [x] Claim audit (DFlash2 wording; no lossless-speedup claims; parallel marked experimental)
 - [x] RELEASE_VALIDATION.md complete (only the tag-time commit hash was pending at review, filled in at tag time)
-- [x] Release commit `5b1c41b` tagged `v0.3.0-rc1`, pushed to `LUOseu/vlm-dflash` (visibility: public since 2026-10-13; main `5ca075f`, CI green)
+- [x] Release commit `5b1c41b` tagged `v0.3.0-rc1`, pushed to `LUOseu/VelaDraft` (formerly `vlm-dflash`; visibility: public since 2026-10-13; main `5ca075f`, CI green)
 
 ## v0.3.1 (distribution fixes + first-run review, in development)
 

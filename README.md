@@ -8,9 +8,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/LUOseu/vlm-dflash/actions/workflows/ci.yml"><img src="https://github.com/LUOseu/vlm-dflash/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-12263a" alt="Python 3.10+" /></a>
-  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-12263a" alt="Apache-2.0" /></a>
+  <a href="https://github.com/LUOseu/VelaDraft/actions/workflows/ci.yml"><img src="https://github.com/LUOseu/VelaDraft/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/LUOseu/VelaDraft/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-12263a" alt="Python 3.10+" /></a>
+  <a href="https://github.com/LUOseu/VelaDraft/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-12263a" alt="Apache-2.0" /></a>
 </p>
 
 <p align="center">
@@ -19,7 +19,7 @@
   <a href="#train-on-your-data">Training</a> ·
   <a href="#benchmarks">Benchmarks</a> ·
   <a href="#documentation">Documentation</a> ·
-  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/CONTRIBUTING.md">Contributing</a>
+  <a href="https://github.com/LUOseu/VelaDraft/blob/main/CONTRIBUTING.md">Contributing</a>
 </p>
 
 <p align="center">
@@ -50,8 +50,8 @@ The package and command are named **`vlm-dflash`**.
 ### Install
 
 ```bash
-git clone https://github.com/LUOseu/vlm-dflash.git
-cd vlm-dflash
+git clone https://github.com/LUOseu/VelaDraft.git
+cd VelaDraft
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[tested]"
@@ -71,7 +71,7 @@ DFlash drafter:
 export VLM_DFLASH_TARGET=/path/to/Qwen2.5-VL-3B-Instruct
 
 curl -fL -o qwen25vl-3b-dflash.tar.gz \
-  https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
+  https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
 tar -xzf qwen25vl-3b-dflash.tar.gz
 
 vlm-dflash demo --target "$VLM_DFLASH_TARGET" --drafter qwen25vl-3b-dflash
@@ -134,8 +134,8 @@ Released checkpoints for **Qwen2.5-VL-3B-Instruct**:
 
 | Drafter | AL¹ | Download | Model card |
 | --- | ---: | --- | --- |
-| **DFlash** · frozen reference | 1.630 | [387 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflash.md) |
-| **Domino** · GRU correction | 1.764 | [464 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [Details](docs/zoo/qwen25vl-3b-domino.md) |
+| **DFlash** · frozen reference | 1.630 | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflash.md) |
+| **Domino** · GRU correction | 1.764 | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [Details](docs/zoo/qwen25vl-3b-domino.md) |
 
 ¹ Canonical 2K protocol below. AL is an acceptance metric, not a wall-clock
 speedup. Both released exports were re-verified after download with the

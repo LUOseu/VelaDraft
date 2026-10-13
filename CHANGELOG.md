@@ -2,6 +2,9 @@
 
 ## v0.3.2 (in development)
 
+- Repository renamed to `github.com/LUOseu/VelaDraft` (old `vlm-dflash` URLs
+  redirect); the distribution name and CLI stay `vlm-dflash`.
+
 ### Online training: live target feature extraction
 
 - `train --mode online` (`--mode` / `--feature-mode` alias; config
@@ -84,7 +87,7 @@ items. No algorithm, protocol or benchmark changes — every recorded number in
 ### Docs, metadata and first-run
 
 - First public release of the Model Zoo:
-  [zoo-v0.3.0](https://github.com/LUOseu/vlm-dflash/releases/tag/zoo-v0.3.0)
+  [zoo-v0.3.0](https://github.com/LUOseu/VelaDraft/releases/tag/zoo-v0.3.0)
   hosts the DFlash and Domino exports (tar.gz + sha256 checksums + model
   cards); both were re-downloaded and re-verified token-exact.
 - `demo --drafter <export>` now follows the checkpoint's recorded algorithm

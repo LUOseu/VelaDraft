@@ -8,9 +8,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/LUOseu/vlm-dflash/actions/workflows/ci.yml"><img src="https://github.com/LUOseu/vlm-dflash/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-12263a" alt="Python 3.10+" /></a>
-  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-12263a" alt="Apache-2.0" /></a>
+  <a href="https://github.com/LUOseu/VelaDraft/actions/workflows/ci.yml"><img src="https://github.com/LUOseu/VelaDraft/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/LUOseu/VelaDraft/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-12263a" alt="Python 3.10+" /></a>
+  <a href="https://github.com/LUOseu/VelaDraft/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-12263a" alt="Apache-2.0" /></a>
 </p>
 
 <p align="center">
@@ -19,7 +19,7 @@
   <a href="#训练自己的数据">训练</a> ·
   <a href="#基准结果">基准结果</a> ·
   <a href="#文档">文档</a> ·
-  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/CONTRIBUTING.md">参与贡献</a>
+  <a href="https://github.com/LUOseu/VelaDraft/blob/main/CONTRIBUTING.md">参与贡献</a>
 </p>
 
 <p align="center">
@@ -42,8 +42,8 @@ VelaDraft 将 **DFlash、DSpark、Domino、JetSpec 和 DFlash2** 接入同一套
 ### 安装
 
 ```bash
-git clone https://github.com/LUOseu/vlm-dflash.git
-cd vlm-dflash
+git clone https://github.com/LUOseu/VelaDraft.git
+cd VelaDraft
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[tested]"
@@ -60,7 +60,7 @@ pip install -e ".[tested]"
 export VLM_DFLASH_TARGET=/path/to/Qwen2.5-VL-3B-Instruct
 
 curl -fL -o qwen25vl-3b-dflash.tar.gz \
-  https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
+  https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
 tar -xzf qwen25vl-3b-dflash.tar.gz
 
 vlm-dflash demo --target "$VLM_DFLASH_TARGET" --drafter qwen25vl-3b-dflash
@@ -116,8 +116,8 @@ DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpe
 
 | Drafter | AL¹ | 下载 | Model card |
 | --- | ---: | --- | --- |
-| **DFlash** · 冻结基线 | 1.630 | [387 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash.md) |
-| **Domino** · GRU 修正 | 1.764 | [464 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [详情](docs/zoo/qwen25vl-3b-domino.md) |
+| **DFlash** · 冻结基线 | 1.630 | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash.md) |
+| **Domino** · GRU 修正 | 1.764 | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [详情](docs/zoo/qwen25vl-3b-domino.md) |
 
 ¹ 下方 canonical 2K 协议。AL 是接受指标，不是墙钟加速倍数。
 两个 export 均在下载后重新通过 token-exact gate；见[发布证据](RELEASE_VALIDATION.md)。
