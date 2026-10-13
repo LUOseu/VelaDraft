@@ -15,6 +15,7 @@ against the plan's first-round budget.
 | R-20261014-06 | 2026-10-14 | E1d memory re-measure (inside R-04 runs) | same | same | 0 (shared) | recipe 8-step train peak **28.6 GB** with sanity off (vs 46.5 GB for the R-01 smoke whose overfit sanity dominated the peak); controlled_ce 1-step probe 31.4 GB | `kernels: train_summary.json` |
 | R-20261014-07 | 2026-10-14 | duplicate E1 set from the other concurrent session: select-parity, kill@4 + resume, export + reload + 8-prompt eval | `6cf8141` | same store; slice 64; mb 8; sanity off | 0.26 GPU-h (train 118.7 + 85.1 + 163.8 + 125 + ~125 s; eval/export ~5 min) | PASS, agrees with R-20261014-03..05: select-parity traces bit-exact (`loss [12.3125, 22.0, 20.125, 21.0]`), 8-step kill+resume traces bit-exact (stage sequence `[0,0,0,0,1,1,1,1]`), export reload OK with `objective_profile=upstream_two_stage`, eval token-exact 8/8 (AL 1.133 vs init 1.000) | `~/vlm-recipe-smoke/runs/e1_ce_off`, `e1_ce_on`, `e1_recipe_straight`, `e1_recipe_kill`; `recipe-smoke-config/export_recipe_smoke`, `eval_recipe.log` |
 | R-20261014-08 | 2026-10-14 | E2: WP2 multi-image/multi-turn smoke - synthetic 2-image/2-turn JSONL through prepare -> regen -> capture -> train (32 steps) -> eval | `6fd243c` worktree | `configs/smoke_multiturn.yaml`; 16 train + 4 val synthetic rows (`scripts/make_wp2_smoke_data.py`); target Qwen2.5-VL-3B; seq 1024; mb 4 | cap 0.5 GPU-h | PENDING (launched 2026-10-14 ~01:55, GPU0) | `~/vlm-recipe-smoke/runs/e2/smoke_multiturn`, `recipe-smoke-config/e2_train.log` |
+| R-20261014-09 | 2026-10-14 | zoo-v0.3.1 clean re-download validation: fetch the six archives + `SHA256SUMS` from the public release URL (via an HTTPS mirror; direct `release-assets` egress is blocked from both hosts), verify hashes + inner `checksums.json` + tar layout, then `demo --drafter` reload of the DFly and DFlare archives in fresh run dirs (4 prompts / 64 tokens, synthetic sample) | `7b3800d` (reload path fixed by `4ddb955`) | public `zoo-v0.3.1` assets; target Qwen2.5-VL-3B; GPU0 | 0.04 GPU-h (two demos; wall inflated by a host-wide writeback stall) | PASS: all six archives sha256-identical to the pre-upload sums; inner checksums 7/7 OK per archive; DFly AL 1.196 / DFlare AL 1.219, both token-exact 4/4 vs target greedy. Surfaced and fixed a demo-path bug: `--drafter` did not adopt the recorded capture list / context subset, so the rebuilt DFly/DFlare archives were refused by the target identity gate; regression tests added | `a6000xuyang:/tmp/zoo-verify/` (tarballs + `download.log`, `runs/demo_dfly_download2`, `runs/demo_dflare_download`) |
 
 ## Reuse sources (not charged; pre-existing plan assets)
 
@@ -31,5 +32,6 @@ against the plan's first-round budget.
 None outstanding. The three registered E1 runs executed on 2026-10-14 — once
 per concurrent session (R-20261014-03..06 and the duplicate set
 R-20261014-07; the two sets agree bit-exactly). E4 (canonical 2K recipe run)
-is the next registered GPU job and stays on hold until the user rules on the
-concurrent-session question.
+was launched 2026-10-14 01:26 under the two-session lane split
+(`COORDINATION.md`: E4 to this session); its train + eval chain is in flight
+and the row will be added when it lands.
