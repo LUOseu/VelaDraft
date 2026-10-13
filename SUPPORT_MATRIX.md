@@ -66,7 +66,7 @@ the algorithm registry above).
 | Feature mode | Status | Evidence |
 | --- | --- | --- |
 | `offline` (staged capture) | validated | the canonical protocol runs in `BENCHMARKS.md` / `RELEASE_VALIDATION.md` are all offline-path numbers |
-| `online` (live target extraction) | experimental | CPU full suite (214 tests) + GPU plumbing smokes on Qwen2.5-VL-3B and Qwen3-VL-8B (`docs/online-training.md`): token-exact eval, provenance, digests, exact-resume gates, per-phase peaks |
+| `online` (live target extraction) | experimental | full CPU suite + GPU plumbing smokes on Qwen2.5-VL-3B and Qwen3-VL-8B (`docs/online-training.md`): token-exact eval, provenance, digests, exact-resume gates, per-phase peaks |
 
 Online has no canonical-quality or split-device recording yet; do not relabel
 offline benchmark numbers as online (see `docs/online-training.md`).

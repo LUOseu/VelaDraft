@@ -1,7 +1,7 @@
 """DFlare: DFlash with learnable per-draft-layer target fusion.
 
 Upstream: Tencent AngelSpec ``angelspec/models/draft/dflare.py`` @
-``d3412bed231025ea85d35dbf5e0af44f1ac62a5b`` (MIT); paper arXiv:2606.02091.
+``d3412bed231025ea85d35dbf5e0af44f1ac62a5b`` (Apache-2.0); paper arXiv:2606.02091.
 Audit and adaptation notes: ``docs/upstream/dflare.md``.
 """
 
@@ -31,7 +31,7 @@ class DFlareAlgorithm(DrafterAlgorithm):
             "paper": "arXiv:2606.02091 (DFlare)",
             "upstream_reference": (
                 "Tencent/AngelSpec@d3412bed231025ea85d35dbf5e0af44f1ac62a5b "
-                "angelspec/models/draft/dflare.py (MIT)"
+                "angelspec/models/draft/dflare.py (Apache-2.0)"
             ),
             "port_notes": "docs/upstream/dflare.md",
             "algorithm_doc": "docs/algorithms/dflare.md",
@@ -118,6 +118,31 @@ class DFlareAlgorithm(DrafterAlgorithm):
         from ..dflare.factory import load_checkpoint
 
         return load_checkpoint(checkpoint_path, map_location=map_location)
+
+    def plan_knobs(self, cfg: dict, contract: dict | None = None) -> dict:
+        """Resolved DFlare knobs for the training-plan digest.
+
+        The effective fusion context is the ordered layer list the run
+        consumes: explicit ids as given, ``null`` resolved to every captured
+        layer (which is why the contract is required -- a digest that cannot
+        name the effective list must not be compared against a checkpoint).
+        """
+        if contract is None:
+            raise ValueError(
+                "dflare training-plan knobs depend on the capture layout; pass the frozen contract "
+                "so context_layer_ids: null resolves to the actual ordered layer list."
+            )
+        from ..contract import contract_capture_layer_ids
+        from ..dflare.factory import resolve_context_layer_ids, resolve_dflare_config
+
+        resolved = resolve_dflare_config(cfg)
+        context = resolve_context_layer_ids(resolved, contract_capture_layer_ids(contract))
+        return {
+            "context_layer_ids": [int(layer) for layer in context],
+            "separate_context_kv": bool(resolved["separate_context_kv"]),
+            "fusion_trainable": bool(resolved["fusion_trainable"]),
+            "fusion_init": str(resolved["fusion_init"]),
+        }
 
     def build_inference_module(self, draft_config_dict: dict, attention_backend: str):
         from transformers.models.qwen3.configuration_qwen3 import Qwen3Config

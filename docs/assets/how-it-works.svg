@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1560" height="800" viewBox="0 0 1560 800" role="img" aria-labelledby="title desc">
-<title id="title">VelaDraft pipeline: reusable visual context, offline drafter training, validation and export</title>
-<desc id="desc">Image-text data is used by the target VLM to generate responses and capture hidden states. Compatible captured features can be reused to train DFlash, DSpark, Domino, JetSpec or experimental DFlash2. The target is off the GPU during drafter training and is reloaded for evaluation. Checkpoint export follows validation.</desc>
+<title id="title">VelaDraft pipeline: reusable visual context, offline or online drafter training, validation and export</title>
+<desc id="desc">Image-text data is used by the target VLM to generate responses and capture hidden states. Compatible captured features can be reused to train DFlash, DSpark, Domino, JetSpec, DFlash2, DFlare or DFly. Training runs offline from the store, or online against the live frozen target; the target is reloaded for evaluation. Checkpoint export follows validation.</desc>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#8795A5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
   <marker id="mintArrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#0D9488" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
@@ -12,7 +12,7 @@
 <text x="48" y="94" font-family="Arial, Nimbus Sans, sans-serif" font-size="46" font-weight="700" fill="#12263A" text-anchor="start" >Capture. Train. Verify.</text>
 <text x="48" y="133" font-family="Arial, Nimbus Sans, sans-serif" font-size="24" font-weight="400" fill="#607187" text-anchor="start" >Turn image–text data into validated multimodal drafters.</text>
 <rect x="1148" y="77" width="364" height="30" rx="15" fill="#EAF7F1" stroke="#EAF7F1" />
-<text x="1330.0" y="98" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#087F73" text-anchor="middle" >ONE CAPTURE · FIVE DRAFTING PATHS</text>
+<text x="1330.0" y="98" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#087F73" text-anchor="middle" >ONE CAPTURE · SEVEN DRAFTING PATHS</text>
 <rect x="48" y="170" width="464" height="534" rx="22" fill="#F0F8F5" stroke="#E0E8EF" />
 <rect x="78" y="194" width="40" height="30" rx="9" fill="#FFFFFF" stroke="#FFFFFF" />
 <text x="98" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#0D9488" text-anchor="middle" >01</text>
@@ -64,38 +64,48 @@
 <text x="190" y="546" font-family="Arial, Nimbus Sans, sans-serif" font-size="24" font-weight="700" fill="#12263A" text-anchor="start" >Reusable features</text>
 <text x="190" y="580" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="400" fill="#607187" text-anchor="start" >Hidden states · positions</text>
 <text x="190" y="608" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="400" fill="#607187" text-anchor="start" >Image spans · target head</text>
-<path d="M574 322 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 322 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="294" width="326" height="56" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="309" width="5" height="27" rx="2" fill="#0D9488" stroke="#0D9488" />
-<text x="632" y="319" font-family="Arial, Nimbus Sans, sans-serif" font-size="21" font-weight="700" fill="#12263A" text-anchor="start" >DFlash</text>
-<text x="632" y="340" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="400" fill="#607187" text-anchor="start" >Frozen reference</text>
-<path d="M574 390 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 390 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="362" width="326" height="56" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="377" width="5" height="27" rx="2" fill="#4F46E5" stroke="#4F46E5" />
-<text x="632" y="387" font-family="Arial, Nimbus Sans, sans-serif" font-size="21" font-weight="700" fill="#12263A" text-anchor="start" >DSpark</text>
-<text x="632" y="408" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="400" fill="#607187" text-anchor="start" >Markov + confidence</text>
-<path d="M574 458 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 458 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="430" width="326" height="56" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="445" width="5" height="27" rx="2" fill="#0284C7" stroke="#0284C7" />
-<text x="632" y="455" font-family="Arial, Nimbus Sans, sans-serif" font-size="21" font-weight="700" fill="#12263A" text-anchor="start" >Domino</text>
-<text x="632" y="476" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="400" fill="#607187" text-anchor="start" >GRU correction</text>
-<path d="M574 526 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 526 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="498" width="326" height="56" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="513" width="5" height="27" rx="2" fill="#B77931" stroke="#B77931" />
-<text x="632" y="523" font-family="Arial, Nimbus Sans, sans-serif" font-size="21" font-weight="700" fill="#12263A" text-anchor="start" >JetSpec</text>
-<text x="632" y="544" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="400" fill="#607187" text-anchor="start" >Causal mask + KL</text>
-<path d="M574 594 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 594 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="566" width="326" height="56" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="581" width="5" height="27" rx="2" fill="#64748B" stroke="#64748B" />
-<text x="632" y="591" font-family="Arial, Nimbus Sans, sans-serif" font-size="21" font-weight="700" fill="#12263A" text-anchor="start" >DFlash2</text>
-<text x="632" y="612" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="400" fill="#607187" text-anchor="start" >Conv + selector</text>
-<rect x="852" y="579" width="56" height="30" rx="15" fill="#EEF1F5" stroke="#EEF1F5" />
-<text x="880.0" y="600" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="500" fill="#64748B" text-anchor="middle" >EXP.</text>
+<path d="M574 314 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
+<path d="M924 314 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="598" y="290" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<rect x="612" y="301" width="5" height="26" rx="2" fill="#0D9488" stroke="#0D9488" />
+<text x="632" y="312" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >DFlash</text>
+<text x="632" y="330" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >Frozen reference</text>
+<path d="M574 365 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
+<path d="M924 365 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="598" y="341" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<rect x="612" y="352" width="5" height="26" rx="2" fill="#4F46E5" stroke="#4F46E5" />
+<text x="632" y="363" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >DSpark</text>
+<text x="632" y="381" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >Markov + confidence</text>
+<path d="M574 416 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
+<path d="M924 416 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="598" y="392" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<rect x="612" y="403" width="5" height="26" rx="2" fill="#0284C7" stroke="#0284C7" />
+<text x="632" y="414" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >Domino</text>
+<text x="632" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >GRU correction</text>
+<path d="M574 467 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
+<path d="M924 467 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="598" y="443" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<rect x="612" y="454" width="5" height="26" rx="2" fill="#B77931" stroke="#B77931" />
+<text x="632" y="465" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >JetSpec</text>
+<text x="632" y="483" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >Causal mask + KL</text>
+<path d="M574 518 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
+<path d="M924 518 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="598" y="494" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<rect x="612" y="505" width="5" height="26" rx="2" fill="#64748B" stroke="#64748B" />
+<text x="632" y="516" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >DFlash2</text>
+<text x="632" y="534" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >Conv + selector (exp.)</text>
+<path d="M574 569 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
+<path d="M924 569 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="598" y="545" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<rect x="612" y="556" width="5" height="26" rx="2" fill="#8B5CF6" stroke="#8B5CF6" />
+<text x="632" y="567" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >DFlare</text>
+<text x="632" y="585" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >Layer fusion + context K/V</text>
+<path d="M574 620 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
+<path d="M924 620 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="598" y="596" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<rect x="612" y="607" width="5" height="26" rx="2" fill="#DB2777" stroke="#DB2777" />
+<text x="632" y="618" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >DFly</text>
+<text x="632" y="636" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >FC + fusion + correction (CE)</text>
 <rect x="1048" y="286" width="432" height="198" rx="16" fill="#FFFFFF" stroke="#DEE6EE" filter="url(#shadow)"/>
 <circle cx="1079" cy="320" r="14" fill="#E7F6EF"/>
 <path d="M1073 320 l4 4 l9 -10" fill="none" stroke="#0D9488" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -134,5 +144,5 @@
 <text x="1264.0" y="677" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#52667B" text-anchor="middle" >Target + drafter loaded for eval</text>
 <path d="M48 739 H1512" fill="none" stroke="#DEE6EE" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="48" y="773" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start" >Compatible captured features are shared; each algorithm is trained in its own run.</text>
-<text x="1512" y="773" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="400" fill="#64748B" text-anchor="end" >DFlash2: experimental objective</text>
+<text x="1512" y="773" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="400" fill="#64748B" text-anchor="end" >DFlash2: experimental objective · DFly: CE adaptation</text>
 </svg>

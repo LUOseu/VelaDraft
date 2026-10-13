@@ -126,6 +126,67 @@ def test_correction_zero_init_is_identity():
     torch.testing.assert_close(correction(hidden, embeds), hidden)
 
 
+def test_correction_matches_upstream_treeflash_formula():
+    """Upstream TreeFlash formula (1), independently recomputed:
+    ``h' = h + down_proj(silu(gate_proj(norm(h) :: norm(embed(prev)))) * up_proj(...))``
+    with both streams RMS-normalized independently."""
+    correction = HiddenStatesCorrection(hidden_size=H, intermediate_size=H)
+    torch.manual_seed(3)
+    with torch.no_grad():
+        correction.down_proj.weight.normal_(0.0, 0.05)
+    hidden = torch.randn(2, 3, H)
+    embeds = torch.randn(2, 3, H)
+    out = correction(hidden, embeds)
+
+    def rms_norm(x, weight, eps):
+        x32 = x.to(torch.float32)
+        variance = x32.pow(2).mean(dim=-1, keepdim=True)
+        return (x32 * torch.rsqrt(variance + eps)).to(x.dtype) * weight
+
+    joined = torch.cat(
+        [
+            rms_norm(hidden, correction.hidden_norm.weight, correction.hidden_norm.variance_epsilon),
+            rms_norm(embeds, correction.embed_norm.weight, correction.embed_norm.variance_epsilon),
+        ],
+        dim=-1,
+    )
+    delta = correction.down_proj(
+        torch.nn.functional.silu(correction.gate_proj(joined)) * correction.up_proj(joined)
+    )
+    torch.testing.assert_close(out, hidden + delta)
+
+
+def test_visual_diagnostic_routes_through_the_correction_hook():
+    """The train-stage visual check must run the served (corrected) path:
+    one pre-head hook call per pass, backbone == full at zero-init, and a
+    trained correction actually moves the reported full logits."""
+    from vlm_dflash.dflash.visual_check import draft_block_logits
+
+    module, _ = _tiny_module()
+    input_ids, loss_mask, hidden = _tiny_batch()
+    hook = module._correct_draft_hidden
+    calls = {"count": 0}
+
+    def counted(*args, **kwargs):
+        calls["count"] += 1
+        return hook(*args, **kwargs)
+
+    module._correct_draft_hidden = counted
+    backbone, full, anchors, keep_mask = draft_block_logits(module, input_ids, loss_mask, hidden, None)
+    assert calls["count"] == 1
+    assert anchors.shape[1] == keep_mask.shape[1]
+    torch.testing.assert_close(backbone, full)  # zero-init: exact identity
+
+    with torch.no_grad():
+        module.draft_model.hidden_correction.down_proj.weight.normal_(0.0, 0.05)
+    calls["count"] = 0
+    backbone, full, _, _ = draft_block_logits(module, input_ids, loss_mask, hidden, None)
+    assert calls["count"] == 1
+    assert module._last_correction_delta_abs_mean is not None
+    assert module._last_correction_delta_abs_mean > 0.0
+    assert not torch.allclose(backbone.float(), full.float())
+
+
 def test_config_constraints_fail_loud():
     with pytest.raises(ValueError, match="target_hidden_size"):
         torch.manual_seed(0)
@@ -277,4 +338,30 @@ def test_resolve_dfly_config_namespace():
     resolved = resolve_dfly_config({"algorithm": {"dfly": {"enable_hidden_correction": False}}})
     assert resolved["enable_hidden_correction"] is False
     assert resolved["context_layer_ids"] is None
+
+
+def test_objective_profile_is_machine_readable_and_recipe_keys_fail_loud(monkeypatch):
+    """The CE adaptation is recorded in the draft config and checkpoint; an
+    upstream two-stage recipe config is rejected instead of silently training CE."""
+    import vlm_dflash.dfly.factory as dfly_factory
+    from vlm_dflash.dfly.factory import OBJECTIVE_PROFILE
+
+    cfg = {
+        "drafter": {"mask_token_id": V - 1, "block_size": BS, "num_hidden_layers": 2},
+        "algorithm": {"dfly": {}},
+    }
+    contract = {"layers": {"draft_layer_ids": [0, 1]}, "text": {"hidden_size": H}}
+    monkeypatch.setattr(
+        dfly_factory, "build_dflash_draft_config", lambda contract, cfg: _dfly_config()
+    )
+    draft_config = dfly_factory.build_draft_config(contract, cfg)
+    assert draft_config.dflash_config["objective_profile"] == OBJECTIVE_PROFILE
+    meta = get_algorithm("dfly").checkpoint_metadata(contract, cfg, draft_config)
+    assert meta["objective_profile"] == OBJECTIVE_PROFILE
+
+    for knobs in ({"loss_objective": "e2e_tv"}, {"lk_loss_weight": 0.5}, {"two_stage": True}):
+        with pytest.raises(ValueError, match="unsupported upstream-recipe knobs"):
+            resolve_dfly_config({"algorithm": {"dfly": knobs}})
+    with pytest.raises(ValueError, match="Supported keys"):
+        resolve_dfly_config({"algorithm": {"dfly": {"fusion_trainble": True}}})
 

@@ -32,13 +32,24 @@ DEFAULTS: dict = {
 
 
 def resolve_dflare_config(cfg: dict) -> dict:
-    """Algorithm-namespaced knobs: ``algorithm.dflare`` (defaults fill gaps)."""
+    """Algorithm-namespaced knobs: ``algorithm.dflare`` (defaults fill gaps).
+
+    Bounded schema: unknown keys fail loud instead of being silently ignored
+    (a typo would otherwise train a different configuration than the one the
+    config claims to describe).
+    """
     resolved = dict(DEFAULTS)
     algorithm_cfg = cfg.get("algorithm")
     if isinstance(algorithm_cfg, dict):
         block = algorithm_cfg.get("dflare") or {}
         if not isinstance(block, dict):
             raise ValueError("algorithm.dflare must be a mapping of DFlare knobs.")
+        unknown = sorted(set(block) - set(DEFAULTS))
+        if unknown:
+            raise ValueError(
+                f"algorithm.dflare has unsupported keys {unknown}. Supported keys: "
+                f"{sorted(DEFAULTS)}."
+            )
         resolved.update(block)
     return resolved
 

@@ -33,8 +33,8 @@
   <g>
     <rect x="620" y="70" width="160" height="84" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
     <text x="700" y="102" text-anchor="middle" font-size="14" font-weight="600" fill="#1d4ed8">drafter training</text>
-    <text x="700" y="122" text-anchor="middle" font-size="11" fill="#1e40af">block-parallel CE, offline</text>
-    <text x="700" y="138" text-anchor="middle" font-size="11" fill="#1e40af">target unloaded from GPU</text>
+    <text x="700" y="122" text-anchor="middle" font-size="11" fill="#1e40af">block-parallel CE, offline or online</text>
+    <text x="700" y="138" text-anchor="middle" font-size="11" fill="#1e40af">offline: target unloaded · online: resident</text>
   </g>
   <line x1="782" y1="112" x2="814" y2="112" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow)"/>
 
@@ -49,7 +49,7 @@
   <g font-size="11" fill="#6b7280">
     <text x="296" y="52" text-anchor="middle">one GPU pass, batched, greedy</text>
     <text x="700" y="52" text-anchor="middle">no target weights needed here</text>
-    <text x="498" y="196" text-anchor="middle">reusable: train DFlash / DSpark / Domino / JetSpec / DFlash2 from one capture</text>
+    <text x="498" y="196" text-anchor="middle">reusable: DFlash / DSpark / Domino / JetSpec / DFlash2 / DFlare / DFly from one capture</text>
     <text x="972" y="196" text-anchor="end">speculative output must match</text>
     <text x="972" y="212" text-anchor="end">the target's greedy tokens exactly</text>
   </g>

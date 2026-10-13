@@ -15,7 +15,9 @@ Reference implementation:  angelspec/models/draft/dflare.py
                              DFlashTrainer stack, reused unchanged upstream)
                            angelspec/config/dflare_draft_config.json   (draft architecture)
                            configs/vllm_qwen3_8b_dflare.yaml           (training recipe)
-License:                   MIT (AngelSpec repo LICENSE + file headers)
+License:                   Apache-2.0 (AngelSpec repo LICENSE; the same file
+                           lists its third-party MIT components: specforge,
+                           deepspec, torchspec)
 ```
 
 ## Semantics recorded from the sources

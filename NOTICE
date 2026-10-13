@@ -34,3 +34,40 @@ Additional notice for the DFlash2 port (v0.3-dev, experimental):
   The DFlash2 training objective is *not* from this source: upstream does not
   publish one, and this repo implements the maintainer implementation's
   experimental split objective (see docs/upstream/dflash2.md).
+
+Additional notice for the DFlare / DFly ports (v0.3-dev, experimental):
+
+  * vlm_dflash/dflare/model.py    (Qwen3DFlareAttention / Qwen3DFlareDraftModel,
+                                   per-draft-layer fusion + separate context K/V)
+  * vlm_dflash/dflare/trainer.py  (fusion diagnostics over the shared DFlash step)
+  * vlm_dflash/dflare/factory.py  (config resolution / draft-config plumbing)
+  * vlm_dflash/dfly/model.py      (Qwen3DFlyDraftModel, HiddenStatesCorrection)
+  * vlm_dflash/dfly/trainer.py    (pre-head correction step, correction metrics)
+  * vlm_dflash/dfly/factory.py    (config resolution / draft-config plumbing)
+
+  Source: Tencent AngelSpec @ commit
+  d3412bed231025ea85d35dbf5e0af44f1ac62a5b
+  (https://github.com/Tencent/AngelSpec):
+  `angelspec/models/draft/dflare.py`, `angelspec/models/draft/dfly.py`,
+  `angelspec/models/dfly.py`, `angelspec/training/dfly_trainer.py`.
+
+  AngelSpec is licensed under the Apache License, Version 2.0. Its LICENSE
+  additionally lists third-party components under the MIT license:
+
+    - specforge, Copyright (c) 2025 sgl-project
+    - deepspec, Copyright (c) 2026 The DeepSpec Authors
+    - torchspec, Copyright (c) 2026 LightSeek Foundation (which in turn refers
+      to https://github.com/lightseekorg/TorchSpec/blob/main/THIRDPARTYNOTICES)
+
+  (each marked in the AngelSpec LICENSE as modified by Tencent in that
+  distribution).
+
+  Modifications: the modules were ported onto this repo's Qwen3-VL draft stack
+  (import paths, config plumbing, docstrings/type hints, MRoPE / image-token /
+  block-mask reuse), the fusion attention keeps the shared-KV ablation behind
+  ``separate_context_kv=false``, and the correction is routed through the shared
+  pre-head hook. The ported model math (distance fusion prior, softmax fusion,
+  shared-FC context, TreeFlash correction formula) is unchanged. DFly runs here
+  train the shared block-CE profile (``objective_profile=controlled_ce``);
+  upstream's two-stage LK/D-PACE -> end-to-end TV recipe is not implemented --
+  see docs/upstream/dfly.md.

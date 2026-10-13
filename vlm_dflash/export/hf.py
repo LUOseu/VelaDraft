@@ -94,6 +94,15 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
             "checkpoint with the same causal in-block mask (per-slot greedy proposals, no tree "
             "conditioning), which is the closest factorization to training this repo supports."
         )
+    if method == "dfly":
+        runtime_note = (
+            "Trained with the shared DFlash block-CE objective (objective_profile=controlled_ce); "
+            "upstream AngelSpec's two-stage LK/D-PACE -> end-to-end TV recipe is not implemented in "
+            "this port (see docs/upstream/dfly.md). At inference the block backbone runs in "
+            "parallel, then the hidden-states correction and the LM-head projection run per slot "
+            "sequentially, conditioned on the previously proposed tokens -- the documented local "
+            "adaptation of upstream's train-time-only correction transformation."
+        )
     return {
         "format": EXPORT_FORMAT,
         "created": now_iso(),
@@ -105,6 +114,10 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
         "algorithm_metadata": algorithm_metadata,
         "method_details": method_details,
         "runtime_note": runtime_note,
+        # Machine-readable training objective when the method records one
+        # (DFly: "controlled_ce" -- the shared block-CE profile, not upstream's
+        # two-stage LK/D-PACE recipe). None for methods that predate the field.
+        "objective_profile": checkpoint.get("objective_profile"),
         "checkpoint": checkpoint_name,
         # Which target-feature source trained these weights: "offline" (staged
         # capture) or "online" (live extraction during training). Serving is
@@ -230,6 +243,8 @@ def render_model_card(export_config: dict) -> str:
         f"| MRoPE sections | {drafter['spatial_rope']['sections']} ({drafter['spatial_rope']['mode']}) |",
         f"| code commit | `{export_config.get('code_commit') or 'n/a'}` |",
     ]
+    if export_config.get("objective_profile"):
+        lines.append(f"| objective profile | {export_config['objective_profile']} |")
     if data:
         lines += [
             f"| training data | {data.get('num_train')} train / {data.get('num_val')} val from `{data.get('source')}` |",

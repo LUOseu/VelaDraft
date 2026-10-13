@@ -48,6 +48,13 @@ DFlash/DFlare (anchors, block mask, slot conventions unchanged). The gap is
 tracked in `ROADMAP.md`; until it lands, DFly here is an architecture +
 correction port, not an objective reproduction.
 
+So a config cannot silently claim the upstream recipe: every DFly run is
+stamped with a machine-readable `objective_profile: controlled_ce` (draft
+config, checkpoint metadata, export and model card), and the upstream recipe
+knobs (`loss_objective`, `lk_loss_weight`, `tv_loss`, `tv_loss_weight`,
+`two_stage`, `d_pace`, `d_pace_weight`) are **rejected at build time** with a
+message pointing back at this profile instead of being ignored.
+
 ## Config
 
 ```yaml

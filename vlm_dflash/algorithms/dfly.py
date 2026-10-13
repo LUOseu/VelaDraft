@@ -2,7 +2,7 @@
 
 Upstream: Tencent AngelSpec ``angelspec/models/draft/dfly.py``,
 ``angelspec/models/dfly.py``, ``angelspec/training/dfly_trainer.py`` @
-``d3412bed231025ea85d35dbf5e0af44f1ac62a5b`` (MIT); report arXiv:2607.25852.
+``d3412bed231025ea85d35dbf5e0af44f1ac62a5b`` (Apache-2.0); report arXiv:2607.25852.
 Audit, adaptation notes and the upstream recipe split: ``docs/upstream/dfly.md``.
 """
 
@@ -35,7 +35,7 @@ class DFlyAlgorithm(DrafterAlgorithm):
             "paper": "arXiv:2607.25852 (AngelSpec / DFly)",
             "upstream_reference": (
                 "Tencent/AngelSpec@d3412bed231025ea85d35dbf5e0af44f1ac62a5b "
-                "angelspec/models/draft/dfly.py (MIT)"
+                "angelspec/models/draft/dfly.py (Apache-2.0)"
             ),
             "port_notes": "docs/upstream/dfly.md",
             "algorithm_doc": "docs/algorithms/dfly.md",
@@ -97,7 +97,7 @@ class DFlyAlgorithm(DrafterAlgorithm):
 
     def checkpoint_metadata(self, contract: dict, cfg: dict, draft_config) -> dict:
         from ..contract import contract_capture_layer_ids
-        from ..dfly.factory import resolve_dfly_config
+        from ..dfly.factory import OBJECTIVE_PROFILE, resolve_dfly_config
 
         drafter = cfg["drafter"]
         resolved = resolve_dfly_config(cfg)
@@ -105,6 +105,9 @@ class DFlyAlgorithm(DrafterAlgorithm):
         context = dflash_config.get("context_layer_ids") or contract_capture_layer_ids(contract)
         return {
             "draft_config": draft_config.to_dict(),
+            # Machine-readable objective: the shared DFlash block-CE profile
+            # (the upstream two-stage LK/D-PACE recipe is not implemented).
+            "objective_profile": str(dflash_config.get("objective_profile", OBJECTIVE_PROFILE)),
             "attention_backend": str(drafter.get("attention_backend", "flex_attention")),
             "mask_token_id": int(drafter["mask_token_id"]),
             "block_size": int(drafter["block_size"]),
@@ -134,6 +137,43 @@ class DFlyAlgorithm(DrafterAlgorithm):
         from ..dfly.factory import load_checkpoint
 
         return load_checkpoint(checkpoint_path, map_location=map_location)
+
+    def plan_knobs(self, cfg: dict, contract: dict | None = None) -> dict:
+        """Resolved DFly knobs for the training-plan digest.
+
+        ``context_layer_ids: null`` resolves to every captured layer (contract
+        required), and the correction width normalizes the same way the model
+        builds it: ``null`` -> the draft/target hidden size when the correction
+        is enabled, and no width at all when it is disabled (the knob has no
+        effect then, so changing it must not fake a plan change).
+        """
+        if contract is None:
+            raise ValueError(
+                "dfly training-plan knobs depend on the capture layout; pass the frozen contract "
+                "so context_layer_ids: null resolves to the actual ordered layer list."
+            )
+        from ..contract import contract_capture_layer_ids
+        from ..dfly.factory import resolve_dfly_config
+        from ..dflare.factory import resolve_context_layer_ids
+
+        resolved = resolve_dfly_config(cfg)
+        context = resolve_context_layer_ids(resolved, contract_capture_layer_ids(contract))
+        correction_enabled = bool(resolved["enable_hidden_correction"])
+        intermediate = resolved["hidden_correction_intermediate_size"]
+        if not correction_enabled:
+            correction_width = None
+        elif intermediate is None:
+            correction_width = int(contract["text"]["hidden_size"])
+        else:
+            correction_width = int(intermediate)
+        return {
+            "context_layer_ids": [int(layer) for layer in context],
+            "separate_context_kv": False,
+            "fusion_trainable": bool(resolved["fusion_trainable"]),
+            "fusion_init": str(resolved["fusion_init"]),
+            "enable_hidden_correction": correction_enabled,
+            "hidden_correction_intermediate_size": correction_width,
+        }
 
     def build_inference_module(self, draft_config_dict: dict, attention_backend: str):
         from transformers.models.qwen3.configuration_qwen3 import Qwen3Config

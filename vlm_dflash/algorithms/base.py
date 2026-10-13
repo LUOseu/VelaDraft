@@ -116,3 +116,19 @@ class DrafterAlgorithm(ABC):
         from ..dflash import draft_model
 
         draft_model.set_verify_sdpa_backend_switch(bool(reference))
+
+    def plan_knobs(self, cfg: dict, contract: dict | None = None) -> dict:
+        """Effective algorithm knobs recorded in the training-plan digest.
+
+        The shared payload already covers the drafter-common sections; an
+        algorithm whose config changes the training trajectory beyond those
+        (e.g. DFlare/DFly fusion context, K/V layout, hidden correction)
+        overrides this to return its *resolved* knobs with defaults filled in.
+
+        ``contract`` is the frozen run contract; normalize layout-dependent
+        values against it (``context_layer_ids: null`` means "every captured
+        layer", so the effective list is only known with the capture layout).
+        Raising when the contract is required but missing is intentional: a
+        digest computed without it could silently disagree with the gate.
+        """
+        return {}

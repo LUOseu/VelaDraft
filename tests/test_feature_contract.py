@@ -103,3 +103,53 @@ def test_identity_gate_includes_capture_layers():
     with pytest.raises(IdentityMismatchError):
         assert_identity(identity, superset, "test")
 
+
+
+def _source_contract(**layers) -> dict:
+    return {
+        "target": {"model_path": "/m", "model_fingerprint": "f", "processor_fingerprint": "p"},
+        "mask": {"token_id": 7},
+        "rope": {"sections": [16, 24, 24]},
+        "layers": {"draft_layer_ids": [1, 17, 33], **layers},
+        "image": {"min_pixels": 1, "max_pixels": 2},
+    }
+
+
+def test_source_identity_gate_splits_consumer_routing():
+    """Feature-store reuse is gated on what the store *contains*: a different
+    draft routing/depth no longer rejects a matching capture, while every real
+    source change still fails loud."""
+    from vlm_dflash.provenance import assert_source_identity, source_identity_from_contract
+
+    contract = _source_contract()
+    identity = identity_from_contract(contract)
+    deeper = {**identity, "draft_layer_ids": [1, 9, 17, 25, 33]}
+    # The full gate (same-run resume/eval semantics) still refuses ...
+    with pytest.raises(IdentityMismatchError):
+        assert_identity(identity, deeper, "test")
+    # ... while the source gate accepts the consumer-routing change.
+    assert_source_identity(identity, deeper, "test")
+    assert set(source_identity_from_contract(contract)) <= set(identity)
+
+    for key, value in (
+        ("model_fingerprint", "other"),
+        ("processor_fingerprint", "other"),
+        ("mask_token_id", 8),
+        ("spatial_rope_sections", [1, 2, 3]),
+        ("image_min_pixels", 9),
+        ("image_max_pixels", 10),
+        ("capture_layer_ids", [1, 33]),
+    ):
+        changed = {**identity, key: value}
+        with pytest.raises(IdentityMismatchError):
+            assert_source_identity(identity, changed, "test")
+
+    # A legacy store without capture_layer_ids recovers the layout from the
+    # routing when they were the same thing ...
+    legacy = {key: value for key, value in identity.items() if key != "capture_layer_ids"}
+    assert_source_identity(identity, legacy, "test")
+    # ... and an artifact that is missing an unrelated source key is refused
+    # instead of silently skipping the check.
+    incomplete = {key: value for key, value in identity.items() if key != "processor_fingerprint"}
+    with pytest.raises(IdentityMismatchError):
+        assert_source_identity(identity, incomplete, "test")
