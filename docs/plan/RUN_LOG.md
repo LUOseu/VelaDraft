@@ -36,6 +36,18 @@ against the plan's first-round budget.
 
 ## Planned (registered before launch)
 
+- WP6 launching 2026-10-14: **R-20261014-17** - SmolVLM2-2.2B-Instruct
+  (first non-Qwen family) end-to-end smoke: 16 train + 4 val synthetic
+  single-image rows (`scripts/make_wp6_smoke_data.py`) through prepare ->
+  regen -> capture (seq 2048; 17 tiles x 81 = 1377 image tokens/row) ->
+  train (mb 4, 8 epochs) -> sequential eval 32 tokens on ckpt_final +
+  ckpt_init; config `configs/smoke_smolvlm.yaml`. Success criterion: the
+  pipeline runs end to end, the capture image-token check passes
+  (1377/1377), training summaries are finite, and eval reports token-exact
+  vs the target greedy on the smoke protocol (a low trained AL is fine -
+  this is an engineering gate, not a quality claim). Budget cap: 1.5 GPU-h
+  (devices x wall), 1 GPU at a time.
+
 - WP5 landed 2026-10-14 03:20-03:46: **R-20261014-14** (vLLM 0.22.1 bridge
   check - PARTIAL: loads and measures, token-exact gate NOT passed, 5/32),
   **R-20261014-15** (in-repo convention arms - both token-exact 32/32, AL

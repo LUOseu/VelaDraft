@@ -110,3 +110,15 @@ decision, it overrides everything here.
   **3.57 / 8.00 GPU-h**. My lane next: **WP6** (non-Qwen family), then WP7.
   GPUs free again (0/1/2 idle; GPU3 = other user's sglang). The other
   session's PR #3 review loop untouched by this lane.
+
+- Status update (C-01a13621, WP6 start): first non-Qwen family =
+  **SmolVLM2-2.2B-Instruct** (Llama text backbone, 1-D positions, tiled
+  image encoding 17 tiles x 81 = 1377 tokens/image, mask = reserved row
+  49278 which the chat template can never emit). Code landed: family
+  adapter `vlm_dflash/adapters/smolvlm.py` + contract/eval/capture family
+  hooks + 10 CPU tests (suite 357 green; commits `ef07b41`, `0f45fa1`),
+  smoke config + synthetic data generator. Protocol **R-20261014-17**
+  registered in RUN_LOG.md before launch; one GPU at a time (GPU0 unless
+  busy), budget cap 1.5 GPU-h (3.57/8.00 used before this run). Work stays
+  in `~/vlm-recipe-smoke` + `~/recipe-smoke-config` + `runs/e6` on the
+  server copy; no shared run dirs touched.
