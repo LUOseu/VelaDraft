@@ -141,7 +141,7 @@ def test_cmd_train_reuses_external_features_and_skips_regen_capture(monkeypatch,
         capture_module, "run_capture", lambda *a, **k: (_ for _ in ()).throw(AssertionError("capture must not run"))
     )
 
-    def fake_train(cfg, run_dir, contract, steps=None, limit=None, resume=False, features_dir=None):
+    def fake_train(cfg, run_dir, contract, steps=None, limit=None, resume=False, features_dir=None, feature_mode=None):
         calls["features_dir"] = str(features_dir)
         return {"steps": 1, "final_loss": 1.0}
 
@@ -171,6 +171,37 @@ def test_deep_merge_overrides_nested():
     assert merged["train"]["lr"] == 2e-3
     assert merged["train"]["betas"] == [0.9, 0.95]
     assert base["train"]["lr"] == 1e-3
+
+
+def test_cli_set_overrides_reach_algorithm_validation(tmp_path):
+    """Dotted --set values must be merged before validate_config runs.
+
+    Regression: validation used to read the pre-override config, so a required
+    knob supplied via --set (JetSpec's ``drafter.loss_decay_gamma=null`` +
+    ``capture.store_final_hidden=true``) failed even though the run config was
+    satisfied.
+    """
+    parser = build_parser()
+    base = [
+        "train",
+        "--target", "/models/Qwen2.5-VL-3B-Instruct",
+        "--dataset", str(tmp_path / "data.jsonl"),
+        "--preset", "single-gpu-24g",
+        "--algorithm", "jetspec",
+    ]
+    cfg = build_train_config(
+        parser.parse_args(
+            base
+            + ["--set", "capture.store_final_hidden=true", "--set", "drafter.loss_decay_gamma=null"]
+        )
+    )
+    assert cfg["capture"]["store_final_hidden"] is True
+    assert cfg["drafter"]["loss_decay_gamma"] is None
+
+    # Without the overrides the merged config must fail validation (the preset
+    # ships DFlash's decayed weighting, which JetSpec rejects).
+    with pytest.raises(ValueError, match="loss_decay_gamma"):
+        build_train_config(parser.parse_args(base))
 
 
 def test_build_train_config_from_jsonl(tmp_path):

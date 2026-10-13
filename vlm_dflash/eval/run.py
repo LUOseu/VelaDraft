@@ -82,14 +82,32 @@ def check_checkpoint_algorithm(checkpoint_name: str, meta: dict, algorithm) -> N
         )
 
 
+def check_checkpoint_feature_mode(checkpoint_name: str, meta: dict) -> str:
+    """Feature source the checkpoint was trained from (legacy tag -> offline).
+
+    Online checkpoints are scored by the same loader as offline ones; the tag is
+    surfaced in the eval result so a report can never silently attribute an
+    online-trained checkpoint to the staged pipeline (or vice versa).
+    """
+    mode = str(meta.get("feature_mode", "offline")).lower()
+    if mode not in ("offline", "online"):
+        raise RuntimeError(f"{checkpoint_name} records an unknown feature_mode={mode!r}.")
+    return mode
+
+
 def preflight_checkpoints(
     run_dir: Path,
     checkpoint_names: list[str],
     contract: dict,
     target_tied_head: bool,
     algorithm,
-) -> None:
-    """Validate every checkpoint's provenance before the expensive generation pass."""
+) -> dict[str, str]:
+    """Validate every checkpoint's provenance before the expensive generation pass.
+
+    Returns the recorded feature mode per checkpoint (offline for checkpoints
+    written before the tag existed).
+    """
+    modes: dict[str, str] = {}
     for checkpoint_name in checkpoint_names:
         checkpoint_path = run_dir / "train" / checkpoint_name
         if not checkpoint_path.exists():
@@ -99,6 +117,8 @@ def preflight_checkpoints(
             assert_identity(identity_from_contract(contract), meta["identity"], f"eval vs {checkpoint_name}")
         check_checkpoint_head(checkpoint_name, meta, target_tied_head)
         check_checkpoint_algorithm(checkpoint_name, meta, algorithm)
+        modes[checkpoint_name] = check_checkpoint_feature_mode(checkpoint_name, meta)
+    return modes
 
 
 def load_eval_rows(prompt_source: dict | None, run_dir: Path, default_split: str = "val.jsonl"):
@@ -355,7 +375,9 @@ def evaluate(
     dtype_name = str(cfg.get("target", {}).get("dtype", "bfloat16"))
     attn_name = str(cfg.get("target", {}).get("attn_implementation", "sdpa"))
     draft_dtype = getattr(torch, dtype_name, torch.bfloat16)
-    preflight_checkpoints(run_dir, checkpoint_names, contract, target_tied_head, algorithm)
+    checkpoint_feature_modes = preflight_checkpoints(
+        run_dir, checkpoint_names, contract, target_tied_head, algorithm
+    )
 
     prompts = prepare_prompts(
         model, processor, rows, media_dir, max_new_tokens=max_new_tokens, device=device, label="eval"
@@ -387,6 +409,10 @@ def evaluate(
         "format": "vlm-dflash-eval-v1",
         "identity": identity_from_contract(contract),
         "algorithm": algorithm.name,
+        # Feature source recorded by the trainer per checkpoint ("offline" for
+        # checkpoints older than the tag). Training/feature provenance only:
+        # eval itself always uses the live target.
+        "checkpoint_feature_modes": checkpoint_feature_modes,
         "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)",
         "settings": {
             "num_prompts": len(rows),

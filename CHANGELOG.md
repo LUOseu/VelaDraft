@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.3.2 (in development)
+
+### Online training: live target feature extraction
+
+- `train --mode online` (`--mode` / `--feature-mode` alias; config
+  `train.feature_mode`) runs the frozen target in the trainer process and
+  extracts the same per-sample records the capture stage writes to disk.
+  Regen answers stay the pre-generated supervision — this is **not** on-policy
+  rollout generation, not continual learning and not a serving runtime.
+  Presets keep `offline` as the default.
+- New `vlm_dflash/target/sample_capture.py` is the shared per-sample capture
+  for both the staged capture stage and the online source (same record fields
+  and dtypes, same frozen-head resolution, same MRoPE / multimodal-token-type
+  handling), so the collator, trainer, loss, audits and eval stay one code
+  path.
+- New `vlm_dflash/target/online.py`: `OnlineFeatureSource` (frozen-target
+  guard, in-process head weights, per-phase extraction counters,
+  `feature_source` summary with target residency) and `OnlineFeatureDataset`
+  (main-process-only extraction; resumed runs fast-forward consumed batches
+  with cheap placeholders instead of re-extracting them).
+- Gates and provenance: `--features` + online is refused before any stage;
+  `num_workers` must be 0 (CLI + dataset guard); resume refuses mode /
+  algorithm / feature-source-digest / step-plan / identity mismatch
+  (checkpoints without `feature_mode` are read as offline); checkpoints record
+  `feature_mode`, `feature_source_digest`, `feature_backend` and both devices;
+  `eval` reports `checkpoint_feature_modes`; `export` records `feature_mode`.
+- Docs: `docs/online-training.md` (offline/online trade-off, shared code,
+  commands, cost accounting, boundaries, validation status); README and
+  README.zh-CN point at it.
+- Fix caught by the smoke matrix: `--set` overrides are now merged before
+  `validate_config`, so a required algorithm knob supplied on the CLI (e.g.
+  JetSpec's `drafter.loss_decay_gamma=null`) validates the config that
+  actually runs; regression test in `tests/test_cli.py`.
+- Tests: 22 new CPU tests (`tests/test_online_mode.py`) plus the CLI
+  ordering regression; full suite green (198 tests). GPU smokes on one A6000:
+  Qwen2.5-VL-3B (4-step demo slice, token-exact eval, peak 13.65 GB); all
+  five algorithms online on 3B (train → token-exact eval → export; peaks
+  13.65-15.53 GB; DSpark calibration on the live source; JetSpec/DFlash2 with
+  `capture.store_final_hidden=true`); Qwen3-VL-8B untied head (peak 33.92 GB,
+  target resident 17.5 GB, token-exact); online resume verified (3
+  fast-forward batches, no re-extraction). Smoke ALs are <=1.09 after 4 steps
+  and are not quality results.
+
 ## v0.3.1 (2026-10-13)
 
 Distribution fixes, first-run experience, and the post-publish growth review

@@ -27,6 +27,14 @@ reference algorithm; the other four plug in through the registry.
   page polish.
 - Release audit before any push; version/tag hygiene.
 
+## v0.3.2 (in development)
+- [x] Online target feature source (`train --mode online`): live
+      teacher-forced extraction sharing the staged trainer; CPU tests + 3B/8B
+      plumbing smokes (all five algorithms on 3B) in
+      `docs/online-training.md`. Offline stays the default.
+- [ ] Online-vs-offline wall-clock/disk curve on a real corpus (only when a
+      canonical online run is scheduled).
+
 ## Later (not on the critical path)
 - DFlash2 objective isolation (`unary_loss: ce` control) if the number is
   quoted as a method claim; JetSpec production parallel-tree runtime.

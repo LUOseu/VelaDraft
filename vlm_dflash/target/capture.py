@@ -1,69 +1,44 @@
 """Offline capture of fused target hidden states for staged DFlash training.
 
-For every regenerated sample this runs one teacher-forced target forward with
-``output_hidden_states=True``, concatenates the contract's routed layers into
-the draft context feature, records the MRoPE 3-axis positions, validates the
-image-token span, and writes fp/bf16 shards plus an index. Training never needs
-the target model in memory afterwards.
+For every regenerated sample this runs one teacher-forced target forward (via
+the shared single-sample helper in :mod:`vlm_dflash.target.sample_capture`),
+concatenates the contract's routed layers into the draft context feature,
+records the MRoPE 3-axis positions, validates the image-token span, and writes
+fp/bf16 shards plus an index. Training never needs the target model in memory
+afterwards; ``feature_mode=online`` skips this stage and extracts the same
+records live instead (see :mod:`vlm_dflash.target.online`).
 """
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import torch
-from PIL import Image
 
-from ..data.sharegpt import load_sharegpt, row_answer, row_image_path, row_question
-from ..provenance import identity_from_contract, load_provenance, record_stage
+from ..data.sharegpt import load_sharegpt
+from ..provenance import identity_from_contract, record_stage
 from ..utils import ensure_dir, log, write_json, write_jsonl
 from .load import load_target
-from .prompts import encode_prompt
+from .sample_capture import (
+    build_sample_record,
+    compute_multimodal_positions,
+    extend_mm_token_type_ids,
+    extract_target_head,
+    forward_and_capture,
+    locate_image_span,
+    storage_dtype,
+)
 
-
-def storage_dtype(name: str) -> torch.dtype:
-    mapping = {"bfloat16": torch.bfloat16, "float16": torch.float16}
-    if name not in mapping:
-        raise ValueError(f"Unsupported capture storage dtype {name!r}.")
-    return mapping[name]
-
-
-def compute_multimodal_positions(model, input_ids, attention_mask, image_grid_thw, mm_token_type_ids=None):
-    """Delegate to the target family adapter's MRoPE position builder."""
-    from ..adapters import adapter_for_model
-
-    return adapter_for_model(model).compute_multimodal_positions(
-        model,
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        image_grid_thw=image_grid_thw,
-        mm_token_type_ids=mm_token_type_ids,
-    )
-
-
-def extend_mm_token_type_ids(mm_token_type_ids: torch.Tensor, full_length: int) -> torch.Tensor:
-    """Extend processor ``mm_token_type_ids`` [1, prompt] with text (0) for the answer."""
-    prompt_length = mm_token_type_ids.shape[1]
-    if full_length <= prompt_length:
-        return mm_token_type_ids[:, :full_length]
-    padding = torch.zeros(
-        (mm_token_type_ids.shape[0], full_length - prompt_length),
-        dtype=mm_token_type_ids.dtype,
-        device=mm_token_type_ids.device,
-    )
-    return torch.cat([mm_token_type_ids, padding], dim=1)
-
-
-def locate_image_span(input_ids: torch.Tensor, image_token_id: int) -> tuple[int, int, int]:
-    """Return ``(start, end_inclusive, count)`` of the contiguous image token span."""
-    matches = (input_ids == image_token_id).nonzero().flatten()
-    if matches.numel() == 0:
-        raise ValueError("No image tokens found in the sequence.")
-    start, end = int(matches[0]), int(matches[-1])
-    if int(matches.numel()) != end - start + 1:
-        raise ValueError("Image tokens are not contiguous; v0.1 requires a single leading image.")
-    return start, end, int(matches.numel())
+__all__ = [
+    "build_sample_record",
+    "compute_multimodal_positions",
+    "extend_mm_token_type_ids",
+    "forward_and_capture",
+    "locate_image_span",
+    "run_capture",
+    "save_target_head",
+    "storage_dtype",
+]
 
 
 def save_target_head(model, features_dir: str | Path, dtype: torch.dtype, contract: dict) -> bool:
@@ -76,20 +51,7 @@ def save_target_head(model, features_dir: str | Path, dtype: torch.dtype, contra
     Returns:
         True when the target head is untied and its weight was stored.
     """
-    embedding_weight = model.get_input_embeddings().weight.detach()
-    lm_head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
-    tied = lm_head_weight is not None and lm_head_weight.data_ptr() == embedding_weight.data_ptr()
-    expected_tied = bool(contract.get("head", {}).get("tie_word_embeddings", tied))
-    if tied != expected_tied:
-        raise RuntimeError(
-            "Loaded target head disagrees with the resolved contract: "
-            f"runtime tie_word_embeddings={tied}, contract={expected_tied}."
-        )
-    if not tied and lm_head_weight is None:
-        raise RuntimeError(
-            "The target exposes no lm_head weight; the draft's training head cannot be reconstructed "
-            "and training would silently diverge from the eval path (which samples through target.lm_head)."
-        )
+    embedding_weight, lm_head_weight, tied = extract_target_head(model, contract)
     head_payload = {
         "format": "vlm-dflash-target-head-v1",
         "embed_tokens": embedding_weight.to(dtype).cpu(),
@@ -97,76 +59,9 @@ def save_target_head(model, features_dir: str | Path, dtype: torch.dtype, contra
         "model_fingerprint": contract["target"]["model_fingerprint"],
     }
     if not tied:
-        head_payload["lm_head"] = lm_head_weight.detach().to(dtype).cpu()
+        head_payload["lm_head"] = lm_head_weight.to(dtype).cpu()
     torch.save(head_payload, Path(features_dir) / "target_head.pt")
     return not tied
-
-
-@torch.inference_mode()
-def forward_and_capture(
-    model,
-    inputs: dict,
-    full_ids: torch.Tensor,
-    layer_ids: list[int],
-    image_token_id: int,
-    dtype: torch.dtype,
-    merge_size: int = 2,
-    store_final_hidden: bool = False,
-) -> dict:
-    """One capture forward; returns the sample record consumed by training.
-
-    ``store_final_hidden`` additionally records the target's final hidden state
-    (the post-final-norm tensor the target lm_head consumes), which distillation
-    objectives (JetSpec) project to full-vocab teacher logits at training time.
-    Old feature stores do not have this field; JetSpec training fails loud on
-    them instead of silently training against the wrong teacher.
-    """
-    device = next(model.parameters()).device
-    input_ids = full_ids.unsqueeze(0).to(device)
-    attention_mask = torch.ones_like(input_ids)
-    forward_kwargs = {
-        "input_ids": input_ids,
-        "attention_mask": attention_mask,
-        "output_hidden_states": True,
-        "use_cache": False,
-        "logits_to_keep": 1,
-    }
-    for key in ("pixel_values", "image_grid_thw", "pixel_values_videos", "video_grid_thw"):
-        if key in inputs:
-            forward_kwargs[key] = inputs[key].to(device)
-    # The target's own multimodal forward *must* see the same token-type map
-    # the processor emitted (extended over the regen answer with text=0):
-    # Qwen3-VL raises without it, and Qwen2.5-VL would otherwise fall back to
-    # plain 1-D positions here while eval/prefill use MRoPE positions.
-    mm_token_type_ids = inputs.get("mm_token_type_ids")
-    if mm_token_type_ids is not None:
-        mm_token_type_ids = extend_mm_token_type_ids(mm_token_type_ids.to(device), input_ids.shape[1])
-        forward_kwargs["mm_token_type_ids"] = mm_token_type_ids
-    output = model(**forward_kwargs)
-    hidden_states = output.hidden_states
-    fused = torch.cat([hidden_states[layer_id + 1][0] for layer_id in layer_ids], dim=-1)
-    # hidden_states[-1] is the post-final-norm tensor; ``lm_head`` applied to it
-    # reproduces the target's own output logits (verified by the capture-time
-    # teacher-logits check in the smoke pipeline).
-    final_hidden = hidden_states[-1][0].to(dtype).cpu() if store_final_hidden else None
-    positions = compute_multimodal_positions(
-        model, input_ids, attention_mask, inputs.get("image_grid_thw"), mm_token_type_ids=mm_token_type_ids
-    )
-    span_start, span_end, span_count = locate_image_span(full_ids.cpu(), image_token_id)
-    grid = inputs.get("image_grid_thw")
-    # image_grid_thw counts 14px patches; every merge_size^2 patches become one token.
-    expected = int(grid.prod().item()) // (merge_size * merge_size) if grid is not None else None
-    record = {
-        "input_ids": full_ids.to(torch.int32),
-        "hidden": fused.to(dtype).cpu(),
-        "position3": positions.to(torch.int32).cpu(),
-        "image_span": (span_start, span_end),
-        "n_image_tokens": span_count,
-        "n_image_tokens_expected": expected,
-    }
-    if final_hidden is not None:
-        record["final_hidden"] = final_hidden
-    return record
 
 
 def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | None = None) -> dict:
@@ -215,52 +110,20 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
 
     log(f"capture: {len(rows)} samples, seq_length={seq_length}, dtype={dtype}")
     for row_number, row in enumerate(rows):
-        image = Image.open(row_image_path(row, media_dir)).convert("RGB")
-        inputs = encode_prompt(processor, row_question(row), image)
-        stored_prompt = row["regen"]["prompt_ids"]
-        fresh_prompt = inputs["input_ids"][0].tolist()
-        if fresh_prompt != stored_prompt:
-            raise RuntimeError(
-                f"Prompt token drift between regen and capture for sample {row.get('id')}: "
-                "the chat template or processor changed between stages."
-            )
-        answer_ids = row["regen"]["answer_ids"]
-        prompt_len = len(stored_prompt)
-        if prompt_len + 8 > seq_length:
-            raise RuntimeError(f"Prompt of sample {row.get('id')} ({prompt_len} tokens) exceeds seq_length.")
-        answer_len = min(len(answer_ids), seq_length - prompt_len)
-        if answer_len < len(answer_ids):
-            truncated += 1
-        full_ids = torch.tensor(stored_prompt + answer_ids[:answer_len], dtype=torch.long)
-        record = forward_and_capture(
+        record = build_sample_record(
             model,
-            inputs,
-            full_ids,
-            layer_ids,
-            image_token_id,
-            dtype,
+            processor,
+            row,
+            media_dir,
+            layer_ids=layer_ids,
+            image_token_id=image_token_id,
             merge_size=merge_size,
+            dtype=dtype,
+            seq_length=seq_length,
             store_final_hidden=store_final_hidden,
         )
-        if record["n_image_tokens_expected"] != record["n_image_tokens"]:
-            raise RuntimeError(
-                f"Image token count mismatch for sample {row.get('id')}: "
-                f"found {record['n_image_tokens']} tokens in input_ids but grid_thw expects "
-                f"{record['n_image_tokens_expected']}."
-            )
-        record.update(
-            {
-                "sample_id": row.get("id"),
-                "prompt_len": prompt_len,
-                "answer_len": answer_len,
-                "loss_mask": torch.cat(
-                    (
-                        torch.zeros(prompt_len, dtype=torch.bool),
-                        torch.ones(answer_len, dtype=torch.bool),
-                    )
-                ),
-            }
-        )
+        if record["truncated"]:
+            truncated += 1
         shard_buffer.append(record)
         if len(shard_buffer) >= shard_size:
             flush_shard()

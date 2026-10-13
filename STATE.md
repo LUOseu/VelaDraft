@@ -1,18 +1,18 @@
 # STATE
 
-Updated: 2026-10-13 (v0.3.1 in development: distribution fixes + first-run
-growth review; repo is public).
+Updated: 2026-10-13 (v0.3.2 in development: online target feature source;
+v0.3.1 tagged and pushed).
 
-**Status: v0.3.0 published publicly** (`github.com/LUOseu/vlm-dflash`, main
-`5ca075f`, tag `v0.3.0-rc1`); **v0.3.1 in development**.
+**Status: v0.3.1 tagged and pushed** (`github.com/LUOseu/vlm-dflash`, tag
+`v0.3.1` at `eb3f314`, main `05460a2`); **v0.3.2 in development — the online
+target feature source is committed locally, not yet pushed**.
 
-- v0.3.1 scope: the post-publish review findings — packaged wheel resources,
-  version single-sourcing, identity path portability, input-addressed stage
-  caches, `--features` reuse, metadata/SUPPORT_MATRIX consistency, Model Zoo
-  downloads, README/examples refresh. No algorithm, protocol or benchmark
-  changes (`CHANGELOG.md` v0.3.1).
+- v0.3.2 scope (so far): `train.feature_mode: offline|online` — live
+  teacher-forced extraction from the frozen target in the trainer process
+  (same trainer/collator/provenance; not on-policy, not serving). See
+  `CHANGELOG.md` v0.3.2 and `docs/online-training.md`.
 - Still frozen: new algorithms, targets, video / multi-image, serving runtime
-  and research methods wait until v0.3.1 is out.
+  and research methods.
 - Release gates: `RELEASE_CHECKLIST.md`; evidence: `RELEASE_VALIDATION.md`.
 
 ## Current stable features
@@ -36,6 +36,35 @@ growth review; repo is public).
   TextVQA lands with this release; DocVQA/ChartQA pin protocol without an
   adapter yet.
 - Parallel runtime speedup numbers (see BENCHMARKS.md) — experimental.
+- Online target feature source (`train --mode online`, v0.3.2-dev): validated
+  by CPU tests + 3B/8B GPU plumbing smokes (token-exact, provenance, resume);
+  no quality/canonical runs yet, offline remains the default and the only
+  path behind the recorded benchmarks (`docs/online-training.md`).
+
+## Online feature source (2026-10-13, v0.3.2-dev)
+
+- `train.feature_mode=offline|online` (CLI `--mode` / `--feature-mode`);
+  presets pin `offline`. Online runs the frozen target in the trainer process
+  and extracts the capture-stage record contract live (shared
+  `target/sample_capture.py`); regen answers stay pre-generated (not
+  on-policy, not serving).
+- Gates: target must be eval/no-`requires_grad`; `num_workers=0` (CLI +
+  dataset guard); `--features` + online refused; resume refuses mode /
+  algorithm / digest / step-plan / identity mismatch (pre-feature ckpts read
+  as offline); leftover `features/` store ignored with a note.
+- Evidence: 22 new CPU tests + a CLI `--set`-before-validation regression +
+  full suite green (198 tests). GPU: 3B smoke (`runs/online_smoke_qwen25_3b`,
+  3-row demo slice, 4 steps) train OK, live visual check passed, coverage
+  36/36, eval token-exact, ckpt + export `feature_mode=online`, peak
+  13.65 GB; all five algorithms smoked online on 3B
+  (`runs/online_smoke_{dspark,domino,jetspec,dflash2}`, train → token-exact
+  eval → export, peaks 13.65-15.53 GB; DSpark calibration ran via
+  `online_target_head_batches`; JetSpec/DFlash2 with
+  `capture.store_final_hidden=true`); 8B untied smoke
+  (`runs/online_smoke_qwen3_8b`) peak 33.92 GB, target resident 16.33 GiB,
+  token-exact; resume check: 3 fast-forward batches, 1 extraction forward
+  instead of 4 (`resume_fast_forward_reduced_cost=true`). Smoke ALs <=1.09
+  after 4 steps — plumbing only, not quality.
 
 ## Latest measured results
 - 3B / 512-corpus rerun: AL 1.198, 64/64 exact (earlier v0.1 run: 1.220).

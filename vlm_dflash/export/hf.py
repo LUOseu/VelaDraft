@@ -84,6 +84,10 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
         "method_details": method_details,
         "runtime_note": runtime_note,
         "checkpoint": checkpoint_name,
+        # Which target-feature source trained these weights: "offline" (staged
+        # capture) or "online" (live extraction during training). Serving is
+        # identical for both; the tag exists so provenance is auditable.
+        "feature_mode": str(checkpoint.get("feature_mode", "offline")),
         "code_commit": _git_commit(),
         "adapter": contract["target"]["model_type"],
         "target": {
@@ -121,7 +125,17 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
         },
         "training": None if train_summary is None else {
             key: train_summary.get(key)
-            for key in ("steps", "final_loss", "first10_mean_loss", "last10_mean_loss", "nan_seen", "wall_seconds", "peak_gpu_mem_gb", "gpu_name")
+            for key in (
+                "steps",
+                "final_loss",
+                "first10_mean_loss",
+                "last10_mean_loss",
+                "nan_seen",
+                "wall_seconds",
+                "peak_gpu_mem_gb",
+                "gpu_name",
+                "feature_mode",
+            )
         },
         "data": data_block,
         "eval": None if eval_result is None else {
@@ -174,6 +188,11 @@ def render_model_card(export_config: dict) -> str:
         f"| target fingerprint | `{target['model_fingerprint'][:16]}…` |",
         f"| adapter | {export_config['adapter']} |",
         f"| block size | {drafter['block_size']} |",
+        (
+            "| features | online (live target extraction) |"
+            if export_config.get("feature_mode") == "online"
+            else "| features | offline (pre-captured feature store) |"
+        ),
         f"| anchors / layers | {drafter['num_anchors']} / {drafter['num_hidden_layers']} |",
         f"| trainable parameters | {export_config.get('trainable_parameters')} |",
         f"| mask token | {drafter['mask_token_id']} |",

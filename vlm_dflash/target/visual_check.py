@@ -8,9 +8,9 @@ import torch
 from PIL import Image
 
 from ..data.sharegpt import row_answer, row_image_path, row_question
-from ..utils import log, write_json
-from .capture import forward_and_capture
+from ..utils import ensure_dir, log, write_json
 from .prompts import encode_prompt
+from .sample_capture import forward_and_capture
 
 
 def _span_and_downstream_deltas(hidden_a: torch.Tensor, hidden_b: torch.Tensor, span: tuple[int, int]) -> dict:
@@ -45,9 +45,20 @@ def run_visual_path_check(
     media_dir: Path,
     dtype: torch.dtype,
     limit: int = 2,
+    check_path: str | Path | None = None,
+    pair_path: str | Path | None = None,
 ) -> dict:
-    """Span/replay/swap checks; writes ``capture/visual_path_check.json`` (+ swap pair)."""
+    """Span/replay/swap checks; writes ``capture/visual_path_check.json`` (+ swap pair).
+
+    ``check_path`` / ``pair_path`` default to the staged-capture locations; the
+    online path passes ``run_dir/online/...`` so online diagnostics never read
+    or overwrite an old staged capture's swap pair.
+    """
     run_dir = Path(run_dir)
+    check_path = Path(check_path) if check_path is not None else run_dir / "capture" / "visual_path_check.json"
+    pair_path = Path(pair_path) if pair_path is not None else run_dir / "features" / "swap_pair.pt"
+    ensure_dir(check_path.parent)
+    ensure_dir(pair_path.parent)
     layer_ids = [int(layer) for layer in contract["layers"]["draft_layer_ids"]]
     image_token_id = int(contract["tokens"]["image_token_id"])
     merge_size = int(contract["image"]["merge_size"])
@@ -105,7 +116,7 @@ def run_visual_path_check(
         },
         "passed": passed,
     }
-    write_json(run_dir / "capture" / "visual_path_check.json", result)
+    write_json(check_path, result)
     if token_count_match:
         torch.save(
             {
@@ -122,7 +133,7 @@ def run_visual_path_check(
                 "hidden_a": sample_a["hidden"],
                 "hidden_b": swap["hidden"],
             },
-            run_dir / "features" / "swap_pair.pt",
+            pair_path,
         )
     log(f"visual_path_check: passed={passed} replay_bitwise={bitwise_equal} span_changed={span_changed} "
         f"downstream_changed={downstream_changed}")

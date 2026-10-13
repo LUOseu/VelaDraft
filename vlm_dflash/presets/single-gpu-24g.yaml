@@ -41,6 +41,9 @@ drafter:
   spatial_rope_mode: replace
 
 train:
+  # Target-feature source: offline (pre-captured feature store) | online
+  # (live target extraction during training; see docs/online-training.md).
+  feature_mode: offline
   micro_batch_size: 2
   grad_accumulation_steps: 2
   num_epochs: 6

@@ -1,9 +1,14 @@
-"""Staged offline DFlash draft training (target never loaded here).
+"""Shared DFlash draft training for both feature sources.
 
-Reads captured feature shards, trains the vendored DFlash trainer core with
-AdamW + warmup/cosine, saves a random-init checkpoint (the acceptance
-baseline), a final checkpoint, the training log, an overfit sanity run on a
-tiny subset, and the drafter visual-dependence check.
+``feature_mode=offline`` (default) reads captured feature shards and never
+loads the target; ``feature_mode=online`` runs the frozen target in the same
+process and extracts the same per-sample records live (see
+:mod:`vlm_dflash.target.online`). Both modes share the collator, this training
+loop, the optimizer/scheduler, checkpointing and the diagnostics; the trained
+core (vendored DFlash trainer, AdamW + warmup/cosine) is identical, and both
+save a random-init checkpoint (the acceptance baseline), a final checkpoint,
+the training log, an overfit sanity run on a tiny subset, and the drafter
+visual-dependence check.
 """
 
 from __future__ import annotations
@@ -61,6 +66,16 @@ def _clone_tree(value):
     return value
 
 
+def _unwrap_subset(dataset):
+    """Peel ``Subset`` wrappers so source flags (online main-process guard, resume
+    fast-forward) keep working for diagnostics that wrap the training dataset."""
+    seen = set()
+    while isinstance(dataset, Subset) and id(dataset) not in seen:
+        seen.add(id(dataset))
+        dataset = dataset.dataset
+    return dataset
+
+
 def gather_train_state(module, master_parameters, optimizer, scheduler, *, step, micro_step, skipped_batches, history, steps_total_planned) -> dict:
     """Self-contained resume payload: weights, fp32 masters, optimizer, schedule.
 
@@ -107,8 +122,20 @@ def run_training_loop(
     max_grad_norm = float(train_cfg.get("max_grad_norm", 1.0))
     epochs = int(train_cfg.get("num_epochs", 6))
     image_token_id = int(contract["tokens"]["image_token_id"])
-    spatial = bool(getattr(module, "uses_multimodal_position_ids", getattr(module.draft_model, "spatial_rope_enabled", False)))
 
+    # The online feature source extracts with the target in this process, so it
+    # refuses to run inside DataLoader workers (a forked worker would copy the
+    # CUDA target). Offline stores stay free to enable workers explicitly.
+    # Checked before anything touches the module so a misconfigured run fails
+    # fast with the actionable error.
+    num_workers = int(train_cfg.get("num_workers", 0))
+    base_dataset = _unwrap_subset(dataset)
+    if getattr(base_dataset, "require_main_process", False) and num_workers != 0:
+        raise ValueError(
+            "feature_mode=online requires train.num_workers=0: the target model cannot be copied "
+            f"into DataLoader workers (got train.num_workers={num_workers})."
+        )
+    spatial = bool(getattr(module, "uses_multimodal_position_ids", getattr(module.draft_model, "spatial_rope_enabled", False)))
     generator = torch.Generator().manual_seed(seed)
     loader = DataLoader(
         dataset,
@@ -117,6 +144,7 @@ def run_training_loop(
         generator=generator,
         collate_fn=lambda batch: collate_features(batch, image_token_id),
         drop_last=False,
+        num_workers=num_workers,
     )
     steps_per_epoch = max(1, math.ceil(len(loader) / accumulation))
     if total_steps is None:
@@ -181,14 +209,25 @@ def run_training_loop(
     iterator = iter(loader)
     # Fast-forward a resumed run to the same micro-batch position the original
     # uninterrupted run had reached (the shuffle order is reproducible from the
-    # seed, so skipping consumed items restores the exact data order).
-    while consumed > 0:
-        try:
-            next(iterator)
-        except StopIteration:
-            iterator = iter(loader)
-        else:
-            consumed -= 1
+    # seed, so skipping consumed items restores the exact data order). Sources
+    # that can skip without compute (the online target source) answer with
+    # cheap placeholders instead of re-extracting teacher features, so a resume
+    # does not pay the target forward cost again.
+    fast_forward_batches = consumed
+    skip_begin = getattr(base_dataset, "start_fast_forward", None)
+    if consumed > 0 and skip_begin is not None:
+        skip_begin(consumed * micro_batch)
+    try:
+        while consumed > 0:
+            try:
+                next(iterator)
+            except StopIteration:
+                iterator = iter(loader)
+            else:
+                consumed -= 1
+    finally:
+        if skip_begin is not None:
+            base_dataset.end_fast_forward()
     while step < total_steps:
         progressed = False
         for batch in iterator:
@@ -321,6 +360,10 @@ def run_training_loop(
         "nan_seen": nan_seen,
         "skipped_no_anchor_batches": skipped_batches,
         "resumed_from_step": int(resume_state["step"]) if resume_state is not None else 0,
+        "resume_fast_forward_batches": int(fast_forward_batches) if resume_state is not None else 0,
+        "resume_fast_forward_reduced_cost": bool(
+            resume_state is not None and skip_begin is not None and fast_forward_batches > 0
+        ),
         "wall_seconds": time.time() - started,
         "peak_gpu_mem_gb": (
             torch.cuda.max_memory_allocated(device) / 1e9 if device.type == "cuda" else None
@@ -332,7 +375,13 @@ def run_training_loop(
     return {"summary": summary, "history": history, "gradient_coverage": gradient_coverage}
 
 
-def run_overfit_sanity(cfg: dict, contract: dict, features_dir: Path, run_dir: Path, device, module, init_state) -> dict:
+def run_overfit_sanity(cfg: dict, contract: dict, dataset_factory, run_dir: Path, device, module, init_state) -> dict:
+    """Overfit a tiny subset as a trainability sanity check.
+
+    ``dataset_factory()`` returns the active feature source's dataset (offline
+    store or online live extraction); the check runs through the same collator,
+    trainer module and optimizer plumbing as the real loop.
+    """
     overfit_cfg = (cfg.get("train", {}).get("overfit_sanity", {}) or {})
     result_path = run_dir / "train" / "overfit_sanity.json"
     if not overfit_cfg.get("enabled", True):
@@ -341,7 +390,7 @@ def run_overfit_sanity(cfg: dict, contract: dict, features_dir: Path, run_dir: P
         return result
     num_samples = int(overfit_cfg.get("num_samples", 16))
     steps = int(overfit_cfg.get("steps", 200))
-    dataset = FeatureDataset(features_dir)
+    dataset = dataset_factory()
     subset = Subset(dataset, list(range(min(num_samples, len(dataset)))))
     run_cfg = dict(cfg)
     run_cfg["train"] = {
@@ -384,6 +433,59 @@ def run_overfit_sanity(cfg: dict, contract: dict, features_dir: Path, run_dir: P
     return result
 
 
+def validate_resume_state(
+    resume_state: dict,
+    *,
+    algorithm_name: str,
+    mode: str,
+    feature_source_digest: str,
+    total_steps: int,
+    contract: dict,
+) -> None:
+    """Refuse resuming across algorithm / feature-mode / data / step-plan changes.
+
+    Checkpoints written before the feature-mode tag existed are interpreted as
+    offline (the only mode that produced them) and can never be resumed as an
+    online run. When the recorded feature-source digest is present it must match
+    the current source exactly; nothing here is bypassable.
+    """
+    if resume_state.get("format") != "vlm-dflash-train-state-v1":
+        raise ValueError(f"Unrecognized resume state format: {resume_state.get('format')!r}")
+    recorded_algorithm = resume_state.get("algorithm")
+    if recorded_algorithm is not None and str(recorded_algorithm) != str(algorithm_name):
+        raise ValueError(
+            f"Resume algorithm mismatch: checkpoint was trained with algorithm={recorded_algorithm!r}, "
+            f"this run resolves algorithm={algorithm_name!r}."
+        )
+    recorded_mode = resume_state.get("feature_mode")
+    if recorded_mode is None:
+        recorded_mode = "offline"
+    recorded_mode = str(recorded_mode).lower()
+    if recorded_mode != str(mode).lower():
+        raise ValueError(
+            f"Resume mode mismatch: checkpoint was produced with feature_mode={recorded_mode!r} but this "
+            f"run is feature_mode={mode!r}. Start a new run directory (or pass matching --mode/--features)."
+        )
+    recorded_digest = resume_state.get("feature_source_digest")
+    if recorded_digest is None:
+        if recorded_mode != "offline":
+            raise ValueError("Resume state claims feature_mode=online but records no feature-source digest.")
+    elif recorded_digest != feature_source_digest:
+        raise ValueError(
+            "Resume feature-source mismatch: the checkpoint was trained from a different source "
+            f"(recorded digest {str(recorded_digest)[:12]} != current {str(feature_source_digest)[:12]}). "
+            "Re-run with the original --limit / modes / extraction settings, or start a new run."
+        )
+    planned = int(resume_state.get("steps_total_planned", -1))
+    if planned != total_steps:
+        raise ValueError(
+            f"Resume plan mismatch: checkpoint planned {planned} total steps, this config computes "
+            f"{total_steps}. Re-run with the same --steps / epochs / dataset slice."
+        )
+    if resume_state.get("identity") is not None:
+        assert_identity(identity_from_contract(contract), resume_state["identity"], "resume vs contract")
+
+
 def train_dflash(
     cfg: dict,
     run_dir: str | Path,
@@ -392,28 +494,31 @@ def train_dflash(
     limit: int | None = None,
     resume: bool = False,
     features_dir: str | Path | None = None,
+    feature_mode: str | None = None,
 ) -> dict:
-    """Train a drafter from a captured feature store.
+    """Train a drafter from a captured feature store (offline) or live target features (online).
 
-    ``features_dir`` defaults to ``run_dir/features``; passing an explicit
-    store lets several algorithms train from one capture (same target, same
-    protocol). The store's identity, manifest and target head are verified
-    against the live contract before any training, and the reuse is recorded
-    in ``provenance.json`` (directory, sample count, seq length, dtype and a
-    digest of the store manifest).
+    Offline (``feature_mode=offline``, the default): ``features_dir`` defaults
+    to ``run_dir/features``; passing an explicit store lets several algorithms
+    train from one capture (same target, same protocol). The store's identity,
+    manifest and target head are verified against the live contract before any
+    training, and the reuse is recorded in ``provenance.json``.
+
+    Online (``feature_mode=online``): the frozen target runs in this process
+    and extracts the same per-sample records on the fly (pre-generated regen
+    answers stay the supervision targets). Both modes share the collator,
+    training loop, optimizer/scheduler, checkpointing, evaluation and export;
+    the run records its mode, backend, devices and extraction cost.
     """
     run_dir = Path(run_dir)
-    features_dir = Path(features_dir) if features_dir is not None else run_dir / "features"
-    dataset = FeatureDataset(features_dir)
-    if limit is not None:
-        dataset = Subset(dataset, list(range(min(limit, len(dataset)))))
-    manifest = FeatureDataset(features_dir).store.manifest
-    assert_identity(identity_from_contract(contract), manifest["identity"], "train vs features")
-    log(
-        f"train: features from {features_dir.resolve()} "
-        f"({manifest.get('num_samples')} samples, seq {manifest.get('seq_length')}, "
-        f"{manifest.get('storage_dtype')}, format {manifest.get('format')})"
-    )
+    mode = str(feature_mode or (cfg.get("train", {}) or {}).get("feature_mode", "offline")).lower()
+    if mode not in ("offline", "online"):
+        raise ValueError(f"train.feature_mode must be 'offline' or 'online', got {mode!r}.")
+    if mode == "online" and features_dir is not None:
+        raise ValueError(
+            "feature_mode=online extracts teacher features live and cannot reuse an offline feature "
+            "store; drop --features (or run with --mode offline to reuse a capture)."
+        )
 
     algorithm = get_algorithm(cfg.get("algorithm"))
     algorithm.validate_config(cfg)
@@ -423,21 +528,98 @@ def train_dflash(
     device = torch.device(train_cfg.get("device", "cuda:0"))
     set_seed(seed)
 
-    draft_config = algorithm.build_draft_config(contract, cfg)
-    target_head = torch.load(features_dir / "target_head.pt", map_location="cpu", weights_only=False)
-    if target_head["model_fingerprint"] != contract["target"]["model_fingerprint"]:
-        raise RuntimeError("features/target_head.pt was produced from a different target fingerprint.")
-    tied_head = bool(target_head.get("tie_word_embeddings", True))
-    lm_head_weight = target_head.get("lm_head")
-    if not tied_head and lm_head_weight is None:
-        raise RuntimeError(
-            "features/target_head.pt has no untied lm_head weight (captured before the head fix). "
-            "Re-run capture_features so training uses the same output head as inference."
+    online_source = None
+    online_pair_path = None
+    online_visual_check = None
+    if mode == "online":
+        num_workers = int(train_cfg.get("num_workers", 0))
+        if num_workers != 0:
+            raise ValueError(
+                f"feature_mode=online extracts target features in the main process and requires "
+                f"train.num_workers=0 (got train.num_workers={num_workers})."
+            )
+        from ..target.online import OnlineFeatureSource
+
+        online_source = OnlineFeatureSource(cfg, contract, run_dir, limit=limit)
+        dataset = online_source.dataset()
+        dataset_factory = online_source.dataset
+        manifest = online_source.manifest()
+        embed_weight = online_source.embed_weight
+        lm_head_weight = online_source.lm_head_weight
+        tied_head = online_source.tied_head
+        feature_source_digest = online_source.digest()
+        log(
+            f"train: feature_mode=online (live {online_source.backend} target on "
+            f"{online_source.target_device}; {manifest['num_samples']} samples, "
+            f"seq {manifest['seq_length']}; target resident for the whole run)"
         )
-    if tied_head and lm_head_weight is not None:
-        raise RuntimeError("features/target_head.pt records a tied target but also stores a separate lm_head.")
+        # Fresh swap pair for this run (never a leftover staged capture's):
+        # the same live model that trains the drafter also produces the
+        # visual-path evidence.
+        online_pair_path = run_dir / "online" / "swap_pair.pt"
+        capture_cfg = cfg.get("capture") or {}
+        if bool(capture_cfg.get("visual_path_check", True)) and len(online_source.rows) >= 2:
+            from ..target.visual_check import run_visual_path_check
+
+            online_source.set_phase("visual_check")
+            try:
+                online_visual_check = run_visual_path_check(
+                    cfg,
+                    run_dir,
+                    contract,
+                    online_source.model,
+                    online_source.processor,
+                    online_source.rows,
+                    online_source.media_dir,
+                    online_source.dtype,
+                    limit=min(int(capture_cfg.get("visual_check_samples", 2)), len(online_source.rows)),
+                    check_path=run_dir / "online" / "visual_path_check.json",
+                    pair_path=online_pair_path,
+                )
+            finally:
+                online_source.set_phase("train")
+    else:
+        features_dir = Path(features_dir) if features_dir is not None else run_dir / "features"
+        dataset = FeatureDataset(features_dir)
+        if limit is not None:
+            dataset = Subset(dataset, list(range(min(limit, len(dataset)))))
+        manifest = FeatureDataset(features_dir).store.manifest
+        assert_identity(identity_from_contract(contract), manifest["identity"], "train vs features")
+        # Resume/provenance digest: content-only (absolute model paths are audit
+        # info; moving the same checkpoint to another directory must not
+        # invalidate a resume), tagged with the mode it was produced in.
+        source_identity = dict(manifest.get("identity") or {})
+        source_identity.pop("target_model_path", None)
+        feature_source_digest = sha256_json(
+            {
+                **{key: value for key, value in manifest.items() if key != "identity"},
+                "identity": source_identity,
+                "feature_mode": "offline",
+            }
+        )
+        dataset_factory = lambda: FeatureDataset(features_dir)
+        log(
+            f"train: features from {features_dir.resolve()} "
+            f"({manifest.get('num_samples')} samples, seq {manifest.get('seq_length')}, "
+            f"{manifest.get('storage_dtype')}, format {manifest.get('format')})"
+        )
+        target_head = torch.load(features_dir / "target_head.pt", map_location="cpu", weights_only=False)
+        if target_head["model_fingerprint"] != contract["target"]["model_fingerprint"]:
+            raise RuntimeError("features/target_head.pt was produced from a different target fingerprint.")
+        tied_head = bool(target_head.get("tie_word_embeddings", True))
+        lm_head_weight = target_head.get("lm_head")
+        if not tied_head and lm_head_weight is None:
+            raise RuntimeError(
+                "features/target_head.pt has no untied lm_head weight (captured before the head fix). "
+                "Re-run capture_features so training uses the same output head as inference."
+            )
+        if tied_head and lm_head_weight is not None:
+            raise RuntimeError("features/target_head.pt records a tied target but also stores a separate lm_head.")
+        embed_weight = target_head["embed_tokens"]
+
+    draft_config = algorithm.build_draft_config(contract, cfg)
     module = algorithm.build_trainer_module(
-        draft_config, contract, cfg, target_head["embed_tokens"], lm_head_weight=lm_head_weight
+        draft_config, contract, cfg, embed_weight, lm_head_weight=lm_head_weight
     )
     init_state = {key: value.clone() for key, value in module.draft_model.state_dict().items()}
 
@@ -453,7 +635,15 @@ def train_dflash(
         # refuses checkpoints whose head does not match the target's tie state.
         "head": "tied_embedding" if tied_head else "target_lm_head",
         "identity": identity_from_contract(contract),
+        # Which feature source trained these weights: resume refuses to mix
+        # modes or data, and eval/export surface the mode.
+        "feature_mode": mode,
+        "feature_source_digest": feature_source_digest,
+        "feature_backend": "huggingface" if online_source is not None else "feature_store",
+        "draft_device": str(device),
     }
+    if online_source is not None:
+        checkpoint_common["target_device"] = str(online_source.target_device)
     torch.save({**checkpoint_common, "step": 0, "model": init_state}, train_dir / "ckpt_init.pt")
 
     total_steps = compute_total_steps(len(dataset), train_cfg, steps)
@@ -463,19 +653,23 @@ def train_dflash(
         if not resume_path.exists():
             raise FileNotFoundError(f"--resume requested but no resume checkpoint at {resume_path}.")
         resume_state = torch.load(resume_path, map_location="cpu", weights_only=False)
-        if resume_state.get("format") != "vlm-dflash-train-state-v1":
-            raise ValueError(f"Unrecognized resume state format: {resume_state.get('format')!r}")
-        planned = int(resume_state.get("steps_total_planned", -1))
-        if planned != total_steps:
-            raise ValueError(
-                f"Resume plan mismatch: checkpoint planned {planned} total steps, this config computes "
-                f"{total_steps}. Re-run with the same --steps / epochs / dataset slice."
-            )
-        if resume_state.get("identity") is not None:
-            assert_identity(identity_from_contract(contract), resume_state["identity"], "resume vs contract")
+        validate_resume_state(
+            resume_state,
+            algorithm_name=algorithm.name,
+            mode=mode,
+            feature_source_digest=feature_source_digest,
+            total_steps=total_steps,
+            contract=contract,
+        )
         overfit = {"enabled": True, "resumed": True}
     else:
-        overfit = run_overfit_sanity(cfg, contract, features_dir, run_dir, device, module, init_state)
+        if online_source is not None:
+            online_source.set_phase("overfit")
+        try:
+            overfit = run_overfit_sanity(cfg, contract, dataset_factory, run_dir, device, module, init_state)
+        finally:
+            if online_source is not None:
+                online_source.set_phase("train")
         module.draft_model.load_state_dict(init_state)
 
     log_path = train_dir / "train_log.jsonl"
@@ -508,16 +702,18 @@ def train_dflash(
 
     from .visual_check import check_drafter_visual_dependence
 
-    visual = check_drafter_visual_dependence(cfg, contract, run_dir, device, module)
+    visual = check_drafter_visual_dependence(cfg, contract, run_dir, device, module, pair_path=online_pair_path)
     if output.get("gradient_coverage"):
         write_json(train_dir / "gradient_coverage.json", output["gradient_coverage"])
     # Algorithm-specific calibration diagnostics (e.g. DSpark's confidence
-    # head): only modules that implement the hook produce an artifact.
+    # head): only modules that implement the hook produce an artifact. The
+    # calibration pass reads from the same feature source as training, so an
+    # online run produces it without a staged capture.
     calibration = None
     if hasattr(module, "calibration_report"):
         from torch.utils.data import DataLoader
 
-        calibration_dataset = FeatureDataset(features_dir)
+        calibration_dataset = dataset_factory()
         calibration_image_token_id = int(contract["tokens"]["image_token_id"])
         calibration_loader = DataLoader(
             calibration_dataset,
@@ -525,9 +721,17 @@ def train_dflash(
             shuffle=False,
             collate_fn=lambda batch: collate_features(batch, calibration_image_token_id),
         )
-        calibration = module.calibration_report(calibration_loader, device)
+        if online_source is not None:
+            online_source.set_phase("calibration")
+        try:
+            calibration = module.calibration_report(calibration_loader, device)
+        finally:
+            if online_source is not None:
+                online_source.set_phase("train")
         if calibration is not None:
-            calibration["source"] = "train_features_head_batches"
+            calibration["source"] = (
+                "online_target_head_batches" if online_source is not None else "train_features_head_batches"
+            )
             write_json(train_dir / "confidence_calibration.json", calibration)
             log(f"train: confidence calibration -> {train_dir / 'confidence_calibration.json'}")
     summary = {
@@ -535,7 +739,27 @@ def train_dflash(
         "overfit_sanity": overfit,
         "visual_dependence": visual,
         "confidence_calibration": calibration,
+        "feature_mode": mode,
     }
+    if online_source is not None:
+        summary["feature_source"] = online_source.summary()
+        summary["visual_path_check"] = online_visual_check
+        summary["draft_device"] = str(device)
+    feature_source_record = (
+        online_source.summary()
+        if online_source is not None
+        else {
+            "feature_mode": "offline",
+            "backend": "feature_store",
+            "dir": str(features_dir.resolve()),
+            "external": features_dir.resolve() != (run_dir / "features").resolve(),
+            "format": manifest.get("format"),
+            "num_samples": manifest.get("num_samples"),
+            "seq_length": manifest.get("seq_length"),
+            "storage_dtype": manifest.get("storage_dtype"),
+            "digest": feature_source_digest,
+        }
+    )
     write_json(train_dir / "train_summary.json", summary)
     record_stage(
         run_dir,
@@ -544,15 +768,11 @@ def train_dflash(
             "identity": identity_from_contract(contract),
             "summary": summary,
             "code": "vlm_dflash.dflash.train.train_dflash",
-            "features": {
-                "dir": str(features_dir.resolve()),
-                "external": features_dir.resolve() != (run_dir / "features").resolve(),
-                "format": manifest.get("format"),
-                "num_samples": manifest.get("num_samples"),
-                "seq_length": manifest.get("seq_length"),
-                "storage_dtype": manifest.get("storage_dtype"),
-                "manifest_digest": sha256_json(manifest),
-            },
+            "feature_mode": mode,
+            "feature_source": feature_source_record,
         },
     )
+    if online_source is not None:
+        # Free the teacher once no diagnostic needs it anymore.
+        online_source.close()
     return summary

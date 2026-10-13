@@ -69,12 +69,24 @@ def fp32_block_ce(module, logits, input_ids, loss_mask, anchors, keep_mask) -> f
     return float((nll * weights.reshape(-1)).sum() / weights.sum().clamp_min(1e-6))
 
 
-def check_drafter_visual_dependence(cfg: dict, contract: dict, run_dir: str | Path, device, module) -> dict:
+def check_drafter_visual_dependence(
+    cfg: dict, contract: dict, run_dir: str | Path, device, module, pair_path: str | Path | None = None
+) -> dict:
+    """Pair-logits/loss sensitivity check against a recorded swap pair.
+
+    ``pair_path`` defaults to ``features/swap_pair.pt`` (staged capture); the
+    online path passes ``online/swap_pair.pt`` so the check uses the live
+    source's own pair instead of a leftover from an earlier staged run.
+    """
     run_dir = Path(run_dir)
-    pair_path = run_dir / "features" / "swap_pair.pt"
+    pair_path = Path(pair_path) if pair_path is not None else run_dir / "features" / "swap_pair.pt"
     out_path = run_dir / "train" / "visual_path_check.json"
     if not pair_path.exists():
-        result = {"skipped": True, "reason": "features/swap_pair.pt missing (capture visual check did not run)"}
+        try:
+            shown = pair_path.relative_to(run_dir)
+        except ValueError:
+            shown = pair_path
+        result = {"skipped": True, "reason": f"{shown} missing (the visual capture check did not run)"}
         write_json(out_path, result)
         return result
 

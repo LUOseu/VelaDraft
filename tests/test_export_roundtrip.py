@@ -91,5 +91,57 @@ def test_export_roundtrip(tmp_path):
     assert exported["drafter"]["spatial_rope"]["sections"] == [16, 24, 24]
     assert exported["target"]["model_fingerprint"] == "f" * 64
     assert exported["data"]["num_train"] == 4
+    # Checkpoints written before the feature-mode tag export as offline.
+    assert exported["feature_mode"] == "offline"
     card = (export_dir / "model_card.md").read_text(encoding="utf-8")
     assert "tiny-vl" in card
+    assert "offline (pre-captured feature store)" in card
+
+
+def test_export_records_online_feature_mode(tmp_path):
+    config, draft = _tiny_draft()
+    run_dir = tmp_path / "run"
+    (run_dir / "train").mkdir(parents=True)
+    (run_dir / "data").mkdir()
+    contract = {
+        "target": {
+            "model_path": "/models/tiny-vl",
+            "model_type": "qwen2_5_vl",
+            "model_fingerprint": "f" * 64,
+            "processor_fingerprint": "p" * 64,
+        },
+        "image": {"min_pixels": 100, "max_pixels": 200},
+        "rope": {"sections": [16, 24, 24]},
+        "layers": {"num_draft_layers": 2},
+        "tokens": {"image_token_id": 1, "vision_start_token_id": 2},
+    }
+    (run_dir / "contract.json").write_text(json.dumps(contract), encoding="utf-8")
+    (run_dir / "config.json").write_text(
+        json.dumps({"drafter": {"spatial_rope_mode": "replace", "spatial_rope_enabled": False}}), encoding="utf-8"
+    )
+    (run_dir / "train" / "train_summary.json").write_text(
+        json.dumps({"steps": 3, "final_loss": 1.0, "feature_mode": "online"}), encoding="utf-8"
+    )
+    checkpoint = {
+        "format": "vlm-dflash-ckpt-v1",
+        "draft_config": config.to_dict(),
+        "attention_backend": "sdpa",
+        "mask_token_id": 255,
+        "block_size": 8,
+        "num_anchors": 16,
+        "loss_decay_gamma": 7.0,
+        "target_layer_ids": [0, 1],
+        "identity": {"model_fingerprint": "f" * 64},
+        "feature_mode": "online",
+        "feature_backend": "huggingface",
+        "step": 3,
+        "model": {key: value.clone() for key, value in draft.state_dict().items()},
+    }
+    torch.save(checkpoint, run_dir / "train" / "ckpt_final.pt")
+
+    export_dir = export_run(run_dir)
+    exported = json.loads((export_dir / "config.json").read_text(encoding="utf-8"))
+    assert exported["feature_mode"] == "online"
+    assert exported["training"]["feature_mode"] == "online"
+    card = (export_dir / "model_card.md").read_text(encoding="utf-8")
+    assert "online (live target extraction)" in card

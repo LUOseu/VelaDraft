@@ -30,7 +30,8 @@ VelaDraft 将 **DFlash、DSpark、Domino、JetSpec 和 DFlash2** 接入同一套
 先让目标 VLM 生成回答并捕获特征，再复用兼容的特征，训练与比较不同 drafter。
 
 - **一次 capture，多种算法复用。** 共享 hidden states、图像区间和位置编码信息。
-- **离线训练。** 训练阶段将目标模型从 GPU 卸载，直接读取捕获的 feature store。
+- **离线 / 在线训练。** 默认离线：训练阶段目标模型不驻留 GPU，直接读取捕获的
+  feature store；`--mode online` 在训练过程中从冻结的目标模型实时提取特征。
 - **配对可检查。** 通过运行时 contract 和 provenance 校验目标、processor、features 与 checkpoint。
 - **输出可验证。** Sequential 评测逐 token 对照目标模型的贪心输出，并报告 AL 与各位置接受率。
 
@@ -87,6 +88,8 @@ vlm-dflash train-demo --target "$VLM_DFLASH_TARGET" --steps 80
 
 将昂贵的目标模型计算与 drafter 训练分开：兼容的捕获特征可供多种算法复用，
 **评测时重新加载目标模型**。每个 checkpoint 都记录对应的 target contract 与算法信息。
+也可以直接针对在线的冻结目标模型训练（`train --mode online`），见
+[在线训练](docs/online-training.md)。
 
 ## 支持的算法
 
@@ -159,6 +162,20 @@ Canonical 2K capture 占用约 **9.4 GiB** 磁盘。
 
 [对比示例](examples/reuse_features_compare.py)展示一次 capture 后分别训练、评测 DFlash 和 DSpark。
 
+### 在线训练（实时提取目标特征）
+
+不落 feature store，让冻结的目标模型与 drafter 一同训练：
+
+```bash
+vlm-dflash train \
+  --target "$VLM_DFLASH_TARGET" --dataset data/rows.jsonl \
+  --mode online --run-dir runs/online
+```
+
+目标模型全程驻留显存，每个 epoch 重新提取一次特征（不占磁盘上的多 GiB
+feature store，代价是目标前向按 epoch 重复支付）；`--features` 复用仅限
+offline。详见[在线训练指南](docs/online-training.md)。
+
 ## 基准结果
 
 **Qwen2.5-VL-3B-Instruct · 2K 训练数据 · block size 8 · 128 prompts ·
@@ -199,7 +216,7 @@ Parallel verification 仍属实验路径，在 bf16 下可能出现输出差异�
 
 | 入口 | 链接 |
 | --- | --- |
-| 使用项目 | [环境](docs/env-preflight.md) · [示例](examples/README.md) · [实测运行](docs/measured-runs.md) |
+| 使用项目 | [环境](docs/env-preflight.md) · [示例](examples/README.md) · [在线训练](docs/online-training.md) · [实测运行](docs/measured-runs.md) |
 | 理解方法 | [算法](docs/algorithms/) · [参考指南](docs/REFERENCE.md) · [上游审计](UPSTREAM_AUDIT.md) |
 | 复现实验 | [基准](BENCHMARKS.md) · [Harness](docs/benchmark.md) · [发布验证](RELEASE_VALIDATION.md) |
 | 扩展项目 | [添加算法](docs/adding_an_algorithm.md) · [支持矩阵](SUPPORT_MATRIX.md) · [贡献指南](CONTRIBUTING.md) |

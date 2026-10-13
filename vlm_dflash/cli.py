@@ -269,6 +269,26 @@ def cmd_doctor(args) -> int:
 # train
 # --------------------------------------------------------------------------- #
 
+FEATURE_MODES = ("offline", "online")
+
+
+def resolve_feature_mode(cfg: dict, cli_value: str | None = None) -> str:
+    """Resolve ``train.feature_mode`` after the final config merge.
+
+    Priority: explicit CLI ``--mode`` / ``--feature-mode`` > dotted ``--set`` >
+    YAML/preset > default ``offline``. Validation runs on the merged config so
+    an override can never be validated away. ``--features`` reuse is an offline
+    concept; combining it with online is refused in :func:`cmd_train` before
+    any expensive stage.
+    """
+    if cli_value is not None:
+        cfg.setdefault("train", {})["feature_mode"] = str(cli_value).lower()
+    mode = str((cfg.get("train") or {}).get("feature_mode", "offline")).lower()
+    if mode not in FEATURE_MODES:
+        raise SystemExit(f"train: feature_mode must be one of {FEATURE_MODES}, got {mode!r}.")
+    return mode
+
+
 def build_train_config(args) -> dict:
     cfg = load_preset(args.preset)
     if args.config:
@@ -309,13 +329,21 @@ def build_train_config(args) -> dict:
             cfg["algorithm"] = str(args.algorithm)
     from .algorithms import get_algorithm
 
+    # Merge preset + YAML + dotted overrides first, then resolve the algorithm
+    # and feature mode on the config training will actually run with, so an
+    # override can never be validated away (or fail validation it satisfied).
+    cfg = apply_overrides(cfg, args.set_list)
     algorithm = get_algorithm(cfg.get("algorithm"))
     algorithm.validate_config(cfg)
+    feature_mode = resolve_feature_mode(cfg, getattr(args, "feature_mode", None))
     run = cfg.setdefault("run", {})
     if not run.get("dir"):
-        name = f"{_slug(cfg['target']['model'])}-{algorithm.name}"
+        explicit_name = run.get("name")
+        name = str(explicit_name) if explicit_name else f"{_slug(cfg['target']['model'])}-{algorithm.name}"
+        if feature_mode == "online" and not explicit_name:
+            name = f"{name}-online"
         run.update({"name": name, "dir": f"runs/{name}"})
-    return apply_overrides(cfg, args.set_list)
+    return cfg
 
 
 def _stage_manifest_path(run_dir: Path, stage: str) -> Path:
@@ -413,6 +441,13 @@ def cmd_train(args) -> int:
     from .utils import log
 
     cfg = build_train_config(args)
+    feature_mode = str((cfg.get("train") or {}).get("feature_mode", "offline")).lower()
+    external_features = Path(args.features).expanduser().resolve() if args.features else None
+    if feature_mode == "online" and external_features is not None:
+        raise SystemExit(
+            "train: --mode online extracts teacher features live and cannot reuse a captured store; "
+            "drop --features (or use --mode offline to reuse one)."
+        )
     run_dir = resolve_run_dir(cfg, args.run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
     if args.resume and not (run_dir / "train" / "ckpt_last.pt").exists():
@@ -422,7 +457,6 @@ def cmd_train(args) -> int:
     contract = ensure_contract(cfg, run_dir)
 
     limit = args.limit
-    external_features = Path(args.features).expanduser().resolve() if args.features else None
     if external_features is not None:
         for required in ("index.jsonl", "manifest.json"):
             if not (external_features / required).exists():
@@ -456,19 +490,30 @@ def cmd_train(args) -> int:
         else:
             log("train: regen stage present with unchanged inputs, skipping (use --force to rerun)")
 
-        capture_digest = stage_digest(cfg, contract, "capture", regen_digest, limit=limit)
-        if stage_status(run_dir, "capture", "features/index.jsonl", capture_digest, args.force) == "run":
-            from .target.capture import run_capture
-
-            run_capture(cfg, run_dir, contract, limit=limit)
-            write_stage_manifest(
-                run_dir,
-                "capture",
-                stage_digest_payload(cfg, contract, "capture", regen_digest, limit=limit),
-                capture_digest,
+        if feature_mode == "online":
+            log(
+                "train: feature_mode=online; skipping the offline capture stage "
+                "(target features are extracted live by the trainer)"
             )
+            if (run_dir / "features" / "index.jsonl").exists():
+                log(
+                    "train: note: a staged capture exists in this run dir; online training ignores it "
+                    "(run with --mode offline to train from it)"
+                )
         else:
-            log("train: capture stage present with unchanged inputs, skipping (use --force to recapture)")
+            capture_digest = stage_digest(cfg, contract, "capture", regen_digest, limit=limit)
+            if stage_status(run_dir, "capture", "features/index.jsonl", capture_digest, args.force) == "run":
+                from .target.capture import run_capture
+
+                run_capture(cfg, run_dir, contract, limit=limit)
+                write_stage_manifest(
+                    run_dir,
+                    "capture",
+                    stage_digest_payload(cfg, contract, "capture", regen_digest, limit=limit),
+                    capture_digest,
+                )
+            else:
+                log("train: capture stage present with unchanged inputs, skipping (use --force to recapture)")
 
     from .dflash.train import train_dflash
 
@@ -480,6 +525,7 @@ def cmd_train(args) -> int:
         limit=limit,
         resume=args.resume,
         features_dir=external_features,
+        feature_mode=feature_mode,
     )
     log(f"train: done with steps={summary['steps']} final_loss={summary['final_loss']}")
     return 0
@@ -621,6 +667,17 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--run-dir", default=None)
     train.add_argument("--limit", type=int, default=None)
     train.add_argument("--steps", type=int, default=None)
+    train.add_argument(
+        "--mode",
+        "--feature-mode",
+        dest="feature_mode",
+        default=None,
+        choices=list(FEATURE_MODES),
+        help=(
+            "target-feature source: offline (default; train from a pre-captured feature store) or "
+            "online (extract teacher-forced hidden states live from the frozen target during training)"
+        ),
+    )
     train.add_argument("--force", action="store_true", help="rebuild completed stages")
     train.add_argument("--resume", action="store_true", help="continue training from train/ckpt_last.pt")
     train.add_argument(

@@ -33,8 +33,9 @@ drafters.
 
 - **Capture once, reuse across methods.** Shared hidden states, image spans and
   position information keep algorithm comparisons on the same foundation.
-- **Train offline.** The target is off the GPU during drafter training; the
-  trainer reads the captured feature store.
+- **Train offline or online.** By default the target is off the GPU during
+  drafter training and the trainer reads the captured feature store;
+  `--mode online` extracts frozen-target features live during training.
 - **Keep the pairing explicit.** Runtime contracts and provenance check the
   target, processor, feature store and checkpoint before they are combined.
 - **Validate the output.** Sequential evaluation compares speculative greedy
@@ -102,6 +103,8 @@ and a full recipe for meaningful drafter quality.
 The expensive target-side work is separated from drafter training. Compatible
 features can feed multiple algorithms; **the target is reloaded for evaluation**.
 Each checkpoint is paired with its target contract and algorithm metadata.
+Training can also run against the live frozen target
+(`train --mode online`); see [online training](docs/online-training.md).
 
 ## Supported algorithms
 
@@ -184,6 +187,21 @@ about **9.4 GiB** on disk.
 The [comparison example](examples/reuse_features_compare.py) demonstrates
 one capture followed by DFlash and DSpark training and evaluation.
 
+### Train online (live target features)
+
+Skip the feature store and let the frozen target run alongside the trainer:
+
+```bash
+vlm-dflash train \
+  --target "$VLM_DFLASH_TARGET" --dataset data/rows.jsonl \
+  --mode online --run-dir runs/online
+```
+
+The target stays resident for the whole run and re-extracts features every
+epoch (no multi-GiB store on disk; the target forward cost is paid per epoch
+instead of once). `--features` reuse is offline-only. See the
+[online training guide](docs/online-training.md).
+
 ## Benchmarks
 
 **Qwen2.5-VL-3B-Instruct · 2K training corpus · block size 8 · 128 prompts ·
@@ -232,7 +250,7 @@ in [verification modes](docs/verification-modes.md).
 
 | Start here | Links |
 | --- | --- |
-| Use the project | [Environment](docs/env-preflight.md) · [Examples](examples/README.md) · [Measured runs](docs/measured-runs.md) |
+| Use the project | [Environment](docs/env-preflight.md) · [Examples](examples/README.md) · [Online training](docs/online-training.md) · [Measured runs](docs/measured-runs.md) |
 | Understand the methods | [Algorithms](docs/algorithms/) · [Reference](docs/REFERENCE.md) · [Upstream audits](UPSTREAM_AUDIT.md) |
 | Reproduce the evidence | [Benchmarks](BENCHMARKS.md) · [Harness](docs/benchmark.md) · [Release validation](RELEASE_VALIDATION.md) |
 | Extend the stack | [Add an algorithm](docs/adding_an_algorithm.md) · [Support matrix](SUPPORT_MATRIX.md) · [Contributing](CONTRIBUTING.md) |
