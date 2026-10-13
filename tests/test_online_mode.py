@@ -16,8 +16,10 @@ CPU-only, three layers of coverage:
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -26,10 +28,17 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from vlm_dflash.cli import build_parser, build_train_config, resolve_feature_mode
-from vlm_dflash.dflash.features import FeatureDataset, collate_features
-from vlm_dflash.dflash.train import run_training_loop, validate_resume_state
+from vlm_dflash.dflash.features import FeatureDataset, collate_features, offline_feature_digest
+from vlm_dflash.dflash.train import (
+    _reconcile_train_log,
+    preflight_resume,
+    run_training_loop,
+    train_dflash,
+    validate_resume_state,
+)
 from vlm_dflash.provenance import IdentityMismatchError, identity_from_contract
-from vlm_dflash.utils import write_jsonl
+from vlm_dflash.training_plan import PLAN_VERSION, training_plan_digest
+from vlm_dflash.utils import read_jsonl, sha256_file, write_jsonl
 
 import vlm_dflash.target.online as online_module
 
@@ -76,6 +85,9 @@ def _write_online_run_dir(tmp_path: Path, *, rows: int = 4, answer_len: int = 12
     )
     payload = []
     for index in range(rows):
+        # Real image bytes: the v2 content digest hashes what the loader would
+        # actually read, so the files must exist.
+        Image.new("RGB", (8, 8), (10 + index, 20, 30)).save(tmp_path / "images" / f"s{index}.png")
         payload.append(
             {
                 "id": f"s{index}",
@@ -315,13 +327,16 @@ def _resume_state(**overrides) -> dict:
         "algorithm": "dflash",
         "feature_mode": "online",
         "feature_source_digest": "d" * 64,
+        "training_plan_version": PLAN_VERSION,
+        "training_plan_digest": "p" * 64,
         "identity": None,
     }
     state.update(overrides)
     return state
 
 
-def _validate(state, *, algorithm_name="dflash", mode="online", digest="d" * 64, total_steps=6, contract=None):
+def _validate(state, *, algorithm_name="dflash", mode="online", digest="d" * 64, total_steps=6, contract=None,
+              plan_version=PLAN_VERSION, plan_digest="p" * 64):
     validate_resume_state(
         state,
         algorithm_name=algorithm_name,
@@ -329,6 +344,8 @@ def _validate(state, *, algorithm_name="dflash", mode="online", digest="d" * 64,
         feature_source_digest=digest,
         total_steps=total_steps,
         contract=contract or _stub_contract(),
+        plan_version=plan_version,
+        plan_digest=plan_digest,
     )
 
 
@@ -336,13 +353,34 @@ def test_resume_state_accepts_matching_state():
     _validate(_resume_state())
 
 
-def test_resume_state_legacy_offline_is_not_resumable_as_online():
+def test_resume_state_legacy_checkpoint_is_not_exactly_resumable():
     legacy = _resume_state()
     legacy.pop("feature_mode")
     legacy.pop("feature_source_digest")
-    _validate(legacy, mode="offline")  # legacy checkpoint == offline
+    legacy.pop("training_plan_version")
+    legacy.pop("training_plan_digest")
+    # States that predate the plan gate recorded nothing to compare against:
+    # exact resume cannot fabricate the missing fields, so they are refused in
+    # both modes (an online attempt fails the mode gate first).
+    with pytest.raises(ValueError, match="training-plan gate"):
+        _validate(legacy, mode="offline")
     with pytest.raises(ValueError, match="mode mismatch"):
         _validate(legacy, mode="online")
+
+
+def test_resume_state_requires_matching_training_plan():
+    # Wrong plan version (or a missing / different digest) is refused: an exact
+    # resume never compares digests across schemes or accepts a changed plan.
+    with pytest.raises(ValueError, match="plan-version mismatch"):
+        _validate(_resume_state(training_plan_version="vlm-dflash-training-plan-v0"))
+    with pytest.raises(ValueError, match="training-plan gate"):
+        _validate(_resume_state(training_plan_digest=None))
+    with pytest.raises(ValueError, match="training-plan mismatch"):
+        _validate(_resume_state(training_plan_digest="q" * 64))
+    # The plan digest is part of the caller-provided plan, not re-derived from
+    # the state: a matching version with a different current plan is refused.
+    with pytest.raises(ValueError, match="training-plan mismatch"):
+        _validate(_resume_state(), plan_digest="r" * 64)
 
 
 def test_resume_state_rejects_mode_algorithm_and_source_mismatch():
@@ -635,6 +673,174 @@ def test_online_digest_tracks_data_and_ignores_model_path(monkeypatch, tmp_path)
     other_run = _write_online_run_dir(tmp_path / "other", rows=4, answer_len=16)
     assert _stub_source(monkeypatch, other_run).digest() != first
     assert _stub_source(monkeypatch, run_dir, limit=2).digest() != first
+
+
+def test_online_digest_v2_covers_token_values_and_image_bytes(monkeypatch, tmp_path):
+    """Equal-length token edits and same-size image swaps must change the digest."""
+    _install_stub_extraction(monkeypatch, [])
+    run_dir = _write_online_run_dir(tmp_path)
+    first = _stub_source(monkeypatch, run_dir).digest()
+
+    # Same length, same ids positionally: only the token *values* change.
+    payload = read_jsonl(run_dir / "regen" / "target_data.jsonl")
+    payload[1]["regen"]["answer_ids"][0] += 1
+    write_jsonl(run_dir / "regen" / "target_data.jsonl", payload)
+    second = _stub_source(monkeypatch, run_dir).digest()
+    assert second != first
+
+    # Same dimensions, different bytes: an image swap must not pass the gate.
+    Image.new("RGB", (8, 8), (200, 10, 10)).save(tmp_path / "images" / "s2.png")
+    assert _stub_source(monkeypatch, run_dir).digest() != second
+
+
+def test_online_digest_v2_is_path_stable_and_verifies_the_data_manifest(monkeypatch, tmp_path):
+    _install_stub_extraction(monkeypatch, [])
+    run_dir = _write_online_run_dir(tmp_path)
+    first = _stub_source(monkeypatch, run_dir).digest()
+
+    # Same content copied elsewhere (run dir *and* media dir move): identical.
+    copy_root = tmp_path / "copy"
+    (copy_root / "run").parent.mkdir(parents=True)
+    import shutil
+
+    shutil.copytree(run_dir, copy_root / "run")
+    shutil.copytree(tmp_path / "images", copy_root / "images")
+    (copy_root / "run" / "data" / "meta.json").write_text(
+        json.dumps({"media_dir": str(copy_root / "images")}), encoding="utf-8"
+    )
+    assert _stub_source(monkeypatch, copy_root / "run").digest() == first
+
+    # A matching data/manifest.json is verified, not trusted blindly ...
+    rows = read_jsonl(copy_root / "run" / "regen" / "target_data.jsonl")
+    (copy_root / "run" / "data" / "manifest.json").write_text(
+        json.dumps(
+            {
+                "rows": [
+                    {
+                        "id": row["id"],
+                        "image_sha256": sha256_file(copy_root / "images" / row["images"][0]),
+                    }
+                    for row in rows
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert _stub_source(monkeypatch, copy_root / "run").digest() == first
+
+    # ... and a stale manifest (recording the pre-swap bytes) is a loud error.
+    Image.new("RGB", (8, 8), (0, 0, 255)).save(copy_root / "images" / "s0.png")
+    with pytest.raises(RuntimeError, match="no longer match"):
+        _stub_source(monkeypatch, copy_root / "run").digest()
+
+
+def test_training_plan_digest_covers_semantic_fields_only():
+    base = {
+        "drafter": {
+            "mask_token_id": 255,
+            "block_size": 8,
+            "num_anchors": 256,
+            "num_hidden_layers": 3,
+            "loss_decay_gamma": 7.0,
+        },
+        "train": {
+            "seed": 42,
+            "micro_batch_size": 2,
+            "grad_accumulation_steps": 1,
+            "num_epochs": 1,
+            "lr": 6e-4,
+            "warmup_ratio": 0.04,
+            "min_lr_ratio": 0.1,
+            "max_grad_norm": 1.0,
+        },
+    }
+    digest = training_plan_digest(base, "dflash")
+    assert training_plan_digest(json.loads(json.dumps(base)), "dflash") == digest
+    assert training_plan_digest(base, "dflash", dataset_len=8) != training_plan_digest(
+        base, "dflash", dataset_len=9
+    )
+
+    # Every effective training knob is covered, including shape-compatible ones.
+    for section, key, value in (
+        ("train", "seed", 43),
+        ("train", "micro_batch_size", 1),
+        ("train", "grad_accumulation_steps", 2),
+        ("train", "num_epochs", 2),
+        ("train", "lr", 1e-3),
+        ("train", "warmup_ratio", 0.1),
+        ("train", "min_lr_ratio", 0.2),
+        ("train", "max_grad_norm", 0.5),
+        ("train", "draft_dtype", "float32"),
+        ("drafter", "block_size", 4),
+        ("drafter", "num_anchors", 8),
+        ("drafter", "num_hidden_layers", 2),
+        ("drafter", "loss_decay_gamma", 4.0),
+        ("drafter", "spatial_rope_enabled", False),
+        ("drafter", "spatial_rope_mode", "add"),
+        ("drafter", "sample_from_anchor", True),
+        ("drafter", "attention_backend", "sdpa"),
+    ):
+        changed = json.loads(json.dumps(base))
+        changed[section][key] = value
+        assert training_plan_digest(changed, "dflash") != digest, (section, key)
+
+    # Non-semantic fields (device, logging cadence, worker count, checkpoint
+    # cadence) are deliberately excluded: they do not change the optimizer steps.
+    for section, key, value in (
+        ("train", "device", "cpu"),
+        ("train", "log_every_steps", 1),
+        ("train", "num_workers", 4),
+        ("train", "save_every_steps", 3),
+    ):
+        changed = json.loads(json.dumps(base))
+        changed[section][key] = value
+        assert training_plan_digest(changed, "dflash") == digest, (section, key)
+
+
+@pytest.mark.parametrize("algorithm", ["dflash", "dspark", "domino", "jetspec", "dflash2"])
+def test_training_plan_digest_resolves_every_algorithm(algorithm):
+    cfg = {"drafter": {"mask_token_id": 255, "block_size": 8}, "train": {}}
+    digest = training_plan_digest(cfg, algorithm)
+    assert len(digest) == 64
+    if algorithm == "dflash":
+        return
+    defaults = _default_knob(algorithm)
+    key = next(iter(defaults))
+    # Algorithm-namespaced knobs resolve with defaults filled in: restating a
+    # default is a no-op ...
+    same = json.loads(json.dumps(cfg))
+    same["algorithm"] = {algorithm: {key: defaults[key]}}
+    assert training_plan_digest(same, algorithm) == digest
+    # ... while overriding one (same shape) changes the digest instead of
+    # slipping through as a missing key.
+    changed = json.loads(json.dumps(cfg))
+    changed["algorithm"] = {algorithm: {key: _changed_knob_value(algorithm, key)}}
+    assert training_plan_digest(changed, algorithm) != digest
+
+
+def _default_knob(algorithm: str) -> dict:
+    from vlm_dflash.dspark.factory import DEFAULTS as DSPARK_DEFAULTS
+    from vlm_dflash.domino.factory import DEFAULTS as DOMINO_DEFAULTS
+    from vlm_dflash.jetspec.factory import DEFAULTS as JETSPEC_DEFAULTS
+    from vlm_dflash.dflash2.factory import DEFAULTS as DFLASH2_DEFAULTS
+
+    return {
+        "dspark": DSPARK_DEFAULTS,
+        "domino": DOMINO_DEFAULTS,
+        "jetspec": JETSPEC_DEFAULTS,
+        "dflash2": DFLASH2_DEFAULTS,
+    }[algorithm]
+
+
+def _changed_knob_value(algorithm: str, key: str):
+    value = _default_knob(algorithm)[key]
+    if isinstance(value, bool):
+        return not value
+    if isinstance(value, int):
+        return value + 1
+    if isinstance(value, float):
+        return value + 0.5
+    return f"{value}-changed"
 
 
 def test_online_final_hidden_flows_into_batches(monkeypatch, tmp_path):
@@ -1283,3 +1489,732 @@ def test_online_head_extraction_reports_tied_and_untied(monkeypatch, tmp_path):
     untied_contract = _stub_contract(head={"tie_word_embeddings": False})
     untied_source = _stub_source(monkeypatch, run_dir, tied=False, contract=untied_contract)
     assert untied_source.tied_head is False and untied_source.lm_head_weight is not None
+
+
+# --------------------------------------------------------------------------- #
+# 5. resume write-order, dtype boundary, offline/online alignment
+# --------------------------------------------------------------------------- #
+
+_TINY_DRAFT_KNOBS = {"mask_token_id": 255, "block_size": 8, "num_anchors": 16}
+
+
+def _tiny_draft_config(*, vocab: int = 512, hidden: int = 32, block_size: int = 8, num_layers: int = 2):
+    """A hand-built draft config standing in for ``factory.build_draft_config``."""
+    torch.manual_seed(0)
+    from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
+
+    config = Qwen3Config(
+        vocab_size=vocab,
+        hidden_size=hidden,
+        intermediate_size=hidden * 2,
+        num_hidden_layers=num_layers,
+        num_attention_heads=4,
+        num_key_value_heads=2,
+        head_dim=hidden // 4,
+        max_position_embeddings=512,
+        rope_parameters={"rope_type": "default", "rope_theta": 10000.0},
+        block_size=block_size,
+        num_target_layers=2,
+        dflash_config={"mask_token_id": 255, "target_layer_ids": [0, 1], "spatial_rope_enabled": False},
+    )
+    config._attn_implementation = "sdpa"
+    return config
+
+
+def _patch_tiny_draft_build(monkeypatch):
+    """Let the real dflash algorithm build the tiny hand-made draft config."""
+    import vlm_dflash.dflash.factory as dflash_factory
+
+    monkeypatch.setattr(
+        dflash_factory,
+        "build_draft_config",
+        lambda contract, cfg: _tiny_draft_config(block_size=int(cfg["drafter"]["block_size"])),
+    )
+
+
+def _patch_drafter_visual_check(monkeypatch):
+    import vlm_dflash.dflash.visual_check as visual_check_module
+
+    monkeypatch.setattr(
+        visual_check_module,
+        "check_drafter_visual_dependence",
+        lambda *args, **kwargs: {"skipped": True, "reason": "unit test"},
+    )
+
+
+def _tiny_train_dflash_cfg(*, draft_dtype: str = "bfloat16") -> dict:
+    return {
+        "target": {"model": "/models/tiny-vl", "dtype": "float32", "attn_implementation": "sdpa"},
+        "capture": {"seq_length": 64, "dtype": draft_dtype, "visual_path_check": False},
+        "drafter": {
+            **_TINY_DRAFT_KNOBS,
+            "num_hidden_layers": 2,
+            "attention_backend": "sdpa",
+            "spatial_rope_enabled": False,
+        },
+        "train": {
+            "micro_batch_size": 1,
+            "grad_accumulation_steps": 1,
+            "num_epochs": 1,
+            "lr": 1e-3,
+            "log_every_steps": 0,
+            "max_grad_norm": 1.0,
+            "warmup_ratio": 0.1,
+            "min_lr_ratio": 0.1,
+            "draft_dtype": draft_dtype,
+            "device": "cpu",
+            "overfit_sanity": {"enabled": False},
+        },
+    }
+
+
+def _tiny_train_setup(monkeypatch, tmp_path, *, rows: int = 2, draft_dtype: str = "bfloat16"):
+    """Real tiny Qwen2.5-VL target + real capture path, no model download."""
+    model, processor = _tiny_qwen25_vl_model()
+    contract = _tiny_contract()
+    run_dir = _sync_online_run_dir(tmp_path, model, processor, rows=rows, answer_len=12)
+    monkeypatch.setattr(online_module, "load_target", lambda cfg, contract_: (model, processor))
+    cfg = _tiny_train_dflash_cfg(draft_dtype=draft_dtype)
+    source = online_module.OnlineFeatureSource(cfg, contract, run_dir)
+    return model, processor, contract, run_dir, cfg, source
+
+
+def _tiny_online_train_run(monkeypatch, tmp_path, *, steps: int = 2):
+    model, processor, contract, run_dir, cfg, _source = _tiny_train_setup(monkeypatch, tmp_path)
+    _patch_tiny_draft_build(monkeypatch)
+    _patch_drafter_visual_check(monkeypatch)
+    summary = train_dflash(cfg, run_dir, contract, steps=steps, feature_mode="online")
+    return cfg, contract, run_dir, summary
+
+
+def test_train_dflash_resume_write_order_online(monkeypatch, tmp_path):
+    cfg, contract, run_dir, summary = _tiny_online_train_run(monkeypatch, tmp_path)
+    assert summary["steps"] == 2 and summary["feature_mode"] == "online"
+    assert summary["dtypes"]["frozen_embed"] == "bfloat16"
+
+    frozen_files = [
+        run_dir / "train" / "ckpt_init.pt",
+        run_dir / "train" / "train_log.jsonl",
+        run_dir / "train" / "train_summary.json",
+        run_dir / "train" / "overfit_sanity.json",
+        run_dir / "provenance.json",
+    ]
+    before = {path: path.read_bytes() for path in frozen_files}
+
+    # A changed plan (seed) is refused before any write: every original
+    # artifact stays byte-identical.
+    broken = json.loads(json.dumps(cfg))
+    broken["train"]["seed"] = int(cfg["train"].get("seed", 42)) + 1
+    with pytest.raises(ValueError, match="training-plan mismatch"):
+        train_dflash(broken, run_dir, contract, steps=2, resume=True, feature_mode="online")
+    for path, payload in before.items():
+        assert path.read_bytes() == payload, path
+
+    # A legal resume keeps the original ckpt_init byte-for-byte (the random-init
+    # baseline is never regenerated) and continues from the recorded step.
+    resumed = train_dflash(cfg, run_dir, contract, steps=2, resume=True, feature_mode="online")
+    assert resumed["resumed_from_step"] >= 1
+    assert (run_dir / "train" / "ckpt_init.pt").read_bytes() == before[run_dir / "train" / "ckpt_init.pt"]
+    assert (run_dir / "train" / "overfit_sanity.json").read_bytes() == before[run_dir / "train" / "overfit_sanity.json"]
+
+
+def test_cli_resume_preflight_refuses_before_writing(monkeypatch, tmp_path):
+    cfg, contract, run_dir, _summary = _tiny_online_train_run(monkeypatch, tmp_path)
+    from vlm_dflash import cli as cli_module
+
+    # The real contract carries layers.block_size, which the YAML check reads.
+    recorded_contract = json.loads(json.dumps(contract))
+    recorded_contract["layers"]["block_size"] = int(cfg["drafter"]["block_size"])
+    (run_dir / "contract.json").write_text(json.dumps(recorded_contract), encoding="utf-8")
+    (run_dir / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+    frozen_files = [
+        run_dir / "contract.json",
+        run_dir / "config.json",
+        run_dir / "train" / "ckpt_init.pt",
+        run_dir / "train" / "ckpt_last.pt",
+    ]
+    before = {path: path.read_bytes() for path in frozen_files}
+
+    # Stage digests are not the subject of this test; the upstream stages are
+    # simulated as present and matching.
+    monkeypatch.setattr(cli_module, "stage_status", lambda *args, **kwargs: "skip")
+    args = SimpleNamespace(limit=None, steps=2, force=False)
+
+    broken = json.loads(json.dumps(cfg))
+    broken["train"]["seed"] = int(cfg["train"].get("seed", 42)) + 1
+    with pytest.raises(SystemExit, match="training-plan mismatch"):
+        cli_module._preflight_resume(broken, run_dir, args, "online", None)
+    # A config pointed at another target must refuse before config.json is
+    # rewritten (ensure_contract would only catch it afterwards).
+    wrong_target = json.loads(json.dumps(cfg))
+    wrong_target["target"]["model"] = "/models/other-vl"
+    with pytest.raises(SystemExit, match="created for target"):
+        cli_module._preflight_resume(wrong_target, run_dir, args, "online", None)
+    for path, payload in before.items():
+        assert path.read_bytes() == payload, path
+
+    result = cli_module._preflight_resume(cfg, run_dir, args, "online", None)
+    assert result["mode"] == "online" and result["total_steps"] == 2
+    assert len(result["plan_digest"]) == 64 and result["step"] >= 1
+
+
+def test_cmd_train_online_rejects_num_workers_before_any_stage(monkeypatch, tmp_path):
+    import vlm_dflash.cli as cli_module
+
+    cfg = {
+        "target": {"model": "/models/x"},
+        "dataset": {"source": "jsonl", "path": "d.jsonl"},
+        "train": {"feature_mode": "online", "num_workers": 2},
+        "run": {"name": "x", "dir": str(tmp_path / "run")},
+    }
+    monkeypatch.setattr(cli_module, "build_train_config", lambda args: cfg)
+    monkeypatch.setattr(
+        cli_module, "stage_status", lambda *a, **k: (_ for _ in ()).throw(AssertionError("stages must not run"))
+    )
+    with pytest.raises(SystemExit, match="num_workers=0"):
+        cli_module.cmd_train(_train_args(tmp_path))
+
+
+def test_online_fp32_target_bf16_storage_trains_through_real_factory(monkeypatch, tmp_path):
+    """The dtype boundary regression: an fp32 target must hand the trainer a
+    bf16 frozen head (storage dtype), never the native fp32 weights."""
+    model, processor, contract, run_dir, cfg, source = _tiny_train_setup(monkeypatch, tmp_path)
+
+    assert next(model.parameters()).dtype == torch.float32
+    assert source.embed_weight.dtype == torch.bfloat16
+    assert source.lm_head_weight is None  # tied target: head shares the embedding
+
+    from vlm_dflash.dflash.factory import build_trainer_module
+
+    module = build_trainer_module(
+        _tiny_draft_config(), contract, cfg, source.embed_weight, lm_head_weight=source.lm_head_weight
+    )
+    assert module.embed_tokens.weight.dtype == torch.bfloat16
+    assert module.lm_head.weight.dtype == torch.bfloat16
+
+    output = run_training_loop(
+        module,
+        source.dataset(),
+        cfg,
+        contract,
+        torch.device("cpu"),
+        total_steps=1,
+        seed=0,
+        shuffle=False,
+        log_path=None,
+    )
+    history = output["history"]
+    assert len(history) == 1 and history[0]["loss"] == history[0]["loss"]
+
+
+def test_training_loop_refuses_frozen_head_dtype_mismatch():
+    module = _tiny_dflash_module()  # frozen fp32 head/embed
+    cfg = {
+        "train": {
+            "micro_batch_size": 1,
+            "grad_accumulation_steps": 1,
+            "num_epochs": 1,
+            "lr": 1e-3,
+            "log_every_steps": 0,
+            "draft_dtype": "bfloat16",
+        }
+    }
+    with pytest.raises(RuntimeError, match="Frozen target head dtype mismatch"):
+        run_training_loop(
+            module,
+            _FastForwardDataset(_tiny_train_items(2)),
+            cfg,
+            {"tokens": {"image_token_id": 999999}},
+            torch.device("cpu"),
+            total_steps=1,
+            seed=0,
+            shuffle=False,
+            log_path=None,
+        )
+
+
+def test_offline_online_multistep_updates_align(monkeypatch, tmp_path):
+    """Fixed teacher / data / init / seed / budget: staged and live features must
+    produce the same optimizer trajectory (CPU: exact float equality)."""
+    model, processor, contract, run_dir, _cfg, source = _tiny_train_setup(
+        monkeypatch, tmp_path, draft_dtype="bfloat16"
+    )
+    records = [source.extract(index) for index in range(len(source.rows))]
+    from vlm_dflash.target.sample_capture import extract_target_head
+
+    embed_weight, lm_head_weight, _tied = extract_target_head(model, contract)
+    # The trainer consumes the frozen head in the feature-storage dtype (bf16),
+    # exactly like capture.save_target_head / the online source do.
+    embed_weight = embed_weight.to(torch.bfloat16)
+    if lm_head_weight is not None:
+        lm_head_weight = lm_head_weight.to(torch.bfloat16)
+    features_dir = run_dir / "features"
+    _write_tiny_feature_store(features_dir, contract, records, embed_weight)
+
+    cfg = {
+        "drafter": {
+            **_TINY_DRAFT_KNOBS,
+            "num_hidden_layers": 2,
+            "attention_backend": "sdpa",
+            "spatial_rope_enabled": False,
+        },
+        "train": {
+            "micro_batch_size": 1,
+            "grad_accumulation_steps": 1,
+            "num_epochs": 1,
+            "lr": 1e-3,
+            "log_every_steps": 0,
+            "max_grad_norm": 1.0,
+            "warmup_ratio": 0.1,
+            "min_lr_ratio": 0.1,
+            # Storage dtype is bf16 (the capture/online storage contract), so the
+            # draft must compute in bf16: the frozen head is stored in bf16.
+            "draft_dtype": "bfloat16",
+        },
+    }
+    from vlm_dflash.dflash.factory import build_trainer_module
+
+    def fresh_module():
+        return build_trainer_module(
+            _tiny_draft_config(), contract, cfg, embed_weight, lm_head_weight=lm_head_weight
+        )
+
+    torch.manual_seed(1234)
+    offline_module = fresh_module()
+    offline_output = run_training_loop(
+        offline_module,
+        FeatureDataset(features_dir),
+        cfg,
+        contract,
+        torch.device("cpu"),
+        total_steps=3,
+        seed=7,
+        shuffle=False,
+        log_path=None,
+    )
+    torch.manual_seed(1234)
+    online_module = fresh_module()
+    online_output = run_training_loop(
+        online_module,
+        source.dataset(),
+        cfg,
+        contract,
+        torch.device("cpu"),
+        total_steps=3,
+        seed=7,
+        shuffle=False,
+        log_path=None,
+    )
+
+    offline_losses = [row["loss"] for row in offline_output["history"]]
+    online_losses = [row["loss"] for row in online_output["history"]]
+    assert len(offline_losses) == len(online_losses) == 3
+    assert offline_losses == online_losses
+    for name, value in offline_module.draft_model.state_dict().items():
+        assert torch.equal(value, online_module.draft_model.state_dict()[name]), name
+
+
+def _write_tiny_feature_store(features_dir: Path, contract: dict, records: list[dict], embed_weight: torch.Tensor):
+    features_dir.mkdir(parents=True, exist_ok=True)
+    torch.save({"samples": records}, features_dir / "shard_000.pt")
+    write_jsonl(
+        features_dir / "index.jsonl",
+        [
+            {
+                "sample_id": record["sample_id"],
+                "shard": "shard_000.pt",
+                "shard_index": index,
+                "seq_len": int(record["input_ids"].numel()),
+                "prompt_len": int(record["prompt_len"]),
+                "answer_len": int(record["answer_len"]),
+                "image_span": list(record["image_span"]),
+                "n_image_tokens": int(record["n_image_tokens"]),
+            }
+            for index, record in enumerate(records)
+        ],
+    )
+    seq_lengths = [int(record["input_ids"].numel()) for record in records]
+    manifest = {
+        "format": "vlm-dflash-features-v1",
+        "identity": identity_from_contract(contract),
+        "seq_length": max(seq_lengths),
+        "storage_dtype": str(records[0]["hidden"].dtype).replace("torch.", ""),
+        "num_samples": len(records),
+        "num_truncated": 0,
+        "draft_layer_ids": contract["layers"]["draft_layer_ids"],
+        "stores_final_hidden": False,
+        "tie_word_embeddings": True,
+        "lm_head_saved": False,
+        "seq_len_stats": {"min": min(seq_lengths), "max": max(seq_lengths), "mean": sum(seq_lengths) / len(seq_lengths)},
+    }
+    (features_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    torch.save(
+        {
+            "format": "vlm-dflash-target-head-v1",
+            "embed_tokens": embed_weight.to(records[0]["hidden"].dtype).cpu(),
+            "tie_word_embeddings": True,
+            "model_fingerprint": contract["target"]["model_fingerprint"],
+        },
+        features_dir / "target_head.pt",
+    )
+
+
+def test_offline_feature_digest_and_offline_resume_write_order(monkeypatch, tmp_path):
+    model, processor, contract, run_dir, cfg, source = _tiny_train_setup(
+        monkeypatch, tmp_path, draft_dtype="bfloat16"
+    )
+    records = [source.extract(index) for index in range(len(source.rows))]
+    from vlm_dflash.target.sample_capture import extract_target_head
+
+    embed_weight, _lm_head_weight, _tied = extract_target_head(model, contract)
+    features_dir = run_dir / "features"
+    _write_tiny_feature_store(features_dir, contract, records, embed_weight)
+
+    # Content-addressed: a copy of the store keeps its identity, a changed
+    # shard does not.
+    copy_dir = tmp_path / "features_copy"
+    shutil.copytree(features_dir, copy_dir)
+    assert offline_feature_digest(copy_dir) == offline_feature_digest(features_dir)
+    tampered = torch.load(copy_dir / "shard_000.pt", map_location="cpu", weights_only=False)
+    tampered["samples"][0]["input_ids"] = tampered["samples"][0]["input_ids"] + 1
+    torch.save(tampered, copy_dir / "shard_000.pt")
+    assert offline_feature_digest(copy_dir) != offline_feature_digest(features_dir)
+
+    _patch_tiny_draft_build(monkeypatch)
+    summary = train_dflash(cfg, run_dir, contract, steps=2, feature_mode="offline")
+    assert summary["steps"] == 2 and summary["feature_mode"] == "offline"
+
+    frozen_files = [
+        run_dir / "train" / "ckpt_init.pt",
+        run_dir / "train" / "train_log.jsonl",
+        run_dir / "train" / "train_summary.json",
+        run_dir / "train" / "overfit_sanity.json",
+        run_dir / "provenance.json",
+    ]
+    before = {path: path.read_bytes() for path in frozen_files}
+
+    # A changed plan (batch geometry) is refused before any write.
+    broken = json.loads(json.dumps(cfg))
+    broken["train"]["micro_batch_size"] = int(cfg["train"]["micro_batch_size"]) + 1
+    with pytest.raises(ValueError, match="training-plan mismatch"):
+        train_dflash(broken, run_dir, contract, steps=2, resume=True, feature_mode="offline")
+    for path, payload in before.items():
+        assert path.read_bytes() == payload, path
+
+    # The read-only preflight validates the same plan without touching the run.
+    preflight = preflight_resume(cfg, run_dir, contract, steps=2, feature_mode="offline")
+    assert preflight["total_steps"] == 2 and preflight["mode"] == "offline"
+
+    # A legal resume keeps the original ckpt_init byte-for-byte.
+    resumed = train_dflash(cfg, run_dir, contract, steps=2, resume=True, feature_mode="offline")
+    assert resumed["resumed_from_step"] >= 1
+    assert (run_dir / "train" / "ckpt_init.pt").read_bytes() == before[run_dir / "train" / "ckpt_init.pt"]
+
+
+# --------------------------------------------------------------------------- #
+# Second-review boundary fixes
+# --------------------------------------------------------------------------- #
+
+def _accum_items(count: int = 4, seq: int = 32, hidden: int = 128, seed: int = 0) -> list[dict]:
+    """Anchor-valid batch items for the tiny trainer module (fused hidden)."""
+    generator = torch.Generator().manual_seed(seed)
+    items = []
+    for _ in range(count):
+        ids = torch.arange(seq) % 200 + 10
+        mask = torch.ones(seq)
+        mask[:8] = 0.0
+        items.append(
+            {
+                "input_ids": ids,
+                "loss_mask": mask,
+                "hidden": torch.randn(seq, hidden, generator=generator) * 0.2,
+                "position3": torch.arange(seq).repeat(3, 1),
+                "image_span": (0, 0),
+                "sample_id": "tiny",
+            }
+        )
+    return items
+
+
+def _accum_cfg(**overrides) -> dict:
+    cfg = {
+        "train": {
+            "micro_batch_size": 1,
+            "grad_accumulation_steps": 4,
+            "num_epochs": 1,
+            "lr": 1e-3,
+            "log_every_steps": 0,
+            "max_grad_norm": 1.0,
+            "warmup_ratio": 0.1,
+            "min_lr_ratio": 0.1,
+            "draft_dtype": "float32",
+        }
+    }
+    for key, value in overrides.items():
+        cfg["train"][key] = value
+    return cfg
+
+
+def test_pending_accumulation_across_epochs_is_not_a_stall():
+    """One legal sample + accumulation=4: the first optimizer step spans four
+    epochs; pending (gradient-bearing) micro-batches are progress, so the
+    stall guard must not fire before the window fills."""
+    module = _tiny_dflash_module()
+    output = run_training_loop(
+        module,
+        _FastForwardDataset(_accum_items(1)),
+        _accum_cfg(),
+        {"tokens": {"image_token_id": 999999}},
+        torch.device("cpu"),
+        total_steps=1,
+        seed=0,
+        shuffle=False,
+        log_path=None,
+    )
+    assert output["summary"]["steps"] == 1
+    assert [row["step"] for row in output["history"]] == [1]
+
+
+def test_no_valid_supervision_still_stalls():
+    """The stall guard must still stop truly empty epochs (all batches raising
+    NoValidAnchorsError), independent of the accumulation bookkeeping."""
+    items = _accum_items(1)
+    items[0]["loss_mask"] = torch.zeros_like(items[0]["loss_mask"])
+    with pytest.raises(RuntimeError, match="no valid supervision"):
+        run_training_loop(
+            _tiny_dflash_module(),
+            _FastForwardDataset(items),
+            _accum_cfg(),
+            {"tokens": {"image_token_id": 999999}},
+            torch.device("cpu"),
+            total_steps=1,
+            seed=0,
+            shuffle=False,
+            log_path=None,
+        )
+
+
+def test_resume_replays_across_epoch_boundaries_exactly():
+    """5 samples, micro-batch=2, accumulation=3: steps straddle epoch
+    boundaries; a resume from a mid-run checkpoint must reproduce the
+    uninterrupted remaining losses exactly (CPU float equality)."""
+    cfg = _accum_cfg(micro_batch_size=2, grad_accumulation_steps=3)
+    contract = {"tokens": {"image_token_id": 999999}}
+    states: dict[int, dict] = {}
+
+    def sink(state: dict) -> None:
+        states[int(state["step"])] = state
+
+    baseline = run_training_loop(
+        _tiny_dflash_module(),
+        _FastForwardDataset(_accum_items(5)),
+        cfg,
+        contract,
+        torch.device("cpu"),
+        total_steps=3,
+        seed=0,
+        shuffle=False,
+        log_path=None,
+        resume_state=None,
+        on_checkpoint=sink,
+        save_every=1,
+    )
+    baseline_losses = [row["loss"] for row in baseline["history"]]
+    assert len(baseline_losses) == 3 and 2 in states
+
+    resumed = run_training_loop(
+        _tiny_dflash_module(),
+        _FastForwardDataset(_accum_items(5)),
+        cfg,
+        contract,
+        torch.device("cpu"),
+        total_steps=3,
+        seed=0,
+        shuffle=False,
+        log_path=None,
+        resume_state=states[2],
+        on_checkpoint=None,
+        save_every=1,
+    )
+    resumed_losses = [row["loss"] for row in resumed["history"]]
+    assert resumed["summary"]["resumed_from_step"] == 2
+    assert [row["step"] for row in resumed["history"]] == [1, 2, 3]
+    assert resumed_losses[:2] == baseline_losses[:2]
+    assert resumed_losses[2] == baseline_losses[2]
+
+
+def test_reconcile_train_log_moves_uncommitted_tail_and_half_lines(tmp_path):
+    log_path = tmp_path / "train_log.jsonl"
+    log_path.write_text(
+        '{"step": 1, "loss": 1.0}\n{"step": 2, "loss": 2.0}\n{"step": 3, "loss": 3.0}\n',
+        encoding="utf-8",
+    )
+    _reconcile_train_log(log_path, 2)
+    kept = [json.loads(line)["step"] for line in log_path.read_text(encoding="utf-8").splitlines()]
+    recovery = tmp_path / "train_log.uncommitted.jsonl"
+    moved = [json.loads(line)["step"] for line in recovery.read_text(encoding="utf-8").splitlines()]
+    assert kept == [1, 2] and moved == [3]
+
+    # A truncated final line (interrupted write) is uncommitted too.
+    with log_path.open("a", encoding="utf-8") as fh:
+        fh.write('{"step": 3')
+    _reconcile_train_log(log_path, 2)
+    assert [json.loads(line)["step"] for line in log_path.read_text(encoding="utf-8").splitlines()] == [1, 2]
+    assert recovery.read_text(encoding="utf-8").strip() == '{"step": 3'
+
+
+def test_interrupted_run_resume_keeps_log_steps_unique(monkeypatch, tmp_path):
+    """Reproduces the [1, 2, 3] -> [1, 2, 3, 3] report: an interrupted run
+    whose log already contains a step the checkpoint does not cover. The
+    resumed run must keep the log unique and ordered, with the replayed tail
+    preserved as a recovery artifact."""
+    import vlm_dflash.dflash.train as train_module
+
+    model, processor, contract, run_dir, cfg, _source = _tiny_train_setup(monkeypatch, tmp_path)
+    _patch_tiny_draft_build(monkeypatch)
+    _patch_drafter_visual_check(monkeypatch)
+
+    original = train_module.gather_train_state
+    calls = {"n": 0}
+
+    def flaky(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 3:  # step-1 and step-2 checkpoints, then the final state
+            raise RuntimeError("injected interruption before the final resumable write")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(train_module, "gather_train_state", flaky)
+    with pytest.raises(RuntimeError, match="injected interruption"):
+        train_dflash(cfg, run_dir, contract, steps=3, feature_mode="online")
+    monkeypatch.setattr(train_module, "gather_train_state", original)
+
+    log_path = run_dir / "train" / "train_log.jsonl"
+    steps_before = [json.loads(line)["step"] for line in log_path.read_text(encoding="utf-8").splitlines()]
+    assert steps_before == [1, 2, 3]
+    ckpt_before = torch.load(run_dir / "train" / "ckpt_last.pt", map_location="cpu", weights_only=False)
+    assert ckpt_before["step"] == 2
+
+    resumed = train_dflash(cfg, run_dir, contract, steps=3, resume=True, feature_mode="online")
+    assert resumed["steps"] == 3 and resumed["resumed_from_step"] == 2
+    steps_after = [json.loads(line)["step"] for line in log_path.read_text(encoding="utf-8").splitlines()]
+    assert steps_after == [1, 2, 3]
+    recovery = run_dir / "train" / "train_log.uncommitted.jsonl"
+    assert [json.loads(line)["step"] for line in recovery.read_text(encoding="utf-8").splitlines()] == [3]
+
+    # The completed run records its final resumable state: repeating the
+    # resume is a no-op and leaves the log untouched.
+    ckpt_done = torch.load(run_dir / "train" / "ckpt_last.pt", map_location="cpu", weights_only=False)
+    assert ckpt_done["step"] == 3
+    again = train_dflash(cfg, run_dir, contract, steps=3, resume=True, feature_mode="online")
+    assert again["steps"] == 3 and again["resumed_from_step"] == 3
+    assert [json.loads(line)["step"] for line in log_path.read_text(encoding="utf-8").splitlines()] == [1, 2, 3]
+
+
+def test_visual_check_failure_closes_online_source(monkeypatch, tmp_path):
+    """A failure during online startup (before the trainer exists) must still
+    release the target: close() is called exactly once and drops its refs."""
+    model, processor, contract, run_dir, cfg, _source = _tiny_train_setup(monkeypatch, tmp_path)
+    _patch_tiny_draft_build(monkeypatch)
+    cfg["capture"]["visual_path_check"] = True
+
+    closed = []
+    original_close = online_module.OnlineFeatureSource.close
+
+    def counting_close(self):
+        closed.append(self)
+        original_close(self)
+
+    monkeypatch.setattr(online_module.OnlineFeatureSource, "close", counting_close)
+
+    import vlm_dflash.target.visual_check as visual_check_module
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("injected visual-check failure")
+
+    monkeypatch.setattr(visual_check_module, "run_visual_path_check", boom)
+    with pytest.raises(RuntimeError, match="injected visual-check failure"):
+        train_dflash(cfg, run_dir, contract, steps=1, feature_mode="online")
+    assert len(closed) == 1
+    source = closed[0]
+    assert source.model is None and source.processor is None
+    assert source.embed_weight is None and source.lm_head_weight is None
+
+
+def test_online_source_constructor_failure_closes_partial_state(monkeypatch, tmp_path):
+    model, processor, contract, run_dir, cfg, _source = _tiny_train_setup(monkeypatch, tmp_path)
+    closed = []
+    original_close = online_module.OnlineFeatureSource.close
+
+    def counting_close(self):
+        closed.append(self)
+        original_close(self)
+
+    monkeypatch.setattr(online_module.OnlineFeatureSource, "close", counting_close)
+    original_extract = online_module.extract_target_head
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("injected head-extraction failure")
+
+    monkeypatch.setattr(online_module, "extract_target_head", boom)
+    with pytest.raises(RuntimeError, match="injected head-extraction failure"):
+        online_module.OnlineFeatureSource(cfg, contract, run_dir)
+    assert len(closed) == 1
+    assert closed[0].model is None and closed[0].processor is None
+
+    # close() is idempotent on a healthy source too, and the released refs
+    # include the frozen embedding/head copies handed to the trainer.
+    monkeypatch.setattr(online_module, "extract_target_head", original_extract)
+    source = online_module.OnlineFeatureSource(cfg, contract, run_dir)
+    source.close()
+    source.close()
+    assert source.model is None and source.processor is None
+    assert source.embed_weight is None and source.lm_head_weight is None
+
+
+def test_cli_resume_preflight_external_features_dependency_chain(monkeypatch, tmp_path):
+    """--features runs never build regen/capture; the resume preflight must
+    check only the stages the run actually owns (data) plus the store digest
+    and training plan."""
+    import vlm_dflash.cli as cli_module
+    from vlm_dflash.target.sample_capture import extract_target_head
+
+    model, processor, contract, run_dir, cfg, source = _tiny_train_setup(monkeypatch, tmp_path)
+    records = [source.extract(index) for index in range(len(source.rows))]
+    embed_weight, _lm_head_weight, _tied = extract_target_head(model, contract)
+    store = tmp_path / "shared_store"
+    _write_tiny_feature_store(store, contract, records, embed_weight)
+
+    _patch_tiny_draft_build(monkeypatch)
+    _patch_drafter_visual_check(monkeypatch)
+    summary = train_dflash(cfg, run_dir, contract, steps=2, feature_mode="offline", features_dir=store)
+    assert summary["steps"] == 2
+    # --features runs record no regen/capture *stage manifests* (cmd_train
+    # skips those stages); the preflight must not demand them.
+    assert not (run_dir / "regen" / "stage_manifest.json").exists()
+    assert not (run_dir / "capture" / "stage_manifest.json").exists()
+
+    recorded_contract = json.loads(json.dumps(contract))
+    recorded_contract["layers"]["block_size"] = int(cfg["drafter"]["block_size"])
+    (run_dir / "contract.json").write_text(json.dumps(recorded_contract), encoding="utf-8")
+    (run_dir / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+    args = SimpleNamespace(limit=None, steps=2, force=False)
+
+    consulted = []
+
+    def fake_stage_status(run_dir_, stage, marker, digest, force):
+        consulted.append(stage)
+        return "skip"
+
+    monkeypatch.setattr(cli_module, "stage_status", fake_stage_status)
+    result = cli_module._preflight_resume(cfg, run_dir, args, "offline", store)
+    assert result["mode"] == "offline" and result["total_steps"] == 2
+    assert consulted == ["data"], f"preflight must not require regen/capture for --features: {consulted}"
+
+    # Without --features the same run is internal-offline and *does* require
+    # the regen stage it never built: the negative case still refuses.
+    def regen_missing(run_dir_, stage, marker, digest, force):
+        return "skip" if stage == "data" else "run"
+
+    monkeypatch.setattr(cli_module, "stage_status", regen_missing)
+    with pytest.raises(SystemExit, match="regen"):
+        cli_module._preflight_resume(cfg, run_dir, SimpleNamespace(limit=None, steps=2, force=False), "offline", None)

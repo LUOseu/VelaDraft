@@ -85,6 +85,145 @@
   fast-forward batches, no re-extraction). Smoke ALs are <=1.09 after 4 steps
   and are not quality results.
 
+### Online review fixes: exact-resume safety, content digests, dtype boundary
+
+Findings from the external review of `aed7bf8` (four confirmed issues), fixed
+before any further online work. No algorithm or protocol changes.
+
+- **Resume preflight is read-only.** `train --resume` now validates the
+  checkpoint (and, for online, the consumed data) *before* writing anything:
+  `config.json` is no longer overwritten before validation, `ckpt_init.pt` is
+  never regenerated (a legal resume keeps the original random-init baseline
+  byte-for-byte), and a refused resume — changed mode/algorithm/plan/source/
+  identity, or rebuilt upstream stages — leaves config, checkpoints, logs,
+  provenance and diagnostics byte-identical. The CLI preflight
+  (`cli._preflight_resume` + `dflash.train.preflight_resume`) also refuses
+  `--resume --force` and legacy runs without stage manifests, and does not
+  need to load the target (the online digest comes from the rows + image
+  bytes directly).
+- **Versioned content digests.** `ONLINE_DIGEST_VERSION`
+  (`vlm-dflash-online-source-digest-v2`) hashes the actual consumed content —
+  per-row prompt/answer token ids in order, the exact `--limit` slice, image
+  bytes (verified against `data/manifest.json`; a stale manifest is a loud
+  error, not evidence) and the extraction settings — so a same-length answer
+  edit or a same-size image swap changes the digest, while the same content
+  copied to another directory keeps its identity. Offline stores get the same
+  treatment (`OFFLINE_DIGEST_VERSION`,
+  `dflash.features.offline_feature_digest` over manifest + index + shard +
+  head bytes).
+- **Training-plan resume gate.** New `vlm_dflash/training_plan.py` records a
+  versioned digest of the effective plan — seed, micro-batch, accumulation,
+  epochs, dataset length, draft dtype, optimizer/schedule settings, drafter
+  architecture knobs and the algorithm-namespaced knobs with resolved
+  defaults — in every checkpoint. Exact resume refuses any change (including
+  shape-compatible ones like seeded shuffles and loss weights) and refuses
+  checkpoints that predate the gate instead of fabricating the missing
+  fields; the migration policy is documented in `docs/online-training.md`.
+- **Dtype boundary.** The online source now hands the trainer embed/head
+  copies in the feature-storage dtype (mirroring `capture.save_target_head`)
+  instead of the target's native dtype, and the training loop refuses any
+  frozen-head/compute-dtype mismatch up front with an actionable error
+  (previously an opaque `expected m1 and m2 to have the same dtype` deep in
+  the first forward). `train_summary.json` records the effective
+  target/storage/drafter/head dtypes (`dtypes` block). Supported combinations
+  are exactly "stored head dtype == `train.draft_dtype`"; `capture.dtype`
+  values the trainer cannot compute in (`float16`) are refused before
+  training.
+- **Cleanup and observability.** The online source is closed on every exit
+  path (success and exceptions); per-phase target-device CUDA peaks
+  (`target_device_peak_gb`) are recorded in the source summary with an
+  explicit note on shared vs split devices; the CLI rejects
+  `feature_mode=online` + `num_workers != 0` before any stage runs; a resumed
+  online run reuses the recorded visual-path check instead of rerunning (and
+  rewriting) it.
+- Tests: new CPU coverage for digest v2 (token-value edits, image swaps,
+  path-stability, stale manifests), the plan gate (field coverage across all
+  five algorithms, legacy refusal), resume write-order regressions (online and
+  offline: refused resume byte-identical, legal resume preserving
+  `ckpt_init`), the real-`build_trainer_module` fp32-target/bf16-storage
+  regression and the mismatched-head refusal, and an exact
+  offline↔online multi-step update-alignment test (fixed teacher/data/init/
+  seed/budget).
+- Post-fix GPU rerun set: all five algorithms, the Qwen3-VL-8B untied head
+  and the split-device path (target `cuda:0` → drafter `cuda:1`) re-ran on
+  the fixed code — train → token-exact eval → export in every run,
+  all-bf16 dtype records, plan digests in every checkpoint, source digests
+  stable across devices and sensitive to extraction settings
+  (`6e2051af43b5` without final hidden, `6e58321b4579` with it; 8B
+  `9d2712d52448`), split-device target peak 8.02 GB isolated, 8B peak
+  33.92 GB. The superseded pre-fix smoke run dirs were pruned for disk
+  space (numbers quoted in this changelog).
+
+### Second review fixes: accumulation stall guard, log reconciliation, startup cleanup, external-store resume
+
+Findings from the external second-pass review of `4e9a538` (four P2 boundary
+issues), fixed without touching the training recipe: loss normalization, the
+step budget and the training trajectory are unchanged, so no plan-version
+bump was needed.
+
+- **Accumulation is progress, not a stall.** The shared loop's stall guard
+  counted optimizer steps, so a legal configuration whose accumulation
+  window spans epochs (e.g. 1 sample, `grad_accumulation_steps=4`) raised
+  "no progress" on the third epoch although every micro-batch had produced
+  gradients. The guard now counts valid micro-batches (forward + backward)
+  and only stalls after three full epochs with zero valid supervision; the
+  error message says exactly that. The budget/loss semantics
+  (`ceil(len/accumulation)` planned per epoch, accumulation carried across
+  epoch boundaries, every optimizer step averaging exactly `accumulation`
+  micro-batches) are documented on `compute_total_steps` and unchanged.
+- **Resume reconciles the train log with the checkpoint.** Rows past the
+  checkpoint's committed step — including a half-written JSON line — are
+  preserved as `train_log.uncommitted.jsonl` (a recovery artifact) before
+  the replay appends, so resuming a `[1,2,3]` log with a step-2 checkpoint
+  ends with unique ordered steps instead of `[1,2,3,3]`. A run that
+  completes now also writes its final resumable state to `ckpt_last.pt`
+  (`step == total_steps`), so a later exact resume of a finished run
+  replays zero steps instead of re-emitting the logged tail.
+- **Startup failures now run the cleanup path.** The online resource guard
+  previously started after the source was constructed; an exception during
+  source init, manifest access or the startup visual check left the target
+  referenced. The `try/finally` now wraps source construction and all
+  startup stages; `OnlineFeatureSource.close()` is idempotent, tolerates
+  partially-constructed instances (the constructor closes on failure) and
+  drops the model/processor/embed/head references (`empty_cache` is
+  deliberately not relied on).
+- **`--features` resumes follow the real dependency chain.**
+  `cli._preflight_resume` now mirrors `cmd_train`: external-store resumes
+  check the data stage plus store digest/plan/identity and no longer demand
+  `regen`/`capture` outputs that an `--features` run never produced (offline
+  regression from the first preflight); online and internal-offline resumes
+  still require regen (and capture for offline).
+- Tests: 8 new CPU regressions — pending accumulation across epochs is not a
+  stall while zero supervision still stops; cross-epoch interrupted resume
+  float-aligns with the uninterrupted run; log reconciliation with
+  uncommitted tails and half lines; interrupted-run resume keeps log steps
+  unique and a completed-run resume is a no-op; visual-check failure and
+  constructor failure both close the online source exactly once; the CLI
+  preflight dependency chain for `--features`. Full CPU suite green (222
+  passed, was 214).
+- GPU smoke (second-review set, Qwen2.5-VL-3B online,
+  `runs/fix3_resume_online`): SIGKILLed after step 3 was logged (log
+  `[1,2,3]`, checkpoint at step 2). Resume reconciled the log (1
+  uncommitted row preserved as `train_log.uncommitted.jsonl`), replayed
+  steps 3-6 with unique ordered entries (replayed step-3 loss identical to
+  the pre-kill value), and the completed run wrote its final resumable
+  state (`ckpt_last.pt` step 6); a second resume replayed zero steps with
+  the log byte-identical, and eval was `token_exact=True` on both
+  `ckpt_final.pt` and `ckpt_init.pt` (feature mode recorded as online).
+
+### README repositioning (docs only)
+
+- `README.md` / `README.zh-CN.md` now present the project as training
+  infrastructure: the first screen keeps the support matrix (targets, five
+  algorithms, offline/online, resume, eval, export) and the correctness
+  evidence (token-exact gates, frozen-target identity, export reload); the
+  small-scale AL numbers, the per-algorithm ranking table and the runtime
+  speedup figures are no longer displayed there. All historical results stay
+  unmodified in `BENCHMARKS.md` / `RELEASE_VALIDATION.md` /
+  `docs/measured-runs.md`, which the README links to; Model Zoo entries are
+  labelled reference/validation artifacts. No claim is made about the causes
+  of smoke-scale acceptance numbers.
+
 ## v0.3.1 (2026-10-13)
 
 Distribution fixes, first-run experience, and the post-publish growth review

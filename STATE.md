@@ -1,14 +1,16 @@
 # STATE
 
 Updated: 2026-10-13 (v0.3.2 in development: online target feature source
-pushed; GitHub repo renamed to `LUOseu/VelaDraft`; DFlare/DFly AngelSpec
-ports landed behind the same interfaces — canonical 2K runs, ablations and
-Qwen3-VL reduced validations recorded).
+pushed as `aed7bf8`; online review fixes pushed as `1786176`; second-pass
+review fixes and the README repositioning pushed as `8d6c54c`; GitHub repo
+renamed to `LUOseu/VelaDraft`; DFlare/DFly AngelSpec ports landed behind the
+same interfaces — canonical 2K runs, ablations and Qwen3-VL reduced
+validations recorded).
 
 **Status: v0.3.1 tagged and pushed** (tag `v0.3.1` at `eb3f314`); **v0.3.2 in
-development — the online target feature source is pushed as `aed7bf8`** (repo
-now `github.com/LUOseu/VelaDraft`; old URLs redirect; distribution and CLI
-stay `vlm-dflash`).
+development — the online target feature source is pushed as `aed7bf8` and
+the review fixes as `1786176`** (repo now `github.com/LUOseu/VelaDraft`; old
+URLs redirect; distribution and CLI stay `vlm-dflash`).
 
 - v0.3.2 scope (so far): `train.feature_mode: offline|online` — live
   teacher-forced extraction from the frozen target in the trainer process
@@ -69,7 +71,108 @@ stay `vlm-dflash`).
   (`runs/online_smoke_qwen3_8b`) peak 33.92 GB, target resident 16.33 GiB,
   token-exact; resume check: 3 fast-forward batches, 1 extraction forward
   instead of 4 (`resume_fast_forward_reduced_cost=true`). Smoke ALs <=1.09
-  after 4 steps — plumbing only, not quality.
+  after 4 steps — plumbing only, not quality. The post-fix rerun set (all
+  five algorithms, the 8B untied head and split devices; smoke 6 in
+  `docs/online-training.md`) supersedes these pre-fix smokes; their run dirs
+  were pruned for disk space afterwards (numbers quoted in the docs).
+
+### Online review fixes (on top of `aed7bf8`, 2026-10-13)
+
+- Fixed the four confirmed findings from the external online review before any
+  further online work (no algorithm/protocol changes):
+  1. **Resume preflight is read-only**: `train --resume` validates plan /
+     source / mode / algorithm / identity before writing anything — a refused
+     resume leaves `config.json`, `ckpt_init.pt`, logs, `provenance.json` and
+     the visual diagnostics byte-identical; a legal resume keeps the original
+     `ckpt_init.pt` and never regenerates the baseline; `--resume --force`
+     and stage rebuilds are refused. The CLI preflight needs no target load
+     (digest computed from rows + image bytes).
+  2. **Versioned v2 content digest** (`ONLINE_DIGEST_VERSION`): consumed
+     prompt/answer token ids in order, the exact `--limit` slice, image bytes
+     (verified against `data/manifest.json`; stale manifests are a loud
+     error), extraction settings; path-stable across directory moves.
+     Offline stores use the equivalent `offline_feature_digest`.
+  3. **Versioned training-plan gate** (`vlm_dflash/training_plan.py`) in every
+     checkpoint: seed / micro-batch / accumulation / epochs / dataset length /
+     draft dtype / optimizer + schedule / drafter + algorithm knobs (resolved
+     defaults). Legacy checkpoints are refused for exact resume instead of
+     being re-stamped with new digests.
+  4. **Dtype boundary**: online head copies are cast to the storage dtype
+     (mirroring `capture.save_target_head`); the training loop refuses
+     frozen-head/compute-dtype mismatches with an actionable error;
+     `train_summary.json.dtypes` records the effective combination;
+     per-phase `target_device_peak_gb` and `digest_version` are in the source
+     summary; the online source is closed on all exit paths; the CLI rejects
+     online + `num_workers != 0` before any stage; a resumed online run
+     reuses the recorded visual-path check.
+- Evidence: full CPU suite green (214 tests, was 198) including new
+  digest/plan/write-order regressions (online and offline failed-resume byte
+  hashes; legal resume keeping `ckpt_init`) and an exact offline↔online
+  multi-step update-alignment test (fixed teacher/data/init/seed/budget, CPU
+  exact float equality). GPU smoke 4 (3B, post-fix, `runs/fix_smoke_online`):
+  fresh 3-step online run OK (`dtypes` all bf16, digest v2, plan digest in
+  every checkpoint, target-device peak 13.65 GB); refused resume (changed
+  seed) exited before any write with `config.json` / `ckpt_init` / `ckpt_last`
+  / logs / summary / provenance / visual check md5-identical; legal resume
+  passed the preflight, reused the recorded visual check, resumed from step 2
+  (2 fast-forward batches → 1 extraction forward, `reduced_cost=true`), kept
+  `ckpt_init` unchanged, then eval was token-exact on both checkpoints and
+  export recorded `feature_mode=online`. Post-fix rerun set (GPU smoke 6,
+  `runs/fix2_smoke_*`): all five algorithms train → token-exact eval →
+  export with all-bf16 dtype records and plan digests in every checkpoint
+  (source digests `6e2051af43b5` without / `6e58321b4579` with
+  `store_final_hidden`, identical across devices); 8B untied head OK (digest
+  `9d2712d52448`, peak 33.92 GB); split-device run (target `cuda:0` →
+  drafter `cuda:1`) token-exact with the isolated target peak 8.02 GB. GPU
+  smoke 5
+  (`runs/fix_smoke_align_{offline,online}`) — SAME teacher / data / init /
+  seed / budget offline vs online: identical per-step losses
+  `[13.25, 16.875, 13.0]` (max |Δloss| = 0.0) and bitwise-identical
+  `ckpt_init.pt` / `ckpt_final.pt`; the feature digests differ by mode
+  (offline `437166daa78a`, online `6e2051af43b5`) while the training-plan
+  digests are equal (`43140c4fdcc5`) — the online path reproduces the staged
+  path exactly at fixed teacher/data/init/seed/budget.
+
+### Second review fixes (on top of `1786176`, 2026-10-13, pushed as `8d6c54c`)
+
+- Fixed the four P2 boundary findings from the external second-pass review of
+  main `4e9a538`. No plan-version bump: loss normalization, the step budget
+  and the training trajectory are unchanged (the loop only changed *when it
+  gives up*, what it logs and what it cleans up).
+  1. **Accumulation stall guard** (`dflash/train.py::run_training_loop`):
+     stall counting now tracks valid micro-batches (successful forward +
+     backward) instead of optimizer steps, so a small dataset with a large
+     accumulation window (reproduced: 1 sample, accum 4) no longer
+     false-stalls on the third epoch; three full epochs with zero valid
+     supervision still stop with an explicit message. Budget semantics
+     (`ceil(len/accumulation)` planned per epoch, cross-epoch accumulation)
+     documented on `compute_total_steps`.
+  2. **Resume log reconciliation** (`_reconcile_train_log`, `train_dflash`):
+     rows past the checkpoint's committed step (incl. a half-written JSON
+     line) are preserved as `train_log.uncommitted.jsonl` before the replay
+     appends — resuming `[1,2,3]` at step 2 ends `[1,2,3,4,...]`, no
+     duplicates; a completed run now persists its final resumable state
+     (`ckpt_last.pt`, `step == total_steps`) so a later exact resume of a
+     finished run replays zero steps.
+  3. **Startup cleanup**: the online `try/finally` now wraps source
+     construction and all startup stages (init, manifest access, visual
+     check); `OnlineFeatureSource.close()` is idempotent, handles
+     partially-constructed instances (constructor failure → close → re-raise)
+     and drops model/processor/embed/head references.
+  4. **External-store resume**: `cli._preflight_resume` mirrors `cmd_train`
+     for the three feature sources — `--features` resumes require only the
+     data stage (plus store digest / plan / identity); online and
+     internal-offline runs still require regen (+ capture for offline).
+     Fixes the offline regression the first preflight introduced.
+- Evidence: 8 new CPU regressions; full CPU suite 222 passed (was 214).
+  GPU smoke 7 (`runs/fix3_resume_online`, 3B online, 6 steps, SIGKILL after
+  step 3): interrupted state log `[1,2,3]` / ckpt step 2 → resume moved the
+  uncommitted row to `train_log.uncommitted.jsonl`, replayed steps 3-6
+  (final log `[1..6]` unique, replayed step-3 loss = pre-kill 13.0),
+  completion wrote the final state (ckpt step 6); a second resume replayed
+  zero steps, log md5 unchanged; eval `token_exact=True` for
+  `ckpt_final` / `ckpt_init`, feature modes online; plan digest
+  `43140c4fdcc5`.
 
 ## DFlare / DFly stage (2026-10-13, stage 6 — AngelSpec ports, evidence recorded)
 
