@@ -43,7 +43,7 @@ class JetSpecAlgorithm(DFlashAlgorithm):
         },
         capabilities={
             "image": True,
-            "multi_image": False,
+            "multi_image": True,
             "video": False,
             "parallel_tree_runtime": False,
             "eval": True,

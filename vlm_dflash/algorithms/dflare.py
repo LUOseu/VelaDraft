@@ -36,7 +36,7 @@ class DFlareAlgorithm(DrafterAlgorithm):
             "port_notes": "docs/upstream/dflare.md",
             "algorithm_doc": "docs/algorithms/dflare.md",
         },
-        capabilities={"image": True, "multi_image": False, "video": False, "eval": True, "export": True},
+        capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
     )
 

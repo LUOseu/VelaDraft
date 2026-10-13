@@ -39,7 +39,7 @@ class DominoAlgorithm(DFlashAlgorithm):
             "port_notes": "docs/upstream/domino.md",
             "algorithm_doc": "docs/algorithms/domino.md",
         },
-        capabilities={"image": True, "multi_image": False, "video": False, "eval": True, "export": True},
+        capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
     )
 
