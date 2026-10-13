@@ -56,8 +56,11 @@ Consequences that must be reported honestly:
   (`doctor --algorithm dflash2` reports the full-vocab check).
 
 Validation status: architecture `validated`, training `experimental`, runtime
-`experimental`; Qwen2.5-VL-3B validated (see `ALGORITHM_MATRIX.md`), Qwen3-VL
-untested.
+`experimental`; Qwen2.5-VL-3B validated (canonical 2K run, 128/128
+token-exact; see `ALGORITHM_MATRIX.md`), Qwen3-VL reduced-scale validation
+(256-row slice, 16-prompt sequential eval, export + reload, token-exact --
+`RELEASE_VALIDATION.md`). The training-objective caveat above still stands
+for every number on this page.
 
 ## Config
 

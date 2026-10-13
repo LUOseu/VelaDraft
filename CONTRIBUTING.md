@@ -1,10 +1,10 @@
 # Contributing
 
-Thanks for helping. This repository is in **release freeze** for v0.3.0: only
-bug fixes, documentation, packaging, release tooling, benchmark adapters,
-reduced validation, CI, and license/security cleanup are accepted until the
-release candidate is reviewed. New algorithms, targets, video/multi-image and
-serving-runtime work wait for after the release.
+Thanks for helping. v0.3.0 is published; v0.3.1 is in development as a
+distribution/first-run fix release. Until v0.3.1 is out, the acceptance scope
+is bug fixes, documentation, packaging, release tooling, benchmark adapters,
+reduced validation, CI, and license/security cleanup. New algorithms, targets,
+video/multi-image and serving-runtime work wait for after the release.
 
 ## Development setup
 

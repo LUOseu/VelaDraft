@@ -30,7 +30,9 @@ agreement.
 
 `validated` on Qwen2.5-VL-3B (see `ALGORITHM_MATRIX.md`, `SUPPORT_MATRIX.md`):
 architecture, training, unit tests, COCO smoke and the canonical 2K run all
-pass; the checkpoint exports and reloads. Qwen3-VL is untested.
+pass; the checkpoint exports and reloads. Qwen3-VL passed reduced-scale
+validation (256-row slice, 16-prompt sequential eval, export + reload, all
+token-exact -- see `RELEASE_VALIDATION.md`).
 
 **Runtime caveat (read before citing eval numbers).** JetSpec's production
 runtime is *parallel tree drafting with branch conditioning*, which is **not

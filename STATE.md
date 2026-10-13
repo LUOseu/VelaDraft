@@ -1,14 +1,18 @@
 # STATE
 
-Updated: 2026-10-13 (v0.3.0-rc1 prepared; private-review candidate).
+Updated: 2026-10-13 (v0.3.1 in development: distribution fixes + first-run
+growth review; repo is public).
 
-**Release freeze: ACTIVE**
-**Target release: v0.3.0**
+**Status: v0.3.0 published publicly** (`github.com/LUOseu/vlm-dflash`, main
+`5ca075f`, tag `v0.3.0-rc1`); **v0.3.1 in development**.
 
-- Scope is frozen: no new algorithms, targets, video / multi-image, serving
-  runtime or research methods until the release candidate is reviewed. Only
-  bug fixes, docs, packaging, release tooling, benchmark adapters, reduced
-  validation, CI and license/security cleanup are in scope.
+- v0.3.1 scope: the post-publish review findings — packaged wheel resources,
+  version single-sourcing, identity path portability, input-addressed stage
+  caches, `--features` reuse, metadata/SUPPORT_MATRIX consistency, Model Zoo
+  downloads, README/examples refresh. No algorithm, protocol or benchmark
+  changes (`CHANGELOG.md` v0.3.1).
+- Still frozen: new algorithms, targets, video / multi-image, serving runtime
+  and research methods wait until v0.3.1 is out.
 - Release gates: `RELEASE_CHECKLIST.md`; evidence: `RELEASE_VALIDATION.md`.
 
 ## Current stable features
@@ -227,8 +231,10 @@ Scope frozen (harden/document/validate/package only). Evidence:
   lossless.
 
 ## Blocked / waiting
-- Public release / PyPI / Hugging Face publishing: awaits author review of
-  the private v0.3.0-rc1 candidate (no public push before that).
+- PyPI publishing and Hugging Face Hub hosting: not done; the code is public
+  (`github.com/LUOseu/vlm-dflash`) and the Model Zoo weights are hosted as the
+  `zoo-v0.3.0` GitHub release. Do not write PyPI/HF instructions that do not
+  exist yet.
 - Server disk policy in effect: feature stores are pruned once a run is
   recorded ("deterministic to recapture"); the zoo 2K stores live in
   `runs/qwen25vl3b_jetspec_2k/features` (capture-v2 superset), symlinked by
@@ -241,13 +247,17 @@ Scope frozen (harden/document/validate/package only). Evidence:
    claim): a `unary_loss: ce` control separates the forward-KL objective axis
    from conv + selector; features and recipe are ready
    (`runs/qwen25vl3b_jetspec_2k/features`, ~25 min GPU per run + eval).
-2. Algorithm-zoo wrap-up: Qwen3-VL reduced-scale validation for
-   DSpark/Domino/DFlash2 (currently `experimental`/`untested` there), and
-   regenerate `SUPPORT_MATRIX.md` from `AlgorithmMetadata` instead of by hand.
-3. Serving-fidelity follow-up from the JetSpec stage: decide whether the
+2. Serving-fidelity follow-up from the JetSpec stage: decide whether the
    `inference_in_block_causal` mask path should be exercised by a
    `strict`-style test on a GPU CI run (currently unit-tested + smoke-tested).
-4. Deterministic benchmark prompt file for `caption_general`; land one public
+   First serving-bridge step is scoped in `docs/serving-bridge.md` (proposal).
+3. Deterministic benchmark prompt file for `caption_general`; land one public
    dataset adapter (TextVQA first) to move a workload from planned -> validated.
-5. HF release prep: publish model cards (export already emits `model_card.md`),
-   run the release audit, then push.
+4. Publish the remaining zoo exports (DSpark / JetSpec / DFlash2-exp / 8B
+   DFlash) as release assets once hosting is decided (HF Hub needs an account
+   decision).
+
+(Done in v0.3.1: Qwen3-VL reduced-scale validation recorded for
+DSpark/Domino/JetSpec/DFlash2 with metadata retagged to `reduced_validation`;
+`SUPPORT_MATRIX.md` regenerated from `AlgorithmMetadata` via
+`scripts/render_support_matrix.py`.)

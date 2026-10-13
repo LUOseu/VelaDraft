@@ -18,8 +18,10 @@ Domino extends the frozen DFlash drafter with a **causal correction head**
 
 `validated` on Qwen2.5-VL-3B (see `ALGORITHM_MATRIX.md`, `SUPPORT_MATRIX.md`):
 architecture, training, unit tests, COCO smoke and the canonical 2K run all
-pass; the checkpoint exports and reloads. Qwen3-VL is untested (no support
-claim). Runtime integration is future work (sequential verification only).
+pass; the checkpoint exports and reloads. Qwen3-VL passed reduced-scale
+validation (256-row slice, 16-prompt sequential eval, export + reload, all
+token-exact -- see `RELEASE_VALIDATION.md`). Runtime integration is future
+work (sequential verification only).
 
 Measured (3B / 2K corpus / 128 prompts, sequential): AL 1.764 vs DFlash 1.630
 at the same protocol, token-exact 128/128; the enabled/disabled ablation puts

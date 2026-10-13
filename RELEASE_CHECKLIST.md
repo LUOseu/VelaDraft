@@ -20,4 +20,28 @@ benchmark adapters, reduced validation, CI, security/license cleanup only.
 - [x] Large-file audit (`find . -type f -size +20M`)
 - [x] Claim audit (DFlash2 wording; no lossless-speedup claims; parallel marked experimental)
 - [x] RELEASE_VALIDATION.md complete (only the tag-time commit hash was pending at review, filled in at tag time)
-- [x] Release commit `5b1c41b` tagged `v0.3.0-rc1`, pushed to private GitHub repo (`LUOseu/vlm-dflash`, visibility: private; CI green)
+- [x] Release commit `5b1c41b` tagged `v0.3.0-rc1`, pushed to `LUOseu/vlm-dflash` (visibility: public since 2026-10-13; main `5ca075f`, CI green)
+
+## v0.3.1 (distribution fixes + first-run review, in development)
+
+- [x] Wheel ships packaged resources (presets + tested constraints); fresh-venv
+      load verified outside the repo; CI asserts wheel contents + loads presets
+      from a repo-less CWD
+- [x] Single version source (`vlm_dflash.__version__` -> pyproject dynamic +
+      `--version`); test pins metadata == module version
+- [x] Identity gate ignores audit-only `target_model_path` (same model in a new
+      directory passes; content/revision changes still fail); negative tests
+- [x] Input-addressed stage caches for data/regen/capture with refusal on
+      changed inputs and `--force` override; tests for all four states
+- [x] `train --features <dir>` reuse interface + provenance record; library API
+      verified on GPU (one capture, DFlash + DSpark trained from it)
+- [x] Algorithm metadata / SUPPORT_MATRIX / doctor / export model cards
+      consistent (`reduced_validation` state; matrix generated + drift test)
+- [x] Model Zoo downloads published (`zoo-v0.3.0` release: DFlash + Domino
+      exports); both re-downloaded from the public URL, sha256-verified and run
+      token-exact (demo) on the reference GPU
+- [x] `demo --drafter` follows the drafter's recorded algorithm
+- [x] README restructured (pretrained demo first, pipeline SVG, Zoo table,
+      split benchmark tables, JSON/CSV results), Chinese README, examples
+      verified on GPU, serving-bridge proposal doc
+- [x] Full CPU test suite green on the reference host; CI updated

@@ -1,6 +1,64 @@
 # Changelog
 
-## v0.3.0 (in development)
+## v0.3.1 (2026-10-13)
+
+Distribution fixes, first-run experience, and the post-publish growth review
+items. No algorithm, protocol or benchmark changes — every recorded number in
+`BENCHMARKS.md` / `RELEASE_VALIDATION.md` is untouched.
+
+### Distribution and identity fixes
+
+- The wheel now ships its resources: `vlm_dflash/presets/*.yaml` and
+  `vlm_dflash/resources/constraints-tested.txt` are packaged (setuptools
+  package-data) and loaded via `importlib.resources`, so `vlm-dflash train
+  --preset smoke` works from a fresh install outside the repo (previously
+  `FileNotFoundError` from site-packages). CI asserts the wheel contents and
+  loads all three presets from a repo-less CWD.
+- Single version source: `vlm_dflash.__version__` drives the distribution
+  metadata (pyproject `dynamic = ["version"]`) and a new
+  `vlm-dflash --version`; a test pins metadata == module version.
+- The teacher/target identity gate no longer requires `target_model_path`:
+  the same checkpoint in a new directory passes (content fingerprints,
+  processor fingerprint and resolved contract fields still gate), while real
+  model/revision/processor changes keep failing loudly. The path stays in the
+  records as audit information; stage input digests ignore it for the same
+  reason.
+
+### Pipeline reuse safety
+
+- `train` stage caching is now input-addressed: each of data/regen/capture
+  records a digest of its inputs (config subset, target identity, upstream
+  stage digest, dataset file fingerprints) in `<stage>/stage_manifest.json`.
+  Existing outputs with changed inputs are refused before any expensive
+  compute (message suggests `--force` or a new run directory); outputs without
+  a recorded digest are refused instead of silently reused.
+- `train --features <dir>` trains from an existing captured feature store
+  (explicit reusable interface; `train_dflash(..., features_dir=...)`), so one
+  capture can drive several algorithms. The store's identity, manifest and
+  saved target head are re-verified and the reuse (directory, samples, seq
+  length, dtype, manifest digest) is recorded in `provenance.json`.
+
+### Docs, metadata and first-run
+
+- First public release of the Model Zoo:
+  [zoo-v0.3.0](https://github.com/LUOseu/vlm-dflash/releases/tag/zoo-v0.3.0)
+  hosts the DFlash and Domino exports (tar.gz + sha256 checksums + model
+  cards); both were re-downloaded and re-verified token-exact.
+- `demo --drafter <export>` now follows the checkpoint's recorded algorithm
+  (scoring a Domino export no longer requires `--algorithm domino`).
+- README restructured around the user path (pretrained demo first, pipeline
+  SVG, Model Zoo links, split acceptance/inference-cost benchmark tables,
+  frozen JSON/CSV results in `benchmarks/results/`), plus a Chinese README
+  (`README.zh-CN.md`) and refreshed `examples/` scripts.
+- `SUPPORT_MATRIX.md` is now generated from the algorithm registry
+  (`scripts/render_support_matrix.py`, drift-tested in CI) and the algorithm
+  metadata records the Qwen3-VL reduced validation
+  (`reduced_validation` state) consistently across doctor/export/docs.
+- Added `docs/serving-bridge.md` (proposal: what a serving bridge must solve;
+  no support claim) and `benchmarks/results/zoo_canonical.{json,csv}` +
+  `scripts/extract_zoo_results.py`.
+
+## v0.3.0 (2026-10-12)
 
 ### Release engineering (v0.3.0-rc1)
 
