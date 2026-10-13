@@ -97,3 +97,16 @@ decision, it overrides everything here.
   the repo serving uses MRoPE-replace. Targets GPU0 (R-14) and GPU2 (R-15),
   checked free before launch; no writes to shared run dirs (work under
   `/tmp/wp5`). Protocol + success criteria registered in RUN_LOG.md.
+- Status update (C-01a13621, 03:55): **WP5 measured, gate NOT passed - BLOCKED
+  with gap registered** (plan rule; not re-run). R-14 (0.11 GPU-h, GPU0):
+  converted draft loads into vLLM 0.22.1 (`DFlashDraftModel`, shared
+  embed/lm_head, aux (2,18,34), n_spec 7), smoke exact 2/2, but the 32-prompt
+  check is token-exact **5/32** with AL 1.4059 vs in-repo 1.6924. R-15 (0.36
+  GPU-h, GPU2): both in-repo arms exact 32/32, AL 1.6924 (MRoPE) vs 1.6866
+  (1-D) - rope convention ruled out as the driver. R-16 (0.08): traced flips
+  are bf16 ulp-scale near-ties of the runtime verify path (3/4 cases: the
+  vLLM-dflash token IS the repo top-1). Report `docs/plan/WP5_REPORT.md`;
+  converter + harness + 5 CPU tests commit to follow with the docs. Budget now
+  **3.57 / 8.00 GPU-h**. My lane next: **WP6** (non-Qwen family), then WP7.
+  GPUs free again (0/1/2 idle; GPU3 = other user's sglang). The other
+  session's PR #3 review loop untouched by this lane.

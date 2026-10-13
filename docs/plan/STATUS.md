@@ -60,15 +60,22 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   shows prefill-bound extraction (render ~17 ms vs forward 129-139 ms/row),
   so the "at most one further I/O optimization" resolved to zero with
   evidence (report `docs/plan/WP4_MEASUREMENT.md`). 342 CPU tests green.
-- Next: WP5 runtime bridge (one real serving-engine load path; proposal in
-  `docs/serving-bridge.md`), then WP6 second model family. Lane split recap
-  in COORDINATION.md.
+- WP5 first bridge built + measured (`R-20261014-14..16`, 0.55 GPU-h):
+  vLLM 0.22.1 native `dflash` accepts the converted zoo export
+  (`scripts/export_vllm_draft.py`; shared embed/lm_head, aux (2,18,34),
+  n_spec 7) and runs, but the strict gate fails: **5/32 token-exact**, AL
+  1.4059 vs in-repo 1.6924 (MRoPE) / 1.6866 (1-D arm, R-15 - rope convention
+  is not the driver), flips are bf16 ulp-scale near-ties (R-16 margin probe).
+  Registered as BLOCKED-with-gap per the plan rule; report
+  `docs/plan/WP5_REPORT.md`, converter/harness code + 5 CPU tests in this
+  branch. Next: WP6 second model family, then WP7. Lane split recap in
+  COORDINATION.md.
 
 ## Budget
 
-8 GPU-h first-round cap; **3.00 GPU-h charged** (E1 0.59 incl. the duplicate
+8 GPU-h first-round cap; **3.57 GPU-h charged** (E1 0.59 incl. the duplicate
 concurrent set, zoo re-download validation 0.04, E2 0.55, E3 0.15, E4 1.45,
-WP4 measurement 0.21); allocation in RESOURCE_LEDGER.md.
+WP4 measurement 0.21, WP5 0.55); allocation in RESOURCE_LEDGER.md.
 
 ## Blockers / risks
 
@@ -97,6 +104,11 @@ WP4 measurement 0.21); allocation in RESOURCE_LEDGER.md.
   01:30 -> 61 GB at 02:20 after pruning E2's renewable `ckpt_last`; a
   host-wide writeback stall slowed the E2 eval ~5 min). Keep net-new
   artifacts small; prune this plan's own renewable temp files after each job.
+- WP5 blocker (runtime numeric parity): vLLM 0.22.1's dflash path is not
+  token-exact vs its own target-only greedy (5/32) and its AL (1.4059) is
+  -17% vs the in-repo sequential numbers on identical weights; MRoPE-vs-1D
+  excluded (R-15), mask-input convention verified equal. Not re-run; gap and
+  candidate causes registered in `docs/plan/WP5_REPORT.md`.
 - Recipe training at micro-batch 8 peaked at 46.5 GB on a 48 GB card (~3%
   margin). Do not raise the micro-batch for recipe runs.
 - Companion plan documents absent (see note above).
