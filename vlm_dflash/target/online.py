@@ -452,6 +452,7 @@ class OnlineFeatureSource:
             merge_size=self.merge_size,
             dtype=self.dtype,
             store_final_hidden=self.store_final_hidden,
+            tokenizer=getattr(self.processor, "tokenizer", None),
         )
         entry = self.stats.setdefault(self.phase, {"target_forwards": 0, "wall_seconds": 0.0})
         entry["target_forwards"] += 1

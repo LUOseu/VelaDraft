@@ -691,7 +691,7 @@ def _install_batched_stub(monkeypatch, calls: list, *, context_hidden: int = 16)
         return {"row": self.rows[int(index)]}
 
     def fake_finalize(model, prepared_list, *, layer_ids, image_token_id, merge_size, dtype,
-                      store_final_hidden):
+                      store_final_hidden, tokenizer=None):
         calls.append(("batch", [item["row"].get("id") for item in prepared_list]))
         return [_record_for_row(item["row"], context_hidden=context_hidden) for item in prepared_list]
 
@@ -1670,7 +1670,7 @@ def test_online_capture_rejects_prompt_drift_and_token_count_mismatch(monkeypatc
     from vlm_dflash.target import sample_capture as sample_capture_module
 
     def fake_forward(model_, inputs, full_ids, layer_ids, image_token_id, dtype, merge_size=2,
-                     store_final_hidden=False):
+                     store_final_hidden=False, tokenizer=None):
         length = int(full_ids.numel())
         return {
             "input_ids": full_ids.to(torch.int32),

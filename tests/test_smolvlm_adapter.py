@@ -294,3 +294,85 @@ def test_batch_processor_images_nests_per_text():
     assert adapter.batch_processor_images(images) == [["a"], ["b"], ["c"]]
     # Qwen-VL keeps the flat list (its processor accepts it).
     assert get_adapter("qwen2_5_vl").batch_processor_images(images) == images
+
+
+def _bridge_tokenizer():
+    """Tiny tokenizer with the SmolVLM structure tokens + a newline token."""
+    from tokenizers import Tokenizer, models
+    from transformers import PreTrainedTokenizerFast
+
+    tokenizer = PreTrainedTokenizerFast(
+        tokenizer_object=Tokenizer(models.WordLevel(vocab={"<unk>": 0, "\n": 1, "hi": 2}, unk_token="<unk>")),
+        unk_token="<unk>",
+    )
+    tokenizer.add_special_tokens(
+        {"additional_special_tokens": ["<image>", "<fake_token_around_image>", "<global-img>", "<row_1_col_1>"]}
+    )
+    return tokenizer
+
+
+def _bridge_ids(tokenizer):
+    return {
+        "img": tokenizer.convert_tokens_to_ids("<image>"),
+        "fake": tokenizer.convert_tokens_to_ids("<fake_token_around_image>"),
+        "global": tokenizer.convert_tokens_to_ids("<global-img>"),
+        "row": tokenizer.convert_tokens_to_ids("<row_1_col_1>"),
+        "nl": tokenizer.convert_tokens_to_ids("\n"),
+        "text": tokenizer.convert_tokens_to_ids("hi"),
+    }
+
+
+def test_image_token_spans_bridge_tile_structure_and_whitespace():
+    import torch
+
+    tokenizer = _bridge_tokenizer()
+    ids = _bridge_ids(tokenizer)
+    image_block = [
+        ids["fake"], ids["row"], ids["img"], ids["img"], ids["img"],
+        ids["fake"],
+        ids["nl"], ids["fake"], ids["global"], ids["img"], ids["img"], ids["img"],
+    ]
+    adapter = SmolVLMAdapter()
+    one_image = torch.tensor([9, 9] + image_block + [ids["text"]])
+    spans = adapter.image_token_spans(one_image, ids["img"], tokenizer=tokenizer)
+    assert spans == [(4, 13)]
+    # Without the tokenizer the adapter falls back to strict image runs (fail loud).
+    strict = adapter.image_token_spans(one_image, ids["img"], tokenizer=None)
+    assert strict == [(4, 6), (11, 13)]
+    # A text token between two expansions keeps the images apart.
+    two_images = torch.tensor([ids["text"]] + image_block + [ids["text"]] + image_block)
+    spans = adapter.image_token_spans(two_images, ids["img"], tokenizer=tokenizer)
+    assert len(spans) == 2
+
+
+def test_capture_counts_only_image_tokens_inside_bridged_span():
+    import torch
+    from types import SimpleNamespace
+
+    from vlm_dflash.target.sample_capture import forward_and_capture_batch
+
+    tokenizer = _bridge_tokenizer()
+    ids = _bridge_ids(tokenizer)
+    row_ids = [ids["fake"], ids["row"], ids["img"], ids["img"], ids["img"], ids["nl"], ids["img"], ids["img"]]
+
+    class _FakeSmolVLM:
+        config = SimpleNamespace(model_type="smolvlm", pad_token_id=0)
+
+        def get_input_embeddings(self):
+            return SimpleNamespace(weight=torch.zeros(50, 4))
+
+        def parameters(self):
+            return iter([torch.zeros(1)])
+
+        def __call__(self, **kwargs):
+            batch, length = kwargs["input_ids"].shape
+            hidden = [torch.zeros(batch, length, 8, dtype=torch.bfloat16) for _ in range(3)]
+            return SimpleNamespace(hidden_states=hidden)
+
+    prepared = [{"inputs": {}, "full_ids": torch.tensor(row_ids), "allow_multi_span": False}]
+    records = forward_and_capture_batch(
+        _FakeSmolVLM(), prepared, [1], image_token_id=ids["img"], dtype=torch.float32,
+        merge_size=None, tokenizer=tokenizer,
+    )
+    assert records[0]["image_span"] == (2, 7)
+    assert records[0]["n_image_tokens"] == 5

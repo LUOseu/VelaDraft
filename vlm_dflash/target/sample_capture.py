@@ -71,24 +71,15 @@ def locate_image_span(input_ids: torch.Tensor, image_token_id: int) -> tuple[int
 
 
 def locate_image_spans(input_ids: torch.Tensor, image_token_id: int) -> list[tuple[int, int]]:
-    """All contiguous image-token runs, ``(start, end_inclusive)`` in appearance order.
+    """All plain contiguous image-token runs, ``(start, end_inclusive)``.
 
-    One run per group of consecutive ``<image>`` parts (images attached to the
-    same turn render back to back); multi-turn rows produce several runs.
+    Family-aware capture goes through the adapter's ``image_token_spans``
+    (tile-encoded families bridge their structure tokens); this helper keeps
+    the strict runs-of-image-tokens view.
     """
-    matches = (input_ids == image_token_id).nonzero().flatten().tolist()
-    if not matches:
-        raise ValueError("No image tokens found in the sequence.")
-    spans: list[tuple[int, int]] = []
-    start = previous = matches[0]
-    for position in matches[1:]:
-        if position == previous + 1:
-            previous = position
-            continue
-        spans.append((start, previous))
-        start = previous = position
-    spans.append((start, previous))
-    return spans
+    from ..adapters.base import locate_image_token_spans
+
+    return locate_image_token_spans(input_ids, image_token_id)
 
 
 def extract_target_head(model, contract: dict):
@@ -128,6 +119,7 @@ def forward_and_capture_batch(
     dtype: torch.dtype,
     merge_size: int | None = None,
     store_final_hidden: bool = False,
+    tokenizer=None,
 ) -> list[dict]:
     """Batched capture forward: one padded model call for several prepared rows.
 
@@ -208,13 +200,16 @@ def forward_and_capture_batch(
             grid.to(device) if grid is not None else None,
             mm_token_type_ids=extended_mm[row_index],
         )
-        spans = locate_image_spans(item["full_ids"].cpu(), image_token_id)
+        row_ids = item["full_ids"].cpu()
+        spans = adapter.image_token_spans(row_ids, image_token_id, tokenizer=tokenizer)
         if not item.get("allow_multi_span") and len(spans) != 1:
             raise ValueError("Image tokens are not contiguous; v0.1 requires a single leading image.")
         # Grid families: image_grid_thw counts patches and every merge_size^2
         # patches become one token; tile families report tiles x fixed length.
+        # The count is always of ``image_token_id`` itself: a bridged family
+        # span may also contain its structure/whitespace markers.
         expected_per_image = adapter.expected_image_token_counts(item["inputs"], merge_size=merge_size)
-        span_count = sum(end - start + 1 for start, end in spans)
+        span_count = int(sum((row_ids[start : end + 1] == image_token_id).sum() for start, end in spans))
         expected = sum(expected_per_image) if expected_per_image is not None else None
         record = {
             "input_ids": item["full_ids"].to(torch.int32),
@@ -245,6 +240,7 @@ def forward_and_capture(
     merge_size: int | None = None,
     store_final_hidden: bool = False,
     allow_multi_span: bool = False,
+    tokenizer=None,
 ) -> dict:
     """One capture forward; returns the sample record consumed by training.
 
@@ -271,6 +267,7 @@ def forward_and_capture(
         dtype,
         merge_size=merge_size,
         store_final_hidden=store_final_hidden,
+        tokenizer=tokenizer,
     )[0]
 
 
@@ -439,6 +436,7 @@ def finalize_prepared_records(
     merge_size: int | None,
     dtype: torch.dtype,
     store_final_hidden: bool,
+    tokenizer=None,
 ) -> list[dict]:
     """Run the (batched) capture forward for prepared rows and attach metadata."""
     if len(prepared_list) == 1:
@@ -456,6 +454,7 @@ def finalize_prepared_records(
                 dtype,
                 merge_size=merge_size,
                 store_final_hidden=store_final_hidden,
+                tokenizer=tokenizer,
                 **extra,
             )
         ]
@@ -468,6 +467,7 @@ def finalize_prepared_records(
             dtype,
             merge_size=merge_size,
             store_final_hidden=store_final_hidden,
+            tokenizer=tokenizer,
         )
     for prepared, record in zip(prepared_list, records):
         if prepared.get("check_image_token_count") and (
@@ -512,4 +512,5 @@ def build_sample_record(
         merge_size=merge_size,
         dtype=dtype,
         store_final_hidden=store_final_hidden,
+        tokenizer=getattr(processor, "tokenizer", None),
     )[0]

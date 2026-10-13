@@ -28,9 +28,10 @@ from pathlib import Path
 import torch
 
 from ..contract import ContractError
-from .base import AdapterInfo, VLMAdapter
+from .base import AdapterInfo, VLMAdapter, locate_image_token_spans
 
 _RESERVED_TOKEN = re.compile(r"^<\|reserved_special_token_\d+\|>$")
+_ROW_COL_TOKEN = re.compile(r"^<row_\d+_col_\d+>$")
 
 
 class SmolVLMAdapter(VLMAdapter):
@@ -169,6 +170,32 @@ class SmolVLMAdapter(VLMAdapter):
         # SmolVLM's processor matches the number of images in the text against a
         # nested per-text image list; a flat batch list raises.
         return [[image] for image in images]
+
+    def image_token_spans(self, input_ids, image_token_id: int, *, tokenizer=None) -> list[tuple[int, int]]:
+        # One SmolVLM2 image expands (per the processor) to tile runs of
+        # ``image_seq_len`` <image> tokens separated by <row_i_col_j>/
+        # <global-img>/<fake_token_around_image> markers and newlines; the
+        # markers and whitespace bridge the runs back into one image region.
+        bridge_ids: tuple[int, ...] = ()
+        is_bridge = None
+        if tokenizer is not None:
+            structure = []
+            for token in ("<global-img>", "<fake_token_around_image>"):
+                value = tokenizer.convert_tokens_to_ids(token)
+                if value is not None and int(value) >= 0:
+                    structure.append(int(value))
+            for candidate in range(max(0, image_token_id - 64), image_token_id):
+                text = tokenizer.convert_ids_to_tokens(candidate)
+                if isinstance(text, str) and _ROW_COL_TOKEN.match(text):
+                    structure.append(candidate)
+            bridge_ids = tuple(structure)
+
+            def is_bridge(token_id: int) -> bool:
+                return not tokenizer.decode([int(token_id)]).strip()
+
+        return locate_image_token_spans(
+            input_ids, image_token_id, bridge_ids=bridge_ids, is_bridge=is_bridge
+        )
 
     def capture_forward_inputs(self, prepared_list: list[dict], device) -> dict:
         forward_kwargs: dict = {}

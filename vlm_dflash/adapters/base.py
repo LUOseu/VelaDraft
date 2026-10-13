@@ -49,6 +49,43 @@ class AdapterInfo:
     forward_input_keys: tuple[str, ...] = ("pixel_values", "image_grid_thw", "mm_token_type_ids")
 
 
+
+def locate_image_token_spans(input_ids, image_token_id: int, *, bridge_ids=(), is_bridge=None):
+    """Contiguous image-token regions, merged across family bridge tokens.
+
+    Runs of ``image_token_id`` that are separated only by bridge tokens (an
+    optional explicit id set plus an optional per-token predicate) belong to
+    the same image region. Text tokens end a region, so images separated by
+    text stay separate spans.
+    """
+    matches = (input_ids == image_token_id).nonzero().flatten().tolist()
+    if not matches:
+        raise ValueError("No image tokens found in the sequence.")
+    bridge = set(int(value) for value in bridge_ids)
+
+    def gap_is_bridge(lo: int, hi: int) -> bool:
+        if hi < lo:
+            return False
+        for position in range(lo, hi + 1):
+            token = int(input_ids[position])
+            if token in bridge:
+                continue
+            if is_bridge is not None and is_bridge(token):
+                continue
+            return False
+        return True
+
+    spans: list[tuple[int, int]] = []
+    start = previous = matches[0]
+    for position in matches[1:]:
+        if position == previous + 1 or gap_is_bridge(previous + 1, position - 1):
+            previous = position
+            continue
+        spans.append((start, previous))
+        start = previous = position
+    spans.append((start, previous))
+    return spans
+
 class VLMAdapter:
     """Base adapter; subclasses set :attr:`info` (and may override hooks)."""
 
@@ -299,6 +336,16 @@ class VLMAdapter:
         if positions.dim() == 3:
             positions = positions[:, 0, :]
         return positions
+
+    def image_token_spans(self, input_ids, image_token_id: int, *, tokenizer=None) -> list[tuple[int, int]]:
+        """Contiguous image regions in one token row (the family's span rule).
+
+        The default treats every run of ``image_token_id`` as its own region
+        (Qwen-VL lays each image out as one pure run). Families whose processors
+        interleave structure tokens between tile runs override this; they may
+        use ``tokenizer`` to recognise their own bridge tokens.
+        """
+        return locate_image_token_spans(input_ids, image_token_id)
 
     def batch_processor_images(self, images: list) -> list:
         """Image argument for a multi-row ``processor(text=[...], images=...)`` call.
