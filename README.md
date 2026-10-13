@@ -1,253 +1,252 @@
-# vlm-dflash
+<p align="center">
+  <img src="docs/assets/veladraft-hero.png" alt="VelaDraft — One capture. Many drafters." width="960" />
+</p>
 
-**The simplest reproducible path to train a multimodal parallel drafter
-(DFlash family) for Qwen-VL from image-text data — and to check it with a
-token-exact gate.**
+<p align="center">
+  <strong>Multimodal parallel drafter training for Qwen-VL.</strong><br />
+  Train, compare and export five drafting algorithms through one shared pipeline.
+</p>
 
-![pipeline](docs/assets/pipeline.svg)
+<p align="center">
+  <a href="https://github.com/LUOseu/vlm-dflash/actions/workflows/ci.yml"><img src="https://github.com/LUOseu/vlm-dflash/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-12263a" alt="Python 3.10+" /></a>
+  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-12263a" alt="Apache-2.0" /></a>
+</p>
 
-Text-only speculative-decoding stacks break on Qwen-VL's multimodal details:
-processor pixel bounds, MRoPE position ids, image-token spans, the reserved
-mask embedding row, tied vs untied `lm_head`. vlm-dflash pins that whole loop
-once and lets five drafter algorithms (DFlash, DSpark, Domino, JetSpec,
-DFlash2) train, evaluate and export through the same commands and the same
-captured features. There is no new algorithm here and no serving framework —
-the point is a correct, inspectable multimodal training loop.
+<p align="center">
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="#model-zoo">Model Zoo</a> ·
+  <a href="#train-on-your-data">Training</a> ·
+  <a href="#benchmarks">Benchmarks</a> ·
+  <a href="#documentation">Documentation</a> ·
+  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/CONTRIBUTING.md">Contributing</a>
+</p>
 
-Why this instead of patching SpecForge / NeMo AutoModel yourself:
+<p align="center">
+  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
+</p>
 
-- the multimodal data → regen → capture → train → eval → export chain runs
-  end-to-end today for Qwen2.5-VL-3B (and Qwen3-VL-8B), with a five-minute
-  demo and a one-command pipeline smoke;
-- teacher/target mismatches fail loudly: the target contract (mask token,
-  MRoPE, layer routing, pixel bounds, processor fingerprint) is resolved at
-  runtime, recorded per stage, and every stage gate refuses silent reuse;
-- every acceptance number in this README is backed by a recorded run that
-  passed the token-exact gate (speculative greedy output must equal the
-  target's greedy output token-for-token), not just a speedup figure.
+VelaDraft brings **DFlash, DSpark, Domino, JetSpec and DFlash2** into a single
+multimodal training stack. Generate responses with your target VLM, capture
+its features, and reuse compatible captures to train and compare different
+drafters.
 
-## 1. Try a pretrained drafter (no training)
+- **Capture once, reuse across methods.** Shared hidden states, image spans and
+  position information keep algorithm comparisons on the same foundation.
+- **Train offline.** The target is off the GPU during drafter training; the
+  trainer reads the captured feature store.
+- **Keep the pairing explicit.** Runtime contracts and provenance check the
+  target, processor, feature store and checkpoint before they are combined.
+- **Validate the output.** Sequential evaluation compares speculative greedy
+  output with the target's own greedy tokens and reports AL and per-slot
+  acceptance.
 
-Frozen v0.3.0 exports for **Qwen2.5-VL-3B-Instruct** (token-exact validated,
-see the [Model Zoo](#4-model-zoo)):
+## Quickstart
+
+Use an existing drafter first, then try the complete training pipeline.
+The package and command are named **`vlm-dflash`**.
+
+### Install
 
 ```bash
-# download a released drafter (387 MB; time depends on your network)
-curl -L -O https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
-tar xzf qwen25vl-3b-dflash.tar.gz
-
-# run it (≈2 min on one A6000; needs a local Qwen2.5-VL-3B model checkout)
-vlm-dflash demo --target <Qwen2.5-VL-3B-Instruct> --drafter qwen25vl-3b-dflash
+git clone https://github.com/LUOseu/vlm-dflash.git
+cd vlm-dflash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[tested]"
 ```
 
-`demo` builds a tiny license-free sample, prints the generated answers, checks
-that the speculative output is token-identical to the target's greedy output,
-and reports acceptance length (AL) and per-slot acceptance. Drop `--drafter` to
-score a random-init drafter instead — that is the acceptance baseline, a useful
-diagnostic (AL ≈ 1.00). AL is an acceptance metric, not a speedup; the
-sequential verification path is the correctness-first path.
+The current supported installation is from source. The tested environment uses
+Python ≥3.10, PyTorch 2.10.0 and Transformers 5.12.1 on one RTX A6000 48 GB.
+See the [environment guide](docs/env-preflight.md) and
+[validation record](RELEASE_VALIDATION.md) for details.
 
-## 2. Train your own drafter
+### Run a pretrained drafter
 
-Requirements: one CUDA GPU (an A6000 48 GB is the reference; see
-[limitations](#7-limitations)), a local Qwen2.5-VL-3B-Instruct checkout, and a
-multimodal dataset (the smoke preset ships a COCO-caption path).
+Point to a **local Qwen2.5-VL-3B-Instruct checkout**, then download the released
+DFlash drafter:
 
 ```bash
-git clone https://github.com/LUOseu/vlm-dflash && cd vlm-dflash
-python -m venv .venv && . .venv/bin/activate && pip install -e ".[tested]"
-
 export VLM_DFLASH_TARGET=/path/to/Qwen2.5-VL-3B-Instruct
-vlm-dflash doctor --target "$VLM_DFLASH_TARGET"      # environment + model contract
-vlm-dflash train --preset smoke --limit 64          # data -> regen -> capture -> train
-vlm-dflash eval runs/smoke_coco                     # token-exact gate + AL + per-slot
-vlm-dflash export runs/smoke_coco                   # self-describing checkpoint + card
+
+curl -fL -o qwen25vl-3b-dflash.tar.gz \
+  https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
+tar -xzf qwen25vl-3b-dflash.tar.gz
+
+vlm-dflash demo --target "$VLM_DFLASH_TARGET" --drafter qwen25vl-3b-dflash
 ```
 
-Until the package is on PyPI, installing from a clone (`pip install -e .`) is
-the only supported install path. There is also a ~3-minute end-to-end demo
-(measured on the reference card) that needs **no dataset download**:
+The demo generates a small image sample, prints the answers, and reports
+**acceptance length, per-slot acceptance and token agreement**. No training or
+external dataset is needed. Download time depends on the network; measured
+execution times are in the [validation record](RELEASE_VALIDATION.md).
+
+Omit `--drafter` to run the random-init acceptance baseline (AL ≈1.00).
+
+### Try the whole training loop
 
 ```bash
 vlm-dflash train-demo --target "$VLM_DFLASH_TARGET" --steps 80
 ```
 
-It runs prepare → target-native regen → capture → tiny training → token-exact
-eval → export on a generated sample and finishes with the trained checkpoint
-scored against the random-init baseline.
+This runs prepare → response generation → capture → tiny training → eval →
+export on generated images. It is a pipeline smoke test; use your own data
+and a full recipe for meaningful drafter quality.
 
-The full long-answer recipe (512-row LLaVA-style subset, ~1 GPU-hour on an
-A6000): `bash scripts/quickstart.sh --config configs/qwen2_5_vl_3b.yaml --limit 512`.
-Every stage is also a standalone script (`scripts/prepare_data.py`,
-`generate_target_data.py`, `capture_features.py`, `train_dflash.py`,
-`eval_dflash.py`); `train` additionally supports `--resume` and
-`--algorithm <name>`, and `--features <dir>` to train another algorithm from
-an existing capture without re-running the target (see §5).
+## How it works
 
-## 3. Supported algorithms and targets
+<p align="center">
+  <img src="docs/assets/how-it-works.svg" alt="Image-text data goes through target generation and capture into a reusable feature store. An offline trainer selects one of five algorithms, then validates and exports its checkpoint." width="1100" />
+</p>
 
-| Algorithm | Qwen2.5-VL | Qwen3-VL | Maturity | Notes |
+The expensive target-side work is separated from drafter training. Compatible
+features can feed multiple algorithms; **the target is reloaded for evaluation**.
+Each checkpoint is paired with its target contract and algorithm metadata.
+
+## Supported algorithms
+
+All five methods use the same train, eval and export commands.
+
+| Algorithm | Qwen2.5-VL-3B | Qwen3-VL-8B | Status | Method |
 | --- | --- | --- | --- | --- |
-| DFlash | validated | validated | stable | frozen reference; decayed block CE |
-| DSpark | validated | reduced validation | validated | Markov logit bias + confidence head |
-| Domino | validated | reduced validation | validated | causal GRU correction |
-| JetSpec | validated | reduced validation | validated | forward-KL + causal in-block mask; tree runtime not ported |
-| DFlash2 | validated | reduced validation | experimental | objective reconstruction (upstream undisclosed) |
+| [DFlash](docs/algorithms/dflash.md) | Validated | Validated | **Stable** | Frozen block-drafter reference |
+| [DSpark](docs/algorithms/dspark.md) | Validated | Reduced validation | **Validated** | Markov logit bias + confidence |
+| [Domino](docs/algorithms/domino.md) | Validated | Reduced validation | **Validated** | Causal GRU correction |
+| [JetSpec](docs/algorithms/jetspec.md) | Validated | Reduced validation | **Validated** | Causal in-block mask + forward-KL |
+| [DFlash2](docs/algorithms/dflash2.md) | Validated | Reduced validation | **Experimental** | Local convolutions + candidate selector |
 
-The algorithms share one backbone and one pipeline; switching algorithms never
-re-opens the multimodal plumbing (checkpoints record their algorithm and
-`train` / `eval` / `export` fail loudly on mismatches). Target columns follow
-[`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) (generated from the same
-machine-readable metadata that `vlm-dflash doctor --algorithm <name>` and the
-exported model cards report): `validated` = canonical protocol recorded;
-`reduced validation` = full pipeline recorded at reduced scale
-(256-row slice / 16-prompt eval for Qwen3-VL, see
-[`RELEASE_VALIDATION.md`](RELEASE_VALIDATION.md)).
+Target names refer to **Qwen2.5-VL-3B-Instruct** and **Qwen3-VL-8B-Instruct**.
+Reduced validation covers a 256-row slice and 16-prompt evaluation. Status
+reflects the recorded training/evaluation coverage; runtime support is listed
+separately in the [support matrix](SUPPORT_MATRIX.md).
 
-Everything family-specific (mask token, MRoPE sections, draft-layer routing,
-pixel bounds, tied vs untied `lm_head`) is resolved from the target at runtime
-into a `contract.json` and validated against the config defaults. Single image
-+ text, greedy decoding, one target per run.
+DFlash2 uses an experimental reconstruction of the undisclosed upstream
+training objective. JetSpec's production tree runtime is not ported.
+See the [algorithm matrix](ALGORITHM_MATRIX.md) and
+[upstream audits](UPSTREAM_AUDIT.md) for the exact implementation scope.
 
-## 4. Model Zoo
+## Model Zoo
 
-| Checkpoint | Algorithm | AL (2K protocol) | Download | Model card |
-| --- | --- | ---: | --- | --- |
-| `qwen25vl-3b-dflash` | DFlash (frozen reference) | 1.6298 | [387 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [card](docs/zoo/qwen25vl-3b-dflash.md) |
-| `qwen25vl-3b-domino` | Domino | 1.7637 | [464 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [card](docs/zoo/qwen25vl-3b-domino.md) |
+Released checkpoints for **Qwen2.5-VL-3B-Instruct**:
 
-Each archive contains `model.safetensors`, `draft_config.json`,
-`algorithm.json`, `target_contract.json`, `training_manifest.json`,
-`checksums.json` (sha256 per file) and a generated `model_card.md`. Both were
-exported from the recorded runs and re-verified after download
-(token-exact, 2026-10-13). The other four zoo checkpoints (DSpark, JetSpec,
-DFlash2-exp, Qwen3-VL-8B DFlash) are reproducible with
-`python scripts/export_zoo.py` from the recorded runs — they are not hosted
-yet; don't wait on downloads that don't exist.
+| Drafter | AL¹ | Download | Model card |
+| --- | ---: | --- | --- |
+| **DFlash** · frozen reference | 1.630 | [387 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflash.md) |
+| **Domino** · GRU correction | 1.764 | [464 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [Details](docs/zoo/qwen25vl-3b-domino.md) |
 
-## 5. Train on your own data
+¹ Canonical 2K protocol below. AL is an acceptance metric, not a wall-clock
+speedup. Both released exports were re-verified after download with the
+token-exact gate; see the [release evidence](RELEASE_VALIDATION.md).
 
-`prepare_data` accepts a local JSONL pool (`dataset.source: jsonl`). Each row
-is one image + one question/answer pair in any of three shapes — OpenAI
-`messages`, ShareGPT/LLaVA `conversations`, or flat
-`{question, answer, image}` keys; see
-[`vlm_dflash/data/schema.py`](vlm_dflash/data/schema.py) for the exact
-contract. Minimal example:
+Each archive includes weights, configuration, algorithm metadata, target
+contract, training manifest, model card and file checksums. Other algorithms
+can be trained and exported locally; their canonical checkpoints are not
+currently hosted.
+
+## Train on your data
+
+Use a JSONL pool of single-image question/answer pairs. Flat records,
+OpenAI-style `messages`, and ShareGPT/LLaVA `conversations` are supported.
 
 ```json
-{"id": "ex1", "question": "<image>\nDescribe this image in detail.", "answer": "…", "image": "000000.jpg"}
+{"id":"sample-001","image":"000001.jpg","question":"Describe this image in detail.","answer":"A red bicycle is parked beside a brick wall."}
 ```
+
+A small end-to-end example:
 
 ```bash
-vlm-dflash train --config my_data.yaml --limit 2000      # or scripts/quickstart.sh
+python examples/train_from_jsonl.py \
+  --target "$VLM_DFLASH_TARGET" \
+  --jsonl data/rows.jsonl --images-dir data/images \
+  --limit 32 --steps 60
 ```
 
-Reusing one capture across algorithms (the zoo protocol): point another
-algorithm's run at an existing feature store instead of re-running the target:
+For the full reference recipe, configure the dataset paths and run
+`vlm-dflash train --config configs/qwen2_5_vl_3b.yaml`. The CLI also supports
+`--algorithm`, `--resume`, and dotted `--set key=value` overrides.
+See the [examples](examples/README.md), [data schema](vlm_dflash/data/schema.py)
+and [reference guide](docs/REFERENCE.md).
+
+### Reuse a capture across algorithms
 
 ```bash
-vlm-dflash train --dataset data/rows.jsonl --target "$VLM_DFLASH_TARGET" \
-    --algorithm dspark --run-dir runs/dspark_2k \
-    --features runs/shared_2k/features --steps 792
+vlm-dflash train \
+  --target "$VLM_DFLASH_TARGET" --dataset data/rows.jsonl \
+  --algorithm dspark --run-dir runs/dspark_2k \
+  --features runs/shared_2k/features --steps 792
 ```
 
-The store's target identity, manifest and saved target head are verified
-against the live contract before training, and the reuse (directory, sample
-count, seq length, dtype, manifest digest) is recorded in the run's
-`provenance.json`. One 2K capture is ≈9.4 GiB on disk and skips one
-regen + capture (GPU-seconds and target forwards) per additional algorithm.
+Use the dataset and compatible target settings associated with the captured
+store. Its identity, manifest and saved target head are verified before
+training; reuse is recorded in `provenance.json`. A canonical 2K capture is
+about **9.4 GiB** on disk.
 
-## 6. Benchmarks
+The [comparison example](examples/reuse_features_compare.py) demonstrates
+one capture followed by DFlash and DSpark training and evaluation.
 
-All numbers: Qwen2.5-VL-3B-Instruct (unless noted), 2K-row corpus, block size
-8, 128 eval prompts / 128 new tokens, greedy, **sequential verification —
-token-exact for every row**, one RTX A6000. Frozen machine-readable results:
-[`benchmarks/results/zoo_canonical.json`](benchmarks/results/zoo_canonical.json)
-/ [`.csv`](benchmarks/results/zoo_canonical.csv)
-(extracted from the recorded run artifacts by
-[`scripts/extract_zoo_results.py`](scripts/extract_zoo_results.py); the full
-tables and ablations live in [`BENCHMARKS.md`](BENCHMARKS.md)).
+## Benchmarks
 
-Acceptance / training behavior:
+**Qwen2.5-VL-3B-Instruct · 2K training corpus · block size 8 · 128 prompts ·
+128 new tokens · greedy · sequential verification · one RTX A6000.**
 
-| Algorithm | AL | rand-init | token-exact | params | steps | block CE (first→last 10%) | peak VRAM | train wall | per-slot (1–7) |
-| --- | ---: | ---: | --- | ---: | ---: | --- | ---: | ---: | --- |
-| DFlash | 1.6298 | 1.003 | 128/128 | 243.8M | 792 | 7.50 → 3.79 | 29.5 GB | 9.8 min | .413 .149 .048 .015 .004 .001 0 |
-| DSpark | 1.7354 | 1.003 | 128/128 | 321.6M | 792 | 7.59 → 3.45 | 38.1 GB | 11.8 min | .432 .173 .074 .034 .015 .007 .003 |
-| Domino | 1.7637 | 1.003 | 128/128 | 292.9M | 792 | 7.25 → 2.20 | 38.4 GB | 12.9 min | .443 .180 .078 .036 .016 .009 .005 |
-| JetSpec | 1.5987 | 1.003 | 128/128 | 243.8M | 792 | 6.06 → 3.26 | 29.7 GB | 20.6 min | .408 .137 .040 .011 .003 .001 0 |
-| DFlash2 (exp. objective) | 1.9541 | 1.003 | 128/128 | 328.5M | 792 | 5.61 → 1.48 | 31.1 GB | 22.7 min | .495 .243 .118 .060 .027 .013 .006 |
+| Algorithm | AL | Token-exact | Drafter params | Training time² |
+| --- | ---: | --- | ---: | ---: |
+| DFlash | 1.630 | 128/128 | 243.8M | 9.8 min |
+| DSpark | 1.735 | 128/128 | 321.6M | 11.8 min |
+| Domino | 1.764 | 128/128 | 292.9M | 12.9 min |
+| JetSpec | 1.599 | 128/128 | 243.8M | 20.6 min |
+| DFlash2³ | 1.954 | 128/128 | 328.5M | 22.7 min |
 
-(Qwen3-VL-8B DFlash for reference: AL 1.665, 32/32 token-exact, 1500 steps,
-5.60 s/sample. Training uses one staged capture ≈9.4 GiB; training itself
-never loads the target.)
+² Drafter training after feature capture; excludes data preparation, response
+generation and capture. ³ Experimental objective reconstruction.
 
-Actual inference cost (what it takes to *run* them, sequential mode):
+These are comparisons under the shared protocol, not a general ranking of
+upstream methods. Frozen results: [JSON](benchmarks/results/zoo_canonical.json)
+/ [CSV](benchmarks/results/zoo_canonical.csv). Per-slot acceptance, VRAM,
+ablations and further runs are in [BENCHMARKS.md](BENCHMARKS.md).
 
-| Run | Mode | s/sample | vs target-only | Token-exact |
-| --- | --- | ---: | ---: | --- |
-| 3B DFlash (AL 1.63) | sequential | 4.14 | 0.87x | 128/128 |
-| 3B DSpark | sequential | 4.10 | 0.86x | 128/128 |
-| 3B Domino | sequential | 4.30 | 0.84x | 128/128 |
-| 3B JetSpec (causal mask) | sequential | 4.07 | 0.86x | 128/128 |
-| 3B DFlash2 | sequential | 4.43 | 0.82x | 128/128 |
-| 8B DFlash (AL 1.67) | sequential | 5.60 | 0.81x | 32/32 |
+On the pinned **TextVQA** workload, DFlash / DSpark / Domino reach AL
+1.263 / 1.253 / 1.268, with 128/128 token-exact prompts. This measures
+speculative acceptance and agreement; standard-answer VQA accuracy is a
+separate metric. See the [benchmark guide](docs/benchmark.md).
 
-The sequential path is **not a speedup** (0.8–0.9x on this card): it is the
-correctness reference and the only token-exact path. Parallel / strict-parallel
-modes reach ~1.0–1.25x but are not bitwise exact in bf16 and are reported as
-experimental throughput only (see
-[`docs/verification-modes.md`](docs/verification-modes.md)).
+**Runtime:** current sequential reference runs measure 0.81–0.87× versus
+target-only on the reference card. Parallel verification is experimental and
+can diverge in bf16. Full timing and agreement results are recorded together
+in [verification modes](docs/verification-modes.md).
 
-Public workload: TextVQA validation, 128-prompt seeded subset — DFlash
-1.263 / DSpark 1.253 / Domino 1.268 AL, token-exact 128/128. This measures
-**speculative acceptance and exactness on TextVQA prompts** (32-token budget),
-not standard-answer accuracy of the model. Reproduce with
-`scripts/prepare_benchmark.py` + `scripts/benchmark.py`
-([`docs/benchmark.md`](docs/benchmark.md)).
+## Scope
 
-Reproducibility: same-seed reruns reproduce data/regen protocols
-(`rows_sha256` identical) but not bf16 bits; treat sub-2% AL differences as
-noise. The frozen baseline re-evaluates bit-identically
-(`tests/reference_dflash/manifest.json`).
+- **Inputs:** one image + text, one turn, greedy decoding.
+- **Targets:** the two Qwen-VL targets listed above; other families need an
+  adapter and validation.
+- **Hardware:** the measured reference is one 48 GB GPU. The 24 GB preset is
+  suggested and unvalidated on an actual 24 GB card.
+- **Serving:** production vLLM/SGLang integration is future work; the
+  [serving bridge](docs/serving-bridge.md) describes the proposed handoff.
+- **Reproducibility:** data and generation protocols are reproducible; bf16
+  training is not bitwise deterministic. Observed sub-2% AL differences may
+  fall within run-to-run noise.
 
-## 7. Limitations
+## Documentation
 
-- Single image + text only; no video, no multi-image, no multi-turn.
-- Two target families (Qwen2.5-VL-3B, Qwen3-VL-8B); other families need a
-  small adapter (`vlm_dflash/adapters/`).
-- No production serving integration — this repo trains, evaluates and exports
-  drafters; the sequential verification path is correctness-first, not a speed
-  path, and the serving bridge is a documented proposal, not a feature
-  ([`docs/serving-bridge.md`](docs/serving-bridge.md)).
-- Parallel / strict-parallel verification is **not bitwise exact** in bf16
-  ([`docs/verification-modes.md`](docs/verification-modes.md)); always compare
-  exactness first.
-- DFlash2 trains with an experimental objective reconstruction (upstream
-  objective undisclosed); JetSpec's production parallel-tree runtime is not
-  ported.
-- Hardware: one 48 GB card is the measured reference; 24 GB setups are a
-  suggested, unvalidated target — lower `train.micro_batch_size` /
-  `capture.seq_length` if you are memory-constrained.
-
-## 8. Documentation
-
-| Document | What it covers |
+| Start here | Links |
 | --- | --- |
-| [`docs/REFERENCE.md`](docs/REFERENCE.md) | ported training semantics, AL definition, head/MRoPE rules |
-| [`docs/algorithms/<name>.md`](docs/algorithms/) | per-algorithm design, config, train/eval commands |
-| [`docs/upstream/<name>.md`](docs/upstream/) | upstream audit: sources, commits, licenses, parity level |
-| [`docs/benchmark.md`](docs/benchmark.md) | the benchmark harness + workload manifests |
-| [`docs/verification-modes.md`](docs/verification-modes.md) | sequential vs parallel verification, runtime probe |
-| [`docs/measured-runs.md`](docs/measured-runs.md) | end-to-end measured runs and scaling tables |
-| [`docs/adding_an_algorithm.md`](docs/adding_an_algorithm.md) | what a new drafter plugin must implement |
-| [`BENCHMARKS.md`](BENCHMARKS.md) / [`STATE.md`](STATE.md) | every measured number / current project state |
-| [`RELEASE_VALIDATION.md`](RELEASE_VALIDATION.md) | the release validation record for this version |
+| Use the project | [Environment](docs/env-preflight.md) · [Examples](examples/README.md) · [Measured runs](docs/measured-runs.md) |
+| Understand the methods | [Algorithms](docs/algorithms/) · [Reference](docs/REFERENCE.md) · [Upstream audits](UPSTREAM_AUDIT.md) |
+| Reproduce the evidence | [Benchmarks](BENCHMARKS.md) · [Harness](docs/benchmark.md) · [Release validation](RELEASE_VALIDATION.md) |
+| Extend the stack | [Add an algorithm](docs/adding_an_algorithm.md) · [Support matrix](SUPPORT_MATRIX.md) · [Contributing](CONTRIBUTING.md) |
 
-Small Python API examples live in [`examples/`](examples/).
+## Contributing and attribution
 
-## License
+Reproduction reports, focused fixes and clear examples help the project.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for the current release policy and
+validation requirements. Algorithms plug into `DrafterAlgorithm`; target
+families are isolated behind `VLMAdapter`.
 
-Apache-2.0. Ported/adapted components carry their upstream attribution in
-[`NOTICE`](NOTICE); each algorithm's parity level and license are recorded in
-[`UPSTREAM_AUDIT.md`](UPSTREAM_AUDIT.md) and [`docs/upstream/`](docs/upstream/).
+Apache-2.0. Adapted components retain their upstream attribution in
+[NOTICE](NOTICE), with source commits and implementation scope documented in
+[UPSTREAM_AUDIT.md](UPSTREAM_AUDIT.md). Citation metadata is in
+[CITATION.cff](CITATION.cff).
+
+<sub><strong>Why Vela?</strong> Latin for sails, and the name of the constellation. A lightweight drafter moves forward on the visual context provided by its target.</sub>

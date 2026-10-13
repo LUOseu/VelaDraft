@@ -1,144 +1,217 @@
-# vlm-dflash
+<p align="center">
+  <img src="docs/assets/veladraft-hero.png" alt="VelaDraft — One capture. Many drafters." width="960" />
+</p>
 
-**从图文数据出发，训练 Qwen-VL 的多模态并行 drafter（DFlash 家族）并做 token 级精确校验的最简可复现路径。**
+<p align="center">
+  <strong>面向 Qwen-VL 的多模态并行草稿模型训练工具。</strong><br />
+  通过同一条流水线，训练、比较和导出五种 drafter 算法。
+</p>
 
-![pipeline](docs/assets/pipeline.svg)
+<p align="center">
+  <a href="https://github.com/LUOseu/vlm-dflash/actions/workflows/ci.yml"><img src="https://github.com/LUOseu/vlm-dflash/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-12263a" alt="Python 3.10+" /></a>
+  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-12263a" alt="Apache-2.0" /></a>
+</p>
 
-纯文本的推测解码栈会在 Qwen-VL 的多模态细节上翻车：processor 像素边界、MRoPE
-position ids、图像 token span、保留的 mask embedding 行、tied / untied
-`lm_head`。vlm-dflash 把这些环节一次性钉死，让五个 drafter 算法
-（DFlash / DSpark / Domino / JetSpec / DFlash2）用同一套命令、同一份捕获特征
-完成训练、评测与导出。这里没有新算法、也不是 serving 框架——目标是一个正确、
-可检查的多模态训练闭环。
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#模型下载">模型下载</a> ·
+  <a href="#训练自己的数据">训练</a> ·
+  <a href="#基准结果">基准结果</a> ·
+  <a href="#文档">文档</a> ·
+  <a href="https://github.com/LUOseu/vlm-dflash/blob/main/CONTRIBUTING.md">参与贡献</a>
+</p>
 
-英文主 README：[`README.md`](README.md)；支持矩阵：
-[`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md)（由算法注册表的机器可读元数据生成）。
+<p align="center">
+  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
+</p>
 
-## 1. 直接试用预训练 drafter（无需训练）
+VelaDraft 将 **DFlash、DSpark、Domino、JetSpec 和 DFlash2** 接入同一套多模态训练流程。
+先让目标 VLM 生成回答并捕获特征，再复用兼容的特征，训练与比较不同 drafter。
 
-**Qwen2.5-VL-3B-Instruct** 的 v0.3.0 冻结导出（已过 token 级精确校验）：
+- **一次 capture，多种算法复用。** 共享 hidden states、图像区间和位置编码信息。
+- **离线训练。** 训练阶段将目标模型从 GPU 卸载，直接读取捕获的 feature store。
+- **配对可检查。** 通过运行时 contract 和 provenance 校验目标、processor、features 与 checkpoint。
+- **输出可验证。** Sequential 评测逐 token 对照目标模型的贪心输出，并报告 AL 与各位置接受率。
+
+## 快速开始
+
+先体验已训练权重，再运行完整训练流程。安装包与命令名仍为 **`vlm-dflash`**。
+
+### 安装
 
 ```bash
-# 下载（387 MB，时间取决于网络）
-curl -L -O https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
-tar xzf qwen25vl-3b-dflash.tar.gz
-
-# 运行（A6000 上约 2 分钟；需要本地 Qwen2.5-VL-3B 模型目录）
-vlm-dflash demo --target <Qwen2.5-VL-3B-Instruct> --drafter qwen25vl-3b-dflash
+git clone https://github.com/LUOseu/vlm-dflash.git
+cd vlm-dflash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[tested]"
 ```
 
-`demo` 会生成一个极小的免版权样本，打印生成结果、校验 speculative 输出与
-target 自身 greedy 输出逐 token 一致，并报告接受长度（AL）与 per-slot 接受率。
-不带 `--drafter` 时评测的是随机初始化 drafter——那是接受率的基线（AL≈1.00），
-用于诊断。AL 是接受性指标，不是加速比；sequential 验证路径以正确性优先。
+当前支持从源码安装。实测环境为 Python ≥3.10、PyTorch 2.10.0、Transformers 5.12.1，
+使用单张 RTX A6000 48 GB。详细环境见[环境指南](docs/env-preflight.md)与[验证记录](RELEASE_VALIDATION.md)。
 
-## 2. 训练自己的 drafter
+### 运行已训练的 drafter
 
-需要：一张 CUDA GPU（参考硬件为 A6000 48 GB）、本地
-Qwen2.5-VL-3B-Instruct、一份图文数据（smoke preset 自带 COCO caption 路径）。
+准备本地 **Qwen2.5-VL-3B-Instruct** 模型目录，下载已发布的 DFlash 权重：
 
 ```bash
-git clone https://github.com/LUOseu/vlm-dflash && cd vlm-dflash
-python -m venv .venv && . .venv/bin/activate && pip install -e ".[tested]"
-
 export VLM_DFLASH_TARGET=/path/to/Qwen2.5-VL-3B-Instruct
-vlm-dflash doctor --target "$VLM_DFLASH_TARGET"      # 环境 + 模型 contract 体检
-vlm-dflash train --preset smoke --limit 64          # 数据 -> regen -> 捕获 -> 训练
-vlm-dflash eval runs/smoke_coco                     # token 精确门 + AL + per-slot
-vlm-dflash export runs/smoke_coco                   # 自描述 checkpoint + model card
+
+curl -fL -o qwen25vl-3b-dflash.tar.gz \
+  https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
+tar -xzf qwen25vl-3b-dflash.tar.gz
+
+vlm-dflash demo --target "$VLM_DFLASH_TARGET" --drafter qwen25vl-3b-dflash
 ```
 
-尚未发布 PyPI，从 clone 安装（`pip install -e .`）是唯一受支持的安装方式。
-另有一个约 3 分钟、**无需下载数据集**的全链路 demo：
+Demo 会生成少量示例图片、打印回答，并报告 **接受长度、各位置接受率和 token 一致性**。
+无需训练或下载外部数据集；目标模型需要提前准备。下载时间取决于网络，实测执行时间见[验证记录](RELEASE_VALIDATION.md)。
+
+省略 `--drafter` 可运行随机初始化的接受率基线（AL ≈1.00）。
+
+### 体验完整训练流程
 
 ```bash
 vlm-dflash train-demo --target "$VLM_DFLASH_TARGET" --steps 80
 ```
 
-## 3. 支持的算法与 target
+在生成的图片上运行 prepare → 目标回答生成 → capture → 小规模训练 → eval → export。
+这是完整流程的 smoke test；训练有实用价值的 drafter，需要真实数据与完整配方。
 
-| 算法 | Qwen2.5-VL | Qwen3-VL | 成熟度 | 说明 |
+## 流程
+
+<p align="center">
+  <img src="docs/assets/how-it-works.svg" alt="图文数据通过目标模型生成回答与捕获特征。共享特征用于离线训练五种算法之一，再校验输出并导出 checkpoint。" width="1100" />
+</p>
+
+将昂贵的目标模型计算与 drafter 训练分开：兼容的捕获特征可供多种算法复用，
+**评测时重新加载目标模型**。每个 checkpoint 都记录对应的 target contract 与算法信息。
+
+## 支持的算法
+
+五种算法使用相同的 train、eval 和 export 命令。
+
+| 算法 | Qwen2.5-VL-3B | Qwen3-VL-8B | 状态 | 方法 |
 | --- | --- | --- | --- | --- |
-| DFlash | validated | validated | stable | 冻结参考实现；decayed block CE |
-| DSpark | validated | 缩减规模验证 | validated | Markov logit bias + 置信度头 |
-| Domino | validated | 缩减规模验证 | validated | causal GRU 修正 |
-| JetSpec | validated | 缩减规模验证 | validated | forward-KL + 因果 in-block mask；树形 runtime 未移植 |
-| DFlash2 | validated | 缩减规模验证 | experimental | 目标函数为重构实现（上游未公开） |
+| [DFlash](docs/algorithms/dflash.md) | 已验证 | 已验证 | **Stable** | 冻结的 block drafter 基线 |
+| [DSpark](docs/algorithms/dspark.md) | 已验证 | 小规模验证 | **Validated** | Markov logit bias + confidence |
+| [Domino](docs/algorithms/domino.md) | 已验证 | 小规模验证 | **Validated** | 因果 GRU 修正 |
+| [JetSpec](docs/algorithms/jetspec.md) | 已验证 | 小规模验证 | **Validated** | 因果块内 mask + forward-KL |
+| [DFlash2](docs/algorithms/dflash2.md) | 已验证 | 小规模验证 | **Experimental** | 局部卷积 + candidate selector |
 
-target 列语义与 [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) 一致：`validated` 表示
-已跑通 canonical 协议；"缩减规模验证" 指完整流程在 256 行切片 / 16 prompt
-评测下通过（见 [`RELEASE_VALIDATION.md`](RELEASE_VALIDATION.md)）。所有
-family-specific 细节（mask token、MRoPE sections、draft 层路由、像素边界、
-tied/untied head）都在运行时从 target 解析成 `contract.json` 并校验。
+Target 分别为 **Qwen2.5-VL-3B-Instruct** 和 **Qwen3-VL-8B-Instruct**。
+小规模验证包含 256 行数据与 16 条评测 prompt。以上状态描述训练与评测覆盖，
+运行时支持单独记录在[支持矩阵](SUPPORT_MATRIX.md)中。
 
-## 4. Model Zoo
+DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpec 的生产 tree runtime 未移植。
+具体实现范围见[算法矩阵](ALGORITHM_MATRIX.md)与[上游审计](UPSTREAM_AUDIT.md)。
 
-| Checkpoint | 算法 | AL（2K 协议） | 下载 | Model card |
-| --- | --- | ---: | --- | --- |
-| `qwen25vl-3b-dflash` | DFlash（冻结参考） | 1.6298 | [387 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [card](docs/zoo/qwen25vl-3b-dflash.md) |
-| `qwen25vl-3b-domino` | Domino | 1.7637 | [464 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [card](docs/zoo/qwen25vl-3b-domino.md) |
+## 模型下载
 
-每个压缩包包含权重、`draft_config.json`、`algorithm.json`、
-`target_contract.json`、`training_manifest.json`、`checksums.json`（逐文件
-sha256）与 `model_card.md`；发布后已重新下载并实测通过 token 精确校验。
+已发布的 **Qwen2.5-VL-3B-Instruct** drafter：
 
-## 5. Benchmark（Qwen2.5-VL-3B，2K 语料，128 prompts / 128 tokens，sequential 验证，全部 token-exact）
+| Drafter | AL¹ | 下载 | Model card |
+| --- | ---: | --- | --- |
+| **DFlash** · 冻结基线 | 1.630 | [387 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash.md) |
+| **Domino** · GRU 修正 | 1.764 | [464 MB](https://github.com/LUOseu/vlm-dflash/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [详情](docs/zoo/qwen25vl-3b-domino.md) |
 
-接受性 / 训练行为（完整表格与消融见 [`BENCHMARKS.md`](BENCHMARKS.md)，机器可读
-结果：[`benchmarks/results/zoo_canonical.json`](benchmarks/results/zoo_canonical.json)）：
+¹ 下方 canonical 2K 协议。AL 是接受指标，不是墙钟加速倍数。
+两个 export 均在下载后重新通过 token-exact gate；见[发布证据](RELEASE_VALIDATION.md)。
 
-| 算法 | AL | 随机初始化 | 参数量 | 训练步数 | 峰值显存 | 训练时长 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| DFlash | 1.6298 | 1.003 | 243.8M | 792 | 29.5 GB | 9.8 min |
-| DSpark | 1.7354 | 1.003 | 321.6M | 792 | 38.1 GB | 11.8 min |
-| Domino | 1.7637 | 1.003 | 292.9M | 792 | 38.4 GB | 12.9 min |
-| JetSpec | 1.5987 | 1.003 | 243.8M | 792 | 29.7 GB | 20.6 min |
-| DFlash2（实验目标函数） | 1.9541 | 1.003 | 328.5M | 792 | 31.1 GB | 22.7 min |
+每个压缩包包括权重、配置、算法 metadata、target contract、training manifest、model card 与文件校验值。
+其他算法可在本地训练并导出，当前未托管其 canonical checkpoints。
 
-实际推理成本（sequential 模式，**不是加速比**）：3B DFlash 4.14 s/sample
-（0.87x）、DSpark 4.10（0.86x）、Domino 4.30（0.84x）、JetSpec 4.07（0.86x）、
-DFlash2 4.43（0.82x）。parallel / strict-parallel 模式可到 ~1.0–1.25x，但 bf16
-下不是逐 bit 精确，仅作为实验性吞吐诊断（见
-[`docs/verification-modes.md`](docs/verification-modes.md)）。TextVQA 上的
-数字衡量的是 **接受性与精确性**，不是标准答案准确率。
+## 训练自己的数据
 
-## 6. 用自己的数据训练
-
-`prepare_data` 接受本地 JSONL（`dataset.source: jsonl`），每行一张图 + 一组
-问答，支持 OpenAI `messages` / ShareGPT `conversations` / 扁平
-`{question, answer, image}` 三种形状（见
-[`vlm_dflash/data/schema.py`](vlm_dflash/data/schema.py)）：
+使用每行包含一张图片和一对问答的 JSONL 数据池。
+支持扁平字段、OpenAI 风格 `messages` 与 ShareGPT/LLaVA 风格 `conversations`。
 
 ```json
-{"id": "ex1", "question": "<image>\nDescribe this image in detail.", "answer": "…", "image": "000000.jpg"}
+{"id":"sample-001","image":"000001.jpg","question":"Describe this image in detail.","answer":"A red bicycle is parked beside a brick wall."}
 ```
 
-跨算法复用同一份捕获特征（zoo 协议）：
+小规模端到端示例：
 
 ```bash
-vlm-dflash train --dataset data/rows.jsonl --target "$VLM_DFLASH_TARGET" \
-    --algorithm dspark --run-dir runs/dspark_2k \
-    --features runs/shared_2k/features --steps 792
+python examples/train_from_jsonl.py \
+  --target "$VLM_DFLASH_TARGET" \
+  --jsonl data/rows.jsonl --images-dir data/images \
+  --limit 32 --steps 60
 ```
 
-训练前会校验特征库的 target identity / manifest / 保存的 target head，复用
-条件（目录、样本数、序列长度、dtype、manifest 摘要）写入
-`provenance.json`。2K 特征库约 9.4 GiB，每多训练一个算法即可省去一遍
-regen + capture。
+完整参考配方：配置数据路径后运行 `vlm-dflash train --config configs/qwen2_5_vl_3b.yaml`。
+CLI 同时支持 `--algorithm`、`--resume` 与 `--set key=value` 覆盖。
+详见[示例](examples/README.md)、[数据 schema](vlm_dflash/data/schema.py)与[参考指南](docs/REFERENCE.md)。
 
-## 7. 已知限制
+### 跨算法复用 capture
 
-- 仅单图 + 文本；不支持 video、多图、多轮对话。
-- 两个 target 家族（Qwen2.5-VL-3B、Qwen3-VL-8B）；其他家族需要小型 adapter。
-- 没有生产级 serving 集成；sequential 验证以正确性优先（当前不是速度路径），
-  serving bridge 是提案文档而非功能
-  （[`docs/serving-bridge.md`](docs/serving-bridge.md)）。
-- parallel / strict-parallel 在 bf16 下不保证逐 bit 精确。
-- DFlash2 为实验性目标函数重构；JetSpec 的生产树形 runtime 未移植。
-- 实测硬件为单张 48 GB 卡；24 GB 是建议但未经充分验证的目标，需下调
-  `train.micro_batch_size` / `capture.seq_length`。
+```bash
+vlm-dflash train \
+  --target "$VLM_DFLASH_TARGET" --dataset data/rows.jsonl \
+  --algorithm dspark --run-dir runs/dspark_2k \
+  --features runs/shared_2k/features --steps 792
+```
 
-## License
+使用与捕获特征对应的数据和兼容 target 设置。
+训练前校验 store 的 identity、manifest 和 target head，复用记录写入 `provenance.json`。
+Canonical 2K capture 占用约 **9.4 GiB** 磁盘。
 
-Apache-2.0；移植/改编组件的上游归属见 [`NOTICE`](NOTICE) 与
-[`UPSTREAM_AUDIT.md`](UPSTREAM_AUDIT.md)。
+[对比示例](examples/reuse_features_compare.py)展示一次 capture 后分别训练、评测 DFlash 和 DSpark。
+
+## 基准结果
+
+**Qwen2.5-VL-3B-Instruct · 2K 训练数据 · block size 8 · 128 prompts ·
+128 new tokens · 贪心解码 · sequential verification · 单张 RTX A6000。**
+
+| 算法 | AL | Token-exact | Drafter 参数量 | 训练时间² |
+| --- | ---: | --- | ---: | ---: |
+| DFlash | 1.630 | 128/128 | 243.8M | 9.8 min |
+| DSpark | 1.735 | 128/128 | 321.6M | 11.8 min |
+| Domino | 1.764 | 128/128 | 292.9M | 12.9 min |
+| JetSpec | 1.599 | 128/128 | 243.8M | 20.6 min |
+| DFlash2³ | 1.954 | 128/128 | 328.5M | 22.7 min |
+
+² Capture 完成后的 drafter 训练时间，不含数据准备、目标回答生成和 capture。
+³ 实验性训练目标重建。
+
+这些是同一协议下的对比，不代表上游方法的通用排名。
+冻结结果：[JSON](benchmarks/results/zoo_canonical.json) / [CSV](benchmarks/results/zoo_canonical.csv)。
+各位置接受率、显存、ablation 与更多运行记录见 [BENCHMARKS.md](BENCHMARKS.md)。
+
+固定 **TextVQA** workload 上，DFlash / DSpark / Domino 的 AL 为
+1.263 / 1.253 / 1.268，均为 128/128 token-exact。
+这里评测投机接受行为与输出一致性，标准答案 VQA 准确率是另一个指标；见[benchmark 指南](docs/benchmark.md)。
+
+**运行成本：** 当前 sequential 参考运行相对 target-only 为 0.81–0.87×。
+Parallel verification 仍属实验路径，在 bf16 下可能出现输出差异。
+时间与一致性结果共同记录在[验证模式说明](docs/verification-modes.md)中。
+
+## 支持范围
+
+- **输入：** 单张图片 + 文本、单轮、贪心解码。
+- **Target：** 上述两种 Qwen-VL 模型；其他家族需要 adapter 和验证。
+- **硬件：** 实测参考为单张 48 GB GPU；24 GB preset 是建议配置，尚未在实际 24 GB 卡上验证。
+- **Serving：** 生产 vLLM/SGLang 集成仍为后续工作；[serving bridge](docs/serving-bridge.md)描述拟议交接方式。
+- **复现：** 数据与生成协议可复现，bf16 训练不保证 bitwise deterministic；小于 2% 的 AL 差异可能落在运行噪声内。
+
+## 文档
+
+| 入口 | 链接 |
+| --- | --- |
+| 使用项目 | [环境](docs/env-preflight.md) · [示例](examples/README.md) · [实测运行](docs/measured-runs.md) |
+| 理解方法 | [算法](docs/algorithms/) · [参考指南](docs/REFERENCE.md) · [上游审计](UPSTREAM_AUDIT.md) |
+| 复现实验 | [基准](BENCHMARKS.md) · [Harness](docs/benchmark.md) · [发布验证](RELEASE_VALIDATION.md) |
+| 扩展项目 | [添加算法](docs/adding_an_algorithm.md) · [支持矩阵](SUPPORT_MATRIX.md) · [贡献指南](CONTRIBUTING.md) |
+
+## 贡献与归属
+
+欢迎提交复现记录、聚焦的修复与清楚的使用示例。
+当前 release policy 与验证要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+算法通过 `DrafterAlgorithm` 接入，目标家族通过 `VLMAdapter` 隔离。
+
+Apache-2.0。移植组件保留上游归属，见 [NOTICE](NOTICE)。
+来源 commit 与实现范围见 [UPSTREAM_AUDIT.md](UPSTREAM_AUDIT.md)；引用信息见 [CITATION.cff](CITATION.cff)。
+
+<sub><strong>为什么叫 Vela？</strong> Vela 意为“船帆”，也是船帆座的名称。
+轻量 drafter 借助目标模型提供的视觉上下文前行。</sub>
