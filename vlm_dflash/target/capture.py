@@ -75,7 +75,14 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
     seq_length = int(cap_cfg.get("seq_length", 2048))
     shard_size = int(cap_cfg.get("shard_size", 32))
     dtype = storage_dtype(cap_cfg.get("dtype", "bfloat16"))
-    layer_ids = [int(layer) for layer in contract["layers"]["draft_layer_ids"]]
+    from ..contract import contract_capture_layer_ids
+
+    # The capture writes the ordered layer list the contract froze. It may be a
+    # superset of any single method's consumption (methods pick explicit subsets
+    # by layer id at train time); the layout is recorded in the manifest so
+    # consumers never have to guess it from the tensor shape.
+    layer_ids = contract_capture_layer_ids(contract)
+    hidden_size = int(contract["text"]["hidden_size"])
     image_token_id = int(contract["tokens"]["image_token_id"])
     merge_size = int(contract["image"]["merge_size"])
     store_final_hidden = bool(cap_cfg.get("store_final_hidden", False))
@@ -142,6 +149,9 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
         "num_samples": len(index_rows),
         "num_truncated": truncated,
         "draft_layer_ids": layer_ids,
+        "capture_layer_ids": layer_ids,
+        "hidden_size": hidden_size,
+        "hidden_layout": "concat_capture_layers",
         "stores_final_hidden": store_final_hidden,
         "tie_word_embeddings": not lm_head_saved,
         "lm_head_saved": lm_head_saved,

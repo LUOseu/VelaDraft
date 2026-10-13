@@ -144,7 +144,10 @@ class OnlineFeatureSource:
         self.seq_length = int(cap_cfg.get("seq_length", 2048))
         self.dtype = storage_dtype(cap_cfg.get("dtype", "bfloat16"))
         self.store_final_hidden = bool(cap_cfg.get("store_final_hidden", False))
-        self.layer_ids = [int(layer) for layer in contract["layers"]["draft_layer_ids"]]
+        from ..contract import contract_capture_layer_ids
+
+        self.layer_ids = contract_capture_layer_ids(contract)
+        self.hidden_size = int(contract["text"]["hidden_size"])
         self.image_token_id = int(contract["tokens"]["image_token_id"])
         self.merge_size = int(contract["image"]["merge_size"])
         self.fused_hidden_size = len(self.layer_ids) * int(contract["text"]["hidden_size"])
@@ -241,6 +244,9 @@ class OnlineFeatureSource:
             "storage_dtype": str(self.dtype).replace("torch.", ""),
             "stores_final_hidden": self.store_final_hidden,
             "draft_layer_ids": self.layer_ids,
+            "capture_layer_ids": self.layer_ids,
+            "hidden_size": self.hidden_size,
+            "hidden_layout": "concat_capture_layers",
             "target_dtype": self.target_dtype,
             "attn_implementation": self.attn_implementation,
             "target_device": str(self.target_device),

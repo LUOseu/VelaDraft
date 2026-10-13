@@ -23,11 +23,23 @@ class ContractError(RuntimeError):
 def contract_defaults_from_config(cfg: dict) -> dict:
     drafter = cfg.get("drafter", {})
     target = cfg.get("target", {})
+    # Fusion algorithms (DFlare/DFly) consume an explicit target-layer subset
+    # instead of the draft routing; any algorithm block that declares
+    # ``context_layer_ids`` names the layers that must exist in the capture.
+    algorithm_context = None
+    algorithm_cfg = cfg.get("algorithm")
+    if isinstance(algorithm_cfg, dict):
+        for block in algorithm_cfg.values():
+            if isinstance(block, dict) and block.get("context_layer_ids") is not None:
+                algorithm_context = block["context_layer_ids"]
+                break
     return {
         "mask_token_id": drafter.get("mask_token_id"),
         "spatial_rope_sections": drafter.get("spatial_rope_sections"),
         "spatial_rope_interleaved": drafter.get("spatial_rope_interleaved"),
         "draft_num_hidden_layers": drafter.get("num_hidden_layers"),
+        "capture_layer_ids": drafter.get("capture_layer_ids"),
+        "algorithm_context_layer_ids": algorithm_context,
         "block_size": drafter.get("block_size"),
         "image_min_pixels": target.get("image_min_pixels"),
         "image_max_pixels": target.get("image_max_pixels"),
@@ -89,6 +101,40 @@ def build_target_layer_ids(num_target_layers: int, num_draft_layers: int) -> lis
         return [start]
     step = (end - start) / (num_draft_layers - 1)
     return [int(start + round(i * step)) for i in range(num_draft_layers)]
+
+
+def contract_capture_layer_ids(contract: dict) -> list[int]:
+    """The captured layer list of a contract or feature manifest (ordered).
+
+    ``capture_layer_ids`` records which target layers a store actually holds and
+    in which order. Contracts/stores written before the field existed captured
+    exactly the draft routing (the old code's single layout), so falling back to
+    ``draft_layer_ids`` recovers their true layout rather than guessing one.
+    """
+    layers = contract.get("layers") or {}
+    raw = layers.get("capture_layer_ids")
+    if raw is None:
+        raw = layers["draft_layer_ids"]
+    return [int(layer) for layer in raw]
+
+
+def validate_capture_layer_ids(capture_layer_ids, num_target_layers: int, where: str) -> list[int]:
+    """Validate an explicit capture list: unique, strictly increasing, in range."""
+    ids = [int(layer) for layer in capture_layer_ids]
+    if not ids:
+        raise ContractError(f"{where}: capture_layer_ids must not be empty.")
+    if ids != sorted(set(ids)):
+        raise ContractError(
+            f"{where}: capture_layer_ids must be unique and strictly increasing "
+            f"(capture order is the layout order), got {ids}."
+        )
+    depth = int(num_target_layers)
+    out_of_range = [layer for layer in ids if layer < 0 or layer >= depth]
+    if out_of_range:
+        raise ContractError(
+            f"{where}: capture_layer_ids {out_of_range} outside the target's {depth} text layers."
+        )
+    return ids
 
 
 def _file_fingerprint(model_dir: Path, names: list[str]) -> dict[str, str | None]:
@@ -240,6 +286,32 @@ def resolve_contract(
     # ---- draft layer routing -------------------------------------------
     draft_layers = int(defaults.get("draft_num_hidden_layers", 3))
     draft_layer_ids = build_target_layer_ids(num_target_layers, draft_layers)
+    capture_default = defaults.get("capture_layer_ids")
+    if capture_default is None:
+        capture_layer_ids = list(draft_layer_ids)
+        capture_source = "default: the draft layer routing (capture == draft_layer_ids)"
+    else:
+        capture_layer_ids = validate_capture_layer_ids(
+            capture_default, num_target_layers, "drafter.capture_layer_ids"
+        )
+        capture_source = "explicit drafter.capture_layer_ids"
+    # Every layer the *configured* algorithm consumes must be in the capture:
+    # the draft routing for DFlash-family, or the explicit context subset the
+    # fusion algorithms (DFlare/DFly) declare.
+    consumed_default = defaults.get("algorithm_context_layer_ids")
+    if consumed_default is None:
+        consumed_layers = list(draft_layer_ids)
+        consumed_source = f"draft routing {consumed_layers}"
+    else:
+        consumed_layers = [int(layer) for layer in consumed_default]
+        consumed_source = f"algorithm context_layer_ids {consumed_layers}"
+    missing_consumed = [layer for layer in consumed_layers if layer not in capture_layer_ids]
+    if missing_consumed:
+        raise ContractError(
+            f"drafter.capture_layer_ids {capture_layer_ids} does not include layers "
+            f"{missing_consumed} that the configured algorithm consumes "
+            f"({consumed_source}); the capture must be a superset of every consumed layer."
+        )
     block_size = int(defaults.get("block_size", 8))
     if block_size < 2:
         raise ContractError(f"block_size must be >= 2, got {block_size}.")
@@ -312,8 +384,13 @@ def resolve_contract(
             "num_target_layers": num_target_layers,
             "num_draft_layers": draft_layers,
             "draft_layer_ids": draft_layer_ids,
+            "capture_layer_ids": capture_layer_ids,
+            "capture_layer_ids_source": capture_source,
             "block_size": block_size,
-            "source": "config default (start=1, end=num_target_layers-3, uniform) validated against target depth",
+            "source": (
+                "config default (start=1, end=num_target_layers-3, uniform) validated against target "
+                "depth; capture_layer_ids is the ordered layer list every feature store holds"
+            ),
         },
         "image": {
             "min_pixels": min_pixels,
@@ -361,6 +438,15 @@ def validate_yaml_against_contract(cfg: dict, contract: dict, where: str = "conf
         value = dotted_get(cfg, dotted)
         if value != expected:
             raise ContractError(f"{where}: {dotted}={value!r} disagrees with frozen contract value {expected!r}.")
+    capture_cfg = (cfg.get("drafter", {}) or {}).get("capture_layer_ids")
+    if capture_cfg is not None:
+        expected_capture = contract_capture_layer_ids(contract)
+        actual_capture = validate_capture_layer_ids(capture_cfg, contract["layers"]["num_target_layers"], where)
+        if actual_capture != expected_capture:
+            raise ContractError(
+                f"{where}: drafter.capture_layer_ids {actual_capture} disagree with frozen contract "
+                f"{expected_capture}."
+            )
     sections = [int(s) for s in (cfg.get("drafter", {}).get("spatial_rope_sections") or [])]
     if sections and sections != [int(s) for s in contract["rope"]["sections"]]:
         raise ContractError(

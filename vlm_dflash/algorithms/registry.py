@@ -50,6 +50,8 @@ def _load_defaults() -> None:
     from . import domino as _domino  # noqa: F401  (self-registers DominoAlgorithm)
     from . import jetspec as _jetspec  # noqa: F401  (self-registers JetSpecAlgorithm)
     from . import dflash2 as _dflash2  # noqa: F401  (self-registers DFlash2Algorithm)
+    from . import dflare as _dflare  # noqa: F401  (self-registers DFlareAlgorithm)
+    from . import dfly as _dfly  # noqa: F401  (self-registers DFlyAlgorithm)
 
 
 def available_algorithms() -> list[str]:

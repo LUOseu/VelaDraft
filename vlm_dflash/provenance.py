@@ -57,6 +57,8 @@ def identity_diff(
     plus weight shard names/sizes -- it identifies a checkpoint layout, not a
     byte-for-byte hash of the weights.
     """
+    expected = _with_legacy_capture_layers(expected)
+    actual = _with_legacy_capture_layers(actual)
     diffs = []
     for key in sorted(set(expected) | set(actual)):
         if key in ignore:
@@ -64,6 +66,17 @@ def identity_diff(
         if expected.get(key) != actual.get(key):
             diffs.append(f"{key}: expected={expected.get(key)!r} actual={actual.get(key)!r}")
     return diffs
+
+
+def _with_legacy_capture_layers(identity: dict) -> dict:
+    """Identity records written before ``capture_layer_ids`` existed captured
+    exactly the draft routing (the old code's single layout). Defaulting the
+    missing key to ``draft_layer_ids`` keeps those artifacts comparable instead
+    of failing the gate on a field that never carried independent information.
+    """
+    if "capture_layer_ids" not in identity and "draft_layer_ids" in identity:
+        return {**identity, "capture_layer_ids": list(identity["draft_layer_ids"])}
+    return identity
 
 
 def assert_identity(
@@ -85,6 +98,8 @@ def identity_from_contract(contract: dict) -> dict:
     gate (see :data:`AUDIT_ONLY_IDENTITY_KEYS`); moving the same checkpoint to
     a new directory must not invalidate a run.
     """
+    from .contract import contract_capture_layer_ids
+
     return {
         "target_model_path": contract["target"]["model_path"],
         "model_fingerprint": contract["target"]["model_fingerprint"],
@@ -92,6 +107,7 @@ def identity_from_contract(contract: dict) -> dict:
         "mask_token_id": contract["mask"]["token_id"],
         "spatial_rope_sections": contract["rope"]["sections"],
         "draft_layer_ids": contract["layers"]["draft_layer_ids"],
+        "capture_layer_ids": contract_capture_layer_ids(contract),
         "image_min_pixels": contract["image"]["min_pixels"],
         "image_max_pixels": contract["image"]["max_pixels"],
     }

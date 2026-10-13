@@ -358,12 +358,7 @@ class Qwen3DFlashAttention(nn.Module):
         ctx_len = target_hidden.shape[1]
         q = self.q_proj(hidden_states).view(bsz, q_len, -1, self.head_dim)
         q = self.q_norm(q).transpose(1, 2)
-        k_ctx = self.k_proj(target_hidden)
-        k_noise = self.k_proj(hidden_states)
-        v_ctx = self.v_proj(target_hidden)
-        v_noise = self.v_proj(hidden_states)
-        k = torch.cat([k_ctx, k_noise], dim=1).view(bsz, ctx_len + q_len, -1, self.head_dim)
-        v = torch.cat([v_ctx, v_noise], dim=1).view(bsz, ctx_len + q_len, -1, self.head_dim)
+        k, v = self._context_noise_kv(hidden_states, target_hidden)
         k = self.k_norm(k).transpose(1, 2)
         v = v.transpose(1, 2)
         cos, sin = position_embeddings
@@ -411,6 +406,27 @@ class Qwen3DFlashAttention(nn.Module):
             )
         attn_output = attn_output.reshape(bsz, q_len, -1)
         return self.o_proj(attn_output), attn_weights
+
+    def _context_noise_kv(
+        self, hidden_states: torch.Tensor, target_hidden: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Project the two K/V sources and concatenate them pre-norm/pre-RoPE.
+
+        DFlash shares one ``k_proj`` / ``v_proj`` for the target context and the
+        draft (noise) tokens; DFlare overrides this seam with dedicated
+        ``k_proj_target`` / ``v_proj_target`` context projections. Layout (and
+        the concat -> k_norm -> RoPE order) is identical in both cases:
+        ``[batch, context_tokens + draft_tokens, kv_heads * head_dim]``.
+        """
+        bsz, q_len = hidden_states.shape[:-1]
+        ctx_len = target_hidden.shape[1]
+        k_ctx = self.k_proj(target_hidden)
+        k_noise = self.k_proj(hidden_states)
+        v_ctx = self.v_proj(target_hidden)
+        v_noise = self.v_proj(hidden_states)
+        k = torch.cat([k_ctx, k_noise], dim=1).view(bsz, ctx_len + q_len, -1, self.head_dim)
+        v = torch.cat([v_ctx, v_noise], dim=1).view(bsz, ctx_len + q_len, -1, self.head_dim)
+        return k, v
 
 
 class DFlashVisualLayer(nn.Module):
@@ -980,6 +996,17 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             return []
         return [self.layer_route_gates]
 
+    def _prepare_target_hidden(self, target_hidden: torch.Tensor) -> torch.Tensor:
+        """Hook: raw concatenated target features -> backbone context input.
+
+        DFlash feeds the concatenation straight into its FC projection; fusion
+        models (DFlare / DFly) override this to stack the captured layers into
+        ``[batch, sequence, num_context_layers, hidden]`` so per-draft-layer
+        fusion can weight them along the layer axis. The reshape is only ever
+        done with the model's own known layer list and width.
+        """
+        return target_hidden
+
     def _build_layer_contexts(self, target_hidden: torch.Tensor) -> tuple[torch.Tensor, ...]:
         """Build one target context per draft layer without changing sequence length.
 
@@ -1143,7 +1170,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             if image_mask is None:
                 image_mask = torch.zeros(target_hidden.shape[:2], dtype=torch.bool, device=target_hidden.device)
             visual_context = self.build_visual_context(target_hidden, image_mask)
-        layer_contexts = self._build_layer_contexts(target_hidden)
+        layer_contexts = self._build_layer_contexts(self._prepare_target_hidden(target_hidden))
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
         multimodal_position_embeddings = None
         if self.spatial_rope_enabled:

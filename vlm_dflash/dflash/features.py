@@ -10,6 +10,64 @@ from torch.utils.data import Dataset
 from ..utils import read_json, read_jsonl
 
 
+def capture_layer_layout(manifest: dict, contract_hidden_size: int | None = None) -> tuple[list[int], int | None]:
+    """Ordered capture layer list + per-layer hidden size from a feature manifest.
+
+    Stores written before ``capture_layer_ids`` / ``hidden_size`` existed
+    captured exactly the draft routing (the old code's single layout), so the
+    fallbacks describe a fact about the old format rather than a guess. The
+    per-layer hidden size falls back to the live contract's text hidden size,
+    which the identity gate has already pinned to the store's target.
+    """
+    raw = manifest.get("capture_layer_ids") or manifest.get("draft_layer_ids")
+    if not raw:
+        raise ValueError("feature manifest has no capture_layer_ids/draft_layer_ids layer list.")
+    layer_ids = [int(layer) for layer in raw]
+    hidden = manifest.get("hidden_size") or contract_hidden_size
+    return layer_ids, (int(hidden) if hidden is not None else None)
+
+
+def select_capture_layers(
+    hidden: torch.Tensor,
+    capture_layer_ids: list[int],
+    context_layer_ids: list[int],
+) -> torch.Tensor:
+    """Slice a concatenated capture tensor to a method's ordered layer subset.
+
+    The store layout is ``[batch, sequence, len(capture_layer_ids) * H]`` with
+    the layers in ``capture_layer_ids`` order. Splitting on ``H`` depends on the
+    recorded list (never on guessing the layout from the shape): a duplicate or
+    unknown layer id fails loud with a recapture hint instead of silently
+    reinterpreting channels.
+    """
+    capture = [int(layer) for layer in capture_layer_ids]
+    context = [int(layer) for layer in context_layer_ids]
+    if context == capture:
+        return hidden
+    if len(set(capture)) != len(capture):
+        raise ValueError(
+            f"capture_layer_ids {capture} contain duplicates; the concatenated layout cannot be "
+            "split safely. Recapture with a unique, strictly increasing layer list."
+        )
+    if hidden.shape[-1] % len(capture) != 0:
+        raise ValueError(
+            f"captured feature width {hidden.shape[-1]} is not divisible by {len(capture)} capture "
+            f"layers; the store layout does not match its manifest. Recapture the features."
+        )
+    per_layer = hidden.shape[-1] // len(capture)
+    index = {layer: position for position, layer in enumerate(capture)}
+    missing = [layer for layer in context if layer not in index]
+    if missing:
+        raise ValueError(
+            f"method needs target layers {missing} but the feature store captured {capture}. "
+            "Recapture with drafter.capture_layer_ids set to a superset of the method's layers."
+        )
+    if not context:
+        raise ValueError("context_layer_ids must not be empty.")
+    chunks = hidden.split(per_layer, dim=-1)
+    return torch.cat([chunks[index[layer]] for layer in context], dim=-1)
+
+
 class FeatureStore:
     """Random access over ``features/shard_*.pt`` described by ``index.jsonl``."""
 

@@ -26,6 +26,13 @@ def build_draft_config(contract: dict, cfg: dict):
     draft["layer_types"] = ["full_attention"] * num_layers
     draft["max_window_layers"] = num_layers
     draft["num_target_layers"] = int(contract["layers"]["num_target_layers"])
+    # Per-layer width of the captured target features (the fusion models need it
+    # to validate their stacked context; equal to the draft width in this stack).
+    # Optional: legacy/synthetic contracts without a ``text`` block fall back to
+    # the draft hidden size, matching the old single-layout stores.
+    text_hidden = contract.get("text", {}).get("hidden_size")
+    if text_hidden is not None:
+        draft["target_hidden_size"] = int(text_hidden)
     draft["block_size"] = int(drafter["block_size"])
     draft["dflash_config"] = {
         "mask_token_id": int(drafter["mask_token_id"]),

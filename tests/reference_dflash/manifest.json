@@ -130,6 +130,16 @@
       "al": 1.6298,
       "token_exact": true,
       "note": "full canonical re-eval of the frozen checkpoint with post-DFlash2 code; reproduces the frozen 1.6298365840801265 bit-identically (ckpt_init 1.0030, both token-exact)"
+    },
+    {
+      "date": "2026-10-13",
+      "tag": "dflare_branch_recheck",
+      "file": "runs/qwen25vl3b_2k/eval/eval_result_dflare_branch_recheck.json",
+      "prompts": 128,
+      "max_new_tokens": 128,
+      "al": 1.6298,
+      "token_exact": true,
+      "note": "after the DFlare/DFly ports + contract layer-slicing changes; reproduces the frozen 1.6298365840801265 bit-identically (ckpt_init 1.0030, both token-exact, per-slot profile unchanged)"
     }
   ],
   "not_comparable": [

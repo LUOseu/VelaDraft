@@ -16,15 +16,19 @@ with `python scripts/render_support_matrix.py`.
 
 | Algorithm | Qwen2.5-VL | Qwen3-VL           | Image     | Multi-image | Video       | Train        | Eval      | Export    |
 | --------- | ---------- | ------------------ | --------- | ----------- | ----------- | ------------ | --------- | --------- |
+| dflare    | validated  | reduced_validation | validated | unsupported | unsupported | validated    | validated | validated |
 | dflash    | validated  | validated          | validated | unsupported | unsupported | validated    | validated | validated |
 | dflash2   | validated  | reduced_validation | validated | unsupported | unsupported | experimental | validated | validated |
+| dfly      | validated  | reduced_validation | validated | unsupported | unsupported | experimental | validated | validated |
 | domino    | validated  | reduced_validation | validated | unsupported | unsupported | validated    | validated | validated |
 | dspark    | validated  | reduced_validation | validated | unsupported | unsupported | validated    | validated | validated |
 | jetspec   | validated  | reduced_validation | validated | unsupported | unsupported | validated    | validated | validated |
 
 - "Train" is the training maturity: DFlash2 trains with an experimental
-  objective reconstruction (upstream objective undisclosed); everything else
-  is validated.
+  objective reconstruction (upstream objective undisclosed) and DFly trains
+  the ported architecture with the shared DFlash objective (upstream's
+  two-stage LK/D-PACE -> e2e-TV recipe is not ported; see
+  `docs/upstream/dfly.md`); everything else is validated.
 - JetSpec eval numbers are validated with its causal in-block mask (its
   parallel-tree production runtime is not ported); every algorithm's runtime
   story is sequential token-exact verification only.

@@ -23,6 +23,9 @@ _MIN_DELTA = 1e-5
 
 def draft_block_logits(module, input_ids, loss_mask, hidden, position3):
     """Draft block logits for one batch; mirrors the trainer forward's prologue."""
+    # Superset stores hold more layers than the model consumes; apply the same
+    # explicit-id slice the training forward applies before the draft forward.
+    hidden = module._select_context_layers(hidden)
     torch.manual_seed(_ANCHOR_SEED)
     anchors, keep_mask, noise_embedding, full_positions, attention_mask, _ = module._prepare_block_inputs(
         input_ids, loss_mask, causal=getattr(module, "causal_in_block", False)
