@@ -1,7 +1,9 @@
 # STATE
 
 Updated: 2026-10-13 (v0.3.2 in development: online target feature source
-pushed; GitHub repo renamed to `LUOseu/VelaDraft`).
+pushed; GitHub repo renamed to `LUOseu/VelaDraft`; DFlare/DFly AngelSpec
+ports landed behind the same interfaces — canonical 2K runs, ablations and
+Qwen3-VL reduced validations recorded).
 
 **Status: v0.3.1 tagged and pushed** (tag `v0.3.1` at `eb3f314`); **v0.3.2 in
 development — the online target feature source is pushed as `aed7bf8`** (repo
@@ -24,10 +26,12 @@ stay `vlm-dflash`).
 - Verification: `sequential` (bitwise-exact gate), `parallel` /
   `strict_parallel` (experimental throughput; not lossless).
 - Unified CLI (`doctor/train/eval/export`), presets, resume, HF-style export.
-- Algorithm registry with five drafters behind one interface: DFlash (stable
+- Algorithm registry with seven drafters behind one interface: DFlash (stable
   frozen reference), DSpark / Domino / JetSpec (validated on the 2K
   apples-to-apples protocol), DFlash2 (experimental objective; upstream does
-  not publish it). See `ALGORITHM_MATRIX.md`, `SUPPORT_MATRIX.md`, `BENCHMARKS.md`.
+  not publish it), DFlare / DFly (AngelSpec ports — canonical evidence in
+  the stage section below). See `ALGORITHM_MATRIX.md`, `SUPPORT_MATRIX.md`,
+  `BENCHMARKS.md`.
 - Gradient coverage audit + per-algorithm calibration/ablation artifacts;
   namespaced algorithm config; export loader dispatch by algorithm.
 
@@ -66,6 +70,58 @@ stay `vlm-dflash`).
   token-exact; resume check: 3 fast-forward batches, 1 extraction forward
   instead of 4 (`resume_fast_forward_reduced_cost=true`). Smoke ALs <=1.09
   after 4 steps — plumbing only, not quality.
+
+## DFlare / DFly stage (2026-10-13, stage 6 — AngelSpec ports, evidence recorded)
+
+- Scope: port `Tencent/AngelSpec @ d3412bed` DFlare (learnable per-draft-layer
+  fusion + dedicated context K/V) and DFly (DFlash shared-KV backbone + FC
+  context + fusion residual + zero-init hidden-states correction) into the
+  algorithm-zoo interfaces. Both keep the frozen DFlash block-CE objective,
+  slot convention and recipes; audits in `docs/upstream/dflare.md` /
+  `docs/upstream/dfly.md`, port notes in `docs/algorithms/dflare.md` /
+  `docs/algorithms/dfly.md`.
+- Feature contract: explicit-id layer slicing — a single capture superset
+  `[1, 9, 17, 25, 33]` serves the matched comparison (context `[1, 17, 33]`,
+  identical to the frozen DFlash routing) and the upstream 5-layer recipe;
+  `contract_defaults_from_config` extracts `algorithm_context_layer_ids` and
+  the capture-coverage check validates the configured algorithm's consumed
+  layers (not always the draft routing).
+- Tests: `tests/test_dflare.py` (12), `tests/test_dfly.py` (12),
+  `tests/test_feature_contract.py` (7); full CPU suite 228 passed / 6 skipped.
+  Gradient coverage: training-time step-0 audits are 42/42 for DFlare and
+  38/42 for DFly — the 4 zero-grad tensors are the zero-init correction's
+  gate/up path (`down_proj` alone is kicked off at step 0, unit-tested);
+  the new `scripts/diag_gradient_coverage.py` replays each canonical run's
+  feature store against `ckpt_final.pt` and reports 42/42 nonzero on the
+  first replayed backward (both algorithms).
+- GPU smokes (Qwen2.5-VL-3B, COCO 64-row): DFlare train + overfit + visual
+  check, eval token-exact 8/8, AL 1.123 vs init 1.000; export verified
+  (`method: dflare`, `method_details.separate_context_kv=true`). DFly smoke
+  eval token-exact 8/8, AL 1.438; correction delta 0 → 0.75, fusion entropy
+  stable (prior-dominated at smoke scale).
+- Fusion diagnostics honesty: fusion logits train through the fp32 optimizer
+  masters, but the live bf16 parameter quantises single AdamW steps, so in-log
+  fusion metrics move coarsely; the trainer now attaches fp32 masters and
+  logs fp32-resolution `fusion_*` metrics plus `fusion_prob_l1_drift` (the
+  2K canonical run predates this and has a `train/fusion_master_summary.json`
+  extracted from its step-594 `ckpt_last.pt`: fusion probabilities moved
+  L1 0.011 from the distance prior, per-layer entropy
+  [0.496, 0.671, 0.396] vs prior [0.441, 0.668, 0.439]).
+  Ablation checkpoints extracted at the same step-594 save: shared-KV drift
+  0.0133, no-correction 0.0026, fixed-prior 0.0 — the knob turns the
+  mechanism off exactly; 8B reduced (step 144) drift 0.0014 / 0.0003,
+  correction `down_proj` |w| 0.0025.
+- Canonical runs recorded (Qwen2.5-VL-3B 2K, 128 prompts, all token-exact;
+  numbers in `BENCHMARKS.md`): DFlare matched `[1,17,33]` **AL 1.637**
+  (frozen baseline 1.630, re-checked bit-identically), fixed-prior ablation
+  1.637, shared-KV ablation **1.579** (the dedicated context K/V is the
+  effective component; the learned fusion is prior-dominated), layer-rich
+  `[1,9,17,25,33]` **1.670**; DFly matched **AL 1.682** (hidden-states
+  correction worth +0.113 — no-correction ablation 1.569), layer-rich
+  **1.709**. Qwen3-VL-8B reduced (192 steps, 16 prompts): DFlare 1.185,
+  DFly 1.226. All 9 run exports re-rendered with the final algorithm
+  metadata; fusion master summaries extracted before pruning `ckpt_last.pt`
+  resume states (~33 GB freed).
 
 ## Latest measured results
 - 3B / 512-corpus rerun: AL 1.198, 64/64 exact (earlier v0.1 run: 1.220).
@@ -271,6 +327,13 @@ Scope frozen (harden/document/validate/package only). Evidence:
   the dspark/domino/dflash2 2K runs. `/home` is at ~99% (278G free as of
   2026-10-12; the cleanup reclaimed ~23G: tmp debug scripts, /tmp exports,
   a stale code copy, smoke resume states, duplicate feature store).
+  On 2026-10-13 `/home` hit 100% (a concurrent eval died with ENOSPC while
+  writing its result); freed ~9.6G by deleting `ckpt_last.pt` (fp32 AdamW
+  masters, ~3.2G each) from completed runs — resume states for finished runs
+  only. The DFlare/DFly 2K pair share one 12G capture superset store
+  (`runs/qwen25vl3b_dflare_2k/features`, symlinked by dfly/ablations); every
+  other new run reuses it, and `ckpt_last.pt` is pruned after each run's eval
+  so the remaining stage-6 runs need only ~1.5G of net new space each.
 
 ## Next highest-value tasks
 1. DFlash2 objective isolation (only if the 1.954 is quoted as a method

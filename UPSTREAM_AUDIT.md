@@ -12,6 +12,8 @@ format, what we port, what we change (and why), and the parity level.
 | Domino | `docs/upstream/domino.md` | — | bb5b34ce | maintainer implementation (ported semantics + same defaults) |
 | JetSpec | `docs/upstream/jetspec.md` | — | bb5b34ce | maintainer implementation (training semantics + mask + metrics; runtime not ported) |
 | DFlash2 | `docs/upstream/dflash2.md` | 55ebbd5b | — (has no dflash2 at bb5b34ce) | architecture: maintainer / objective: experimental reconstruction (undisclosed) / runtime: inferred |
+| DFlare | `docs/upstream/dflare.md` | — | — | AngelSpec port @ `d3412bed` (fusion + separate context K/V; shared DFlash objective; inference adaptation documented) |
+| DFly | `docs/upstream/dfly.md` | — | — | AngelSpec port @ `d3412bed` (fusion + hidden correction; LK/D-PACE two-stage objective and e2e-TV not ported — documented) |
 
 Pinned commits
 
@@ -22,6 +24,8 @@ Pinned commits
 - `jacky566/Automodel_lao` @ `d21fb5aa` — the read-only reference this repo's
   DFlash port was taken from (see `docs/REFERENCE.md`; never imported at
   runtime).
+- `Tencent/AngelSpec` @ `d3412bed231025ea85d35dbf5e0af44f1ac62a5b`
+  (MIT) — upstream for the DFlare / DFly ports.
 
 Rule (GOAL §2): no algorithm implementation starts before its audit doc exists
 with concrete source file / commit references — not just conclusions.

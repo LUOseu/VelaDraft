@@ -64,6 +64,13 @@ are the same run recipe with one algorithm knob flipped.
 | JetSpec (shared runtime, no in-block mask) | 1.338 | .242 | .069 | .020 | .005 | .001 | .0004 | .0002 | 128/128 |
 | DFlash2 (conv + selector, experimental objective) | 1.954 | .495 | .243 | .118 | .060 | .027 | .013 | .006 | 128/128 |
 | DFlash2 `conv_kernel_size: 1` + `selector_loss_alpha: 0` (ablation) | 1.798 | .482 | .203 | .077 | .027 | .009 | .003 | .001 | 128/128 |
+| DFlare (fusion + separate context K/V, matched `[1,17,33]`) | 1.637 | .421 | .154 | .049 | .011 | .003 | .001 | 0 | 128/128 |
+| DFly (fusion residual + hidden correction, matched `[1,17,33]`) | 1.682 | .384 | .160 | .073 | .037 | .019 | .008 | .004 | 128/128 |
+| DFlare (5-layer recipe `[1,9,17,25,33]`) | 1.670 | .435 | .162 | .055 | .016 | .004 | .001 | .0001 | 128/128 |
+| DFly (5-layer recipe `[1,9,17,25,33]`) | 1.709 | .394 | .169 | .079 | .037 | .019 | .010 | .005 | 128/128 |
+| DFly `enable_hidden_correction: false` (ablation) | 1.569 | .391 | .126 | .038 | .011 | .004 | .001 | .0004 | 128/128 |
+| DFlare `fusion_trainable: false` (fixed prior, ablation) | 1.637 | .422 | .154 | .049 | .010 | .002 | .001 | .0001 | 128/128 |
+| DFlare `separate_context_kv: false` (shared K/V, ablation) | 1.579 | .401 | .129 | .037 | .010 | .002 | .001 | .0002 | 128/128 |
 
 - DSpark decomposition: at the frozen DFlash round width the Markov head alone
   lifts AL 1.630 -> 1.719 (+0.089, deep slots roughly doubled); drafting the
@@ -126,6 +133,85 @@ are the same run recipe with one algorithm knob flipped.
   token-exact 128/128.)
 - `AL = new_tokens / target_verification_steps` (bonus-token-inclusive);
   random-init drafter AL ~1.003 means proposals are almost never accepted.
+- DFlare (matched `[1,17,33]`, AngelSpec port): parity with the
+  frozen DFlash baseline at this budget — AL 1.637 vs 1.630 (+0.007, inside
+  the ~2% run-to-run noise), slots within ±0.004 of the baseline profile. The
+  fusion logits train (fp32-master drift from the distance prior: prob L1
+  0.011 at step 594; per-layer entropy [0.496, 0.671, 0.396] vs prior
+  [0.441, 0.668, 0.439]), but the prior still dominates the mixture at 2K —
+  the run tests the architecture + prior, not a freely re-shaped fusion.
+  792 steps, first/last-10 loss 7.39 -> 3.73 (final 3.64), overfit sanity
+  passed (CE drop 0.9997, slot0 1.0), visual check logits_diff 10.59, peak
+  30.2 GB, 24 min; sequential speedup 0.85x. Both runs token-exact 128/128;
+  the frozen DFlash 2K baseline re-checked on this branch reproduces
+  1.6298365840801265 bit-identically (`tests/reference_dflash/manifest.json`).
+- DFly (matched `[1,17,33]`, AngelSpec port): AL 1.682
+  (+0.052 over the frozen baseline) with the deep slots carrying the gain
+  (slot 3: .049 -> .073, slot 5: .003 -> .019, slot 6: .001 -> .004) while
+  slot 1 gives some back (.421 -> .384) — the same suffix-decay relief shape
+  as DSpark/Domino. The hidden-states correction trains from its zero init
+  (correction |delta| 0 -> 1.81 by step 792; `down_proj` |w| 0.0065) and the
+  fusion stays near its prior (drift 0.0039). 792 steps, loss 6.29 -> 1.60
+  (final 1.68), visual check logits_diff 5.63, peak 31.6 GB, 16 min;
+  sequential speedup 0.775x (the per-slot corrected head walk costs wall time
+  — see `docs/algorithms/dfly.md`). Token-exact 128/128.
+- Layer-rich runs (the upstream-style wider context on the same store, same
+  recipe/seed): DFlare `[1,9,17,25,33]` takes AL 1.637 -> **1.670** (+0.033;
+  every slot at or above the matched run, but wall speedup drops to 0.781x —
+  twice the context K/V projections to run) and its fusion moves further from
+  the prior (fp32-master drift 0.0094; per-layer entropy [0.523, 0.830, 0.421]
+  vs prior [0.458, 0.794, 0.458]). DFly `[1,9,17,25,33]` takes 1.682 ->
+  **1.709** (+0.027; slots
+  `[.394,.169,.079,.037,.019,.010,.005]`) with the correction still active
+  (`down_proj` |w| 0.0066) and a near-prior fusion (drift 0.0014). Both
+  792 steps, visual check passed, token-exact 128/128.
+- DFly no-correction ablation: the zero-init hidden-states correction is worth
+  **+0.113 AL** (1.682 -> 1.569) and its gain is concentrated in the deep
+  slots (slot 2 .160 -> .126, slot 3 .073 -> .038, slot 5 .019 -> .004 while
+  slot 1 barely moves) — i.e. it relieves exactly the suffix-acceptance decay
+  of the block-parallel drafter, not the first proposal. Training-side the
+  ablated run also fits worse (final loss 3.98 vs 1.68) and it is *faster* at
+  serving (0.851x vs 0.775x vs target-only) because the per-slot corrected
+  head walk disappears. The ablated checkpoint is below its frozen DFlash
+  baseline (1.569 < 1.630): the DFlash backbone plus a near-prior fusion and
+  the layer slicing does not beat plain DFlash by itself; the correction is
+  what carries DFly's gain at this scale.
+- DFlare fixed-prior ablation: freezing the fusion at the distance prior
+  changes AL by **0.0005** (1.6374 trained -> 1.6369 fixed; per-slot within
+  ±0.002) — at this corpus/step budget the trained fusion buys nothing the
+  prior does not already provide, consistent with the small fp32-master drift
+  measured on the trained run. The knob still moves the mechanism (the
+  gradient audit covers `layer_fusion_weights` and the layer-rich run drifts
+  further, 0.0094), so quote DFlare's 2K numbers as "architecture + distance
+  prior", not "learned fusion".
+- DFlare separate-context-KV ablation (`separate_context_kv: false`, same
+  recipe/seed/store, fusion knob unchanged): AL **1.579** vs 1.637 matched
+  and 1.630 frozen baseline — the dedicated context K/V projections are the
+  component with a measurable effect at this scale (**+0.058** over the
+  shared-KV variant), while the fusion stays prior-dominated (fixed-prior
+  AL Δ0.0005; the shared-KV run's fusion drifts a bit further, prob L1 0.0133
+  vs 0.0110, without a gain). Reading the ablations together: DFlare's 2K
+  numbers are "dedicated context K/V + distance prior"; a learned-fusion gain
+  is not established at this budget. The ablation trains cleanly (792 steps,
+  first/last-10 loss 7.40 -> 3.68, final 3.53, overfit sanity passed, visual
+  check logits_diff 8.5, coverage 36/36, token-exact 128/128 vs init 1.003;
+  sequential speedup 0.79x — the lower AL costs target rounds, peak
+  30.2 GB).
+
+### AngelSpec ports — Qwen3-VL-8B reduced validation (256-row slice, 192 steps, 16-prompt eval)
+
+Same reduced protocol as the zoo release runs (shared capture-v2 store, 3
+layers `[1,17,33]`, token-exact gate).
+
+| Run | final loss (first-10% -> last-10%) | AL (init 1.000) | token-exact | peak VRAM |
+| --- | --- | ---: | --- | ---: |
+| DFly reduced | 4.16 (20.26 -> 4.13) | 1.2256 | 16/16 | 22.6 GB |
+| DFlare reduced | 6.22 (12.83 -> 6.02) | 1.1852 | 16/16 | 20.4 GB |
+
+Both reduced runs were exported with the final algorithm metadata; their
+step-144 fusion masters sit close to the prior (drift 0.0014 / 0.0003) and
+DFly's correction `down_proj` is still small (|w| 0.0025) — at 192 steps the
+reduced runs validate the pipeline on Qwen3-VL-8B, not converged quality.
 
 ## Runtime probe (32 prompts, bf16, parity backend, same card)
 

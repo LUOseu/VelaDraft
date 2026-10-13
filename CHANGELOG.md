@@ -5,6 +5,45 @@
 - Repository renamed to `github.com/LUOseu/VelaDraft` (old `vlm-dflash` URLs
   redirect); the distribution name and CLI stay `vlm-dflash`.
 
+### DFlare / DFly (AngelSpec ports)
+
+- New algorithms `dflare` and `dfly`, ported from `Tencent/AngelSpec @
+  d3412bed` (MIT) behind the existing algorithm interface:
+  - DFlare: per-draft-layer learnable softmax fusion over the captured target
+    layers (distance-prior init, upstream semantics) + dedicated
+    `k_proj_target`/`v_proj_target` context projections;
+  - DFly: DFlash shared-KV layers + FC context + fusion residual + zero-init
+    TreeFlash hidden-states correction applied before the frozen LM head
+    (`sample_from_anchor=false`); the upstream two-stage LK/D-PACE objective
+    and e2e-TV are **not** ported (documented in `docs/upstream/dfly.md`).
+- Feature contract: explicit-id layer slicing — one capture superset
+  (`[1, 9, 17, 25, 33]`) serves the matched comparison (`[1, 17, 33]`, the
+  frozen DFlash routing) and the upstream 5-layer recipe;
+  `contract_defaults_from_config` extracts `algorithm_context_layer_ids` and
+  capture-coverage validates the configured algorithm's consumed layers.
+- Configs: `configs/dflare/` and `configs/dfly/` each ship the smoke, matched
+  2K, layer-rich 2K and Qwen3-VL reduced recipes.
+- Training diagnostics: modules can attach the optimizer's fp32 masters
+  (`set_master_parameters`); DFlare/DFly fusion metrics are read at fp32
+  resolution and log `fusion_prob_l1_drift` against the prior (the bf16 live
+  parameter otherwise hides sub-ulp AdamW steps).
+- Tooling: `scripts/summarize_fusion_master.py` extracts that fp32 master
+  trajectory from a saved checkpoint; `scripts/diag_gradient_coverage.py`
+  replays a finished run's feature store against its checkpoint to re-audit
+  gradient coverage after training (the step-0 audit sees a zero-init
+  residual branch cold, by construction).
+- Tests: 31 new CPU tests across `tests/test_dflare.py`,
+  `tests/test_dfly.py`, `tests/test_feature_contract.py`; docs:
+  `docs/upstream/{dflare,dfly}.md`, `docs/algorithms/{dflare,dfly}.md`,
+  `ROADMAP.md`, `ALGORITHM_MATRIX.md`, `UPSTREAM_AUDIT.md`.
+- Recorded evidence: COCO 64-row smokes on Qwen2.5-VL-3B (both token-exact,
+  exports verified; DFlare AL 1.123, DFly AL 1.438); canonical 2K runs +
+  ablations on Qwen2.5-VL-3B (DFlare 1.637 — its dedicated context K/V is
+  worth +0.058 while the learned fusion is prior-dominated; DFly 1.682 —
+  the hidden-states correction carries +0.113) and Qwen3-VL-8B reduced
+  validation (DFlare 1.185, DFly 1.226), all token-exact; numbers in
+  `BENCHMARKS.md` and `benchmarks/results/zoo_canonical.{json,csv}`.
+
 ### Online training: live target feature extraction
 
 - `train --mode online` (`--mode` / `--feature-mode` alias; config
