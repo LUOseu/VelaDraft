@@ -95,13 +95,24 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
             "conditioning), which is the closest factorization to training this repo supports."
         )
     if method == "dfly":
+        profile = str(checkpoint.get("objective_profile") or "controlled_ce")
+        if profile == "controlled_ce":
+            objective_note = (
+                "Trained with the shared DFlash block-CE objective (objective_profile=controlled_ce); "
+                "upstream AngelSpec's two-stage LK/D-PACE -> end-to-end TV recipe is selectable in "
+                "this repo via algorithm.train_recipe=upstream_two_stage (see docs/upstream/dfly.md)."
+            )
+        else:
+            objective_note = (
+                "Trained with this repo's port of upstream AngelSpec's two-stage recipe "
+                f"(objective_profile={profile}: LK / D-PACE cold start -> end-to-end TV; see "
+                "docs/upstream/dfly.md)."
+            )
         runtime_note = (
-            "Trained with the shared DFlash block-CE objective (objective_profile=controlled_ce); "
-            "upstream AngelSpec's two-stage LK/D-PACE -> end-to-end TV recipe is not implemented in "
-            "this port (see docs/upstream/dfly.md). At inference the block backbone runs in "
-            "parallel, then the hidden-states correction and the LM-head projection run per slot "
-            "sequentially, conditioned on the previously proposed tokens -- the documented local "
-            "adaptation of upstream's train-time-only correction transformation."
+            f"{objective_note} At inference the block backbone runs in parallel, then the "
+            "hidden-states correction and the LM-head projection run per slot sequentially, "
+            "conditioned on the previously proposed tokens -- the documented local adaptation of "
+            "upstream's train-time-only correction transformation."
         )
     return {
         "format": EXPORT_FORMAT,
@@ -115,8 +126,8 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
         "method_details": method_details,
         "runtime_note": runtime_note,
         # Machine-readable training objective when the method records one
-        # (DFly: "controlled_ce" -- the shared block-CE profile, not upstream's
-        # two-stage LK/D-PACE recipe). None for methods that predate the field.
+        # (DFly: the objective profile -- "controlled_ce" or the selected
+        # algorithm.train_recipe name). None for methods that predate the field.
         "objective_profile": checkpoint.get("objective_profile"),
         "checkpoint": checkpoint_name,
         # Which target-feature source trained these weights: "offline" (staged

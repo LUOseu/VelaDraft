@@ -24,9 +24,10 @@ class DFlyAlgorithm(DrafterAlgorithm):
         ),
         maturity={
             "architecture": "validated",
-            # Upstream's two-stage objective (LK/D-PACE -> e2e TV) is not
-            # ported; runs train the ported architecture with the shared
-            # DFlash CE, so training stays experimental (mirrors dflash2).
+            # Upstream's two-stage objective (LK/D-PACE -> e2e TV) is ported as
+            # the config-selectable ``algorithm.train_recipe`` (objectives.py,
+            # CPU-tested end to end); no canonical GPU recipe run is recorded
+            # yet, so training stays experimental (mirrors dflash2).
             "training": "experimental",
             "multimodal": "validated",
             "runtime": "experimental",
@@ -75,6 +76,9 @@ class DFlyAlgorithm(DrafterAlgorithm):
             )
         if dfly.get("context_layer_ids") is not None and not isinstance(dfly["context_layer_ids"], (list, tuple)):
             raise ValueError("algorithm.dfly.context_layer_ids must be a list of target layer indices.")
+        from ..objectives import assert_recipe_capture, resolve_recipe
+
+        assert_recipe_capture(resolve_recipe(cfg, self.name), cfg, algorithm_name=self.name)
 
     def build_draft_config(self, contract: dict, cfg: dict):
         from ..dfly.factory import build_draft_config
@@ -90,23 +94,31 @@ class DFlyAlgorithm(DrafterAlgorithm):
         lm_head_weight: torch.Tensor | None = None,
     ):
         from ..dfly.factory import build_trainer_module
+        from ..objectives import resolve_recipe
 
         return build_trainer_module(
-            draft_config, contract, cfg, embed_weight, lm_head_weight=lm_head_weight
+            draft_config,
+            contract,
+            cfg,
+            embed_weight,
+            lm_head_weight=lm_head_weight,
+            module_kwargs={"train_recipe": resolve_recipe(cfg, self.name)},
         )
 
     def checkpoint_metadata(self, contract: dict, cfg: dict, draft_config) -> dict:
         from ..contract import contract_capture_layer_ids
         from ..dfly.factory import OBJECTIVE_PROFILE, resolve_dfly_config
+        from ..objectives import resolve_recipe
 
         drafter = cfg["drafter"]
         resolved = resolve_dfly_config(cfg)
+        recipe = resolve_recipe(cfg, self.name)
         dflash_config = dict(getattr(draft_config, "dflash_config", {}) or {})
         context = dflash_config.get("context_layer_ids") or contract_capture_layer_ids(contract)
         return {
             "draft_config": draft_config.to_dict(),
-            # Machine-readable objective: the shared DFlash block-CE profile
-            # (the upstream two-stage LK/D-PACE recipe is not implemented).
+            # Machine-readable objective: the selected recipe name, defaulting
+            # to the shared DFlash block-CE profile (controlled_ce).
             "objective_profile": str(dflash_config.get("objective_profile", OBJECTIVE_PROFILE)),
             "attention_backend": str(drafter.get("attention_backend", "flex_attention")),
             "mask_token_id": int(drafter["mask_token_id"]),
@@ -131,6 +143,7 @@ class DFlyAlgorithm(DrafterAlgorithm):
                     resolved["hidden_correction_intermediate_size"],
                 ),
             },
+            "train_recipe": None if recipe is None else recipe.as_dict(),
         }
 
     def load_decoder(self, checkpoint_path, map_location: str = "cpu"):
@@ -166,7 +179,9 @@ class DFlyAlgorithm(DrafterAlgorithm):
             correction_width = int(contract["text"]["hidden_size"])
         else:
             correction_width = int(intermediate)
-        return {
+        from ..objectives import plan_recipe_knobs
+
+        knobs = {
             "context_layer_ids": [int(layer) for layer in context],
             "separate_context_kv": False,
             "fusion_trainable": bool(resolved["fusion_trainable"]),
@@ -174,6 +189,8 @@ class DFlyAlgorithm(DrafterAlgorithm):
             "enable_hidden_correction": correction_enabled,
             "hidden_correction_intermediate_size": correction_width,
         }
+        knobs.update(plan_recipe_knobs(cfg, self.name))
+        return knobs
 
     def build_inference_module(self, draft_config_dict: dict, attention_backend: str):
         from transformers.models.qwen3.configuration_qwen3 import Qwen3Config

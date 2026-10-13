@@ -97,7 +97,14 @@ def build_draft_config(contract: dict, cfg: dict):
     return config
 
 
-def build_trainer_module(draft_config, contract: dict, cfg: dict, embed_weight, lm_head_weight=None):
+def build_trainer_module(
+    draft_config,
+    contract: dict,
+    cfg: dict,
+    embed_weight,
+    lm_head_weight=None,
+    module_kwargs: dict | None = None,
+):
     from ..dflash.factory import build_trainer_module as build_dflash_trainer_module
 
     from .model import Qwen3DFlareDraftModel
@@ -111,6 +118,7 @@ def build_trainer_module(draft_config, contract: dict, cfg: dict, embed_weight, 
         lm_head_weight=lm_head_weight,
         model_class=Qwen3DFlareDraftModel,
         module_class=DFlareTrainerModule,
+        module_kwargs=module_kwargs,
     )
 
 

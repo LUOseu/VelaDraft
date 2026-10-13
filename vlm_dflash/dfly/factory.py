@@ -16,14 +16,17 @@ __all__ = [
     "resolve_dfly_config",
 ]
 
-#: Machine-readable objective of every DFly run in this repo: the shared DFlash
+#: Default objective profile of DFly runs in this repo: the shared DFlash
 #: block-CE training profile (anchors + block mask + decayed CE through the
 #: frozen LM head), recorded in the draft config, the checkpoint and the export.
-#: Upstream's two-stage recipe (LK / D-PACE -> end-to-end TV) is not ported.
+#: Selecting ``algorithm.train_recipe`` replaces it with the recipe name
+#: (``upstream_two_stage`` = upstream's LK / D-PACE cold start -> end-to-end TV).
 OBJECTIVE_PROFILE = "controlled_ce"
 
-#: Upstream recipe knobs this port does not implement; accepting one silently
-#: would train CE while the config claims otherwise, so they fail loud.
+#: Upstream's raw recipe knob names. They stay rejected: the recipe is selected
+#: through the first-class ``algorithm.train_recipe`` interface instead
+#: (``upstream_two_stage``), and accepting both spellings could describe one run
+#: two conflicting ways.
 UNSUPPORTED_RECIPE_KEYS = frozenset(
     {
         "loss_objective",
@@ -52,10 +55,11 @@ DEFAULTS: dict = {
 def resolve_dfly_config(cfg: dict) -> dict:
     """Algorithm-namespaced knobs: ``algorithm.dfly`` (defaults fill gaps).
 
-    Bounded schema: only the supported keys are accepted. Upstream-recipe keys
-    (LK / D-PACE / e2e TV) are rejected explicitly -- this port trains the
-    shared block-CE objective (``objective_profile=controlled_ce``) and must not
-    silently ignore a config that asked for something else.
+    Bounded schema: only the supported keys are accepted. Upstream's raw recipe
+    knobs (LK / D-PACE / e2e TV) are rejected explicitly -- select the ported
+    recipe through ``algorithm.train_recipe: upstream_two_stage`` instead; a
+    config must never be able to ask for an objective by a spelling the run
+    would silently ignore.
     """
     resolved = dict(DEFAULTS)
     algorithm_cfg = cfg.get("algorithm")
@@ -67,8 +71,8 @@ def resolve_dfly_config(cfg: dict) -> dict:
         if unknown:
             hinted = sorted(set(unknown) & UNSUPPORTED_RECIPE_KEYS)
             detail = (
-                f" (unsupported upstream-recipe knobs: {', '.join(hinted)}; this port trains the "
-                f"shared block-CE objective, objective_profile={OBJECTIVE_PROFILE!r})"
+                f" (unsupported upstream-recipe knobs: {', '.join(hinted)}; select the ported recipe "
+                "via algorithm.train_recipe=upstream_two_stage instead)"
                 if hinted
                 else ""
             )
@@ -95,14 +99,17 @@ def build_draft_config(contract: dict, cfg: dict):
             f"algorithm.dfly.hidden_correction_intermediate_size must be >= 1, got {intermediate!r}."
         )
     dflash_config = dict(getattr(config, "dflash_config", {}) or {})
+    from ..objectives import resolve_recipe
+
+    recipe = resolve_recipe(cfg, "dfly")
     dflash_config.update(
         {
             "target_layer_ids": context,
             "context_layer_ids": context,
-            # Machine-readable statement that these weights were trained with
-            # the shared block-CE profile (the upstream two-stage recipe is not
-            # implemented); re-read by checkpoints and exports.
-            "objective_profile": OBJECTIVE_PROFILE,
+            # Machine-readable objective profile: the default shared block-CE
+            # profile, or the selected ``algorithm.train_recipe`` name
+            # (e.g. upstream_two_stage); re-read by checkpoints and exports.
+            "objective_profile": OBJECTIVE_PROFILE if recipe is None else recipe.name,
             # DFly keeps DFlash's shared context/draft K/V projections.
             "separate_context_kv": False,
             "sample_from_anchor": False,
@@ -119,7 +126,14 @@ def build_draft_config(contract: dict, cfg: dict):
     return config
 
 
-def build_trainer_module(draft_config, contract: dict, cfg: dict, embed_weight, lm_head_weight=None):
+def build_trainer_module(
+    draft_config,
+    contract: dict,
+    cfg: dict,
+    embed_weight,
+    lm_head_weight=None,
+    module_kwargs: dict | None = None,
+):
     from ..dflash.factory import build_trainer_module as build_dflash_trainer_module
 
     from .model import Qwen3DFlyDraftModel
@@ -133,6 +147,7 @@ def build_trainer_module(draft_config, contract: dict, cfg: dict, embed_weight, 
         lm_head_weight=lm_head_weight,
         model_class=Qwen3DFlyDraftModel,
         module_class=DFlyTrainerModule,
+        module_kwargs=module_kwargs,
     )
 
 

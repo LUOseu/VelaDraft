@@ -65,6 +65,9 @@ class DFlareAlgorithm(DrafterAlgorithm):
             )
         if dflare.get("context_layer_ids") is not None and not isinstance(dflare["context_layer_ids"], (list, tuple)):
             raise ValueError("algorithm.dflare.context_layer_ids must be a list of target layer indices.")
+        from ..objectives import assert_recipe_capture, resolve_recipe
+
+        assert_recipe_capture(resolve_recipe(cfg, self.name), cfg, algorithm_name=self.name)
 
     def build_draft_config(self, contract: dict, cfg: dict):
         from ..dflare.factory import build_draft_config
@@ -80,17 +83,25 @@ class DFlareAlgorithm(DrafterAlgorithm):
         lm_head_weight: torch.Tensor | None = None,
     ):
         from ..dflare.factory import build_trainer_module
+        from ..objectives import resolve_recipe
 
         return build_trainer_module(
-            draft_config, contract, cfg, embed_weight, lm_head_weight=lm_head_weight
+            draft_config,
+            contract,
+            cfg,
+            embed_weight,
+            lm_head_weight=lm_head_weight,
+            module_kwargs={"train_recipe": resolve_recipe(cfg, self.name)},
         )
 
     def checkpoint_metadata(self, contract: dict, cfg: dict, draft_config) -> dict:
         from ..contract import contract_capture_layer_ids
         from ..dflare.factory import resolve_dflare_config
+        from ..objectives import resolve_recipe
 
         drafter = cfg["drafter"]
         resolved = resolve_dflare_config(cfg)
+        recipe = resolve_recipe(cfg, self.name)
         dflash_config = dict(getattr(draft_config, "dflash_config", {}) or {})
         context = dflash_config.get("context_layer_ids") or contract_capture_layer_ids(contract)
         return {
@@ -112,6 +123,7 @@ class DFlareAlgorithm(DrafterAlgorithm):
                 ),
                 "fusion_init": str(dflash_config.get("fusion_init", resolved["fusion_init"])),
             },
+            "train_recipe": None if recipe is None else recipe.as_dict(),
         }
 
     def load_decoder(self, checkpoint_path, map_location: str = "cpu"):
@@ -137,12 +149,16 @@ class DFlareAlgorithm(DrafterAlgorithm):
 
         resolved = resolve_dflare_config(cfg)
         context = resolve_context_layer_ids(resolved, contract_capture_layer_ids(contract))
-        return {
+        from ..objectives import plan_recipe_knobs
+
+        knobs = {
             "context_layer_ids": [int(layer) for layer in context],
             "separate_context_kv": bool(resolved["separate_context_kv"]),
             "fusion_trainable": bool(resolved["fusion_trainable"]),
             "fusion_init": str(resolved["fusion_init"]),
         }
+        knobs.update(plan_recipe_knobs(cfg, self.name))
+        return knobs
 
     def build_inference_module(self, draft_config_dict: dict, attention_backend: str):
         from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
