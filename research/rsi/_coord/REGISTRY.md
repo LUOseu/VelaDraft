@@ -306,3 +306,18 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - S3 追赶链 smoke_s3 于 02:19:21–02:19:52 失败 → 已按你的"停 S3 线"政策处理（Tier 0+A+B 保留），**C0 登记为事故 #7**（工具链缺陷，非租约违规；证据见 RESOURCE_SCHEDULE §3）。
 - C0 取证结论（供修复对照）：canonical smoke 全局 kept=1/16，切分后 workers 各自跑 `run_regen`，其中 w0 切片合法 keep=0 却被 `run_regen` 的全局零检查硬停——**worker 级 zero-keep 应容忍**（写 stats、空切片照常 merge），零检查放在 merge 后的全局统计；canonical 语义（批内 zero-keep 容忍、全局才判零）应逐项对齐。你已在改 `split_worker.py`+`test_split_worker_zero.py`——方向一致。
 - 修复提交后：`G2_SKIP_LEGS` 重跑 smoke_s3（gate）→ s3_b8 → s3_b32；S3 结果、staged_b32 store-parity 复验、§10 汇总与 GPU-h 时间戳重算照旧；**Tier C 仍倾向暂缓**（见 02:22 条目）。
+
+### R4 收口（2026-10-15 02:38；L-W3-D1R4 CLOSED）
+
+- R4 sub1 边界两格完成（W3 02:26:44→02:30:22、MIX→02:33:11，均 rc=0；GPU3；总 6m27s ≈ **0.108 GPU-h**）。C0 独立重算（raw jsonl，100 timed 批/臂；与 summary 逐值一致）：W3 canon 652.626ms → cost 577.772ms（**1.1296 < 1.135**）；MIX 302.156→296.261ms（**1.0199**）；峰值 W3 25.04→8.16 GiB（−67.4%）、MIX 23.99→7.99 GiB（−66.7%）；parity vs canonical：loss ≤6.49e-3、update ≤7.6e-8（bf16 带内）。
+- **判决：负分支——R4 以边界结论关闭**（`d1-005-c0`）：sub1 无增量速度余量（W3≈k4 下限；MIX 被微批开销吞掉）；**D3 packed-block kernel 不触发重开**（条件未满足）。shipped 配置仍 = grid/sub2（k4）。
+- 窗口披露：跨卡共驻 = C0 smoke（GPU0 02:27–02:30）+ D5 S3 链（1+2，02:28 起）；GPU3 卡内无共租。D1 待补：EXPERIMENTS 两行。
+
+### D5 S3 恢复（2026-10-15 02:38）
+
+- 修复生效：smoke_s3 重跑 **exit=0**（wall 102s，02:30:33）；**s3_b8 02:30:34 起**（cards 1+2、batch8、mode=s3；run `g2_s3_b8_1015_0230`），其后 s3_b32 排队。待出数后照旧 harvest（§10 汇总 / staged_b32 store-parity / GPU-h 时间戳重算）；Tier C 仍暂缓。
+
+### D4×D1 2×2 预注册发布（2026-10-15 02:38；L-W3-D4xD1）
+
+- `d4xd1-001-c0`：{cache_off, cache_on=16GiB} × {bucket_off, grid/sub2}，online 模式（`train.feature_mode=online`），W3+MIX × seed42、1 warmup + 100 updates = **8 legs**；F1–F4 判决冻结（数值带 7.5e-3 / 缓存生效 hits≥0.5×行数 / 峰值比值 ≤0.75 / 步时方向 ≥1.00）；≤**1.5 GPU-h**；GPU3 优先且 8 legs 同卡；**D1 执行全部 8 腿**（另半 = D4 机制产品路径集成运行，D4 线不重开）；开跑前 D1 出执行 addendum（命令 / parity 捕获法 / anchor 口径）→ C0 ack。
+- 定位：wave-3/论文主轴（系统组合叙事）的判定实验；承接 `d1-003-c0` §4 与 INTEGRATION §5 已排项。输入已齐（D1 handoff `b0c2225` + D4 `1f8963e`/`d4-003-c0`）。
