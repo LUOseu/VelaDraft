@@ -102,7 +102,7 @@
 
 **未决（他人执行项）**
 
-- D1 harvest 回填（四腿归档 + REPORT/EXPERIMENTS/STATE）→ C0 最终对账；
+- ~~D1 harvest 回填~~ **已收讫（`1b0328e` 等）并逐项对账一致（05:52；收据 `evidence/c0_d1q_harvest_receipt_20261015.md`；budget 1.1536/2.4 关闭）**；
 - D5 `staged_b32`（L-W3-D5B ≤0.75 GPU-h）开工 → C0 复核（`research/rsi/d5/runner/split_verify.py`）；
 - 转发文本：`_coord/messages/20261015_d1q_recovery.md`（D1 终裁通知 + D5 提醒）。
 
