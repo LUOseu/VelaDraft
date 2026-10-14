@@ -40,6 +40,7 @@ from vlm_dflash.provenance import IdentityMismatchError, identity_from_contract
 from vlm_dflash.training_plan import PLAN_VERSION, training_plan_digest
 from vlm_dflash.utils import read_jsonl, sha256_file, write_jsonl
 
+import vlm_dflash.target.cache_budget as cache_budget_module
 import vlm_dflash.target.online as online_module
 
 
@@ -3103,3 +3104,168 @@ def test_online_cache_real_tiny_model_second_epoch_is_free(monkeypatch, tmp_path
     assert summary["enabled"] is True
     assert summary["hits"] == len(source.rows) and summary["misses"] == len(source.rows)
     assert summary["current_bytes"] > 0 and summary["current_bytes"] == summary["peak_bytes"]
+
+
+# --------------------------------------------------------------------------- #
+# 5b. adaptive budget on top of the fixed cache (train.online_feature_cache_adaptive)
+# --------------------------------------------------------------------------- #
+
+class _AdaptiveSensorStub:
+    """Scriptable headroom reading for the adaptive-budget tests."""
+
+    def __init__(self, available_bytes: int) -> None:
+        self.available_bytes = available_bytes
+
+    def __call__(self):
+        return cache_budget_module.MemorySample("stub", None, None, self.available_bytes)
+
+
+def _adaptive_params(**overrides) -> "cache_budget_module.BudgetParams":
+    base = dict(
+        reserve_bytes=0,
+        reserve_fraction=0.0,
+        low_watermark_bytes=1584,
+        high_watermark_bytes=2000,
+        shrink_tolerance_bytes=1,
+        grow_fraction=1.0,
+        grow_min_bytes=792,
+        min_interval_s=0.0,
+    )
+    base.update(overrides)
+    return cache_budget_module.BudgetParams(**base)
+
+
+def _install_adaptive_controller(monkeypatch, sensor, params=None):
+    """Make OnlineFeatureSource build its controller with a scripted sensor."""
+
+    def make_controller(cap_bytes):
+        return cache_budget_module.CacheBudgetController(
+            cap_bytes, params=params or _adaptive_params(), sensor=sensor
+        )
+
+    monkeypatch.setattr(online_module, "CacheBudgetController", make_controller)
+
+
+def test_online_cache_adaptive_trims_under_pressure_and_grows_back(monkeypatch, tmp_path):
+    """Adaptive budget: pressure trims the LRU store, recovery grows it stepwise."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    run_dir = _write_online_run_dir(tmp_path, rows=6, answer_len=12)
+    sensor = _AdaptiveSensorStub(available_bytes=10_000)
+    _install_adaptive_controller(monkeypatch, sensor)
+    cfg = _cache_cfg(4752 / (1 << 30))  # 6 records x 792 B
+    cfg["train"]["online_feature_cache_adaptive"] = True
+    source = _stub_source_with_cfg(monkeypatch, run_dir, cfg)
+    dataset = source.dataset()
+
+    # Plenty of headroom: the full working set is retained, as with a fixed cap.
+    for index in range(6):
+        dataset[index]
+    assert source.cache_stats["stores"] == 6
+    assert source.cache_stats["evictions"] == 0
+    assert source.cache_current_bytes() == 4752
+    assert source.cache_budget_bytes() == 4752
+
+    # Pressure: room for two records only -> the LRU head is trimmed on the next read.
+    sensor.available_bytes = 1584
+    dataset[4]
+    assert source.cache_budget_bytes() == 1584
+    assert source.cache_stats["evictions"] == 4
+    assert source.cache_current_bytes() == 1584
+    # Rows 0..2 were evicted: they re-extract (one forward per row) and evict in turn.
+    forwards = _forward_calls(calls)
+    for index in (0, 1, 2):
+        dataset[index]
+    assert _forward_calls(calls) == forwards + 3
+    assert source.cache_current_bytes() <= 1584
+    assert source.cache_stats["evictions"] == 7
+
+    # Recovery: above the high watermark the budget grows in steps, never by a jump.
+    sensor.available_bytes = 10_000
+    assert source.cache_budget_bytes() == 3168
+    assert source.cache_budget_bytes() == 4752
+    before_evictions = source.cache_stats["evictions"]
+    for index in (3, 4, 5):
+        dataset[index]
+    assert source.cache_stats["evictions"] == before_evictions  # room again: no churn
+    assert source.cache_current_bytes() <= 4752
+
+    fc = source.summary()["feature_cache"]
+    assert fc["budget_bytes"] == 4752 and fc["capacity_bytes"] == 4752
+    adaptive = fc["adaptive_budget"]
+    assert adaptive["cap_bytes"] == 4752
+    assert adaptive["sensor"]["source"] == "stub"
+    assert adaptive["shrinks"] == 1 and adaptive["grows"] == 2 and adaptive["adjustments"] == 3
+
+
+def test_online_cache_adaptive_zero_headroom_stores_nothing_until_relief(monkeypatch, tmp_path):
+    """A zero budget is supported: reads re-extract until the headroom returns."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    run_dir = _write_online_run_dir(tmp_path, rows=2, answer_len=12)
+    sensor = _AdaptiveSensorStub(available_bytes=0)
+    _install_adaptive_controller(monkeypatch, sensor)
+    cfg = _cache_cfg(4752 / (1 << 30))
+    cfg["train"]["online_feature_cache_adaptive"] = True
+    source = _stub_source_with_cfg(monkeypatch, run_dir, cfg)
+    dataset = source.dataset()
+
+    first = dataset[0]
+    second = dataset[0]
+    assert _forward_calls(calls) == 2  # nothing retained -> both reads extract
+    assert source.cache_budget_bytes() == 0
+    assert source.cache_stats["stores"] == 0
+    assert source.cache_stats["skipped_too_large"] == 2
+    assert source.cache_current_bytes() == 0
+    _assert_same_record(first, second)
+
+    sensor.available_bytes = 10_000
+    assert source.cache_budget_bytes() == 792  # one step back up
+    third = dataset[0]
+    assert _forward_calls(calls) == 3  # still a miss, but now it is retained
+    fourth = dataset[0]
+    assert _forward_calls(calls) == 3  # hit
+    assert source.cache_current_bytes() == 792
+    _assert_same_record(third, fourth)
+
+
+def test_online_cache_adaptive_defaults_off_and_rejects_non_bool(monkeypatch, tmp_path):
+    """No knob (or false) keeps the fixed policy; a non-bool is rejected loudly."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    run_dir = _write_online_run_dir(tmp_path, rows=2, answer_len=8)
+    for value in (None, False):
+        cfg = _cache_cfg(1.0)
+        if value is not None:
+            cfg["train"]["online_feature_cache_adaptive"] = value
+        source = _stub_source_with_cfg(monkeypatch, run_dir, cfg)
+        dataset = source.dataset()
+        dataset[0]
+        dataset[0]
+        assert source.cache_stats["hits"] == 1 and source.cache_stats["stores"] == 1
+        fc = source.summary()["feature_cache"]
+        assert "adaptive_budget" not in fc and "budget_bytes" not in fc
+    cfg = _cache_cfg(1.0)
+    cfg["train"]["online_feature_cache_adaptive"] = "yes"
+    with pytest.raises(ValueError, match="online_feature_cache_adaptive"):
+        _stub_source_with_cfg(monkeypatch, run_dir, cfg)
+
+
+def test_online_cache_adaptive_sensor_unavailable_falls_back_to_fixed_cap(monkeypatch, tmp_path):
+    """Without a sensor the budget stays the configured cap: fixed-policy behavior."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    run_dir = _write_online_run_dir(tmp_path, rows=2, answer_len=8)
+    unavailable = lambda: cache_budget_module.MemorySample("unavailable", None, None, None)
+    _install_adaptive_controller(monkeypatch, unavailable)
+    cfg = _cache_cfg(1.0)
+    cfg["train"]["online_feature_cache_adaptive"] = True
+    source = _stub_source_with_cfg(monkeypatch, run_dir, cfg)
+    dataset = source.dataset()
+    dataset[0]
+    dataset[0]
+    assert _forward_calls(calls) == 1  # second read is a cache hit
+    fc = source.summary()["feature_cache"]
+    assert fc["budget_bytes"] == fc["capacity_bytes"]
+    assert fc["adaptive_budget"]["sensor"]["source"] == "unavailable"
+    assert fc["adaptive_budget"]["adjustments"] == 0
