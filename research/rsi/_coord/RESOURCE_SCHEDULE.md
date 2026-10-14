@@ -40,14 +40,14 @@
 | W1-D2 N/U + teacher 成本 | ≤1.0 GPU-h | 计数与成本占比，128–256 样本 |
 | W1-D3 attention/mask profile | ≤0.5 GPU-h | 仅 profiling；未证明瓶颈不写 kernel |
 | W1-D4 收尾/容量探针 | ≤0.5 GPU-h | 容量/命中率为主，优先 CPU/trace |
-| W1-D5 静态流水线/trace 可行性 | ≤1.0 GPU-h（单卡；23:35 由 0.5 上调，依据 D5 handoff 的 regen scaling probe） | 静态 trace + 单卡模拟；不建多 GPU 系统 |
+| W1-D5 静态流水线/trace 可行性 | ≤1.0 GPU-h（单卡；23:12 由 0.5 上调，依据 D5 handoff 的 regen scaling probe） | 静态 trace + 单卡模拟；不建多 GPU 系统 |
 | **wave 1 合计** | **≤4.0 GPU-h** | 当前 2 张空闲卡 + 紧张磁盘下的可执行上界 |
 
 ### 已发布租约
 
 | 租约 | 对象 | 卡/条件 | 有效期 | 备注 |
 |---|---|---|---|---|
-| L-W1-D5 | D5 | GPU0 或 GPU2（开跑前实测 0%/>40GiB free；同一时刻只允许 D5 一个任务） | 2026-10-14 23:35 → wave 1 结束或他人占用出现 | 单卡 provisional ≤1.0 GPU-h |
+| L-W1-D5 | D5 | GPU0 或 GPU2（开跑前实测 0%/>40GiB free；同一时刻只允许 D5 一个任务） | 2026-10-14 23:12 → wave 1 结束或他人占用出现 | 单卡 provisional ≤1.0 GPU-h |
 | L-W1-open | D1/D2/D3/D4 | 任一实测空闲卡（D1≥D2≥D3/D4 优先顺序由任务到达决定；同卡不并发重负载） | 同上 | 各角色 wave 1 上限见上表 |
 | L-W2-G2 | 通过门槛者 | 2×A6000 同时空闲 ≥3–4h 窗口 | **UNCONFIRMED**（GPU1/3 被占） | wave 2 由 C0 复核证据后发布 |
 
