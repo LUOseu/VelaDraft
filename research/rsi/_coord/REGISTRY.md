@@ -339,3 +339,9 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - 第一轮粗查（arXiv API + OpenAlex；S2 全程 429、无 WebSearch → 工程文档未核）。结论：**空间拥挤**——"去 padding / packing / bucketing / 自动 microbatch"有 2017→2026 连续先例（含 2026 SSRN 综述《Beyond Concatenation》）。
 - 仍可能站住的 delta（待深读确认）：① 单 step 内"精确损失等价的重分组"formalization；② 容量轴（固定 peak ×2–3 logical batch）；③ invalid-block slack 分解诊断（96–98%）。**工程价值独立成立；论文新颖性未证。**
 - 记录：`evidence/c0_novelty_firstpass_d1_20261015.md`（prior-art 表 + 深读清单：综述 / Libra(2607.23250) / SeqPacking(2107.02027) / Varuna(2111.04007) 等）。
+
+### 资源事件（2026-10-15 02:59–03:00，C0）
+
+- 磁盘告警并自愈：s3_b8 峰值写至 avail 5G → exit=0（02:59:11，0.95 GPU-h，wall 1716s）后 D5 prune（ckpt/shard，8.0G→19.4G）；`s3_b32` 首试 rc=96 → 300s 重试（run `g2_s3_b32_1015_0259`、vs `g2_sync_b32_1015_0153`）。
+- D1：02:54 六连重试 GUARD FAIL（disk 7–9G；GPU3 本身 quiet）→ **02:59:21 空间释放后自动重启 `d4xd1_smoke`**（3 步；visual_path_check 过）→ 2×2 8 腿随后（L-W3-D4xD1 条款照旧）。留痕：D5 `logs/d5_prune.log` / `logs/d5_prune_s3b8.sh`；D1 `logs/d4xd1_smoke.log`。
+- novelty 深读 #1：`evidence/c0_novelty_deepread_d1_20261015.md`（SSRN 综述 DOI 核实 10.2139/ssrn.7343278；ACL'25/IJCAI'25/NeurIPS'24 对照；工程栈核查=HF padding-free / Megatron PackedSeqParams / torchtune packing 均 HTTP 200）。
