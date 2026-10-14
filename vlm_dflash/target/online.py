@@ -391,11 +391,14 @@ class OnlineFeatureSource:
         # epochs (``train.online_feature_cache_gb``; 0 = disabled, the
         # reference behavior). Hits serve a row from RAM instead of re-running
         # the target and return the stored tensors bitwise; a miss (cold
-        # start, eviction, oversized record) re-extracts exactly as the
-        # reference path would. The cache changes neither the consumed rows
-        # nor their order; a hit reuses the first-extraction-epoch bytes, so
-        # under a shuffling loader cached runs drift from re-extracting ones
-        # at the bf16-rounding scale (measured in docs/online-training.md).
+        # start, eviction, oversized record) re-extracts through the reference
+        # extraction path -- with online_batch_size > 1 a partially cached
+        # group forwards only its missing rows, so the forward's shape can
+        # differ from a fully uncached run's. The cache changes neither the
+        # consumed rows nor their order; a hit reuses the first-extraction
+        # bytes, so under a shuffling loader cached runs drift from
+        # re-extracting ones at the bf16-rounding scale (measured in
+        # docs/online-training.md).
         # Runtime-only, never persisted, LRU-evicted at a byte cap; it stays
         # out of every digest/plan gate, and a resume simply starts cold.
         cache_gb = (cfg.get("train") or {}).get("online_feature_cache_gb", 0) or 0
@@ -423,7 +426,9 @@ class OnlineFeatureSource:
         # Optional adaptive budget on top of the fixed cap
         # (``train.online_feature_cache_adaptive``): when enabled, the
         # controller senses the job's memory headroom and the payload is
-        # trimmed to ``min(cap, headroom - reserve)`` under pressure, growing
+        # trimmed to ``min(cap, headroom + retained - reserve)`` under pressure
+        # (the headroom already excludes the cache's own bytes, so retained is
+        # added back and only the missing safety margin is evicted), growing
         # back stepwise when headroom returns. Default off; with it off the
         # cache behaves exactly as before (the LRU store keeps its semantics -
         # only the byte budget it runs against becomes dynamic).
@@ -611,11 +616,17 @@ class OnlineFeatureSource:
 
         Records larger than the whole budget are not stored (they would evict
         every other entry for a single hit); placeholders must never be passed
-        here. With the adaptive budget enabled the budget is refreshed first.
+        here. With the adaptive budget enabled the budget is refreshed and the
+        existing store is trimmed to it first, so a store that is then refused
+        (the record exceeds the budget, e.g. under new pressure) still leaves
+        the cache inside the budget instead of holding stale payload until the
+        next lookup.
         """
         if not self.cache_capacity_bytes:
             return
         budget = self.cache_budget_bytes()
+        if budget < self._record_cache_bytes:
+            self._trim_record_cache(budget)
         index = int(index)
         size = _record_nbytes(record)
         if size > budget:
@@ -638,12 +649,13 @@ class OnlineFeatureSource:
         """Effective payload budget in bytes.
 
         Without the adaptive controller this is the configured cap; with it,
-        the controller's current budget (``min(cap, job share, headroom -
-        reserve)``), refreshed at most once per controller interval.
+        the controller's current budget (``min(cap, job share, headroom +
+        retained - reserve)``), refreshed at most once per controller
+        interval and sized against the bytes this store currently retains.
         """
         if self._cache_budget_controller is None:
             return self.cache_capacity_bytes
-        return self._cache_budget_controller.observe()
+        return self._cache_budget_controller.observe(retained_bytes=self._record_cache_bytes)
 
     def _trim_record_cache(self, budget: int) -> None:
         while self._record_cache_bytes > budget and self._record_cache:

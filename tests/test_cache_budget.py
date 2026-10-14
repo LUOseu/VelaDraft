@@ -44,6 +44,26 @@ class FakeSensor:
         return self.sample
 
 
+class FakeMemoryEnv:
+    """Closed-loop memory model: used = other usage + the cache's own payload.
+
+    A real cgroup probe already excludes the cache's retained bytes from
+    ``available``; this couples the fake reading to the retained payload the
+    same way, so the controller cannot shrink the cache by charging its own
+    residency against its own budget (review finding: the old
+    ``available - reserve`` formula oscillated under a constant external load).
+    """
+
+    def __init__(self, limit_bytes: int, other_bytes: int) -> None:
+        self.limit_bytes = limit_bytes
+        self.other_bytes = other_bytes
+        self.retained = 0
+
+    def sample(self) -> MemorySample:
+        used = self.other_bytes + self.retained
+        return MemorySample("cgroup-v2", self.limit_bytes, used, self.limit_bytes - used)
+
+
 def _sample(available_gb: float, limit_gb: float | None = None) -> MemorySample:
     return MemorySample(
         "meminfo" if limit_gb is None else "cgroup-v2",
@@ -180,12 +200,75 @@ def test_job_share_caps_the_effective_budget():
     assert capped.budget_bytes == 256 * MB
 
 
+def test_closed_loop_does_not_shrink_the_cache_against_its_own_residency():
+    # Review finding: 16 GiB limit, 4 GiB fixed non-cache usage, the cache
+    # already holds 8 GiB. The old ``available - reserve`` formula treated the
+    # 4 GiB of remaining headroom as the cache's whole cap (2.4 GiB), evicted
+    # 5.6 GiB of resident data and then oscillated while the external load
+    # stayed constant. With the retained payload added back, the cache keeps
+    # its 8 GiB and the budget settles at the safe cap.
+    env = FakeMemoryEnv(16 * GB, other_bytes=4 * GB)
+    clock = FakeClock()
+    controller = CacheBudgetController(16 * GB, sensor=env.sample, clock=clock)
+    reserve = int(0.10 * 16 * GB)
+    expected = 12 * GB - reserve
+    budgets = []
+    for _ in range(10):  # stores arrive 1 GiB at a time up to the reviewer's 8 GiB
+        env.retained = min(8 * GB, env.retained + 1 * GB)
+        clock.advance(1.0)
+        budget = controller.observe(retained_bytes=env.retained)
+        env.retained = min(env.retained, budget)  # the caller trims to the budget
+        budgets.append(budget)
+    assert env.retained == 8 * GB  # no eviction of the resident cache
+    assert set(budgets[-3:]) == {expected}  # settled, no oscillation
+    assert controller.adjustments == 1  # only the startup right-size: no per-cycle churn
+    assert env.limit_bytes - env.other_bytes - env.retained >= reserve  # free headroom kept
+    assert controller.stats()["retained_bytes"] == 8 * GB
+
+
+def test_closed_loop_eviction_yields_exactly_the_missing_safety_margin():
+    env = FakeMemoryEnv(16 * GB, other_bytes=4 * GB)
+    clock = FakeClock()
+    controller = CacheBudgetController(16 * GB, sensor=env.sample, clock=clock)
+    reserve = int(0.10 * 16 * GB)
+    expected = 12 * GB - reserve
+    for _ in range(16):  # fill the cache to its budget
+        env.retained = min(expected, env.retained + 1 * GB)
+        clock.advance(1.0)
+        env.retained = min(env.retained, controller.observe(retained_bytes=env.retained))
+    assert env.retained == expected
+    assert env.limit_bytes - env.other_bytes - env.retained == reserve  # exactly the reserve
+    # External pressure rises by 800 MiB: the cache yields exactly that much.
+    missing = 800 * MB
+    env.other_bytes += missing
+    clock.advance(1.0)
+    budget = controller.observe(retained_bytes=env.retained)
+    evicted = env.retained - min(env.retained, budget)
+    env.retained -= evicted
+    assert evicted == missing
+    assert env.retained == expected - missing
+    assert env.limit_bytes - env.other_bytes - env.retained == reserve
+    # And the loop is at a fixed point: no further adjustments or evictions.
+    adjustments = controller.adjustments
+    for _ in range(5):
+        clock.advance(1.0)
+        budget = controller.observe(retained_bytes=env.retained)
+        evicted = env.retained - min(env.retained, budget)
+        env.retained -= evicted
+        assert evicted == 0
+    assert controller.adjustments == adjustments
+
+
 def test_read_memory_sample_prefers_cgroup_v2(tmp_path):
     cg2 = tmp_path / "cg2"
     cg2.mkdir()
     (cg2 / "memory.max").write_text(f"{4 * GB}\n", encoding="ascii")
     (cg2 / "memory.current").write_text(f"{1 * GB}\n", encoding="ascii")
-    sample = read_memory_sample(cgroup_v2=cg2, cgroup_v1=tmp_path / "nope1", meminfo=tmp_path / "nope2")
+    proc = tmp_path / "cgroup"
+    proc.write_text("0::/\n", encoding="ascii")
+    sample = read_memory_sample(
+        cgroup_v2=cg2, cgroup_v1=tmp_path / "nope1", proc_cgroup=proc, meminfo=tmp_path / "nope2"
+    )
     assert sample == MemorySample("cgroup-v2", 4 * GB, 1 * GB, 3 * GB)
 
 
@@ -194,7 +277,11 @@ def test_read_memory_sample_uses_cgroup_v1_when_v2_is_absent(tmp_path):
     cg1.mkdir()
     (cg1 / "memory.limit_in_bytes").write_text(f"{2 * GB}\n", encoding="ascii")
     (cg1 / "memory.usage_in_bytes").write_text(f"{GB // 2}\n", encoding="ascii")
-    sample = read_memory_sample(cgroup_v2=tmp_path / "nope", cgroup_v1=cg1, meminfo=tmp_path / "no")
+    proc = tmp_path / "cgroup"
+    proc.write_text("7:memory:/\n", encoding="ascii")
+    sample = read_memory_sample(
+        cgroup_v2=tmp_path / "nope", cgroup_v1=cg1, proc_cgroup=proc, meminfo=tmp_path / "no"
+    )
     assert sample == MemorySample("cgroup-v1", 2 * GB, GB // 2, 2 * GB - GB // 2)
 
 
@@ -205,12 +292,117 @@ def test_read_memory_sample_falls_back_to_meminfo_when_unlimited(tmp_path):
     (cg2 / "memory.current").write_text("12345\n", encoding="ascii")
     meminfo = tmp_path / "meminfo"
     meminfo.write_text("MemTotal: 16299460 kB\nMemAvailable: 8000000 kB\n", encoding="ascii")
-    sample = read_memory_sample(cgroup_v2=cg2, cgroup_v1=tmp_path / "nope", meminfo=meminfo)
+    proc = tmp_path / "cgroup"
+    proc.write_text("0::/\n", encoding="ascii")
+    sample = read_memory_sample(
+        cgroup_v2=cg2, cgroup_v1=tmp_path / "nope", proc_cgroup=proc, meminfo=meminfo
+    )
     assert sample.source == "meminfo"
     assert sample.available_bytes == 8000000 * 1024
 
 
 def test_read_memory_sample_unavailable_when_nothing_is_readable(tmp_path):
-    sample = read_memory_sample(cgroup_v2=tmp_path / "a", cgroup_v1=tmp_path / "b", meminfo=tmp_path / "c")
+    proc = tmp_path / "cgroup"
+    proc.write_text("0::/\n", encoding="ascii")
+    sample = read_memory_sample(
+        cgroup_v2=tmp_path / "a", cgroup_v1=tmp_path / "b", proc_cgroup=proc, meminfo=tmp_path / "c"
+    )
     assert sample.source == "unavailable"
     assert sample.available_bytes is None
+
+
+def test_read_memory_sample_resolves_the_process_cgroup_path(tmp_path):
+    # Review finding (P1): the mount root is not the job under systemd / Slurm /
+    # container nesting. The old probe read /sys/fs/cgroup directly, saw the
+    # root's "max"/absent limit and fell back to the host's 64 GiB
+    # MemAvailable while the job actually had 0.5 GiB left.
+    cg2 = tmp_path / "cg2"
+    job = cg2 / "system.slice" / "d4-job.scope"
+    job.mkdir(parents=True)
+    (cg2 / "memory.max").write_text("max\n", encoding="ascii")
+    (cg2 / "memory.current").write_text(f"{3 * GB}\n", encoding="ascii")
+    (job / "memory.max").write_text(f"{GB // 2}\n", encoding="ascii")
+    (job / "memory.current").write_text(f"{GB // 8}\n", encoding="ascii")
+    proc = tmp_path / "cgroup"
+    proc.write_text("0::/system.slice/d4-job.scope\n", encoding="ascii")
+    meminfo = tmp_path / "meminfo"
+    meminfo.write_text(
+        f"MemTotal: {128 * GB // 1024} kB\nMemAvailable: {64 * GB // 1024} kB\n", encoding="ascii"
+    )
+    sample = read_memory_sample(
+        cgroup_v2=cg2, cgroup_v1=tmp_path / "nope", proc_cgroup=proc, meminfo=meminfo
+    )
+    assert sample.source == "cgroup-v2"
+    assert sample.limit_bytes == GB // 2
+    assert sample.used_bytes == GB // 8
+    assert sample.available_bytes == GB // 2 - GB // 8  # the job's headroom, not 64 GiB
+    assert sample.host_available_bytes == 64 * GB
+
+
+def test_read_memory_sample_honours_ancestor_limits(tmp_path):
+    # The job's own cgroup may be unlimited while a parent (a Slurm job or a
+    # container scope) carries the binding limit.
+    cg2 = tmp_path / "cg2"
+    leaf = cg2 / "job" / "leaf"
+    leaf.mkdir(parents=True)
+    (cg2 / "memory.max").write_text("max\n", encoding="ascii")
+    (cg2 / "job" / "memory.max").write_text(f"{2 * GB}\n", encoding="ascii")
+    (cg2 / "job" / "memory.current").write_text(f"{int(1.5 * GB)}\n", encoding="ascii")
+    (leaf / "memory.max").write_text("max\n", encoding="ascii")
+    (leaf / "memory.current").write_text(f"{GB // 4}\n", encoding="ascii")
+    proc = tmp_path / "cgroup"
+    proc.write_text("0::/job/leaf\n", encoding="ascii")
+    sample = read_memory_sample(
+        cgroup_v2=cg2, cgroup_v1=tmp_path / "no", proc_cgroup=proc, meminfo=tmp_path / "no"
+    )
+    assert sample.source == "cgroup-v2"
+    assert (sample.limit_bytes, sample.used_bytes) == (2 * GB, int(1.5 * GB))
+    assert sample.available_bytes == 2 * GB - int(1.5 * GB)
+
+
+def test_read_memory_sample_uses_proc_membership_for_cgroup_v1(tmp_path):
+    cg1 = tmp_path / "cg1"
+    leaf = cg1 / "job"
+    leaf.mkdir(parents=True)
+    (leaf / "memory.limit_in_bytes").write_text(f"{GB}\n", encoding="ascii")
+    (leaf / "memory.usage_in_bytes").write_text(f"{GB // 4}\n", encoding="ascii")
+    proc = tmp_path / "cgroup"
+    proc.write_text("7:memory:/job\n", encoding="ascii")
+    sample = read_memory_sample(
+        cgroup_v2=tmp_path / "no", cgroup_v1=cg1, proc_cgroup=proc, meminfo=tmp_path / "no"
+    )
+    assert sample == MemorySample("cgroup-v1", GB, GB // 4, 3 * GB // 4)
+
+
+def test_read_memory_sample_combines_cgroup_with_host_memavailable(tmp_path):
+    # A finite cgroup reading must not mask a machine-wide squeeze.
+    cg2 = tmp_path / "cg2"
+    cg2.mkdir()
+    (cg2 / "memory.max").write_text(f"{8 * GB}\n", encoding="ascii")
+    (cg2 / "memory.current").write_text(f"{GB}\n", encoding="ascii")
+    proc = tmp_path / "cgroup"
+    proc.write_text("0::/\n", encoding="ascii")
+    meminfo = tmp_path / "meminfo"
+    meminfo.write_text(
+        f"MemTotal: {64 * GB // 1024} kB\nMemAvailable: {2 * GB // 1024} kB\n", encoding="ascii"
+    )
+    sample = read_memory_sample(
+        cgroup_v2=cg2, cgroup_v1=tmp_path / "no", proc_cgroup=proc, meminfo=meminfo
+    )
+    assert sample.source == "cgroup-v2"
+    assert sample.available_bytes == 2 * GB  # host headroom wins when smaller
+    assert sample.host_available_bytes == 2 * GB
+    assert sample.limit_bytes == 8 * GB  # cgroup identity kept
+
+
+def test_read_memory_sample_reports_over_limit_headroom_as_negative(tmp_path):
+    cg2 = tmp_path / "cg2"
+    cg2.mkdir()
+    (cg2 / "memory.max").write_text(f"{GB}\n", encoding="ascii")
+    (cg2 / "memory.current").write_text(f"{GB + GB // 4}\n", encoding="ascii")
+    proc = tmp_path / "cgroup"
+    proc.write_text("0::/\n", encoding="ascii")
+    sample = read_memory_sample(
+        cgroup_v2=cg2, cgroup_v1=tmp_path / "no", proc_cgroup=proc, meminfo=tmp_path / "no"
+    )
+    assert sample.available_bytes == -(GB // 4)  # over the limit: trim the shortfall
