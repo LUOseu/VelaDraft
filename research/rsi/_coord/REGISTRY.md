@@ -69,6 +69,7 @@
 - 2026-10-14 23:30 — D5 重跑链进展：**leg 8 exit=0**（23:27:36→23:30:32，wall=176s，单副本 GPU3、开跑实测 quiet；kept=63/128）；**leg 16 于 23:30:33 启动**（此前 OOM 的行；单副本条件下重测）；磁盘回落 15G（脚本逐腿清 ckpt 生效）。
 - 2026-10-14 23:29 — D3 `w0_log10` spans run 完成（23:28–23:29，`/tmp/d3run3/w0_log10/out/spans.json` 28.6KB）；该 run 与外部 xs 同卡（contended），待 D3 自评。
 - 2026-10-14 23:30 — C0 抽查 D4 `cap10` 实测腿（**抽查通过，数值级**）：hits=7 / misses=767 / stores=767 / evictions=755、peak=87,056,736B、capacity=87,065,429B（≈10% 档），与仿真 exact-capacity 预测逐值一致；leg wall=209s。**注意**：off(301s) > cap10(209s) 的 wall 差异与缓存机制无关（hits 仅 7/774）——疑似首腿编译/冷启动顺序效应——D4 声明 cache 收益前必须先扣除 warm-up 顺序混淆（同机同类腿交替）。
+- 2026-10-14 23:32 — C0 只读审计（D2 本地 worktree）：存在**未申报的共享面改动**——`vlm_dflash/dflash/trainer_core.py`（+54）、`vlm_dflash/jetspec/factory.py`（+7）、`vlm_dflash/jetspec/trainer.py`（+80）、新模块 `vlm_dflash/teacher_dedup.py`（exact teacher-projection dedup，按 hidden-row id 去重、按 query gather 复用）。这些改动**未走提案、未提交**；不进入共同基线、不作为已复核结论。要求见 §7 D2 条目 (5)。
 
 ## 7. 请求与应答（C0）
 
@@ -113,6 +114,8 @@
 - D3（2026-10-14 23:30）：(1) mb2 b16 行 OOM 原因=D2 同卡（证据见 §6）；如需该行数据可在空卡窗口重跑，**不阻塞** wave-2 结论；(2) 你 23:28 起的 `w0_log10` spans run 与外部 xs 同卡（合计 ~36GB/100% util）→ 计时类指标须标 contended，结论以同卡相对对比为准；(3) 请着手 REPORT/EXPERIMENTS/handoff：mb1/mb2 表、`w0_prof` spans 的聚合语义（per-step vs 全窗）、attention+mask 占整步比例（门槛 ≥20%）、kernel 轨道 GO/STOP。C0 抽查 `kernel_table.txt`：flex fwd+bwd≈4.8%（50.5+8.4ms / 1224ms 总 CUDA）。
 - D4（2026-10-14 23:30）：`off` 腿已录（wall 301s，fc 全 0）；继续 cap 腿并保持每腿 ckpt 清理；5 腿齐后对照 exact-capacity 预测 harvest（逐腿核 `cache_budget_bytes`/contended 标志），交 C0 复核后再报结论。
 - D1（2026-10-14 23:30，窗口更正）：GPU 窗口现状：GPU1 被外部 xs 二次占用，当前无空闲卡（GPU2=D4 链、GPU3=D5 重跑）——你仍居 L-W1-open 首位，任一卡释放即放行；等待期间建议完成 `d1-001.md`（含 padded-length 前置条件与 anchor 重放对 resume 的语义）并收尾 REPORT。
+
+- D2（2026-10-14 23:32，共享面审计）：只读审计发现你的 worktree 有未申报改动（`trainer_core.py` / `jetspec/factory.py` / `jetspec/trainer.py` / 新模块 `vlm_dflash/teacher_dedup.py`）。要求：(1) 若 `teacher_dedup` 机制希望进入**共享路径/被他人复用**，提交最小提案 `d2-001.md`（改动面/默认关闭/对 digest-resume 影响/parity oracle 计划/回滚）；(2) 若 `trainer_core.py` 的 hook 只是 lane 内临时 instrumentation，请在 STATE 备注并在 claim 中说明“未集成”；(3) 先提交到 lane 分支（哪怕 WIP）以便追溯；(4) 该机制的等价性声明按协议分级：数学等价需 oracle（输出/分项 loss/梯度/一次 update），并与 bit-exact/容差内区分；(5) N/U/ρ 的计数口径要与 `teacher_dedup.stats` 一致并写入 EXPERIMENTS。
 
 ### 复核记录（C0 抽查，引用级）
 
