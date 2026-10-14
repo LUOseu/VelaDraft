@@ -1,4 +1,4 @@
-# REPORT — VelaDraft system-optimization lane (status: S1a/S1b/S2/S2c/S3 complete; frames 1+2 DONE: acceptance eval functionally identical; cache drift 30-90x below seed variation, see §4.5/§6)
+# REPORT — VelaDraft system-optimization lane (status: S1a/S1b/S2/S2c/S3 complete; frames 1+2 DONE: acceptance eval functionally identical; cache drift 30-90x below seed variation; offline baseline measured (§4.6); see §4.5/§6)
 
 Scope: one system-level optimization for the frozen-target / external-L2-drafter
 training flow, judged on wall-clock and GPU-hours at fixed semantics, with an
@@ -280,9 +280,25 @@ epoch-k recompute == ON's epoch-1 stored values bitwise).
 
 ### 4.6 Strong baselines and ablations (doc §8.3)
 - Current online (fixed timing) = the OFF legs of S2/S3 (measured paired).
-- Full offline store = §4.0 + the disk-infeasibility argument (store cannot be
-  written when `/home` is 100% full; the lane's claim is "same wall without
-  any disk", not "faster than offline").
+- Full offline store - MEASURED 2026-10-14 (leg e = capture + train, leg e2 =
+  train from e's store; same S3 staged inputs/config; GPU2 21:18-21:42,
+  0.39 GPU-h): trainer walls e 624.5 s (capture ~75.6 s + train 548.8 s;
+  writes a 7.0G store) and e2 548.8 s (store pre-existing); end-to-end
+  836.8 s / 582.2 s; peak GPU 17.4 GB both; e/e2 train logs byte-identical
+  (store round-trip lossless, offline path deterministic); final_loss
+  4.03125 on all four legs (e, e2, a_off, b_on).
+- Train-stage comparison (762 steps / 6 epochs): offline store reuse 548.8 s
+  vs online cache 470.9 s vs full store cycle 624.5 s vs online no-cache
+  1167.0 s -> the cache path is 14.2% faster than reusing an already-written
+  store (7.0G) at zero disk bytes, and 24.6% faster than produce-and-train;
+  offline still beats no-cache online (624.5 vs 1167.0) - the cache recovers
+  the reuse benefit inside online mode. Caveat: single-shot legs under host
+  I/O contention (loadavg ~10-12; offline pace 0.72 s/step vs cache-trained
+  0.45 s/step may be partly shard-I/O contention; both offline legs
+  consistent with each other).
+- Disk-infeasibility note (unchanged): the store cannot be written when
+  `/home` is in the 3-8 GiB windows this lane hit; the lane's claim is the
+  disk-free variant.
 - Simple batching/prefetch = H-A sweep (S1b); predicted flat per-row, so not
   a competing mechanism on this hardware.
 - "Visual-only cache": not implementable in this harness without changing the
@@ -290,14 +306,15 @@ epoch-k recompute == ON's epoch-1 stored values bitwise).
   vision-only extraction API, and no kernel-level vision/text split measured
   this round) - stated as a limitation, not tested.
 - LRU parameter ablation: capacity vs working set (S2: 8 GiB vs ~1-2.4 GB;
-  S3: 16 GiB vs ~7-9.4 GB) => expected zero evictions; any evictions are
-  reported.
+  S3: 16 GiB vs 6.8 GB cache set / 7.0G store measured) => zero evictions
+  observed; the capacity-below-working-set test covers eviction -> recompute.
 
 ### 4.7 Failure scenarios / boundaries
 - Cache cap smaller than the record set: LRU recompute (degrades to today's
   behavior); correctness unchanged, gain shrinks.
 - Host RAM pressure on a shared node: measured via `/usr/bin/time -v` RSS.
-- Resume: cache starts cold, re-extracts (correct, slower first epoch).
+- Resume: cache starts cold, re-extracts (correct, slower first epoch); under
+  the shuffling loader not guaranteed bit-exact to an uninterrupted cached run.
 - Regen answers or target weights changing between epochs: assumption broken
   -> cache would be wrong; the lane's protocol fixes both (greedy fixed
   transcript, frozen target), and the digest gates forbid silent drift.
@@ -306,15 +323,19 @@ epoch-k recompute == ON's epoch-1 stored values bitwise).
 
 ### 4.8 Maintenance cost of the patch
 
-Cache feature: ~136 changed lines in `vlm_dflash/target/online.py`, 159 lines
-of tests (7 cache tests incl. a tiny real-model end-to-end), 20 doc lines;
-opt-in config key `train.online_feature_cache_gb` (default 0 = off), no new
-deps, runtime-only state, no digest/plan/provenance schema change. Tests:
-65/65 pass with the patched code (server venv). Lane-only env gates, all
-default-off (not standalone merge candidates): `VLM_DFLASH_FLEX_FORCE_MAIN=1`
-(flex_decoding workaround, `draft_model.py`), `VLM_DFLASH_SKIP_RESUME_CKPT=1`
-(hostile-disk runs, `train.py`), `VLM_DFLASH_TRAIN_SHUFFLE=0` (diagnostic
-fixed-order runs, `train.py`).
+Cache feature (merge-ready scope, after the 22:2x cleanup): +137/-5 lines in
+`vlm_dflash/target/online.py`, +200 lines of tests (8 cache tests incl. a
+tiny real-model end-to-end and an eviction->recompute value-exactness test),
++50 doc lines; opt-in config key `train.online_feature_cache_gb` (default
+0 = off), no new deps, runtime-only state, no digest/plan/provenance schema
+change. Tests on the cleaned tree (server venv, 2026-10-14): online suite
+66/66; full suite 425 collected -> 418 passed / 6 skipped / 1 pre-existing
+venv-metadata failure (`test_cli` version vs stale editable dist-info,
+reproduces on pristine HEAD). Lane-only env gates used by the lane's runs
+were removed from the merge change (kept in the lane working copy +
+`lane_patch_backup_20261014/`): `VLM_DFLASH_FLEX_FORCE_MAIN=1` (flex_decoding
+workaround), `VLM_DFLASH_SKIP_RESUME_CKPT=1` (hostile-disk runs),
+`VLM_DFLASH_TRAIN_SHUFFLE=0` (diagnostic fixed-order runs).
 
 ## 5. Final judgement
 
@@ -350,7 +371,12 @@ Closing frame 2 (seed change, order + init) puts the weight drift in
 context: a routine seed change moves the same weights by global relL2 131.5%
 and the last-10 loss by 0.345, while the cache moves them by 1.45-4.26%
 relL2 (per seed) with display-identical loss - the cache's effect is 1-2
-orders of magnitude below the pipeline's own run-to-run variation.
+orders of magnitude below the pipeline's own run-to-run variation. The goal
+§8.3 offline baseline closes the last comparison (measured 2026-10-14 on the
+same staged inputs): producing the 7.0G store + training took 836.8 s
+end-to-end and reusing it trained in 548.8 s - both above the cache's
+470.9 s train stage at zero disk bytes, and the store round-trip was
+numerically lossless (e/e2 train logs byte-identical).
 
 ## 6. Next-phase recommendations
 
@@ -379,5 +405,7 @@ probe/S2c methodology as an evaluation harness), plus the H-A closure
 strongest counter-argument — "an offline store with page-cache reads is
 equivalent when the disk is healthy" — is answered by scope: this lane's
 claim is the disk-free variant (0 bytes written on a 100%-full host), and
-the store writes 9.4 GB the cache does not; where the disk is healthy and a
-store already exists, reuse it instead.
+the store writes 7.0G for this workload the cache does not (measured
+2026-10-14; the older 1050-row baseline quotes 9.4 GB). Even with a store
+already written, the measured reuse training (548.8 s) did not beat the
+cache's train stage (470.9 s) in tonight's single-shot comparison.

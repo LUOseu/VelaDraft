@@ -85,8 +85,10 @@ parity tests); the A/B loss sequence must be bit-identical or the mechanism
 is wrong. (c) Bigger corpora / 8B targets exceed a sane RAM cap — LRU degrades
 to today's behavior (recompute); cap must be recorded in provenance. (d) It
 duplicates an existing option: an offline store with page-cache reads is close
-in wall terms *when the disk is healthy and the store exists* — the lane's
-claim is "same wall without any disk", not "faster than offline".
+in wall terms *when the disk is healthy and the store exists*. Measured
+2026-10-14 (REPORT §4.6): store reuse trains in 548.8 s vs the cache's
+470.9 s train stage, and the store cycle costs capture + 7.0G disk — on this
+host the disk-free variant is stronger, not merely equal.
 
 **Related work / A+B card (doc §2.2).**
 - **A (mature work)**: SpecForge disaggregated training (docs: bounded
@@ -146,15 +148,20 @@ loss 757/762 identical, drift relL2 1.45% vs 4.26% at seed 42) and the
 reference frame a-vs-c: relL2 131.5% / last-10 loss Delta 0.345 -> the
 cache moves the run 30-90x less than a routine seed change.
 
-**Budget.** Spent ≈1.8 GPU-h of the lane's 16: booked S1/S2/S2c/probes
-0.86 + S3 (incl. data build) 0.91. **Paper value:** engineering adaptation;
+**Budget.** Spent ≈3.2 GPU-h of the lane's 16: S1/S2/S2c/probes 0.86 +
+S3 (incl. data build) 0.91 + closing frames 1.06 + offline baseline 0.39.
+**Paper value:** engineering adaptation;
 no new mechanism (LRU + retention is standard). The reusable artifact is the
 equivalence-boundary protocol (freeze grouping or bound the drift) with its
 probe/S2c methodology. **Decision: KEEP** — mergeable with the
 numeric-behavior note and the amended gate (REPORT §4.5); canonical 2K
 number now measured (-59.7% train stage); closing frames: acceptance eval
 DONE (functionally equivalent, mean_al identical to 10 decimals);
-seed-change control running.
+seed-change control DONE (drift 30-90x below a seed change). Offline
+baseline (goal §8.3) DONE 2026-10-14: store 7.0G; e end-to-end 836.8 s;
+e2 reuse train 548.8 s vs cache b_on 470.9 s -> the cache path beats store
+reuse by 14.2% at zero disk; e/e2 train logs byte-identical (store
+round-trip lossless).
 
 ## H-C2 — fuse regen with capture (deferred)
 

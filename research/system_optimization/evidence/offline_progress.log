@@ -1,0 +1,11 @@
+[2026-10-14 21:18:39] offline baseline start on GPU 2 (free 40G)
+[2026-10-14 21:18:40] e start (capture+train; free 40G)
+[2026-10-14 21:32:37] e exit=0
+[2026-10-14 21:32:37] store size: 7.0G
+[2026-10-14 21:32:45] e2 start (reuse e_off_store/features; free 31G)
+[2026-10-14 21:42:27] e2 exit=0
+  offline_e_off_store_summary: wall=624.4933176040649 steps=762 final_loss=4.03125
+  offline_e2_off_reuse_summary: wall=548.8472685813904 steps=762 final_loss=4.03125
+  s3_a_off_summary: wall=1167.0084478855133 steps=762 final_loss=4.03125
+  s3_b_on_summary: wall=470.86994671821594 steps=762 final_loss=4.03125
+[2026-10-14 21:42:27] offline baseline DONE on GPU 2

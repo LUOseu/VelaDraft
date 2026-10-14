@@ -430,3 +430,31 @@ self-gated); zero usable GPU results from that attempt.
   leg e (full offline capture, disk store) exit=0 at 21:32:37, store 7.0G;
   leg e2 (reuse via `--features`) started 21:32:45 on GPU2. REPORT §4.6 and
   RUNS.jsonl get the offline numbers when e2 lands.
+
+## 21:42-22:35 — offline baseline DONE; push; PR #6; merge cleanup
+
+- Offline baseline (goal §8.3; screen `offline`, GPU2, 0.39 GPU-h): e =
+  capture+train, end-to-end 836.8 s, trainer wall 624.5 s (capture ~75.6 s +
+  train 548.8 s), store 7.0G / 36 files, peak GPU 17.4 GB, host RSS 4.78 GiB;
+  e2 = reuse e's store (`--features`), end-to-end 582.2 s, train 548.8 s,
+  RSS 3.90 GiB. e/e2 train logs byte-identical (md5 b9340d10..., written
+  10 min apart) -> store round-trip numerically lossless, offline path
+  deterministic. final_loss 4.03125 on all four legs (e, e2, a_off, b_on).
+  Train-stage: a_off 1167.0 / e2 548.8 / e 624.5 / b_on 470.9 s -> the cache
+  path beats store reuse by 14.2% at zero disk; caveat: single-shot legs
+  under host I/O contention (0.72 vs 0.45 s/step may be partly shard-I/O).
+- Push: `ea8381b` -> origin `research/online-systems` (closes the push-sha
+  note from the 21:35 section); PR #6 opened (base main, by LUOseu, 21:46).
+- Merge cleanup per review brief (`f015f4f`): lane-only env gates removed
+  from the merge branch (train.py / draft_model.py now identical to main);
+  docs resume semantics (cold start; not bit-exact to an uninterrupted
+  cached run under the shuffling loader) + hit/miss-precise claim wording;
+  online.py comments likewise + "records are shared, not copied"; +1 test
+  (eviction->recompute value-exact, capacity below working set).
+- Tests on the cleaned tree (server venv): online suite 66/66; full suite
+  425 collected -> 418 passed / 6 skipped / 1 pre-existing venv-metadata
+  failure. Logs: `evidence/pytest_*_cleanup_20261014.log`.
+- Lane-only patch backup: the server lane copy was tested with the cleaned
+  files and then restored to the pre-cleanup snapshot
+  (`/home/lyh/vlm-systems/lane_patch_backup_20261014/`, md5s verified).
+- Lane budget now ≈3.2 of 16 GPU-h.
