@@ -58,17 +58,17 @@
 
 优先给 D1/D2 研究资源，D4 提供实用 backend；按真实证据调整排序。
 
-### 4.1 Wave-1 台账（滚动；更新 2026-10-15 01:02）
+### 4.1 Wave-1 台账（滚动；更新 2026-10-15 02:05）
 
 | 路线 | wave-1 证据 | 门槛核验 | 当前判定 |
 |---|---|---|---|
-| D1 | 浪费审计 + oracle（C0 复跑 ✓）；**store 全 ✓（W1 191/W2 144/W3 192/MIX 335）**；**R3 全矩阵完成：W3 k4 +19.0% / MIX k4 +24.7%（C0 抽查 ✓）；peak −30~58%**；EXPERIMENTS 24 条（device 全填）；`d1-001` 已提（接收） | **整步门 ≥15% ✓（W3 真实混合）；显存门 ≥25% ✓**；parity bf16-class（grad 口径待修正） | **GO（wave-2 放行，`d1-001-c0`）**：≥3 交替 100–200 更新配对 + capacity demo；集成排 wave-2 后 |
+| D1 | 浪费审计 + oracle（C0 复跑 ✓）；store 全 ✓（W1 191/W2 144/W3 192/MIX 335）；**wave-2 完成：6/6 rc=0，grid W3 1.129/1.136/1.141、MIX 1.154/1.137/1.107（均值 13.5%/13.3%，win 580/600；peak −57%；parity b0/50/100 ✓；0.67/1.5 GPU-h）**；round-2 R3：W3 k4 +19.0% / MIX k4 +24.7%（8 批 cell，改口径）；EXPERIMENTS 24 条 | 整步门 ≥15%：wave-2 13.5%/13.3%（未达）；显存门 ≥25% ✓（−57%）→ OR 通过 | **GO（修订口径，`d1-002-c0`）**：capacity demo（§2 单列）收尾 → 关闭 L-W2-D1 → 集成 d1-001 最小集 + D4×D1 2×2 |
 | D2 | rho=6.83；**12 项 CPU 测试（C0 复跑 12/12 ✓）**；pin 2×2 fwd -6.8%（loss 四腿 bitwise）；**dfly recipe 2×2 完成：fwd −12.9ms、bwd −19.5ms（12 步 loss 四腿逐值相同，C0 直读 ✓）**；phase dedup4 归因完成（editable install 遮蔽=空对照；未钉卡 event 伪影已修） | ρ≥2 ✓；**收益 −3.0%（Jetspec）/ −5.6%（DFly recipe）≪15%；显存无降** | **STOP（D2 自判，C0 采纳；d2-001-c0）**→DEFERRED（lane-local opt-in；再开条件=REPORT §8） |
 | D3 | trace + Amdahl：attention+mask=21.16ms/595.9ms=**3.55%**（cap +3.7% 步 / +1.4% online），**C0 核数 ✓** | ≥20% ✗（远未达） | **STOP**（kernel 轨；re-open 条件已登记） |
 | D4 | W1 五腿 counters 逐值一致（**C0 5/5 ✓**）；W2 CPU 压力轨迹（零越界）；**W2 降级 B 收口（F1–F4 PASS；两腿 counters 645/129/129/0/0 相同；adjustments=0；lane `a8e762c`）** | 无提速声称（安全阀）；d4-001 集成 `1f8963e`（sha1 4 文件再核一致；13+4+70/70 ✓） | **merge-ready（平台工程级，`d4-003-c0`）**：静态 RAM 场景 / opt-in 默认关；压力响应未验证（环境限制）；不自动 merge main |
-| D5 | trace 分解 + sim v3/v4；regen 真测 1.66×/2.33×；静态分裂 sim 1.70×；cost-aware sim +0.8–2.1%；**d5-001 步 2 + 两卡 split 接线（lane 79/79 C0 独立复跑 ✓，含 36 parity 项；Tier 0 smoke 批准）** | cost-aware ✗（≪15%）；静态 split 待真实 ladder | HOLD（split=wave-2 条件项；G2 分档预授权等窗口） |
+| D5 | trace 分解 + sim v3/v4；regen 真测 1.66×/2.33×；静态分裂 sim 1.70×；d5-001 步 2 + 两卡 split 接线（lane 85/85 C0 复跑 ✓）；**G2 链：Tier0 canon ✓、staged_b8 ✓（762 步/kept 1012）、sync_b8 ✓（762 步 final_loss=4.03125；visual ✓）、sync_b32 运行中（01:53:29）** | cost-aware ✗（≪15%）；静态 split 待真实 ladder 出数 | HOLD（split=wave-2 条件项；G2 进行中） |
 
-未决：D1 wave-2 配对（L-W2-D1 ≤1.5 GPU-h；**窗口已开放**——p3 收尾 5/7，`mix_w1w2_k2`/`w3_k2` 两格 guard 跳过待补）→ `d1-001` 集成排程（默认全关、wave-2 结论后）；D4 收口完成（`d4-003-c0` merge-ready；无待办；`host_ram_budget_gb` 已确认、PROTOCOL §12）；D5 chain2 Tier A/B 进行中（staged_b8 00:38 起；**S3 线修复已合入 `2cc57c6`/`daf6b1d`**，追赶链待接力；Tier C 待 C0）；iface v0.2（D1 增量候选已登记）；预算实耗：**D1 0.70/1.5**、D2 0.5/1.0、D3 0.22/1.0、D4 0.37/0.5、D5 进行中（自报待收）。
+未决：D1 wave-2 判读已出（GO 修订口径；`d1-002-c0`）——余 capacity demo 一项，完成并核验后关闭 L-W2-D1 → `d1-001` 最小集集成 + D4×D1 2×2 排程；D4 收口完成（merge-ready；无待办）；D5 chain2：Tier0/staged_b8/sync_b8 ✓；sync_b32 运行中，其后 S3 追赶链接力；Tier C 待 C0；预算实耗（详见 §8）：D1 0.92/1.5 + wave-2 0.67（单列）、D2 0.5/1.0、D3 0.22/1.0、D4 0.37/0.5、D5 进行中（staged_b8 ≈1.27 + sync_b8 ≈1.21 分配口径，待 harvest 复核）。
 
 ## 5. 组合与复核（只做相关组合）
 
@@ -95,17 +95,17 @@
 7. 声明审计：抽查 2–3 个关键数字与原始日志/JSON 一致；限制与反证条件写明；负结果保留。
 8. 复现：EXPERIMENTS 字段齐全、依赖 SHA 固定、复现命令可执行；外部引用标明“引用、未独立复核”。
 
-## 8. Wave-1 收口（滚动草稿 · 更新 2026-10-15 01:02）
+## 8. Wave-1 收口（滚动草稿 · 更新 2026-10-15 02:05）
 
 > wave-1 尚未关闭（D1 wave-2 配对——窗口已开；D5 Tier A/B 进行中；D4 已收口）。本节是 C0 的滚动台账：给每条**当前判定 / 证据路径 / 解除条件**；最终 GO/HOLD/STOP/BLOCKED 在关闭时冻结。平台工程价值与论文贡献潜力分列，不互相折算。
 
 | 路线 | 当前判定 | 关键证据 | 平台 / 论文 | 解除或关闭条件 |
 |---|---|---|---|---|
-| D1 | **GO（wave-2 放行；`d1-001-c0`）** | R3 全矩阵（W3 k4 +19.0% / MIX k4 +24.7%；peak −30~58%；C0 抽查 4 组 ✓）+ 24 条 EXPERIMENTS + oracle/pipeline 复跑 ✓；round-2.1 parity-3 5/7（2 格 guard 跳过待补）；预算 0.70/1.5 | 平台：布局重排引擎 + probe stores；论文：候选（wave-2 配对 + 质量证据后定） | wave-2：L-W2-D1 配对跑 → 通过则 C0 集成 d1-001；条件（同表 replay / 字段口径）见 `d1-001-c0` |
+| D1 | **GO（修订口径；`d1-002-c0`）** — wave-2 6/6 ✓ | wave-2 配对（C0 重算）：grid W3 1.129/1.136/1.141、MIX 1.154/1.137/1.107（均值 13.5%/13.3%；win 580/600；peak −57%；parity b0/50/100 ✓；用量 0.67/1.5 GPU-h）；round-2 的 +19.0%/+24.7% 为 8 批 cell（不再作主数字）；条件（同表 replay/字段口径）见 `d1-001-c0` | 平台：布局重排引擎（跨 seed 稳定复现）；论文：候选保持（约 +13–14% 步 + −57% 峰值→容量杠杆） | **capacity demo（§2 单列）→ 关闭 L-W2-D1** → 集成 d1-001 最小集 + D4×D1 2×2 排程 |
 | D2 | **STOP（自判+采纳；机制 DEFERRED；已全收口）** | `research/rsi/d2/` @ lane `bfb3635`（+`d6e3c9a` 记录提交；REPORT/EXPERIMENTS/handoff 全量含失败与归因段；“12/12”笔误已更正；预算 0.5/1.0 GPU-h 已记）；pin 2×2（−6.8%，loss bitwise）+ dfly recipe 2×2（−12.9/−19.5ms，12 步 loss 逐值相同） | 论文：否（−3.0%/−5.6% ≪15%；Amdahl 上限 ~5–6%）；平台：opt-in 旋钮（lane 存档，不集成） | **已关闭**；再开=REPORT §8 条件 |
 | D3 | STOP（已接受） | REPORT `b88cdf2`：attention+mask=3.55%（C0 核数 ✓）；/tmp 已清 | 论文：否 | 再开条件：W2 长答 ~15% 外推 / b16 / S≥2.5–4k |
 | D4 | **merge-ready（平台工程级；`d4-003-c0`；不动 main）** | W1 五腿 counter-exact（C0 5/5 ✓）；**d4-001 集成 `1f8963e`（sha1 核对 ✓；13+4+70/70 ✓）**；**W2-B 收口**（F1–F4 PASS；两腿 counters 相同、adjustments=0；lane `a8e762c`；0.062 GPU-h） | 平台：adaptive 安全阀（opt-in、默认关、静态 RAM 场景）；论文：低（无提速声称；压力响应未验证） | 无待办；推进 main 由消费方/用户决定（按 INTEGRATION §7 checklist，不自动 merge） |
-| D5 | HOLD（条件项；chain2 进行中：Tier0 canon ✓；**S3 线修复已合入**（`2cc57c6`/`daf6b1d`）；staged_b8 运行中（GPU1）） | REPORT `85cbf8b` + sim v4 `23875e8` + d5-001 步 2 + lane 79/79（C0 ✓；D5 侧扩至 85/85 待复核）+ G2 链记录（含 0.16 GPU-h 事故 + smoke_s3 两败与修复） | 平台：runner 语义级可驱动真 trainer；论文：低（H2 负） | Tier A/B：staged_b8→sync_b8→sync_b32 出数（进行中）；**S3 追赶链**（smoke_s3→s3_b8→s3_b32）接力；Tier C 需 C0 |
+| D5 | HOLD（条件项；G2 链进行中） | REPORT `85cbf8b` + sim v4 `23875e8` + d5-001 步 2 + lane 85/85（C0 ✓）；**Tier0 canon ✓；staged_b8 ✓（762 步，kept 1012，≈1.27 GPU-h 分配口径）；sync_b8 ✓（01:53:28 leg OK；762 步 final_loss=4.03125；visual check passed=True；≈1.21 GPU-h）；sync_b32 运行中（01:53:29，cards 0+2）**；S3 修复已合入（`2cc57c6`/`daf6b1d`） | 平台：runner 语义级可驱动真 trainer；论文：低（H2 负） | Tier A/B 出数后 harvest（GPU-h 按时间戳重算——链脚本 107 行算式报错）；S3 追赶链接力；Tier C 需 C0 |
 
 跨路线观察：D5 v4 的 keep-oracle 变体需要“生成前已知 keep”的预测器——若 D1 双轴组织能提供此类信号，仅作为 **D1×D5 条件组合的讨论项**（未批准；须双方有共同监督位置才立项）。
 
@@ -114,7 +114,7 @@
 - 共享资产：D1 W1 store（`e044f488…`）+ W2 store（`5980f77b…`）+ **W3 store（`95ef12e4…`，192 行多轮）+ MIX store（335 行 = W1+W2 交织）**；D5 CPU LivePipeline（`b60d1eb`，lane）；D4 fixed-LRU（已随 PR #6 合入）。
 - 集成分支：**`research/rsi-c0` 本身**；d4-001 集成 commit `1f8963e`；验证（本机 dflare venv）：`pytest tests/test_cache_budget.py` 13/13、`pytest tests/test_online_mode.py` **70/70（BASE 66 + 新 4）**；merge-readiness 待 real-sensor A/B + lane 对账，不自动 merge main。
 
-**预算实耗（GPU-h）**：D1 **0.70/1.5**（自报入账；wave-2 L-W2-D1 ≤1.5 单列）；D2 0.5/1.0（已盘点）；D3 0.22/1.0；D4 **0.37/0.5**（W1 0.31 + W2-B 0.062）；D5 进行中（自报待收；含 0.16 事故计入）。
+**预算实耗（GPU-h）**：D1 **0.92/1.5**（round-2.1 后更新）；wave-2 单列 **0.67/1.5**（GPU3 单卡 6/6；capacity demo 待跑）；D2 0.5/1.0（已盘点）；D3 0.22/1.0；D4 **0.37/0.5**（W1 0.31 + W2-B 0.062）；D5 进行中：staged_b8 ≈1.27 + sync_b8 ≈1.21（分配 2 卡口径，待 harvest 复核；含 0.16 事故计入）。
 
 **事故台账**：见 RESOURCE_SCHEDULE §3 / REGISTRY §6（#1–#5，均含时间线、处置与租约修正）。
 
