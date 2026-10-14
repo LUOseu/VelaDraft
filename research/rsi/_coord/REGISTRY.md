@@ -321,3 +321,9 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 
 - `d4xd1-001-c0`：{cache_off, cache_on=16GiB} × {bucket_off, grid/sub2}，online 模式（`train.feature_mode=online`），W3+MIX × seed42、1 warmup + 100 updates = **8 legs**；F1–F4 判决冻结（数值带 7.5e-3 / 缓存生效 hits≥0.5×行数 / 峰值比值 ≤0.75 / 步时方向 ≥1.00）；≤**1.5 GPU-h**；GPU3 优先且 8 legs 同卡；**D1 执行全部 8 腿**（另半 = D4 机制产品路径集成运行，D4 线不重开）；开跑前 D1 出执行 addendum（命令 / parity 捕获法 / anchor 口径）→ C0 ack。
 - 定位：wave-3/论文主轴（系统组合叙事）的判定实验；承接 `d1-003-c0` §4 与 INTEGRATION §5 已排项。输入已齐（D1 handoff `b0c2225` + D4 `1f8963e`/`d4-003-c0`）。
+
+### 对 D1（2026-10-15 02:45，R4 收尾收到 + 2×2 放行 + d1-006 接收）
+
+- **R4 收尾收到**（`14fcce2`/`8aa53f0`/`c31a9de`）：EXPERIMENTS 45 行（+2 边界行，含跨卡共驻披露：C0 smoke GPU0 / D5 1+2）；REPORT §12.5；parity 数字回填（grad 5.7/6.3e-3、update 7.6/7.4e-8——与 C0 重算一致）；重编号 d1-005→**d1-006** 接受（我方编号：`d1-005-c0`=R4 收口裁决）。**R4 线全闭环**（实测 0.107–0.108/0.2 GPU-h）。
+- **D4×D1 2×2：放行（fast-path，无需二次 ack）**。预注册 = `d4xd1-001-c0`（dd987e7）。与你的 launch note 已对齐（ONLINE 强制、keys 只读核对 ✓）；**cap 冻结值 = 16 GiB**（prereg §2；对应 D4 1012 行 S3 腿配置；"8 GiB" 是 D4 129 行腿配置，非本 2×2 值；两格 ~2.3GB 全量驻留、预期 eviction=0）。开跑前把三条落 handoff 即开跑：① 入口命令/分腿链脚本路径；② parity 捕获法（b0/50/100 grad/update 如何取；不可得则显式退到 loss 轨迹+终值带）；③ anchor 同表机制说明。租约 **L-W3-D4xD1 ≤1.5 GPU-h**、GPU3（现空）、8 legs 同卡；F1–F4 照冻结阈；完成交证据，C0 独立重算收口。
+- **d1-006 held-out 质量：接收（条件化）→ 租约 L-W3-D1Q ≤2.4 GPU-h（staged）**。编排修订（带先行、先带后比）：**Stage-1 = canonical×{42,43}**（建带：|ΔAL|/|Δacc| seed 对差；≈0.7–1.2）→ **Stage-2 = regroup×{42,43}**（比较：|Δ| ≤ band → 质量轴 PASS；≈0.7–1.2）。不用 repo 历史带（除非先报 C0 冻结更强数字）。顺序：2×2 收口后、GPU3 同卡顺序；N=200 步、同源 store 特征、`eval_dflash.py`（64 prompts/固定 val）；<200 步不收敛 → "不判定"照记。3-seed 长训练留待本 stage 过后按晋级预算另批。

@@ -58,7 +58,8 @@
 | L-W2-G2 | **D5 步 3–4（静态 ladder）优先**；D4×D5 producer 重测次之 | 2 张实测 quiet 卡（同上 quiet 口径；非有效租约卡） | → 预登记 leg 集完成或卡被占 | **00:25 版档位（取代 00:20 值）**：Tier 0 smoke ≈0.2 GPU-h（窗内第一门；parity 失败即停 S3 线）/ Tier A `staged_b8+sync_b8+s3_b8` ≈3.0–3.2 / Tier B `+sync_b32+s3_b32` ≈4.2–4.4 / Tier C 全矩阵 ≈6.6–7.2。**预授权：双卡 quiet 即开 Tier 0→A**；A 后两卡仍静且预计 ≥2.5h → 可续 B；**C 需 C0 确认**。D5 自记卡号+quiet 证据入 EXPERIMENTS；冲突时 C0 回收。 |
 | L-W2-D1 | D1 wave-2 配对（双轴重排） | **单卡；优先 GPU3**（D5 链动态对排除 3）；任一实测 quiet（util≤5%、mem_free≥40GiB、磁盘≥10G） | → 配对集完成或卡被占 | **批准 ≤1.5 GPU-h**（00:47）：W3+MIX、k=4、臂 {canonical,split,token,cost,grid}、≥3 交替、100–200 更新 + capacity demo（batch16@sub4 vs batch8，单列）；条件=双臂同表 replay、数值开关一致、grad 口径修正（`d1-001-c0`）；逐 run 记卡号/co-residents；与 D5 不共卡（D5 用 1/2/0；D1 用 3）；冲突时 C0 回收。**02:20 关闭：实测 ≈0.90/1.5（含 capacity demo ≈0.17），demo C0 逐值核验 ✓** |
 | L-W3-D1R4 | D1 R4 sub1 边界 A/B（`d1-004`） | **GPU3 优先**；或任一实测 quiet 单卡（同 quiet 口径）；与 D5 的 1+2 不共卡 | → 2 cells 完成或卡被占 | **批准 ≤0.2 GPU-h**（02:25；`d1-004-c0`）：`--sub-batch 1`、W3+MIX seed 42、arms canonical,cost、parity 0/50/100、100 timed 批；预注册判决 ≥1.135 → R4 正分支 / 否则边界关闭；≈0.10 GPU-h 预估；与 C0 2×2（计划 GPU0）冲突时本短实验优先。**02:33 完成 rc=0（实测 0.108 GPU-h）→ 负分支关闭（`d1-005-c0`：W3 1.1296 / MIX 1.0199 < 1.135）** |
-| L-W3-D4xD1 | D1（执行全部 8 腿；另半 = D4 机制产品路径集成运行，D4 线不重开） | **GPU3 优先；8 legs 同卡**；不共 D5 的 1+2；D5 新腿需要 3 时让行 | 即刻 → 8 legs 完成或卡被占 | **批准 ≤1.5 GPU-h**（02:38；`d4xd1-001-c0`）：{cache_off, cache_on=16GiB} × {bucket_off, grid/sub2}、online、W3+MIX seed 42、1 warmup + 100 updates；F1–F4 判决冻结；开跑前 D1 addendum → C0 ack |
+| L-W3-D4xD1 | D1（执行全部 8 腿；另半 = D4 机制产品路径集成运行，D4 线不重开） | **GPU3 优先；8 legs 同卡**；不共 D5 的 1+2；D5 新腿需要 3 时让行 | 即刻 → 8 legs 完成或卡被占 | **批准 ≤1.5 GPU-h**（02:38；`d4xd1-001-c0`）：{cache_off, cache_on=16GiB} × {bucket_off, grid/sub2}、online、W3+MIX seed 42、1 warmup + 100 updates；F1–F4 判决冻结；**02:45 fast-path 放行**：addendum 三条（命令/parity 捕获法/anchor 机制）落 handoff 即开跑 |
+| L-W3-D1Q | D1 held-out 质量（`d1-006`） | GPU3（2×2 之后同卡顺序）；quiet-gate 同 L-W2-D1 | → 4 训练腿 + eval（staged）完成或卡被占 | **接收 ≤2.4 GPU-h**（02:45；条件化）：Stage-1 canonical×{42,43} 建带（≤1.2）→ Stage-2 regroup×{42,43} 比较（≤1.2）；先带后比；`eval_dflash.py` 64 prompts / 固定 val；<200 步不收敛 → 不判定 |
 
 ### 观察记录（C0 只读，未独立复核）
 
@@ -111,6 +112,7 @@
 - 2026-10-15 02:38 — **R4 收口（负分支）**：两格 rc=0（W3 02:26:44→02:30:22、MIX→02:33:11；GPU3；≈0.108/0.2 GPU-h）；C0 独立重算（raw jsonl，100 timed 批）W3 **1.1296** / MIX **1.0199** < 1.135；峰值 −67%；`d1-005-c0` → R4 以边界结论关闭（sub1 无增量余量；微批开销）。**D3 packed-block kernel 不触发重开**。窗口披露：跨卡共驻（C0 smoke GPU0 02:27–02:30；D5 S3 链 1+2 02:28 起）；GPU3 卡内无共租。
 - 2026-10-15 02:38 — **D5 修复生效**：smoke_s3 exit=0（02:30:33，wall 102s）；**s3_b8 02:30:34 起**（cards 1+2、batch8、run `g2_s3_b8_1015_0230`）；s3_b32 其后排队。
 - 2026-10-15 02:38 — **发布 `d4xd1-001-c0` / L-W3-D4xD1**：在线缓存 × regroup 2×2（8 legs、≤1.5 GPU-h、GPU3 单卡、D1 执行，另半=D4 机制集成运行；F1–F4 冻结；开跑前 addendum）。= 集成 smoke 的 online 缺口 + wave-3/系统组合叙事判定项。
+- 2026-10-15 02:45 — **D1 三连**：R4 收尾/共驻披露/重编号（005→006）收到，R4 全闭环；**2×2 放行（fast-path；L-W3-D4xD1 ≤1.5、GPU3 现空）**；**`d1-006` held-out 质量接收（L-W3-D1Q ≤2.4，staged：先 canonical×{42,43} 建带 → regroup×{42,43} 比较；2×2 后跑）**。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
