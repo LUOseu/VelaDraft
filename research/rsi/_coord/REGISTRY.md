@@ -3,7 +3,7 @@
 - 协议版本：**rsi-protocol-v0.1.0** ｜ 接口版本：**rsi-iface-v0.1.0**
 - 共同基线 BASE_SHA：`7eab1369266010137702de8c714053729cde5834`（origin/main，PR #6 合并后；含固定预算 LRU 记录缓存）
 - 历史核对基线 B0：`e15256d7c4bd10a490a7ac821eb12a0749a96fdd`
-- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 05:52 (Asia/Shanghai)
+- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 05:54 (Asia/Shanghai)
 - 无法确认的字段以 `?` 标注并在文末说明；未创建的 worktree/分支在下一次更新回填。
 
 ## 1. 角色与分支
@@ -478,4 +478,5 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - 补充表述证据：lossdiff（s42 max 1.026e-2@195 / s43 3.207e-2@10；披露 fp32-vs-auto logging-grid 不对称，非判决项）；timeline 全记账。
 - 预算 **1.1536/2.4**（四 train + 四 eval + smoke）——与 C0 窗口估算一致；L-W3-D1Q 关闭。
 - 映射（C0 采纳）：离线冻结布局轴负向 → 长训练 GO 需机制/数值修复 + 新预注册；「N=200 加 seed」不改变结论。工程测速/容量结果不受影响。
+- D1 于 `cb0e77f` 正式 ack（对账逐项一致；blockade 映射入 REPORT §14.3 + handoff）——**D1 侧闭环**。
 - 待办仅余：D5 `staged_b32`（L-W3-D5B ≤0.75，仍未开跑）。

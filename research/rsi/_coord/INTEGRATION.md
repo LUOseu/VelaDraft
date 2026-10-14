@@ -103,7 +103,7 @@
 **未决（他人执行项）**
 
 - ~~D1 harvest 回填~~ **已收讫（`1b0328e` 等）并逐项对账一致（05:52；收据 `evidence/c0_d1q_harvest_receipt_20261015.md`；budget 1.1536/2.4 关闭）**；
-- D5 `staged_b32`（L-W3-D5B ≤0.75 GPU-h）开工 → C0 复核（`research/rsi/d5/runner/split_verify.py`）；
+- D5 `staged_b32`（L-W3-D5B ≤0.75 GPU-h）——**维持终态 HOLD**（D5 侧未开跑；重启动 = 用户/D5 发起，C0 复核入口就绪：`research/rsi/d5/runner/split_verify.py`）；
 - 转发文本：`_coord/messages/20261015_d1q_recovery.md`（D1 终裁通知 + D5 提醒）。
 
 ## 7. 晋级复核 checklist（wave-2 放行前 C0 逐项取证）
