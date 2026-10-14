@@ -147,11 +147,15 @@ resume (including the placeholder fast-forward) is unaffected.
   consume target work.
 - Measured on the registered WP2 smoke slice (`R-20261014-12`,
   `docs/plan/WP4_MEASUREMENT.md`): 16 synthetic 2-image / 2-turn rows,
-  seq 1024, 4 steps, batch 1 vs capture group 4 - extraction wall
-  2.84 s -> 2.31 s (-18.8%), one forward per 4 rows instead of 16 forwards,
-  target peak unchanged (13.67 GB), step losses bit-identical. Prefill
-  compute dominates on that slice, so the saving is smaller than the 4x call
-  reduction.
+  seq 1024, 4 steps, batch 1 vs capture group 4 - one forward per 4 rows
+  instead of 16 forwards, target peak unchanged (13.67 GB), step losses
+  bit-identical. The report's original extraction-wall percentage
+  (2.84 s -> 2.31 s, "-18.8%") is **superseded/invalid** (R2: the per-sample
+  leg timed render+forward, the batched leg only forward); the unified
+  boundary is implemented in `vlm_dflash/target/online.py`, and quoting an
+  extraction-wall gain waits for the paired GPU re-measurement. Prefill
+  compute dominates on that slice (profiling: render ~17 ms vs forward
+  129-139 ms/row).
 
 ## Exact resume
 

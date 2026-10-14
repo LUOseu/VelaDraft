@@ -95,6 +95,7 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
     shard_number = 0
     truncated = 0
     multi_turn = 0
+    multi_turn_modes: set[str] = set()
 
     def flush_shard() -> None:
         nonlocal shard_buffer, shard_number
@@ -136,8 +137,17 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
         )
         if record["truncated"]:
             truncated += 1
-        if record.get("n_turns", 1) > 1 or len(record.get("image_spans") or [1]) > 1:
+        # New records carry the conversation-turn count; legacy records (no
+        # field) keep their historical "regenerated turns" semantics.
+        conversation_turns = record.get("n_conversation_turns")
+        is_multi_turn = (
+            conversation_turns > 2 if conversation_turns is not None else record.get("n_turns", 1) > 1
+        )
+        if is_multi_turn or len(record.get("image_spans") or [1]) > 1:
             multi_turn += 1
+        mode = record.get("multi_turn_mode")
+        if mode is not None:
+            multi_turn_modes.add(str(mode))
         shard_buffer.append(record)
         if len(shard_buffer) >= shard_size:
             flush_shard()
@@ -157,6 +167,7 @@ def run_capture(cfg: dict, run_dir: str | Path, contract: dict, limit: int | Non
         "num_samples": len(index_rows),
         "num_truncated": truncated,
         "num_multi_turn": multi_turn,
+        "multi_turn_modes": sorted(multi_turn_modes),
         "draft_layer_ids": layer_ids,
         "capture_layer_ids": layer_ids,
         "hidden_size": hidden_size,

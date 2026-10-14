@@ -132,8 +132,10 @@ Parity level:  architecture + correction = file-level port against the pinned
                commit; objective = file-level port of the LK / D-PACE / e2e-TV
                math, selectable via algorithm.train_recipe, with the shared CE
                profile as the default; inference = documented adaptation. Not
-               verified against upstream checkpoints, and no canonical GPU
-               recipe run is recorded yet.
+               verified against upstream checkpoints; the canonical 2K recipe
+               run is recorded in-house (`R-20261014-11`: AL 1.839 vs
+               controlled_ce 1.682, 128/128 token-exact) - no upstream-run
+               equivalence is claimed.
 ```
 
 Local code: `vlm_dflash/dfly/model.py` (FC + fusion residual + correction),

@@ -2,10 +2,13 @@
 
 Runs: `R-20261014-14` (vLLM bridge check), `R-20261014-15` (in-repo
 serving-convention arms), `R-20261014-16` (divergence margin probe; diagnostic
-added during execution, not pre-registered). Plan owner C-01a13621. GPU0
+added during execution, not pre-registered; v1 probe design, v2 replay probe
+implemented under the R5 review remediation - see the R-16 section). Plan
+owner C-01a13621. GPU0
 (R-14), GPU2 (R-15), 1 GPU (R-16). Code: `vlm_dflash/export/vllm_bridge.py`,
 `scripts/{export_vllm_draft,vllm_bridge_check,probe_divergence_margin}.py`,
-CPU coverage in `tests/test_export_vllm_bridge.py` (5 tests).
+CPU coverage in `tests/test_export_vllm_bridge.py` (5 tests) +
+`tests/test_probe_divergence_margin.py` (7 tests).
 
 ## What vLLM 0.22.1 provides (verified against the installed wheel)
 
@@ -80,15 +83,19 @@ the frozen 3B DFlash checkpoint: weights sha256 `2383b226...` (36 tensors).
 | 1D (`spatial_rope_enabled=false`) | 1.6866 | 32/32 | 0.439 / 0.172 / 0.060 / 0.018 / 0.003 / 0.0004 / 0.0 |
 
 The RoPE convention moves AL by 0.006 (~0.3%): **MRoPE-vs-1D is not the
-driver** of the vLLM gap. The same eval's parallel diagnostic (16 prompts)
-reproduces the repo's documented phenomenon: 6/16 exact, every listed flip at
-a top1-top2 margin <= 0.125 (bf16 near-ties).
+driver** of the vLLM gap. The same eval's parallel diagnostic (16 prompts,
+repo-internal, no vLLM involved) reproduces the repo's documented
+small-margin flip class: 6/16 exact, every listed flip at a top1-top2 margin
+<= 0.125.
 
-### R-16: divergence margin probe (1 GPU)
+### R-16: divergence margin probe (1 GPU) - HF-assisted diagnostic (v1, superseded design)
 
-The first 4 vLLM-vs-target-only divergences, re-derived with the repo target
-(sequential). Margins are the target's top1-top2 logit gap at the traced
-step; `rank` is the vLLM-dflash token's rank in the repo target distribution.
+The first 4 vLLM-vs-target-only divergences, traced with the repo target
+(sequential). The v1 probe **regenerated its own prefix** with the repo
+target before reading logits (`prefix re-derived` column); that design is
+replaced by the v2 replay probe below (R5 remediation, review `950b394`).
+Margins are the target's top1-top2 logit gap at the traced step; `rank` is
+the vLLM-dflash token's rank in the repo target distribution.
 
 | row | step | prefix re-derived | margin | vLLM token rank | logit gap |
 | --- | ---: | --- | ---: | ---: | ---: |
@@ -97,21 +104,51 @@ step; `rank` is the vLLM-dflash token's rank in the repo target distribution.
 | 000000420750 | 93 | no | 0.125 | 1 | 0.0 |
 | 000000376912 | 45 | yes | 0.125 | 1 | 0.0 |
 
-In 3/4 cases the vLLM-dflash token IS the repo target's top-1 (gap 0.0): the
-vLLM *verify* path resolved a bf16 near-tie differently, it is not a wrong
-draft token. In the 2 prefix-not-reproduced cases the sequences differ
-earlier than the traced step (expected across runtimes).
+What these numbers do and do not say:
+
+- Margins are small (0.0-0.125) at every traced step and in 3/4 cases the
+  vLLM-dflash token is the repo target's argmax at the traced step. That is
+  an **observation** consistent with near-tie resolution - it does not
+  establish the verify path as the root cause.
+- 2/4 cases have `prefix re-derived = no`: the v1 probe's own regeneration
+  did not reproduce the sequence before the traced step, so those cases were
+  not on the same condition distribution. With 4 of 27 divergences traced,
+  nothing here generalises to the remaining flips.
+- The token-exact gate therefore stays **BLOCKED at 5/32**; nothing in this
+  probe relaxes it.
+
+Replacement diagnostic (implemented + CPU-tested):
+`scripts/probe_divergence_margin.py`, output format
+`vlm-dflash-divergence-margin-v2`:
+
+- replays the *frozen* target-only prefix from the bridge JSON through one
+  teacher-forced forward (no regeneration); the fed ids are asserted to end
+  with the saved prefix;
+- causal gate per case: probe prompt token length equals vLLM's recorded
+  `prompt_len`; preprocessing is digest-deterministic across two renders; and
+  every frozen prefix token is the argmax of the position predicting it
+  (prefix lies on the model's own greedy trajectory). Failing cases carry an
+  `exclusion_reason` and are excluded from `summary.causal_cases`;
+- records top-k candidates, the vLLM token's rank/logit gap and the absolute
+  probe position; evidence only a same-engine run can provide (vLLM-side
+  processor digests, verify logits, per-request acceptance positions, KV
+  state) is marked `missing`;
+- CPU coverage: `tests/test_probe_divergence_margin.py` (7 tests: saved
+  prefix enters the forward; off-trajectory / prompt-length-mismatch /
+  non-deterministic cases excluded; missing-evidence marks; case selection).
 
 ## Attribution and registered gaps
 
 Ruled out as the driver: the RoPE convention (R-15, ~0.3%) and the mask-slot
-input convention (code-verified identical). The gate itself: vLLM's dflash
-verification is a block/parallel-shaped path whose greedy output is not
-bit-identical to vLLM's own target-only greedy on 27/32 prompts (all flips at
-ulp-scale margins); the repo's token-exact mode works precisely because
-sequential verification reuses the `generate()`-backend logits, and vLLM
-0.22.1 exposes no equivalent sequential-parity verify mode. Therefore a
-strict token-exact claim under vLLM's dflash path cannot be made today.
+input convention (code-verified identical). Observed at the traced
+divergences: small top1-top2 margins (<=0.125) on 4 cases (HF-assisted
+diagnostic, R-16). The **root cause of the 27/32 token flips and of the AL
+gap remains unresolved**; the small margins are consistent with bf16
+near-ties on vLLM's block/parallel verify path but do not establish it. The
+repo's token-exact mode works by reusing `generate()`-backend logits in
+sequential verification, and vLLM 0.22.1 exposes no equivalent
+sequential-parity verify mode; a strict token-exact claim under vLLM's dflash
+path cannot be made today (R5: attribution narrowed accordingly).
 
 Open gap (the real remaining work): **AL 1.4059 (vLLM) vs 1.6866/1.6924
 (in-repo) on identical weights and prompts (-17%)**. Candidate causes for a
@@ -127,7 +164,11 @@ repo-runtime-only.
 - Builder: implemented, CPU-tested, load-verified end-to-end; conversion is
   layout-exact.
 - Gate: NOT passed -> no "vLLM/SGLang support" claim, no speed claim; the
-  README/docs say "bridge exists, token-exact gate not passed".
+  README/docs say "bridge exists, token-exact gate not passed". R5 remediation
+  (review `950b394`): the divergence is documented as observations with an
+  unresolved root cause; the v2 replay probe + causal gate are in place, and
+  same-engine diagnosis inside vLLM is a GPU_PENDING item
+  (`docs/plan/REVIEW_REMEDIATION.md`).
 - Status per plan rule (blocked by runtime incompatibility: deliver the
   independently implementable part, register the gap, do not mark done, do
   not re-run the same failing job): WP5 = BLOCKED, and execution moves on to

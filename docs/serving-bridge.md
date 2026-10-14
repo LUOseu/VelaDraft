@@ -21,17 +21,18 @@ divergence analysis and registered gaps in
   names/shapes validated, `bridge.json` + `VLLM_DRAFT.md` written),
   `scripts/export_vllm_draft.py` (CLI), `scripts/vllm_bridge_check.py`
   (two-phase target-only vs dflash greedy check + `llm.get_metrics()`
-  spec-decode accounting), `scripts/probe_divergence_margin.py` (near-tie
-  forensics), 5 CPU tests.
+  spec-decode accounting), `scripts/probe_divergence_margin.py` (frozen-prefix margin replay with a
+  causal gate; HF-assisted diagnostic only), 5 bridge + 7 probe CPU tests.
 - Verified end-to-end on the frozen 3B DFlash checkpoint: the draft loads
   (`DFlashDraftModel`, aux layers `(2, 18, 34)` -> internal `(1, 17, 33)`,
   mask 151669, n_spec 7), generation runs, metrics are readable.
 - **Not achieved:** token-exact greedy output. On 32 pinned prompts,
   vLLM-dflash matched its own target-only output on 5/32; AL 1.4059 vs
-  in-repo sequential 1.6866/1.6924 on identical weights (+ margin probe shows
-  the traced flips are bf16 ulp-scale near-ties on the runtime verify path).
-  The remaining AL gap (-17%) is registered as the open blocker; until it is
-  closed, no vLLM number is quotable.
+  in-repo sequential 1.6866/1.6924 on identical weights (the margin probe
+  observed small top1-top2 margins at the 4 traced flips - an HF-assisted
+  observation; the root cause stays unresolved). The remaining AL gap (-17%)
+  is registered as the open blocker; until it is closed, no vLLM number is
+  quotable.
 
 ## Why "exported checkpoint" ≠ "serving-compatible"
 

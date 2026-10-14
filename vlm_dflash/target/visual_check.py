@@ -71,15 +71,24 @@ def run_visual_path_check(
     def capture_sample(row: dict, images) -> dict:
         """Capture one row with the provided image(s); v2 rows take a list of PIL images."""
         if row_is_multi_turn(row):
-            turns = row["regen"]["turns"]
+            regen = row["regen"]
+            turns = regen["turns"]
             assistant_indices = [
                 index
                 for index, turn in enumerate(row.get("conversations") or [])
                 if str(turn.get("from", "")).lower() in ("gpt", "assistant", "model")
             ]
-            overrides = {msg_index: turn["answer_text"] for msg_index, turn in zip(assistant_indices, turns)}
-            messages, _ = messages_from_row(row, assistant_overrides=overrides)
-            inputs = encode_conversation(processor, messages, list(images))
+            # Legacy records (no mode/assistant_indices) regenerated every turn;
+            # last_turn_only records regenerate exactly the last one.
+            regenerated_indices = regen.get("assistant_indices") or assistant_indices
+            overrides = {
+                msg_index: turn["answer_text"] for msg_index, turn in zip(regenerated_indices, turns)
+            }
+            messages, image_indices = messages_from_row(row, assistant_overrides=overrides)
+            # ``images`` arrives in row order; the processor consumes them in
+            # the conversation's appearance order (R4: interleaved rows may
+            # place images in any order inside their turns).
+            inputs = encode_conversation(processor, messages, [images[position] for position in image_indices])
             full_ids = torch.tensor([int(token) for token in row["regen"]["full_ids"]], dtype=torch.long)
             return forward_and_capture(
                 model,

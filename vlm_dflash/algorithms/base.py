@@ -26,6 +26,49 @@ from dataclasses import dataclass
 from typing import Any
 
 
+# Evidence-state vocabulary (review R6): capability flags say what the code
+# supports; these states say what has actually been recorded for a concrete
+# family x layout x feature-mode combination.
+EVIDENCE_STATES = (
+    "implemented",          # code path exists, only unit-level exercises so far
+    "cpu_tested",           # CPU test coverage recorded, no GPU run
+    "gpu_smoke",            # real GPU run at smoke / demo scale
+    "reduced_validation",   # full pipeline recorded at a reduced protocol
+    "canonical_validated",  # canonical protocol recorded (BENCHMARKS.md scale)
+    "blocked",              # known gap / gate not passed
+)
+EVIDENCE_FAMILIES = ("qwen25_vl", "qwen3_vl", "smolvlm")
+EVIDENCE_LAYOUTS = ("single_image", "multi_image", "multi_turn")
+EVIDENCE_FEATURE_MODES = ("offline", "online")
+
+
+@dataclass(frozen=True)
+class EvidenceRecord:
+    """One recorded (or explicitly missing) validation fact.
+
+    ``layout`` is one of :data:`EVIDENCE_LAYOUTS`; multi-axis runs may join
+    parts with ``+`` (e.g. ``multi_image+multi_turn``). ``evidence`` must
+    point at concrete run ids / configs / commits / protocol docs so a claim
+    can be traced; a record whose pointer cannot be produced must be
+    downgraded instead of claimed.
+    """
+
+    family: str
+    layout: str
+    feature_mode: str
+    state: str
+    evidence: str
+
+    def as_dict(self) -> dict[str, str]:
+        return {
+            "family": self.family,
+            "layout": self.layout,
+            "feature_mode": self.feature_mode,
+            "state": self.state,
+            "evidence": self.evidence,
+        }
+
+
 @dataclass(frozen=True)
 class AlgorithmMetadata:
     """Machine-readable support statement (rendered into docs, not just prose).
@@ -38,7 +81,9 @@ class AlgorithmMetadata:
     ``RELEASE_VALIDATION.md``). Maturity describes how trustworthy the
     algorithm is, ``targets`` how far the pipeline is validated per family,
     and ``capabilities`` what the implementation supports at all -- keep the
-    three axes separate and derived from recorded runs.
+    three axes separate and derived from recorded runs. ``evidence`` binds the
+    recorded runs to concrete family x layout x feature-mode combinations
+    (review R6); ``targets`` entries must not exceed the recorded evidence.
     """
 
     name: str
@@ -47,6 +92,7 @@ class AlgorithmMetadata:
     references: dict[str, str]
     capabilities: dict[str, bool]
     targets: dict[str, str]
+    evidence: tuple[EvidenceRecord, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -56,6 +102,7 @@ class AlgorithmMetadata:
             "references": dict(self.references),
             "capabilities": dict(self.capabilities),
             "targets": dict(self.targets),
+            "evidence": [record.as_dict() for record in self.evidence],
         }
 
 

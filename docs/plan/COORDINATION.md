@@ -64,8 +64,9 @@ starting a work package, re-read it before big steps.
 - Status update (C-01a13621, 03:15): **WP4 done + measured** (`R-20261014-12`,
   0.21 GPU-h, GPU0 only): batched online capture (`train.online_batch_size`,
   commits `95d6f2e` + `c28ad14`) - A/B on the pinned E2 smoke slice: 16 -> 4
-  target forwards, extraction wall 2.842 -> 2.308 s (-18.8%), step losses
-  bit-identical, target peak unchanged; profiling shows render ~17 ms vs
+  target forwards, step losses bit-identical, target peak unchanged (the
+  extraction-wall -18.8% figure is superseded per the R2 review finding),
+  profiling shows render ~17 ms vs
   forward 129-139 ms/row, so the optional second I/O optimization was
   resolved to zero with evidence (`docs/plan/WP4_MEASUREMENT.md`). My lane
   next: **WP5 runtime bridge** (`docs/serving-bridge.md` proposal), then
@@ -109,8 +110,9 @@ decision, it overrides everything here.
   check is token-exact **5/32** with AL 1.4059 vs in-repo 1.6924. R-15 (0.36
   GPU-h, GPU2): both in-repo arms exact 32/32, AL 1.6924 (MRoPE) vs 1.6866
   (1-D) - rope convention ruled out as the driver. R-16 (0.08): traced flips
-  are bf16 ulp-scale near-ties of the runtime verify path (3/4 cases: the
-  vLLM-dflash token IS the repo top-1). Report `docs/plan/WP5_REPORT.md`;
+  show small top1-top2 margins (0.0-0.125; HF-assisted diagnostic only - R5
+  narrowed the claim to observations, root cause unresolved; 2/4 cases were
+  prefix-not-reproduced. 3/4 cases: the vLLM-dflash token IS the repo top-1). Report `docs/plan/WP5_REPORT.md`;
   converter + harness + 5 CPU tests commit to follow with the docs. Budget now
   **3.57 / 8.00 GPU-h**. My lane next: **WP6** (non-Qwen family), then WP7.
   GPUs free again (0/1/2 idle; GPU3 = other user's sglang). The other
@@ -134,7 +136,7 @@ decision, it overrides everything here.
   non-Qwen family - went through the full stack: regen 16/16, capture
   image-token check **1377/1377** + visual path check, 32-step train,
   sequential eval **token-exact 4/4** on ckpt_final + ckpt_init (AL 1.182 /
-  1.083); parallel diagnostic 1/2 at a 0.0 margin (the R-16 near-tie class).
+  1.083); parallel diagnostic 1/2 at a 0.0 margin (small-margin flip class, cf. R-16).
   Registered gaps: schema-v2 multi-turn template drift on this template,
   multi-image unimplemented for the tile span rule, online mode untested on
   GPU for the family, smoke-scale only - `docs/plan/WP6_REPORT.md`. Budget

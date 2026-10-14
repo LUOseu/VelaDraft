@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, DrafterAlgorithm
+from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord
 from .registry import register
 
 
@@ -41,6 +41,26 @@ class DFlash2Algorithm(DrafterAlgorithm):
         },
         capabilities={"image": True, "multi_image": True, "video": False, "parallel_tree_runtime": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
+        evidence=(
+            EvidenceRecord(
+                family="qwen25_vl",
+                layout="single_image",
+                feature_mode="offline",
+                state="canonical_validated",
+                evidence=(
+                    "RELEASE_VALIDATION.md canonical benchmark (AL 1.954, 128/128; experimental objective reconstruction) + zoo-v0.3.1 archive reload"
+                ),
+            ),
+            EvidenceRecord(
+                family="qwen3_vl",
+                layout="single_image",
+                feature_mode="offline",
+                state="reduced_validation",
+                evidence=(
+                    "RELEASE_VALIDATION.md Qwen3-VL-8B reduced validation (256-row slice, 16-prompt eval AL 1.2104, 16/16 exact, export + reload)"
+                ),
+            ),
+        ),
     )
 
     # ------------------------------------------------------------------ #

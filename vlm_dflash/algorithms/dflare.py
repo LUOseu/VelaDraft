@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, DrafterAlgorithm
+from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord
 from .registry import register
 
 
@@ -38,6 +38,26 @@ class DFlareAlgorithm(DrafterAlgorithm):
         },
         capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
+        evidence=(
+            EvidenceRecord(
+                family="qwen25_vl",
+                layout="single_image",
+                feature_mode="offline",
+                state="canonical_validated",
+                evidence=(
+                    "docs/algorithms/dflare.md canonical 2K matched run (AL 1.637, 128/128; configs/dflare/qwen2_5_vl_3b_2k.yaml); zoo-v0.3.1 archive + demo reload"
+                ),
+            ),
+            EvidenceRecord(
+                family="qwen3_vl",
+                layout="single_image",
+                feature_mode="offline",
+                state="reduced_validation",
+                evidence=(
+                    "docs/algorithms/dflare.md Qwen3-VL-8B reduced validation (configs/dflare/qwen3_vl_8b_reduced.yaml)"
+                ),
+            ),
+        ),
     )
 
     def validate_config(self, cfg: dict) -> None:

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata
+from .base import AlgorithmMetadata, EvidenceRecord
 from .dflash import DFlashAlgorithm
 from .registry import register
 
@@ -50,6 +50,26 @@ class JetSpecAlgorithm(DFlashAlgorithm):
             "export": True,
         },
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
+        evidence=(
+            EvidenceRecord(
+                family="qwen25_vl",
+                layout="single_image",
+                feature_mode="offline",
+                state="canonical_validated",
+                evidence=(
+                    "RELEASE_VALIDATION.md canonical benchmark (AL 1.599, 128/128; causal-mask serving - tree runtime not ported) + zoo-v0.3.1 archive reload"
+                ),
+            ),
+            EvidenceRecord(
+                family="qwen3_vl",
+                layout="single_image",
+                feature_mode="offline",
+                state="reduced_validation",
+                evidence=(
+                    "RELEASE_VALIDATION.md Qwen3-VL-8B reduced validation (256-row slice, 16-prompt eval AL 1.1185, 16/16 exact, export + reload)"
+                ),
+            ),
+        ),
     )
 
     def validate_config(self, cfg: dict) -> None:

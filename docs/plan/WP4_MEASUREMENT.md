@@ -1,5 +1,18 @@
 # WP4 measurement - batched online capture + extraction profiling
 
+> **R2 correction (2026-10-14, review `950b394`) - the extraction-wall
+> percentage in this report is superseded/invalid.** The per-sample leg timed
+> ``build_sample_record`` (render + forward + finalise); the batched leg timed
+> only ``finalize_prepared_records`` (forward + finalise) - the prepare/render
+> work was real but uncharged in leg B, so the two
+> ``extraction_wall_seconds_total`` numbers are not the same metric. The
+> 16 -> 4 target-forward counts, the bit-identical losses, the peak-memory
+> readings and the profiling table remain valid as recorded; the "-18.8%"
+> comparison does not. The unified boundary (prepare + forward timed on both
+> paths, CUDA-synchronised) is implemented and CPU-tested (R2,
+> `docs/plan/REVIEW_REMEDIATION.md`); the paired GPU re-measurement is a
+> GPU_PENDING item. Raw logs are kept unchanged.
+
 Run: `R-20261014-12` (2026-10-14, GPU0 of `a6000xuyang`, plan owner
 C-01a13621). Design: `docs/plan/WP4_DESIGN.md`. Code:
 `vlm_dflash/target/{sample_capture,online}.py`, `vlm_dflash/dflash/train.py`
@@ -32,16 +45,15 @@ accounting, Subset index mapping, capture-group chunking).
 | --- | ---: | ---: | --- |
 | `target_forwards_total` | 16 | 4 | 4.0x fewer calls |
 | `target_samples_total` | 16 | 16 | 0 |
-| `extraction_wall_seconds_total` | 2.842 | 2.308 | **-18.8%** |
-| extraction ms/sample | 177.6 | 144.3 | -18.8% |
+| `extraction_wall_seconds_total` (invalid comparison - R2: leg A included prepare/render, leg B did not) | 2.842 | 2.308 | not a gain; re-measure |
 | train-phase target device peak | 13.669 GB | 13.673 GB | +0.004 GB |
 | step losses | 13.5 / 15.5625 / 14.4375 / 16.375 | identical | bit-equal |
 | train `wall_seconds` (incl. 3 resumable checkpoint writes) | 121.6 | 124.4 | noise on this disk-bound host |
 
 One target forward serves 4 rows with no measurable quality or memory change.
-The extraction-wall saving (-19%) is smaller than the 4x call reduction
-because prefill compute dominates and is nearly linear in rows on this slice
-(3B target, ~600 tokens + 2 images per row).
+The per-call reduction (16 -> 4) is the recorded, still-valid result; the
+extraction-wall saving this report originally derived from the mismatched
+timers must not be quoted and is being re-measured under the unified boundary.
 
 ## Profiling evidence (render vs forward)
 
@@ -73,10 +85,28 @@ Raw: `~/recipe-smoke-config/wp4_profile.log`, run logs
 - On this slice extraction is ~2% of the training wall; projected at ~20% for
   a 2K online run, a render-side optimization caps out at ~2% of step time.
   Per the plan's acceptance rule (no default-enabled optimizations without
-  measured benefit, "at most one"), the batched capture - measured at -19%
-  of extraction with zero quality change - is the WP4 optimization; the
+  measured benefit, "at most one"), the batched capture - measured at 4x
+  fewer target forwards with zero quality change (the extraction-wall
+  percentage is superseded, see the R2 correction note) - is the WP4 optimization; the
   render-side candidates are documented here for a future round if many-epoch
   online 2K runs make extraction hot.
+
+## R2 metric boundary (current definition)
+
+Both extraction paths now charge the same boundary (`vlm_dflash/target/online.py`):
+
+| Counter | Boundary |
+| --- | --- |
+| `prepare_seconds` | image decode + processor/render + prompt-drift checks |
+| `forward_seconds` | teacher-forced target forward + output finalisation (one call per capture group) |
+| `wall_seconds` (= `extraction_wall_seconds_total`) | prepare_seconds + forward_seconds, timed per row on both the per-sample and batched paths |
+| `fast_forward_items` | resumed items answered with placeholders (no target work, never counted in wall time) |
+
+The target device is CUDA-synchronised around every timed stage, so the
+numbers cover completed GPU work (not just kernel launches). The startup
+visual-path check still runs its fixed capture forwards outside these
+counters. CPU fake-clock tests pin that equal work yields equal totals across
+the per-sample and batched paths (`tests/test_online_mode.py`).
 
 ## Cost
 

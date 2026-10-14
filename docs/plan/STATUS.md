@@ -15,6 +15,18 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
 
 ## Now
 
+- **Review remediation round (2026-10-14, branch `review-remediation` off
+  `950b394`): R1-R6 implemented.** R1 collision-safe media + audit script
+  (`7cc9e5b`), R4 ordered segments + explicit unsupported-media rejection
+  (`47b0075`), R3 `last_turn_only` regen default with `all_turns` opt-in
+  (`c2d98e5`), R2 unified online timing boundary + WP4 supersession
+  (`7038c56`), R5 frozen-prefix probe v2 + narrowed vLLM attribution
+  (`7a44301`), R6 support matrix capability vs evidence (`b3730d7`).
+  Full CPU regression 411 passed / 6 skipped; no new GPU jobs (budget
+  4.10/8.00 GPU-h) - GPU re-checks listed in
+  `docs/plan/REVIEW_REMEDIATION.md` (GPU_PENDING section). WP5 stays BLOCKED
+  at 5/32 token-exact with the root cause unresolved.
+
 - WP0 done: capability gap table + ledgers below; CPU baseline suite green
   (321 tests collected, all pass; `pytest tests/ -q`).
 - WP1 done, pushed: upstream two-stage DFly recipe on branch
@@ -55,8 +67,9 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   forward per capture group (group size `min(N, micro_batch)`), and slices
   records back per row; the trainer walks the same sampler order as the
   per-sample `DataLoader` (parity pinned by tests). A/B on the pinned E2
-  slice: 16 -> 4 target forwards, extraction wall 2.842 -> 2.308 s (-18.8%),
-  losses bit-identical, peak unchanged; profiling `scripts/profile_online_extraction.py`
+  slice: 16 -> 4 target forwards, losses bit-identical, peak unchanged (the
+  reported extraction-wall 2.842 -> 2.308 s / "-18.8%" is superseded - R2
+  timer-boundary mismatch; re-measurement pending); profiling `scripts/profile_online_extraction.py`
   shows prefill-bound extraction (render ~17 ms vs forward 129-139 ms/row),
   so the "at most one further I/O optimization" resolved to zero with
   evidence (report `docs/plan/WP4_MEASUREMENT.md`). 342 CPU tests green.
@@ -65,7 +78,7 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   (`scripts/export_vllm_draft.py`; shared embed/lm_head, aux (2,18,34),
   n_spec 7) and runs, but the strict gate fails: **5/32 token-exact**, AL
   1.4059 vs in-repo 1.6924 (MRoPE) / 1.6866 (1-D arm, R-15 - rope convention
-  is not the driver), flips are bf16 ulp-scale near-ties (R-16 margin probe).
+  is not the driver), traced flips show small top1-top2 margins (R-16 HF-assisted probe; root cause unresolved per the R5 remediation).
   Registered as BLOCKED-with-gap per the plan rule; report
   `docs/plan/WP5_REPORT.md`, converter/harness code + 5 CPU tests in this
   branch. Lane split recap in COORDINATION.md.
@@ -74,7 +87,7 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   capture (image-token check **1377/1377**, `visual_path_check` passed) ->
   32-step train -> sequential eval **token-exact 4/4** on trained + init
   checkpoints (AL 1.182 / 1.083); parallel diagnostic 1/2 (0.0-margin flip,
-  the R-16 near-tie class). Family adapter + hooks + 14 CPU tests in this
+  small-margin flip class cf. R-16). Family adapter + hooks + 14 CPU tests in this
   branch (`ef07b41`, `0f45fa1` + fixes). Gaps registered (schema-v2
   multi-turn template drift, multi-image, online mode untested for the
   family; smoke scale - no quality claim): `docs/plan/WP6_REPORT.md`.

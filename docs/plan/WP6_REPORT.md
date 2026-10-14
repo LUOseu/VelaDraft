@@ -55,8 +55,9 @@ Command chain: `vlm_dflash train --config configs/smoke_smolvlm.yaml` then
   drafter visual check `passed=True`.
 - eval (sequential parity, 4 val prompts, 32 new tokens, `ckpt_final` +
   `ckpt_init`): **token-exact 4/4 for both**; AL 1.182 / 1.083; parallel
-  diagnostic 1/2 exact (the flip sits at a 0.0 top-2 margin - the same bf16
-  near-tie phenomenon recorded in R-20261014-16).
+  diagnostic 1/2 exact (the flip sits at a 0.0 top-2 margin - the same
+  small-margin flip class recorded across the repo's own diagnostics; cf.
+  R-20261014-16, whose vLLM root cause remains unresolved).
 - No speed claim: at this scale the trained draft's wall includes first-call
   kernel compilation (1.41 s/sample vs 0.05 s for the init checkpoint's same
   architecture); speedup numbers in `eval_result.json` are diagnostic only.

@@ -46,7 +46,6 @@ from ..provenance import identity_from_contract
 from ..utils import read_json, sha256_file, sha256_json
 from .load import load_target
 from .sample_capture import (
-    build_sample_record,
     extract_target_head,
     finalize_prepared_records,
     prepare_sample_record,
@@ -126,19 +125,24 @@ def online_source_digest(cfg: dict, contract: dict, rows: list[dict], media_dir,
                 )
         regen = row["regen"]
         if "turns" in regen:
-            content.append(
-                {
-                    "turns": [
-                        {
-                            "prompt_ids": [int(token) for token in turn["prompt_ids"]],
-                            "answer_ids": [int(token) for token in turn["answer_ids"]],
-                        }
-                        for turn in regen["turns"]
-                    ],
-                    "full_ids": [int(token) for token in regen["full_ids"]],
-                    "image_sha256": image_hashes,
-                }
-            )
+            entry = {
+                "turns": [
+                    {
+                        "prompt_ids": [int(token) for token in turn["prompt_ids"]],
+                        "answer_ids": [int(token) for token in turn["answer_ids"]],
+                    }
+                    for turn in regen["turns"]
+                ],
+                "full_ids": [int(token) for token in regen["full_ids"]],
+                "image_sha256": image_hashes,
+            }
+            # Supervision protocol of multi-turn rows. Only rows that record a
+            # mode fold it in, so digests of legacy (mode-less, all-turn)
+            # artifacts stay byte-identical; a regenerated row under a different
+            # mode can never silently pass an exact-resume gate.
+            if regen.get("mode") is not None:
+                entry["multi_turn_mode"] = str(regen["mode"])
+            content.append(entry)
         else:
             content.append(
                 {
@@ -227,6 +231,7 @@ class OnlineFeatureDataset(Dataset):
             )
         if self._placeholder_remaining > 0:
             self._placeholder_remaining -= 1
+            self.source.note_fast_forward()
             return self._placeholder_record(str(index))
         record = self.source.extract(int(index))
         return self._normalize(record)
@@ -250,6 +255,7 @@ class OnlineFeatureDataset(Dataset):
         for position, index in enumerate(indices):
             if self._placeholder_remaining > 0:
                 self._placeholder_remaining -= 1
+                self.source.note_fast_forward()
                 records[position] = self._placeholder_record(str(index))
             else:
                 prepared.append(self.source.prepare(int(index)))
@@ -407,42 +413,66 @@ class OnlineFeatureSource:
         self.phase = phase
         self._open_peak_window()
 
-    def extract(self, index: int) -> dict:
-        started = time.perf_counter()
-        record = build_sample_record(
-            self.model,
-            self.processor,
-            self.rows[index],
-            self.media_dir,
-            layer_ids=self.layer_ids,
-            image_token_id=self.image_token_id,
-            merge_size=self.merge_size,
-            dtype=self.dtype,
-            seq_length=self.seq_length,
-            store_final_hidden=self.store_final_hidden,
+    def _sync_target(self) -> None:
+        """Synchronize the target device so wall-clock attribution is honest.
+
+        Timed regions bracket their own CUDA work with a synchronize on both
+        sides: without it ``perf_counter`` deltas only measure kernel launch
+        time and the reported preparation/forward split (and total) would
+        depend on queue depth instead of actual work.
+        """
+        device = getattr(self, "target_device", None)
+        if device is not None and device.type == "cuda":
+            torch.cuda.synchronize(device)
+
+    def _stats_entry(self) -> dict:
+        return self.stats.setdefault(
+            self.phase,
+            {"target_forwards": 0, "wall_seconds": 0.0, "prepare_seconds": 0.0, "forward_seconds": 0.0},
         )
-        entry = self.stats.setdefault(self.phase, {"target_forwards": 0, "wall_seconds": 0.0})
-        entry["target_forwards"] += 1
-        entry["target_samples"] = int(entry.get("target_samples", 0)) + 1
-        entry["wall_seconds"] += time.perf_counter() - started
-        return record
+
+    def note_fast_forward(self, items: int = 1) -> None:
+        """Count resume fast-forward items, which consume no target work."""
+        entry = self._stats_entry()
+        entry["fast_forward_items"] = int(entry.get("fast_forward_items", 0)) + max(0, int(items))
+
+    def extract(self, index: int) -> dict:
+        """One extraction of one row (render half + forward half, both timed).
+
+        Identical boundary to ``prepare`` + ``extract_prepared``: the same work
+        is charged the same way whether the caller fetches per sample or in
+        capture groups (R2).
+        """
+        return self.extract_prepared([self.prepare(index)])[0]
 
     def prepare(self, index: int) -> dict:
-        """Render one row without a target forward (half of ``extract``)."""
-        return prepare_sample_record(
+        """Render one row without a target forward; timed into ``prepare_seconds``."""
+        self._sync_target()
+        started = time.perf_counter()
+        prepared = prepare_sample_record(
             self.processor,
             self.rows[index],
             self.media_dir,
             seq_length=self.seq_length,
         )
+        self._sync_target()
+        elapsed = time.perf_counter() - started
+        entry = self._stats_entry()
+        entry["prepare_seconds"] = float(entry.get("prepare_seconds", 0.0)) + elapsed
+        entry["wall_seconds"] += elapsed
+        return prepared
 
     def extract_prepared(self, prepared_list: list[dict]) -> list[dict]:
         """One batched target forward for already-prepared rows.
 
         Counters record one target forward call and ``len(prepared_list)``
         samples, so a summary distinguishes forward calls from extracted rows
-        once ``train.online_batch_size > 1``.
+        once ``train.online_batch_size > 1``. The forward half (target forward
+        + output finalisation) is timed into ``forward_seconds``; both timed
+        halves sum into ``wall_seconds`` with the same boundary as
+        :meth:`extract` (R2).
         """
+        self._sync_target()
         started = time.perf_counter()
         records = finalize_prepared_records(
             self.model,
@@ -454,10 +484,13 @@ class OnlineFeatureSource:
             store_final_hidden=self.store_final_hidden,
             tokenizer=getattr(self.processor, "tokenizer", None),
         )
-        entry = self.stats.setdefault(self.phase, {"target_forwards": 0, "wall_seconds": 0.0})
+        self._sync_target()
+        elapsed = time.perf_counter() - started
+        entry = self._stats_entry()
         entry["target_forwards"] += 1
         entry["target_samples"] = int(entry.get("target_samples", 0)) + len(prepared_list)
-        entry["wall_seconds"] += time.perf_counter() - started
+        entry["forward_seconds"] = float(entry.get("forward_seconds", 0.0)) + elapsed
+        entry["wall_seconds"] += elapsed
         return records
 
     # -- trainer-facing surface ----------------------------------------------
@@ -502,6 +535,9 @@ class OnlineFeatureSource:
         total_forwards = sum(entry["target_forwards"] for entry in self.stats.values())
         total_samples = sum(int(entry.get("target_samples", 0)) for entry in self.stats.values())
         total_wall = sum(entry["wall_seconds"] for entry in self.stats.values())
+        total_prepare = sum(float(entry.get("prepare_seconds", 0.0)) for entry in self.stats.values())
+        total_forward = sum(float(entry.get("forward_seconds", 0.0)) for entry in self.stats.values())
+        total_fast_forward = sum(int(entry.get("fast_forward_items", 0)) for entry in self.stats.values())
         return {
             **self.manifest(),
             "target_resident_params": self.target_resident_params,
@@ -510,15 +546,23 @@ class OnlineFeatureSource:
             "target_forwards_total": total_forwards,
             "target_samples_total": total_samples,
             "extraction_wall_seconds_total": total_wall,
+            "extraction_prepare_seconds_total": total_prepare,
+            "extraction_forward_seconds_total": total_forward,
+            "fast_forward_items_total": total_fast_forward,
             "target_forwards_note": (
                 "target_forwards counts model forward calls; target_samples counts extracted rows. "
                 "They differ when train.online_batch_size > 1 (one forward per capture group)."
             ),
             "extraction_wall_seconds_note": (
-                "per-phase counters cover train / overfit sanity / calibration extraction; the "
-                "startup visual-path check runs a fixed 3 capture forwards outside these "
-                "counters, a resumed run does not re-extract fast-forwarded items and reuses "
-                "the recorded visual-path check instead of rerunning it"
+                "wall_seconds is the full extraction boundary for one row: render/decode + processor "
+                "(prepare_seconds) plus the teacher-forced target forward and record finalisation "
+                "(forward_seconds), with the target device synchronized around each timed stage. "
+                "Per-sample reads (extract) and batched reads (fetch_batch) charge the same boundary, "
+                "so their extraction_wall_seconds_total values are comparable. Counters are per phase "
+                "(train / overfit sanity / calibration); the startup visual-path check runs a fixed 3 "
+                "capture forwards outside these counters, and a resumed run answers fast-forwarded "
+                "items with cheap placeholders that consume no target work (counted as "
+                "fast_forward_items, never as wall_seconds)"
             ),
             "target_device_peak_note": (
                 "target_device_peak_gb is the CUDA peak on the target's device during that phase "

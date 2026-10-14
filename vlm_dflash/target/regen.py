@@ -4,11 +4,24 @@ The regenerated answers (token ids included) become the supervision targets for
 the drafter. Storing the exact token ids here is what makes the later capture
 step bit-exact: capture re-renders the prompt and asserts it matches.
 
-Schema-v2 rows (multi-image / multi-turn) generate each assistant turn
-progressively, conditioned on the already-generated earlier turns (never on
-the dataset's own assistant text). The per-turn token ids are concatenated
-into ``regen.full_ids`` and checked against one full-conversation render:
-any chat-template drift fails loud, exactly like the v1 prompt-drift check.
+Schema-v2 rows (multi-image / multi-turn) support two supervision modes
+(``regen.multi_turn_mode``):
+
+* ``last_turn_only`` (default): the dataset's own earlier assistant turns are
+  kept verbatim as context and only the last assistant turn is regenerated and
+  supervised -- eval renders the same original history, so train and eval
+  follow one protocol.
+* ``all_turns`` (opt-in, experimental): every assistant turn is regenerated
+  progressively, conditioned on the already-generated earlier turns (never on
+  the dataset's own assistant text), and every regenerated answer is
+  supervised. Eval still renders the dataset history, so all-turn artifacts
+  are only comparable within their own protocol.
+
+The per-turn token ids are concatenated into ``regen.full_ids`` and checked
+against one full-conversation render: any chat-template drift fails loud,
+exactly like the v1 prompt-drift check. Legacy regen records without a
+recorded ``mode`` stay identifiable as all-turn artifacts and keep rendering
+through the legacy path.
 """
 
 from __future__ import annotations
@@ -33,6 +46,10 @@ from .prompts import encode_prompt, messages_from_row, render_conversation, rend
 
 _HUMAN_ROLES = ("human", "user")
 _GPT_ROLES = ("gpt", "assistant", "model")
+
+#: Supported multi-turn supervision modes (see the module docstring).
+MULTI_TURN_MODES = ("last_turn_only", "all_turns")
+DEFAULT_MULTI_TURN_MODE = "last_turn_only"
 
 
 def _cut_at_stop(ids: list[int], stop_ids: set[int]) -> list[int]:
@@ -114,6 +131,31 @@ def _assistant_turn_indices(conversations: list[dict], sample_id) -> list[int]:
     return indices
 
 
+def _verify_full_render(processor, row: dict, images: list, full_ids: list[int], overrides: dict[int, str]) -> None:
+    """Assert ``full_ids`` is exactly one full-conversation chat-template render.
+
+    Any prefix mismatch is chat-template drift and fails loud; non-empty
+    trailing text after ``full_ids`` is refused so a stored sequence can never
+    silently drop part of the conversation.
+    """
+    full_messages, full_image_indices = messages_from_row(row, assistant_overrides=overrides)
+    full_text = render_conversation(processor, full_messages, add_generation_prompt=False)
+    full_inputs = processor(
+        text=[full_text], images=[images[position] for position in full_image_indices], return_tensors="pt"
+    )
+    rendered = full_inputs["input_ids"][0].tolist()
+    if rendered[: len(full_ids)] != full_ids:
+        raise RuntimeError(
+            f"Multi-turn full-render drift for sample {row.get('id')}: the incremental token ids do not "
+            "match one apply_chat_template render of the whole conversation; refusing to store them."
+        )
+    tail = rendered[len(full_ids) :]
+    if tail and processor.tokenizer.decode(tail, skip_special_tokens=False).strip():
+        raise RuntimeError(
+            f"Multi-turn render of sample {row.get('id')} produced unexpected trailing tokens {tail!r}."
+        )
+
+
 def _regen_multi_turn_row(
     model,
     processor,
@@ -124,19 +166,70 @@ def _regen_multi_turn_row(
     primary_stop: int,
     device,
     max_new_tokens: int,
+    mode: str = DEFAULT_MULTI_TURN_MODE,
 ) -> tuple[dict | None, dict | None, list[int]]:
-    """Progressive greedy regen for one schema-v2 row.
+    """Greedy regen for one schema-v2 row under the selected supervision mode.
 
     Returns ``(record, skipped_or_None, per_turn_answer_tokens)``. A row with
     an empty generated answer is skipped (``skipped`` non-null). Answers that
     hit ``max_new_tokens`` without a stop token get the primary stop appended so
     the stored sequence is exactly a valid chat-template render (recorded as
-    ``forced_stop`` in the per-turn stats).
+    ``forced_stop`` in the per-turn stats). ``per_turn_answer_tokens`` lists the
+    regenerated answers only (one entry under ``last_turn_only``).
     """
+    if mode not in MULTI_TURN_MODES:
+        raise ValueError(f"Unknown regen.multi_turn_mode {mode!r}; expected one of {list(MULTI_TURN_MODES)}.")
     conversations = row.get("conversations") or []
     assistant_indices = _assistant_turn_indices(conversations, row.get("id"))
     image_paths = row_image_paths(row, media_dir)
     images = [Image.open(path).convert("RGB") for path in image_paths]
+
+    if mode == "last_turn_only":
+        target_index = assistant_indices[-1]
+        # Original history (dataset assistant texts, never regenerated) plus the
+        # final user turn; the generation prompt closes it.
+        messages, image_indices = messages_from_row(row, upto=target_index)
+        text = render_conversation(processor, messages, add_generation_prompt=True)
+        inputs = processor(text=[text], images=[images[position] for position in image_indices], return_tensors="pt").to(device)
+        prompt_ids = inputs["input_ids"][0].tolist()
+        with torch.inference_mode():
+            generated = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+        answer_ids = _cut_at_stop(generated[0, len(prompt_ids) :].tolist(), stop_ids)
+        if not answer_ids:
+            return None, {"id": row.get("id"), "reason": "empty_answer", "turn": target_index}, []
+        forced = answer_ids[-1] not in stop_ids
+        if forced:
+            answer_ids = answer_ids + [primary_stop]
+        answer_text = processor.tokenizer.decode(answer_ids[:-1], skip_special_tokens=False)
+        full_ids = prompt_ids + answer_ids
+        regen = {
+            "mode": "last_turn_only",
+            "assistant_indices": [target_index],
+            "turns": [
+                {
+                    "prompt_ids": prompt_ids,
+                    "answer_ids": answer_ids,
+                    "answer_text": answer_text,
+                    "stop_token_id": int(answer_ids[-1]),
+                    "forced_stop": bool(forced),
+                }
+            ],
+            "full_ids": full_ids,
+            "answer_spans": [[len(prompt_ids), len(full_ids)]],
+            "n_turns": 1,
+            "forced_stop": int(forced),
+        }
+        record = {
+            "id": row.get("id"),
+            "conversations": conversations,
+            "images": row["images"],
+            "image_turns": row_image_turns(row),
+            "schema": "vlm-dflash-data-v2",
+            "regen": regen,
+        }
+        _verify_full_render(processor, row, images, full_ids, {target_index: answer_text})
+        return record, None, [len(answer_ids)]
+
     turns, answer_spans, overrides = [], [], {}
     full_ids: list[int] = []
     forced_stop = 0
@@ -176,20 +269,7 @@ def _regen_multi_turn_row(
                 "forced_stop": bool(forced),
             }
         )
-    full_messages, full_image_indices = messages_from_row(row, assistant_overrides=overrides)
-    full_text = render_conversation(processor, full_messages, add_generation_prompt=False)
-    full_inputs = processor(text=[full_text], images=[images[position] for position in full_image_indices], return_tensors="pt")
-    rendered = full_inputs["input_ids"][0].tolist()
-    if rendered[: len(full_ids)] != full_ids:
-        raise RuntimeError(
-            f"Multi-turn full-render drift for sample {row.get('id')}: the incremental token ids do not "
-            "match one apply_chat_template render of the whole conversation; refusing to store them."
-        )
-    tail = rendered[len(full_ids) :]
-    if tail and processor.tokenizer.decode(tail, skip_special_tokens=False).strip():
-        raise RuntimeError(
-            f"Multi-turn render of sample {row.get('id')} produced unexpected trailing tokens {tail!r}."
-        )
+    _verify_full_render(processor, row, images, full_ids, overrides)
     record = {
         "id": row.get("id"),
         "conversations": conversations,
@@ -197,6 +277,8 @@ def _regen_multi_turn_row(
         "image_turns": row_image_turns(row),
         "schema": "vlm-dflash-data-v2",
         "regen": {
+            "mode": "all_turns",
+            "assistant_indices": list(assistant_indices),
             "turns": turns,
             "full_ids": full_ids,
             "answer_spans": answer_spans,
@@ -216,13 +298,18 @@ def _template_sha(processor, row: dict) -> str:
 
 def run_regen(cfg: dict, run_dir: str | Path, contract: dict, limit: int | None = None) -> dict:
     run_dir = Path(run_dir)
-    rows, media_dir = load_sharegpt(run_dir / "data" / "data.jsonl")
-    if limit is not None:
-        rows = rows[:limit]
     regen_cfg = cfg.get("regen", {})
     max_new_tokens = int(regen_cfg.get("max_new_tokens", 160))
     min_response_tokens = int(regen_cfg.get("min_response_tokens", 128))
     batch_size = int(regen_cfg.get("batch_size", 8))
+    multi_turn_mode = str(regen_cfg.get("multi_turn_mode", DEFAULT_MULTI_TURN_MODE)).strip().lower()
+    if multi_turn_mode not in MULTI_TURN_MODES:
+        raise ValueError(
+            f"regen.multi_turn_mode must be one of {list(MULTI_TURN_MODES)}, got {multi_turn_mode!r}."
+        )
+    rows, media_dir = load_sharegpt(run_dir / "data" / "data.jsonl")
+    if limit is not None:
+        rows = rows[:limit]
 
     model, processor = load_target(cfg, contract)
     device = next(model.parameters()).device
@@ -259,7 +346,10 @@ def run_regen(cfg: dict, run_dir: str | Path, contract: dict, limit: int | None 
         skipped.extend(dropped)
         buffer = []
 
-    log(f"regen: {len(rows)} samples, batch={batch_size}, max_new={max_new_tokens}, min_answer={min_response_tokens}")
+    log(
+        f"regen: {len(rows)} samples, batch={batch_size}, max_new={max_new_tokens}, "
+        f"min_answer={min_response_tokens}, multi_turn_mode={multi_turn_mode}"
+    )
     for row in rows:
         if not row_is_multi_turn(row):
             buffer.append(row)
@@ -277,6 +367,7 @@ def run_regen(cfg: dict, run_dir: str | Path, contract: dict, limit: int | None 
             primary_stop=primary_stop,
             device=device,
             max_new_tokens=max_new_tokens,
+            mode=multi_turn_mode,
         )
         if drop is not None:
             v2_skipped.append(drop)
@@ -309,6 +400,9 @@ def run_regen(cfg: dict, run_dir: str | Path, contract: dict, limit: int | None 
         "min_response_tokens": min_response_tokens,
         "batch_size": batch_size,
         "greedy": True,
+        # Supervision protocol for schema-v2 rows (data records carry the same
+        # value per row; legacy records without a mode are all-turn artifacts).
+        "multi_turn_mode": multi_turn_mode,
         "answer_token_histogram": {
             "min": min((len(r["regen"]["answer_ids"]) for r in v1_rows), default=None),
             "max": max((len(r["regen"]["answer_ids"]) for r in v1_rows), default=None),
@@ -320,9 +414,11 @@ def run_regen(cfg: dict, run_dir: str | Path, contract: dict, limit: int | None 
         stats["skip_reasons"].setdefault("empty_answer", 0)
         stats["skip_reasons"]["empty_answer"] = sum(1 for entry in skipped if entry["reason"] == "empty_answer")
         stats["multi_turn"] = {
+            "mode": multi_turn_mode,
             "num_input": v2_count,
             "num_kept": len(v2_totals),
             "num_skipped": len(v2_skipped),
+            # Regenerated (and, under last_turn_only, supervised) answers per row.
             "num_turns": {
                 "min": min(v2_turns_count, default=None),
                 "max": max(v2_turns_count, default=None),

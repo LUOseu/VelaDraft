@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, DrafterAlgorithm
+from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord
 from .registry import register
 
 
@@ -37,6 +37,44 @@ class DFlashAlgorithm(DrafterAlgorithm):
         },
         capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "validated"},
+        evidence=(
+            EvidenceRecord(
+                family="qwen25_vl",
+                layout="single_image",
+                feature_mode="offline",
+                state="canonical_validated",
+                evidence=(
+                    "RELEASE_VALIDATION.md canonical benchmark (frozen 128p baseline AL 1.6298, 128/128 exact; tests/reference_dflash/manifest.json); zoo-v0.3.0 export reload"
+                ),
+            ),
+            EvidenceRecord(
+                family="qwen3_vl",
+                layout="single_image",
+                feature_mode="offline",
+                state="canonical_validated",
+                evidence=(
+                    "RELEASE_VALIDATION.md targets (full 2K pipeline AL 1.665, 32/32 exact; zoo-v0.3.1 8B export reload)"
+                ),
+            ),
+            EvidenceRecord(
+                family="qwen25_vl",
+                layout="multi_image+multi_turn",
+                feature_mode="offline",
+                state="gpu_smoke",
+                evidence=(
+                    "R-20261014-08 E2 smoke (2-image/2-turn rows, 16 train + 4 val, token-exact eval; configs/smoke_multiturn.yaml; recorded before the R3/R4 review remediations)"
+                ),
+            ),
+            EvidenceRecord(
+                family="smolvlm",
+                layout="single_image",
+                feature_mode="offline",
+                state="gpu_smoke",
+                evidence=(
+                    "R-20261014-17 (SmolVLM2-2.2B smoke: 16 train + 4 val synthetic rows, token-exact 4/4; single-image only; no quality claim)"
+                ),
+            ),
+        ),
     )
 
     # ------------------------------------------------------------------ #

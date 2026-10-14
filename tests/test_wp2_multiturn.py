@@ -389,9 +389,12 @@ def test_regen_multi_turn_bookkeeping(tmp_path):
         primary_stop=_END,
         device=torch.device("cpu"),
         max_new_tokens=16,
+        mode="all_turns",
     )
     assert drop is None and record is not None
     regen = record["regen"]
+    assert regen["mode"] == "all_turns"
+    assert regen["assistant_indices"] == [1, 3]
     assert regen["n_turns"] == 2
     assert [len(turn["answer_ids"]) for turn in regen["turns"]] == [3, 3]
     # Turn 2 hit max_new_tokens without a stop; the primary stop was appended.
@@ -464,7 +467,7 @@ def test_run_regen_dispatches_v1_and_v2_rows(monkeypatch, tmp_path):
     ]
     write_jsonl(run_dir / "data" / "data.jsonl", rows)
     processor = _FakeChatProcessor()
-    model = _StubLM([[ord("a"), _END], [ord("x"), _END], [ord("y"), ord("z"), _END]])
+    model = _StubLM([[ord("a"), _END], [ord("x"), _END]])
     monkeypatch.setattr(regen_module, "load_target", lambda cfg, contract: (model, processor))
     contract = {
         "target": {"model_path": "/models/tiny-vl", "model_type": "qwen2_5_vl", "model_fingerprint": "f" * 64, "processor_fingerprint": "p" * 64},
@@ -482,11 +485,17 @@ def test_run_regen_dispatches_v1_and_v2_rows(monkeypatch, tmp_path):
     out_rows = read_jsonl(run_dir / "regen" / "target_data.jsonl")
     assert [row["id"] for row in out_rows] == ["v1", "v2"]
     assert set(out_rows[0]["regen"]) == {"prompt_ids", "answer_ids", "stop_token_id"}
-    assert out_rows[1]["regen"]["n_turns"] == 2
+    # R3: the default multi-turn protocol regenerates and supervises the last
+    # assistant turn only; the earlier dataset turns stay context.
+    assert out_rows[1]["regen"]["mode"] == "last_turn_only"
+    assert out_rows[1]["regen"]["assistant_indices"] == [3]
+    assert out_rows[1]["regen"]["n_turns"] == 1
     assert stats["num_kept"] == 2
+    assert stats["multi_turn_mode"] == "last_turn_only"
     assert stats["multi_turn"]["num_kept"] == 1
-    assert stats["multi_turn"]["num_turns"] == {"min": 2, "max": 2}
-    assert len(stats["multi_turn"]["per_turn"]) == 2
+    assert stats["multi_turn"]["mode"] == "last_turn_only"
+    assert stats["multi_turn"]["num_turns"] == {"min": 1, "max": 1}
+    assert len(stats["multi_turn"]["per_turn"]) == 1
 
 
 # --------------------------------------------------------------------------- #
@@ -725,3 +734,214 @@ def test_feature_store_v1_and_v2_items_collate(tmp_path):
     assert batch["image_mask"][0].sum().item() == 0
     assert batch["image_mask"][1].sum().item() == 8
     assert batch["loss_mask"][1, 16 - 4] == 1.0
+
+
+# --------------------------------------------------------------------------- #
+# 6. R3 supervision modes: last_turn_only (default) vs all_turns (opt-in)
+# --------------------------------------------------------------------------- #
+
+
+def _multiturn_row() -> dict:
+    return {
+        "id": "mt",
+        "conversations": [
+            {"from": "human", "value": "<image>\nq0"},
+            {"from": "gpt", "value": "dataset a0"},
+            {"from": "human", "value": "q1 <image>"},
+            {"from": "gpt", "value": "dataset a1"},
+        ],
+        "images": ["a.png", "b.png"],
+        "image_turns": [0, 2],
+    }
+
+
+class _RecordingChatProcessor(_FakeChatProcessor):
+    """Fake processor that records (rendered text, image count) per call."""
+
+    def __init__(self):
+        super().__init__()
+        self.calls: list[tuple[str, int]] = []
+
+    def __call__(self, text, images, return_tensors="pt", padding=False):
+        rendered = text[0] if isinstance(text, (list, tuple)) else text
+        self.calls.append((rendered, len(list(images))))
+        return super().__call__(text, images, return_tensors=return_tensors, padding=padding)
+
+
+def test_regen_last_turn_only_keeps_original_history_and_supervises_last(tmp_path):
+    """Default mode: dataset history verbatim, exactly one generated/supervised answer."""
+    _write_media(tmp_path, ["a.png", "b.png"])
+    processor = _FakeChatProcessor()
+    row = _multiturn_row()
+    model = _StubLM([[ord("y"), ord("o")]])
+    record, drop, per_turn = regen_module._regen_multi_turn_row(
+        model,
+        processor,
+        row,
+        tmp_path,
+        stop_ids={_END},
+        primary_stop=_END,
+        device=torch.device("cpu"),
+        max_new_tokens=16,
+        mode="last_turn_only",
+    )
+    assert drop is None and record is not None
+    # Only the last assistant turn was generated (one model call), and it kept
+    # the max-new-tokens-forced primary stop.
+    assert model.calls == 1
+    regen = record["regen"]
+    assert regen["mode"] == "last_turn_only"
+    assert regen["assistant_indices"] == [3]
+    assert regen["n_turns"] == 1 and regen["forced_stop"] == 1
+    turn = regen["turns"][0]
+    assert turn["answer_ids"] == [ord("y"), ord("o"), _END]
+    assert turn["answer_text"] == "yo"
+    full_ids = regen["full_ids"]
+    assert regen["answer_spans"] == [[len(turn["prompt_ids"]), len(full_ids)]]
+    assert full_ids[len(turn["prompt_ids"]):] == turn["answer_ids"]
+    # The history is the dataset's own text, never a regenerated answer.
+    history = processor.decode(full_ids[: len(turn["prompt_ids"])])
+    assert "dataset a0" in history and "dataset a1" not in history
+    assert per_turn == [3]  # "yo" + appended stop
+    # The stored sequence is exactly one full render of [history + generation prompt + answer].
+    messages, image_indices = messages_from_row(row, assistant_overrides={3: "yo"})
+    fresh = processor(
+        text=[render_conversation(processor, messages)],
+        images=[Image.open(tmp_path / row["images"][index]) for index in image_indices],
+    )
+    assert fresh["input_ids"][0].tolist()[: len(full_ids)] == full_ids
+
+
+def test_regen_all_turns_gates_late_images_per_turn(tmp_path):
+    """Opt-in all_turns mode: turn i's prompt sees only images attached up to turn i."""
+    _write_media(tmp_path, ["a.png", "b.png"])
+    processor = _RecordingChatProcessor()
+    row = _multiturn_row()
+    model = _StubLM([[ord("h"), ord("i"), _END], [ord("y"), ord("o"), _END]])
+    record, drop, _ = regen_module._regen_multi_turn_row(
+        model,
+        processor,
+        row,
+        tmp_path,
+        stop_ids={_END},
+        primary_stop=_END,
+        device=torch.device("cpu"),
+        max_new_tokens=16,
+        mode="all_turns",
+    )
+    assert drop is None and record is not None
+    assert record["regen"]["mode"] == "all_turns"
+    assert record["regen"]["assistant_indices"] == [1, 3]
+    # Two generation prompts plus the final full-render drift check.
+    assert len(processor.calls) == 3
+    first_text, first_images = processor.calls[0]
+    second_text, second_images = processor.calls[1]
+    assert first_images == 1 and first_text.count("<IMG>") == 1  # the late image is not readable yet
+    assert second_images == 2 and second_text.count("<IMG>") == 2
+    assert "q1" not in first_text  # the second user turn is not part of turn-0 context
+
+
+def test_run_regen_rejects_unknown_multi_turn_mode(tmp_path):
+    run_dir = tmp_path / "run"
+    (run_dir / "data").mkdir(parents=True)
+    with pytest.raises(ValueError, match="multi_turn_mode"):
+        regen_module.run_regen({"regen": {"multi_turn_mode": "banana"}}, run_dir, {})
+
+
+def _stored_last_turn_row(tmp_path, processor, answer: str) -> dict:
+    """A stored schema-v2 row regenerated under the default last_turn_only mode."""
+    row = _multiturn_row()
+    _write_media(tmp_path, ["a.png", "b.png"])
+    images = [Image.open(tmp_path / name).convert("RGB") for name in row["images"]]
+    last_index = 3
+    messages, image_indices = messages_from_row(row, upto=last_index)
+    prompt_ids = processor(
+        text=[render_conversation(processor, messages, add_generation_prompt=True)],
+        images=[images[position] for position in image_indices],
+    )["input_ids"][0].tolist()
+    answer_ids = [ord(character) for character in answer] + [_END]
+    full_ids = prompt_ids + answer_ids
+    row["schema"] = "vlm-dflash-data-v2"
+    row["regen"] = {
+        "mode": "last_turn_only",
+        "assistant_indices": [last_index],
+        "turns": [
+            {
+                "prompt_ids": prompt_ids,
+                "answer_ids": answer_ids,
+                "answer_text": answer,
+                "stop_token_id": _END,
+                "forced_stop": False,
+            }
+        ],
+        "full_ids": full_ids,
+        "answer_spans": [[len(prompt_ids), len(full_ids)]],
+        "n_turns": 1,
+        "forced_stop": 0,
+    }
+    return row
+
+
+def test_capture_last_turn_only_masks_only_the_last_answer(tmp_path):
+    model, processor = _tiny_qwen25_vl_model()
+    row = _stored_last_turn_row(tmp_path, processor, "two")
+    record = build_sample_record(
+        model,
+        processor,
+        row,
+        tmp_path,
+        layer_ids=[0, 1],
+        image_token_id=500,
+        merge_size=2,
+        dtype=torch.float32,
+        seq_length=256,
+        store_final_hidden=False,
+    )
+    prompt_len = len(row["regen"]["turns"][0]["prompt_ids"])
+    mask = record["loss_mask"]
+    assert record["multi_turn_mode"] == "last_turn_only"
+    assert record["n_turns"] == 1
+    assert record["n_conversation_turns"] == 4
+    assert int(mask.sum()) == len("two") + 1
+    assert not bool(mask[:prompt_len].any()), "history/user/image positions must not be supervised"
+    assert bool(mask[prompt_len:].all())
+    assert record["turn_spans"][0][0] == 0
+    assert record["turn_spans"][-1][1] == int(record["input_ids"].numel())
+    history = processor.decode(record["input_ids"][:prompt_len].tolist())
+    assert "dataset a0" in history and "one" not in history
+
+
+def test_capture_rejects_mode_and_assistant_indices_mismatch(tmp_path):
+    model, processor = _tiny_qwen25_vl_model()
+    row = _stored_last_turn_row(tmp_path, processor, "two")
+    # A last_turn_only record must regenerate exactly the last assistant turn.
+    row["regen"]["assistant_indices"] = [1, 3]
+    with pytest.raises(RuntimeError, match="last_turn_only"):
+        build_sample_record(
+            model,
+            processor,
+            row,
+            tmp_path,
+            layer_ids=[0, 1],
+            image_token_id=500,
+            merge_size=2,
+            dtype=torch.float32,
+            seq_length=256,
+            store_final_hidden=False,
+        )
+    # An all_turns record must cover every assistant turn.
+    row = _stored_last_turn_row(tmp_path, processor, "two")
+    row["regen"]["mode"] = "all_turns"
+    with pytest.raises(RuntimeError, match="all_turns"):
+        build_sample_record(
+            model,
+            processor,
+            row,
+            tmp_path,
+            layer_ids=[0, 1],
+            image_token_id=500,
+            merge_size=2,
+            dtype=torch.float32,
+            seq_length=256,
+            store_final_hidden=False,
+        )

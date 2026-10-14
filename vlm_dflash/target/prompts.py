@@ -4,9 +4,10 @@ Two shapes exist: :func:`render_prompt` / :func:`encode_prompt` for v1 rows
 (single image, single question - byte-identical to the original pipeline) and
 :func:`messages_from_row` / :func:`render_conversation` / :func:`encode_conversation`
 for schema-v2 rows (multi-image, multi-turn). The v2 renderer places each
-turn's images at the START of that turn's content (in ``images`` order) and
-strips the ``<image>`` placeholders from the text, which is exactly the v1
-layout for single-image rows.
+turn's content from the row's ordered ``segments`` when present (text and
+images keep their declared positions); legacy rows without segments keep the
+historical layout (images at the START of the turn, ``<image>`` placeholders
+stripped), which is exactly the v1 layout for single-image rows.
 """
 
 from __future__ import annotations
@@ -78,12 +79,38 @@ def messages_from_row(
         text = str(turn.get("value", ""))
         if role in _HUMAN_ROLES:
             parts: list[dict] = []
-            for position in per_turn.get(index, []):
-                parts.append({"type": "image"})
-                image_indices.append(position)
-            stripped = strip_image_placeholder(text)
-            if stripped or not parts:
-                parts.append({"type": "text", "text": stripped})
+            segments = turn.get("segments")
+            if segments is not None:
+                attached = per_turn.get(index, [])
+                for segment in segments:
+                    if segment.get("type") == "image":
+                        position = int(segment["index"])
+                        if not 0 <= position < len(images):
+                            raise ValueError(
+                                f"Row {row.get('id')!r} references image {position}, but only "
+                                f"{len(images)} image(s) exist."
+                            )
+                        if position not in attached:
+                            raise ValueError(
+                                f"Row {row.get('id')!r} places image {position} on turn {index}, but its "
+                                "image_turns entry attaches it to another turn."
+                            )
+                        parts.append({"type": "image"})
+                        image_indices.append(position)
+                    else:
+                        segment_text = str(segment.get("text", ""))
+                        if segment_text:
+                            parts.append({"type": "text", "text": segment_text})
+            else:
+                # Legacy rows (pre-segment): images at the turn start, placeholders stripped.
+                for position in per_turn.get(index, []):
+                    parts.append({"type": "image"})
+                    image_indices.append(position)
+                stripped = strip_image_placeholder(text)
+                if stripped or not parts:
+                    parts.append({"type": "text", "text": stripped})
+            if not parts:
+                parts.append({"type": "text", "text": ""})
             messages.append({"role": "user", "content": parts})
         elif role in _GPT_ROLES:
             if assistant_overrides is not None and index in assistant_overrides:
