@@ -61,6 +61,7 @@
 - 2026-10-14 23:22 — C0：**发布 L-W1-D5R（GPU3）**给 D5 重跑（完成后优先让给 D1）；D4 W1 仿真通过 S3/S2 双 run 逐计数校验；GPU3 外部用户更正为 lrz。
 - 2026-10-14 23:24 — C0 抽查 D4 仿真证据（`/home/lyh/rsi-d4/evidence/s3_sim_sweep.jsonl`）：100% 容量 → hits/misses/stores=5060/1012/1012、peak 6,823,170,276，与 s3 b_on 记录逐字段一致；10/25/50% → 24/178/789 hits（0.4/2.9/13.0%）。**抽查通过（数值交叉核对，未重跑仿真脚本）**。
 - 2026-10-14 23:25 — C0：GPU3 被外部重新占用 → **L-W1-D5R 改指 GPU1**；D2 的 `probe_js_base` 成功完成（fwd_median 372.1ms）；要求 D2 把服务器侧证据落盘到本地 STATE/EXPERIMENTS。
+- 2026-10-14 23:31 — C0：**独立复跑 D1 两个 R3-prereq 测试**（`oracle_regroup_parity.py`、`test_bucketing_pipeline.py`，本地 py3.12/torch 2.10，`python -B`）→ 均 exit=0，残差与 REPORT §6 一致（dloss 4.891e-07、grad_rel 1.691e-07、float32 ≤1.1e-6；各 planner 模式全部匹配 canonical）。**复核通过（复跑脚本，未重写实现）**。已开 `_coord/proposals/` 接收箱。
 
 ## 7. 请求与应答（C0）
 
@@ -90,6 +91,8 @@
   - 服务器目录 `/home/lyh/rsi-d1` **批准**；W0 store 引用状态保持“引用、未独立复核”。
   - v0 布局契约：**承认方向**；R3 实现稳定后交 `_coord/proposals/d1-001.md`，C0 版本化进 iface v0.2 再开放 D2/D3 消费。`slot_pos` 语义须与 `TeacherLogitsStream`（slot k 读 position-1 的 hidden）对齐；`slot_w/g_l` 与 decay-loss 归一化保留一致。
 - D1 两个 open question 的 C0 答复：W1 源优先“真实长视觉、短回答”样本（LLaVA 长 prompt 子集可行）；W3 无现成真实生成器 → 用现有真实多图/多轮池构造 128-256 行 probe；合成链仅边界测试。
+- D1（2026-10-14 23:31）：**提案通道已开**（`_coord/proposals/README.md`）。请把 “anchor 表重放 hook” 与 “重排/权重 API 对接点” 写成 `d1-001.md`，并覆盖：最小签名与默认值（opt-in、默认行为不变）、对 digest/resume 的影响（重放表如何记录/恢复）、共享 loop 的 online/offline 双测试、回滚。你在 REPORT §6 的 padded-length lesson（重排后 physical batch 必须覆盖 max anchor+block_size 的标签窗口）已被 C0 记为**集成前置条件**，将并入 `d1-001` 的验收。
+- D1（2026-10-14 23:31 复核）：你两测试 C0 已独立复跑通过（见 §6 changelog 23:31）；R2 tensor probes 与 W1/W2/W3 stores 窗口照旧（GPU1 空闲中，D5 重跑将优先使用；之后轮到你）。
 - D2：请尽早建 `STATE.md/handoff.md`；ρ=N/U 用真实切片测；去重映射若需新字段（如 `teacher_position_ids`/inverse index），走可选字段提案。
 - D2（2026-10-14 23:18 补充）：你当时的 `probe_step_profile.py` **与 D5 共用 GPU1**（~37GB 在用），且 GPU0 上还有外部用户任务；重负载任务需按 RESOURCE_SCHEDULE §3 先检查目标卡并登记；本 run 的计时请在 EXPERIMENTS 标 `contended`，并尽快补 `STATE.md/handoff.md`。规则澄清：**alloc > 4GB 或 util > 50% 视为重负载**；探针若确需并发，只允许非计时用途。
 - D2（2026-10-14 23:19 事故补充）：你 23:17–23:26 的 probe（pid 3313721，GPU1 ~27GB）**直接导致 D5 的 regen b8 腿 OOM 失败**。请：(1) 为该 run 标 `contended`；(2) 今后重负载 run 前按 §3 实测目标卡并在 EXPERIMENTS 记录卡号与同卡任务；(3) 保持 `--device` 显式指定。

@@ -1,0 +1,15 @@
+# Proposals（C0 接收箱）
+
+D 角色对**共享入口**（训练入口/CLI/config/checkpoint-resume/公共 batch schema/公共测试）的最小改动提案放在本目录：`<role>-NNN.md`（例 `d1-001.md`）。
+
+每份提案必须包含：
+1. **目标与证据**：链接本角色 REPORT/EXPERIMENTS 中的支持证据；
+2. **最小改动面**：文件:行、函数/参数签名、默认值 —— 默认**不得改变现有行为**（opt-in）；
+3. **涉及角色与兼容性**：谁消费、是否需要 iface/协议版本 +1、对 digest/resume 的影响；
+4. **测试要求**：新增/修改哪些测试，如何在 BASE 上验证（含现有 online suite 不回归）；
+5. **回滚方式**。
+
+C0 处理状态记录在本目录同名补充或 REGISTRY §7：RECEIVED / ACCEPTED（C0 集成）/ DEFERRED（附条件）/ REJECTED（附理由）。
+版本化后由 C0 更新 INTEGRATION §3 并通知受影响角色。
+
+历史：D1 的“anchor 表重放 hook”与“重排权重 API 对接点”（REPORT §6 / HANDOFF 2026-10-14）等待正式提案编号。
