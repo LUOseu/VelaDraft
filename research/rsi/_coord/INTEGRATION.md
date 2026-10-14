@@ -58,7 +58,7 @@
 
 优先给 D1/D2 研究资源，D4 提供实用 backend；按真实证据调整排序。
 
-### 4.1 Wave-1 台账（滚动；更新 2026-10-15 00:56）
+### 4.1 Wave-1 台账（滚动；更新 2026-10-15 01:02）
 
 | 路线 | wave-1 证据 | 门槛核验 | 当前判定 |
 |---|---|---|---|
@@ -68,7 +68,7 @@
 | D4 | W1 五腿 counters 逐值一致（**C0 5/5 ✓**）；W2 CPU 压力轨迹（零越界）；**W2 降级 B 收口（F1–F4 PASS；两腿 counters 645/129/129/0/0 相同；adjustments=0；lane `a8e762c`）** | 无提速声称（安全阀）；d4-001 集成 `1f8963e`（sha1 4 文件再核一致；13+4+70/70 ✓） | **merge-ready（平台工程级，`d4-003-c0`）**：静态 RAM 场景 / opt-in 默认关；压力响应未验证（环境限制）；不自动 merge main |
 | D5 | trace 分解 + sim v3/v4；regen 真测 1.66×/2.33×；静态分裂 sim 1.70×；cost-aware sim +0.8–2.1%；**d5-001 步 2 + 两卡 split 接线（lane 79/79 C0 独立复跑 ✓，含 36 parity 项；Tier 0 smoke 批准）** | cost-aware ✗（≪15%）；静态 split 待真实 ladder | HOLD（split=wave-2 条件项；G2 分档预授权等窗口） |
 
-未决：D1 wave-2 配对（L-W2-D1 ≤1.5 GPU-h，窗口执行）→ `d1-001` 集成排程（默认全关、wave-2 结论后）；D4 收口标注（`cgroup_limit=unavailable`/`sensor=meminfo`、adaptive 字段口径）+ lane 追记 → merge-readiness 评估；D5 chain2 Tier A/B 进行中（staged_b8 运行；S3 线待修 split 图像暂存后补跑；Tier C 待 C0）；iface v0.2（D1 增量已登记候选；`host_ram_budget_gb` 待 D4）；预算实耗：**D1 0.70/1.5**、D2 0.5/1.0、D3 0.22/1.0、D4 0.31/0.5（+≤0.3 降级项已跑）、D5 进行中（自报待收）。
+未决：D1 wave-2 配对（L-W2-D1 ≤1.5 GPU-h；**窗口已开放**——p3 收尾 5/7，`mix_w1w2_k2`/`w3_k2` 两格 guard 跳过待补）→ `d1-001` 集成排程（默认全关、wave-2 结论后）；D4 收口完成（`d4-003-c0` merge-ready；无待办；`host_ram_budget_gb` 已确认、PROTOCOL §12）；D5 chain2 Tier A/B 进行中（staged_b8 00:38 起；**S3 线修复已合入 `2cc57c6`/`daf6b1d`**，追赶链待接力；Tier C 待 C0）；iface v0.2（D1 增量候选已登记）；预算实耗：**D1 0.70/1.5**、D2 0.5/1.0、D3 0.22/1.0、D4 0.37/0.5、D5 进行中（自报待收）。
 
 ## 5. 组合与复核（只做相关组合）
 
@@ -95,17 +95,17 @@
 7. 声明审计：抽查 2–3 个关键数字与原始日志/JSON 一致；限制与反证条件写明；负结果保留。
 8. 复现：EXPERIMENTS 字段齐全、依赖 SHA 固定、复现命令可执行；外部引用标明“引用、未独立复核”。
 
-## 8. Wave-1 收口（滚动草稿 · 更新 2026-10-15 00:56）
+## 8. Wave-1 收口（滚动草稿 · 更新 2026-10-15 01:02）
 
-> wave-1 尚未关闭（D1 wave-2 配对、D4 收口标注、D5 Tier A/B 进行中）。本节是 C0 的滚动台账：给每条**当前判定 / 证据路径 / 解除条件**；最终 GO/HOLD/STOP/BLOCKED 在关闭时冻结。平台工程价值与论文贡献潜力分列，不互相折算。
+> wave-1 尚未关闭（D1 wave-2 配对——窗口已开；D5 Tier A/B 进行中；D4 已收口）。本节是 C0 的滚动台账：给每条**当前判定 / 证据路径 / 解除条件**；最终 GO/HOLD/STOP/BLOCKED 在关闭时冻结。平台工程价值与论文贡献潜力分列，不互相折算。
 
 | 路线 | 当前判定 | 关键证据 | 平台 / 论文 | 解除或关闭条件 |
 |---|---|---|---|---|
-| D1 | **GO（wave-2 放行；`d1-001-c0`）** | R3 全矩阵（W3 k4 +19.0% / MIX k4 +24.7%；peak −30~58%；C0 抽查 4 组 ✓）+ 24 条 EXPERIMENTS + oracle/pipeline 复跑 ✓；预算 0.70/1.5 | 平台：布局重排引擎 + probe stores；论文：候选（wave-2 配对 + 质量证据后定） | wave-2：L-W2-D1 配对跑 → 通过则 C0 集成 d1-001；条件（同表 replay / 字段口径）见 `d1-001-c0` |
+| D1 | **GO（wave-2 放行；`d1-001-c0`）** | R3 全矩阵（W3 k4 +19.0% / MIX k4 +24.7%；peak −30~58%；C0 抽查 4 组 ✓）+ 24 条 EXPERIMENTS + oracle/pipeline 复跑 ✓；round-2.1 parity-3 5/7（2 格 guard 跳过待补）；预算 0.70/1.5 | 平台：布局重排引擎 + probe stores；论文：候选（wave-2 配对 + 质量证据后定） | wave-2：L-W2-D1 配对跑 → 通过则 C0 集成 d1-001；条件（同表 replay / 字段口径）见 `d1-001-c0` |
 | D2 | **STOP（自判+采纳；机制 DEFERRED；已全收口）** | `research/rsi/d2/` @ lane `bfb3635`（+`d6e3c9a` 记录提交；REPORT/EXPERIMENTS/handoff 全量含失败与归因段；“12/12”笔误已更正；预算 0.5/1.0 GPU-h 已记）；pin 2×2（−6.8%，loss bitwise）+ dfly recipe 2×2（−12.9/−19.5ms，12 步 loss 逐值相同） | 论文：否（−3.0%/−5.6% ≪15%；Amdahl 上限 ~5–6%）；平台：opt-in 旋钮（lane 存档，不集成） | **已关闭**；再开=REPORT §8 条件 |
 | D3 | STOP（已接受） | REPORT `b88cdf2`：attention+mask=3.55%（C0 核数 ✓）；/tmp 已清 | 论文：否 | 再开条件：W2 长答 ~15% 外推 / b16 / S≥2.5–4k |
 | D4 | **merge-ready（平台工程级；`d4-003-c0`；不动 main）** | W1 五腿 counter-exact（C0 5/5 ✓）；**d4-001 集成 `1f8963e`（sha1 核对 ✓；13+4+70/70 ✓）**；**W2-B 收口**（F1–F4 PASS；两腿 counters 相同、adjustments=0；lane `a8e762c`；0.062 GPU-h） | 平台：adaptive 安全阀（opt-in、默认关、静态 RAM 场景）；论文：低（无提速声称；压力响应未验证） | 无待办；推进 main 由消费方/用户决定（按 INTEGRATION §7 checklist，不自动 merge） |
-| D5 | HOLD（条件项；chain2 进行中：Tier0 canon ✓ / smoke_s3 二败（图像暂存）→ S3 线停；非 S3 legs 跑中） | REPORT `85cbf8b` + sim v4 `23875e8` + d5-001 步 2 + lane 79/79（C0 复跑 ✓；82/82 待复核）+ G2 链记录（含 0.16 GPU-h 事故 + smoke_s3 两败） | 平台：runner 语义级可驱动真 trainer；论文：低（H2 负） | Tier A/B：staged_b8→sync_b8→sync_b32 出数（进行中）；S3 线修好暂存后补跑；Tier C 需 C0 |
+| D5 | HOLD（条件项；chain2 进行中：Tier0 canon ✓；**S3 线修复已合入**（`2cc57c6`/`daf6b1d`）；staged_b8 运行中（GPU1）） | REPORT `85cbf8b` + sim v4 `23875e8` + d5-001 步 2 + lane 79/79（C0 ✓；D5 侧扩至 85/85 待复核）+ G2 链记录（含 0.16 GPU-h 事故 + smoke_s3 两败与修复） | 平台：runner 语义级可驱动真 trainer；论文：低（H2 负） | Tier A/B：staged_b8→sync_b8→sync_b32 出数（进行中）；**S3 追赶链**（smoke_s3→s3_b8→s3_b32）接力；Tier C 需 C0 |
 
 跨路线观察：D5 v4 的 keep-oracle 变体需要“生成前已知 keep”的预测器——若 D1 双轴组织能提供此类信号，仅作为 **D1×D5 条件组合的讨论项**（未批准；须双方有共同监督位置才立项）。
 

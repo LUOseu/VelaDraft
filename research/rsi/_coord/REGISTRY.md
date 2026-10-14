@@ -3,7 +3,7 @@
 - 协议版本：**rsi-protocol-v0.1.0** ｜ 接口版本：**rsi-iface-v0.1.0**
 - 共同基线 BASE_SHA：`7eab1369266010137702de8c714053729cde5834`（origin/main，PR #6 合并后；含固定预算 LRU 记录缓存）
 - 历史核对基线 B0：`e15256d7c4bd10a490a7ac821eb12a0749a96fdd`
-- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 00:56 (Asia/Shanghai)
+- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 01:02 (Asia/Shanghai)
 - 无法确认的字段以 `?` 标注并在文末说明；未创建的 worktree/分支在下一次更新回填。
 
 ## 1. 角色与分支
@@ -11,11 +11,11 @@
 | 角色 | branch | worktree | 负责人 | 可改范围 | 依赖 | 接口版本 | 状态 |
 |---|---|---|---|---|---|---|---|
 | C0 | `research/rsi-c0` | `/Users/Admin/grounding-parallel/veladraft-c0` | C0 agent（本会话） | `research/rsi/_coord/` + 经批准的共享入口集成 | 五条路线输入；用户转发 | rsi-iface-v0.1.0 | ACTIVE：BASE 已冻结；v0.1.0 已发布（origin `research/rsi-c0`） |
-| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | **GO（wave-2 放行；`d1-001-c0`）**：round-2 全收（`56b6563`）——**R3 全矩阵（W3 k4 +19.0% / MIX k4 +24.7%；peak −30~58%；W0/W1 中性边界；C0 抽查 4 组 ✓）**；EXPERIMENTS 24 条（device 全填）；预算 **0.70/1.5 GPU-h**（自报入账）；`d1-001` 接收（条件=同表 replay / grad 字段口径 / git_sha 注记）；**L-W2-D1 ≤1.5 GPU-h**（GPU3 优先）；MIX store 登记 |
-| D2 | `research/rsi-d2` | `/Users/Admin/grounding-parallel/vlm-dflash-d2` | D2 agent（用户安排） | `research/rsi/d2/` + 新模块/测试 | BASE；与 D1 的软目标覆盖对齐 | rsi-iface-v0.1.0 | **STOP（自判+C0 采纳，`d2-001-c0`）**：REPORT/handoff/EXPERIMENTS/d2-001 到齐；pin 2×2 −6.8%（loss 四腿 bitwise）；dfly recipe 2×2（fwd −12.9/bwd −19.5ms；12 步 loss 四腿逐值相同，C0 直读 ✓）；CPU oracle **12/12（C0 复跑；更正“13”措辞）**；归因段完成（editable 遮蔽/event 伪影）；机制 DEFERRED（lane-local opt-in；再开=REPORT §8）；**欠 lane commit** |
+| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | **GO（wave-2 放行；`d1-001-c0`）**：round-2 全收（`56b6563`）——**R3 全矩阵（W3 k4 +19.0% / MIX k4 +24.7%；peak −30~58%；W0/W1 中性边界；C0 抽查 4 组 ✓）**；EXPERIMENTS 24 条（device 全填）；预算 **0.70/1.5 GPU-h**（自报入账）；`d1-001` 接收（条件=同表 replay / grad 字段口径 / git_sha 注记）；**L-W2-D1 ≤1.5 GPU-h**（GPU3 优先）；MIX store 登记；**round-2.1 p3 收尾 5/7**（`mix_w1w2_k2`/`w3_k2` guard 跳过待补；wave-2 窗口已开） |
+| D2 | `research/rsi-d2` | `/Users/Admin/grounding-parallel/vlm-dflash-d2` | D2 agent（用户安排） | `research/rsi/d2/` + 新模块/测试 | BASE；与 D1 的软目标覆盖对齐 | rsi-iface-v0.1.0 | **STOP（自判+C0 采纳，`d2-001-c0`）**：REPORT/handoff/EXPERIMENTS/d2-001 到齐；pin 2×2 −6.8%（loss 四腿 bitwise）；dfly recipe 2×2（fwd −12.9/bwd −19.5ms；12 步 loss 四腿逐值相同，C0 直读 ✓）；CPU oracle **12/12（C0 复跑；更正“13”措辞）**；归因段完成（editable 遮蔽/event 伪影）；机制 DEFERRED（lane-local opt-in；再开=REPORT §8）；lane commit `bfb3635`+`d6e3c9a` ✓（worktree 净；修正三项闭环） |
 | D3 | `research/rsi-d3` | `/Users/Admin/grounding-parallel/vlm-dflash-d3` | D3 agent（用户安排） | `research/rsi/d3/` + 新模块/测试 | BASE；D1 形状分布输入 | rsi-iface-v0.1.0 | **CLOSED（STOP 已接受；最终关闭确认 2026-10-15 00:18）**：attention+mask=21.16ms/595.9ms=**3.55%** ≪20%（cap +3.7% 步 / +1.4% online）；C0 核数 ✓；交付物全（`b88cdf2`：REPORT/EXPERIMENTS/handoff/support_matrix/evidence/scripts；worktree 净）；预算自报 0.22/1.0 GPU-h；服务器清理 ✓；无集成；再开条件=REPORT §8 |
 | D4 | `research/rsi-d4` | `/Users/Admin/grounding-parallel/vlm-dflash-d4` | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | **merge-ready（平台工程级；`d4-003-c0`）**：d4-001 集成 `1f8963e`（sha1 对账一致；13+4+70/70 复跑 ✓）；**W2 收口**（F1–F4 PASS；两腿 counters 645/129/129/0/0 逐值相同；adjustments=0；lane `a8e762c`；runtime 4 文件 sha1 再核一致）；范围=静态 RAM 场景/opt-in 默认关（压力响应未验证）；预算 0.37/0.5；不自动 merge main |
-| D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | D5 agent（用户安排） | `research/rsi/d5/` + 新模块/测试 | BASE；D1 成本模型；D4 缓存/配额接口 | rsi-iface-v0.1.0 | REPORT 已接收（`85cbf8b`；**C0 抽查 ✓**）；sim v4 `23875e8`；**d5-001 步 2 完成（`cf74790`+duplicate guard；lane **43/43 C0 独立复跑 ✓**；驱动真 train_dflash）**；**iface v0.2 候选受理（PROTOCOL §12）**；**G2 档位预授权**（min ≈2.2 GPU-h / 有价值集 ≈4.0）；静态分裂=wave-2 条件项（等窗口）；预算 ≤0.4/1.0 GPU-h |
+| D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | D5 agent（用户安排） | `research/rsi/d5/` + 新模块/测试 | BASE；D1 成本模型；D4 缓存/配额接口 | rsi-iface-v0.1.0 | REPORT 已接收（`85cbf8b`；**C0 抽查 ✓**）；sim v4 `23875e8`；**d5-001 步 2 完成（`cf74790`+duplicate guard；lane **43/43 C0 独立复跑 ✓**；驱动真 train_dflash）**；**iface v0.2 候选受理（PROTOCOL §12）**；**G2 档位预授权**（min ≈2.2 GPU-h / 有价值集 ≈4.0）；静态分裂=wave-2 条件项（窗口使用中）；预算 ≤0.4/1.0 GPU-h；**G2 chain2 运行中**（staged_b8 00:38 起；S3 线修复 `2cc57c6`/`daf6b1d` 已合入，追赶链待接力） |
 
 边界（不得越界）：D4 不改 batch/anchor/目标函数、不调度流水线；D1 不改 cache policy/soft loss/attention kernel；D2 不合并不同 student 查询、不改 anchor 采样与 attention；D3 不改可见性语义、不接管布局调度与 cache；D5 用 D4/D1 接口，不重写缓存/采样器/训练目标；C0 只协调集成，不接管研究路线。
 
@@ -207,6 +207,10 @@ REPORT Round-2 / EXPERIMENTS（24 条，hardware 全填）/ `proposals/d1-001.md
 
 `d4-003` 收讫（00:46）。C0 独立核验（00:52）：lane `a8e762c`（含 `208f422`）worktree 净；runtime 4 文件 sha1 与集成版逐一致（`3d48e108`/`fc019296`/`1c5c2a64`/`69071557`）；`w2_gpu_fcheck.txt` F1–F4 逐项 PASS；两腿 counters `645/129/129/0/0`、peak=current=870,653,628（=sim 预测）；`adaptive_budget` 字段（cap=budget=allowed=1GiB、adjustments=0、reserve 27.0GB、sensor=meminfo available 219.0GB）与 `execution_mode`/`limitation` 标注到位。**裁决：`proposals/d4-003-c0.md`——收口接收 + merge-readiness READY（平台工程级；范围=静态 RAM 场景 / opt-in 默认关 / 不动 main）。** 压力响应/收缩回涨时延类主张不得基于本轮（实机未验证）。`host_ram_budget_gb` 命名与语义**确认**（默认 null）；PROTOCOL §12 已更新。预算 W1 0.31 + W2-B 0.062 ≈ **0.37/0.5 GPU-h**；L-W2-D4 关闭；无待办（可选升级 A 保持 HOLD，再开需用户条件 + 新预注册）。
 
+### 对 D1（2026-10-15 01:02，p3 收尾与 wave-2 窗口）
+
+round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**5/7 格 rc=0**（mix_k4 / w3_k4 / w0_k2 / w1_k2 / w2_k2；末格 exit=0 00:56:52）。**`mix_w1w2_k2_p3`、`w3_k2_p3` 被 GPU2 guard 跳过**：w2_k2 刚结束、卡已清空（18MiB/48522MiB free）但 util 残差采样 31% > 10 → 单次 FAIL 即跳过（脚本无重试、无产物；两格 round-2 原件在案）。请补跑这两格（建议 guard 二次采样 / 短等待）或注明放弃理由；**k4 两格（wave-2 用料）覆盖完好**。v2 summary 抽查 ✓（`*_vs_ref`/`*_vs_canonical` 语义自述、`git_sha=research/rsi-d1@56b6563+round2.1-parity3` 注记到位）。**wave-2 窗口现已开放**（GPU2/3 空闲）：按 `L-W2-D1` 自启（≤1.5 GPU-h、GPU3 优先、不占 D5 的 1+2）；未提交回填（EXPERIMENTS device 字段 / `r3_ab_step.py` v2）提交后 C0 复核。
+
 ### 复核记录（C0 抽查，引用级）
 
 - 2026-10-14 23:24 — D4 W1 仿真：s3_sim_sweep.jsonl 全容量行与 s3 b_on 记录逐字段一致（命中/存储/峰值字节）；不足容量命中率序列合理（10/25/50% → 0.4/2.9/13.0%）。结论：LRU/字节模型对这组访问序列**成立**；未独立重跑仿真。
@@ -242,3 +246,7 @@ REPORT Round-2 / EXPERIMENTS（24 条，hardware 全填）/ `proposals/d1-001.md
 - 2026-10-15 00:52 — D4 W2 收口复核（C0）：lane `a8e762c`；4 文件 sha1 与集成 `1f8963e` 一致；F1–F4 PASS（counters 645/129/129/0/0；adjustments=0；sensor meminfo；exit=0；自清 ✓）；merge-ready 评估见 `d4-003-c0`。
 - 2026-10-15 00:49 — D1 观察（只读）：自启 round-2.1 `--parity 3` 重复跑——mix k4 p3 完成（cost 1.170/grid 1.163 < 首跑 1.240/1.247，跨 run 波动待聚合）；w3 k4 p3 运行于 GPU2（quiet-guard ✓；非 C0 指令，属 wave-1 证据加强）；卡位提醒见 RESOURCE_SCHEDULE（sync 腿需 1+2；长跑优先 GPU3）。
 - 2026-10-15 00:52 — D1 round-2.1 抽样复核（C0，服务器直读）：新 summary 字段 `*_vs_ref`/`*_vs_canonical` 生效（mix k4 p3：canonical-vs-ref grad 3.66e-3=bf16 量化；各重排臂 vs-ref grad ≤5.3e-3、update ≤7.2e-8；loss vs-ref ≤2.1e-5；peak 与首跑一致）。旧 summary 的 `grad_rel_err_max=0.0` 仍须在提交里注明口径（或重生成）。
+- 2026-10-15 00:57 — D1 round-2.1 p3 队列收尾（C0 服务器直读）：**5/7 格 rc=0**（mix_k4 00:47 / w3_k4 00:51 / w0_k2 00:53 / w1_k2 00:55 / w2_k2 exit=0 00:56:52）；**`mix_w1w2_k2_p3` 与 `w3_k2_p3` guard 单次失败被跳过**——卡已清空（18MiB/48522 free）但 util 残差采样 31% > 10；脚本无重试、无产物。v2 summary 核读 ✓（`*_vs_ref` grad 5.96e-3 / update 5.78e-8；`parity_semantics` 自述“null=未记录、0.0 为真实值”；git_sha 注记 `56b6563+round2.1-parity3`）。待办见 §7 对 D1。
+- 2026-10-15 00:57 — 服务器快照：GPU0=外部 xs 15.9GB/96%；GPU1=D5 staged_b8 8.3GB/62%（regen 1448/2000、kept=679 @00:56）；GPU2/GPU3 空闲；disk 17G。**L-W2-D1 窗口开放**（D1 自启；D5 后续 sync 腿用 1+2，互不冲突）。
+- 2026-10-15 00:57 — D5 lane S3 线修复合入（记录级，待复跑复核）：`bb0036e`（split_pipeline 入口 roots 修正+回归）、`2378f73`（chain2 header + G2_LADDER post-mortem）、`2cc57c6`（split_stage 装配 media 符号链接——修 smoke_s3 worker FileNotFoundError；+2 测试）、`daf6b1d`（`G2_SKIP_LEGS` 旋钮 + S3 追赶计划）。策略=「S3 线内硬失败只停 S3 线」；**S3 追赶链（smoke_s3→s3_b8→s3_b32）待非 S3 legs 完成后启动**；Tier C 仍待 C0。C0 复跑计划：追赶链开跑前后按 lane 85/85 + smoke_s3 parity 再核。
+- 2026-10-15 00:58 — **D2 修正三项全闭环（lane 终态）**：`bfb3635`（00:29:55；9 文件 knobs 默认 OFF；12 tests 含 fp64 oracle）+ `d6e3c9a`（00:30:10 docs）；worktree 全净；REPORT §4.1 已改述“12/12（‘13/13’ 为计数笔误）”；handoff 含 9 文件冻结 sha1 清单 + 聚合 `88457542…`。D2 = STOP 终态、无待办。
