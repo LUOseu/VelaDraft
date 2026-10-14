@@ -115,6 +115,10 @@
 - 2026-10-15 02:45 — **D1 三连**：R4 收尾/共驻披露/重编号（005→006）收到，R4 全闭环；**2×2 放行（fast-path；L-W3-D4xD1 ≤1.5、GPU3 现空）**；**`d1-006` held-out 质量接收（L-W3-D1Q ≤2.4，staged：先 canonical×{42,43} 建带 → regroup×{42,43} 比较；2×2 后跑）**。
 
 - 2026-10-15 02:59–03:00 — **磁盘告警→自愈（C0 实测）**：s3_b8 尾部写入把 `/home` avail 压至 **5G**（02:58:55 实测）；02:59:11 s3_b8 `exit=0`（wall 1716s、alloc 0.95 GPU-h）后，**D5 prune 脚本 02:59:14 清理其 ckpt/shard（8.0G→19.4G avail）**；02:59:12 `s3_b32` 首试被磁盘守卫跳过（rc=96、run `g2_s3_b32_1015_0259`、vs `g2_sync_b32_1015_0153`），链已按 300s 重试（预计 03:04 通过）。D1：02:54 曾六连重试后 **GUARD FAIL（disk 7–9G；GPU3 本身 quiet）**；**02:59:21 释放后自动重启** `d4xd1_smoke`（3 步；visual_path_check 已过）→ 2×2 8 腿随后。**教训**：s3 腿峰值写 ~10–12G，10G 守卫仅够"起步"；后续腿前建议实测 ≥15G。候选余量清理（用户确认）：zoo-publish-20261013/14 7.5G、fpt_tmp 0.4G。
+- 2026-10-15 03:02–03:17 — **D4×D1 2×2 初跑（GPU3）**：legs 1–3 rc=0（ref 03:07:29 / cacheoff×bucketon 03:12:26 / cacheon×bucketoff 03:15:25）；leg4（cacheon×bucketon）03:17:31 rc=1（guard：/home 7–9G 低于当时门槛；非训练错误）。**03:17 parity 捕获缺陷自检停链**（sitecustomize grads hook 写错为参数本体，D1 全披露 addendum §5.5）→ 4 个 W3 腿目录 + 全部 tensor 目录删除（证据无效）。初跑 **≈0.26 GPU-h 入账、全部作废**（仅仪器调通参考）。
+- 2026-10-15 03:22 — **D5 `s3_b32` exit=0**（wall 1074s、alloc 0.59 GPU-h）；03:22:12 prune 释放 `/home` 6.2G→17.7G。D5 `g2_collect.json`（11 行）出数：s3_b8 1716s（parity 全 ✓；vs sync_b8 −21%、vs staged_b8 −25%）；s3_b32 1074s（regen ✓、store 待 staged_b32 复验；vs sync_b32 −12.6%）。
+- 2026-10-15 03:22–03:25 — **D1 修复版 smoke 复核通过**：03:22（自校）与 03:24（trace 版，`research/rsi-d1@trace`）各 3 步 exit=0；clip trace call0 `my_clone 88.956` vs `clip_return 89.053`（0.11% = bf16 量化类）→ 恒等式健康。GPU3 释放；/home 17.7G、/tmp 23G。
+- 2026-10-15 03:30 — **裁定 `d4xd1-002-c0` 发布**（update 轴读法冻结 + 重启 GO；重启集 8 腿 = 唯一正式证据；预算 初跑 ≈0.26 + 重启 ≤1.2 ≤ 1.5 内）。重启链 **等待执行**（守卫双卷就绪：/tmp 21G+、/home 13G+；GPU3 空）。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
