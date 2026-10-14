@@ -62,7 +62,7 @@
 
 | 路线 | wave-1 证据 | 门槛核验 | 当前判定 |
 |---|---|---|---|
-| D1 | 浪费审计（ctx pad 12.6%、block pad 6.0%）；R3-prereq oracle（**C0 复跑 ✓**）；R3 冒烟 ✓；**W1 store ✓（191/192）＋W2 store ✓（00:08:25 exit=0；144/144；自清 ckpt）＋W3 build 运行中**；W1 首跑曾被 SIGTERM（事故 #4） | W3/R3 正式 A/B 待跑 | HOLD（W3 + 正式 R3 A/B + d1-001；W1/W2 资产可被 D4/D5 引用） |
+| D1 | 浪费审计（ctx pad 12.6%、block pad 6.0%）；R3-prereq oracle（**C0 复跑 ✓**）；**W1/W2/W3 store 全 ✓（W3 00:30:29；192/192 全多轮；摘要 `95ef12e4…`）**；**R3 正式扫掠进行中**（k2 四 store 完成 + w1_k2 运行 + k4 排队；k2 初验：mix **1.24×** wall、显存 −30~38%；W1 首跑曾被 SIGTERM=事故 #4） | **显存门 ≥25% 初测达标（k2 全 store）**；wall 门待整步口径；grad/update parity 记录待修正 | HOLD（R3 收口 + d1-001 + 预算；W1/W2/W3 资产可被 D4/D5 引用） |
 | D2 | rho=6.83；**12 项 CPU 测试（C0 复跑 12/12 ✓）**；pin 2×2 fwd -6.8%（loss 四腿 bitwise）；**dfly recipe 2×2 完成：fwd −12.9ms、bwd −19.5ms（12 步 loss 四腿逐值相同，C0 直读 ✓）**；phase dedup4 归因完成（editable install 遮蔽=空对照；未钉卡 event 伪影已修） | ρ≥2 ✓；**收益 −3.0%（Jetspec）/ −5.6%（DFly recipe）≪15%；显存无降** | **STOP（D2 自判，C0 采纳；d2-001-c0）**→DEFERRED（lane-local opt-in；再开条件=REPORT §8） |
 | D3 | trace + Amdahl：attention+mask=21.16ms/595.9ms=**3.55%**（cap +3.7% 步 / +1.4% online），**C0 核数 ✓** | ≥20% ✗（远未达） | **STOP**（kernel 轨；re-open 条件已登记） |
 | D4 | W1 五腿 counters 逐值一致（**C0 5/5 ✓**）+ harvest 回填（REPORT §W1/§W2）；W2 CPU 压力轨迹（证伪→修复；零越界） | 无提速声称（安全阀）；d4-001 已集成（`1f8963e`）；lane commit 对账 + real-sensor A/B（L-W2-D4）待完成 | HOLD→集成路径明确（ACCEPTED 条件；L-W2-D4 ≤1.5 GPU-h，00:20 起预授权窗口）；平台工程候选，非收益项 |
@@ -101,7 +101,7 @@
 
 | 路线 | 当前判定 | 关键证据 | 平台 / 论文 | 解除或关闭条件 |
 |---|---|---|---|---|
-| D1 | HOLD（最高候选） | **W1 store ✓（191/192）＋W2 store ✓（144/144；00:08:25）＋W3 build 运行中**（server `/home/lyh/rsi-d1/runs/`）；`research/rsi/d1/evidence/w0_waste_v2.json`；oracle/parity 复跑（REGISTRY §6）；R3 冒烟 `r3_ab_w0_smoke3.jsonl` | 平台：probe store 资产；论文：潜力最高（双轴组织 + R3） | W3 完成；正式 R3 A/B（≥3 交替）；`d1-001.md`；整步 ≥15% 或显存 ≥25% 才进 wave-2 配对 |
+| D1 | HOLD（最高候选；R3 扫掠中） | **W1/W2/W3 store 全 ✓（W3 00:30:29；192/192 多轮；摘要 `95ef12e4…`）**（server `/home/lyh/rsi-d1/runs/`）；waste 审计 + oracle（C0 复跑 ✓）；**R3 正式 k2 四 store 已出数（mix 1.242×、显存 −30~38%，C0 重算抽查 ✓）**＋k4 排队 | 平台：probe store 资产；论文：潜力最高（双轴组织 + R3） | R3 收口（含 device/parity 口径修正）+ `d1-001.md`；整步 ≥15% 或显存 ≥25% 才进 wave-2 配对 |
 | D2 | **STOP（自判+采纳；机制 DEFERRED）** | `research/rsi/d2/{REPORT.md,EXPERIMENTS.jsonl,handoff.md}`（全量与失败，含归因段 §6）；pin 2×2（−6.8%，loss bitwise）；dfly recipe 2×2（fwd −12.9/bwd −19.5ms；12 步 loss 逐值相同，C0 直读 ✓）；`d2-001` + `d2-001-c0` | 论文：否（−3.0%/−5.6% ≪15%）；平台：opt-in 旋钮（不集成） | 已按 STOP 收口；再开=REPORT §8 条件；欠 lane commit |
 | D3 | STOP（已接受） | REPORT `b88cdf2`：attention+mask=3.55%（C0 核数 ✓）；/tmp 已清 | 论文：否 | 再开条件：W2 长答 ~15% 外推 / b16 / S≥2.5–4k |
 | D4 | HOLD → 已集成（merge 待验证） | W1 五腿 counter-exact（C0 5/5 ✓）；REPORT §W1/§W2；**d4-001 集成 `1f8963e`（sha1 对账一致；复跑 13+4 ✓）** | 平台：adaptive 安全阀（opt-in）；论文：低（无提速声称） | D4 lane commit 对账；L-W2-D4 ≤1.5 GPU-h real-sensor A/B → 然后可评 merge-ready |
