@@ -61,6 +61,7 @@
 | L-W3-D4xD1 | D1（执行全部 8 腿；另半 = D4 机制产品路径集成运行，D4 线不重开） | **GPU3 优先；8 legs 同卡**；不共 D5 的 1+2；D5 新腿需要 3 时让行 | 即刻 → 8 legs 完成或卡被占 | **批准 ≤1.5 GPU-h**（02:38；`d4xd1-001-c0`）：{cache_off, cache_on=16GiB} × {bucket_off, grid/sub2}、online、W3+MIX seed 42、1 warmup + 100 updates；F1–F4 判决冻结；**02:45 fast-path 放行**：addendum 三条（命令/parity 捕获法/anchor 机制）落 handoff 即开跑 |
 | L-W3-D1Q | D1 held-out 质量（`d1-006`） | GPU3（2×2 之后同卡顺序）；quiet-gate 同 L-W2-D1 | → 4 训练腿 + eval（staged）完成或卡被占 | **接收 ≤2.4 GPU-h**（02:45；条件化）：Stage-1 canonical×{42,43} 建带（≤1.2）→ Stage-2 regroup×{42,43} 比较（≤1.2）；先带后比；`eval_dflash.py` 64 prompts / 固定 val；<200 步不收敛 → 不判定 |
 | L-W3-D5B | D5 staged_b32（补离线静态基线 + store-parity 复验） | 任一实测 quiet 单卡（避开 D1 2×2 所在 GPU3；quiet 口径同 L-W2-D1） | 2026-10-15 03:45 → staged_b32 完成 + `verify_against` 收据或卡被占 | **批准 ≤0.75 GPU-h**（03:45；`d5-002-c0`）：offline 单卡；目的=关闭 s3_b32 store parity 盲区（对 `g2_s3_b32_1015_0304` 复验）+ 补 b32 离线基线行；**建议 avail ≥15G 起步**（s3 腿峰值 10–12G 教训）、跑后 prune、结果回填 EXPERIMENTS/REPORT §10 |
+| L-W3-D4xD1B | D1 W3 损失路径隔离对照（`d4xd1-004`） | **GPU3 优先**；quiet 口径同 L-W2-D1；与 D5 L-W3-D5B 不共卡 | 2026-10-15 04:15 → 单腿完成 + C0 重算收据或卡被占 | **批准 ≤0.10 GPU-h**（04:15；`d4xd1-004-c0`）：W3、cache_off、bucket_on(grid/sub2) + `train.regroup.fp32_weights=false`、101 步、seed 42；ref 复用（不重跑）；F1B 门 7.5e-3 冻结；映射预登记（PASS→归因收敛 / FAIL→阻断加深）；D1 执行，C0 同工具重算 |
 
 ### 观察记录（C0 只读，未独立复核）
 
@@ -123,6 +124,8 @@
 - 2026-10-15 03:45 — **C0：D5 三项请求复核与裁定（`d5-002-c0`）**：套件范围 pin `55e4e9c`（`55e4e9c..7db5d93` 仅文档 diff）→ 本地+服务器 88/88 复跑 ✓（服务器需 shim 绕 c1vllm site-packages 的 `tests` 遮蔽）；数字抽查 ✓（g2_collect walls、split parity、step 760/762/768 loss 行逐字节）；**批准 staged_b32**（L-W3-D5B）；**pinned_b8 = HOLD**。
 - 2026-10-15 03:38–03:53 — **D1 2×2 重启链（GPU3）**：W3 4 腿 rc=0（03:38:52→03:49:57；≈0.05 GPU-h/腿）；MIX ref（leg5）rc=0 03:53:24，legs 6–8 在跑。C0 直读：floor probe bitwise 0.0（缓存数值惰性 + 跨进程确定性）；bucket_on 两腿逐位一致；F1 冻结门下 bucket_on max loss_rel 1.248e-2@11（4/100 步超门）——初步归因损失路径差类（fp32 vs bf16 权重）+ 动力学；细节 `evidence/c0_d4xd1_interim_read_20261015.md`；不事后放宽，收口待 MIX。
 - 2026-10-15 03:47 — **磁盘腾挪（C0；用户先前确认候选）**：删除 `/home/lyh/zoo-publish-20261013`（4.0G）/`zoo-publish-20261014`（3.5G）/`fpt_tmp`（0.4G）→ `/home` avail 13G→**21G**（保 D1 在途链与 D5 staged_b32 余量）。
+- 2026-10-15 04:02 — **D1 2×2 重启链完成（GPU3）**：8/8 rc=0（03:34:22→04:02:42；腿墙合计 **0.472 GPU-h** + 修复 smoke ≈0.03；L-W3-D4xD1 累计 ≈0.76/1.5，余额 ≈0.74）；**收口判决 `d4xd1-003-c0` + 隔离对照预注册 `d4xd1-004-c0` 发布**（W3 F1-as-registered FAIL→组合声明不成立·阻断；MIX 全过；交互 bit-0）。GPU3 释放；/home 20G。
+- 2026-10-15 04:15 — **新租约 L-W3-D4xD1B**（`d4xd1-004-c0`）：W3 损失路径隔离单腿（`regroup.fp32_weights=false`）≤0.10 GPU-h、GPU3、D1 执行（harvest 回填提交后、d1-006 前）。D5 `L-W3-D5B`（staged_b32 ≤0.75）已批；截至 04:15 未见开跑（服务器 4 卡全空、/home 20G）。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 

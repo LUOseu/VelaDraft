@@ -3,7 +3,7 @@
 - 协议版本：**rsi-protocol-v0.1.0** ｜ 接口版本：**rsi-iface-v0.1.0**
 - 共同基线 BASE_SHA：`7eab1369266010137702de8c714053729cde5834`（origin/main，PR #6 合并后；含固定预算 LRU 记录缓存）
 - 历史核对基线 B0：`e15256d7c4bd10a490a7ac821eb12a0749a96fdd`
-- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 02:27 (Asia/Shanghai)
+- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 04:15 (Asia/Shanghai)
 - 无法确认的字段以 `?` 标注并在文末说明；未创建的 worktree/分支在下一次更新回填。
 
 ## 1. 角色与分支
@@ -11,10 +11,10 @@
 | 角色 | branch | worktree | 负责人 | 可改范围 | 依赖 | 接口版本 | 状态 |
 |---|---|---|---|---|---|---|---|
 | C0 | `research/rsi-c0` | `/Users/Admin/grounding-parallel/veladraft-c0` | C0 agent（本会话） | `research/rsi/_coord/` + 经批准的共享入口集成 | 五条路线输入；用户转发 | rsi-iface-v0.1.0 | ACTIVE：BASE 已冻结；v0.1.0 已发布（origin `research/rsi-c0`） |
-| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | **GO（修订口径；`d1-002-c0`+`d1-003-c0`；wave-2 全收）**：wave-2 6/6 rc=0（{W3,MIX}×3 seeds；grid 配对均值 1.135/1.133、win 580/600、peak −57%、parity b0/50/100 ✓，C0 重算）；**capacity demo ✓ C0 逐值重算**（W3 b16 43.59→14.32 GiB；**b24 canonical OOM 5/5 vs cost 14.41 GiB 5/5**；MIX b16 27.74→9.83 GiB）→ **L-W2-D1 关闭（≈0.90/1.5）**；close-out `6dc5f74`（REPORT §11 / EXPERIMENTS 42）；**d1-001 最小集已集成**：`research/rsi-c0` @ `4e1674e`（opt-in、默认 byte-identical；全套 509 pass/6 skip）；下一 = **D4×D1 2×2（已解锁）** + held-out 质量（欠）；round-2 的 +19.0%/+24.7% 系 8 批 cell（不作主数字）；**R4 评估已收（k4 残余 4.7–5.2%/6.1–6.4%；§12）；cross-check `3e29244` PASS（建议 a 采纳 → `192554a`）；d1-004 租约 L-W3-D1R4 已批（≤0.2 GPU-h）** |
+| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | **GO（修订口径；`d1-002-c0`+`d1-003-c0`；wave-2 全收）**：wave-2 6/6 rc=0（{W3,MIX}×3 seeds；grid 配对均值 1.135/1.133、win 580/600、peak −57%、parity b0/50/100 ✓，C0 重算）；**capacity demo ✓ C0 逐值重算**（W3 b16 43.59→14.32 GiB；**b24 canonical OOM 5/5 vs cost 14.41 GiB 5/5**；MIX b16 27.74→9.83 GiB）→ **L-W2-D1 关闭（≈0.90/1.5）**；close-out `6dc5f74`（REPORT §11 / EXPERIMENTS 42）；**d1-001 最小集已集成**：`research/rsi-c0` @ `4e1674e`（opt-in、默认 byte-identical；全套 509 pass/6 skip）；**D4×D1 2×2 已收官（`d4xd1-003-c0`）：W3 cell F1-as-registered FAIL（1.2475e-2@11）→ 组合数值相容性声明不成立·正确性阻断；MIX cell 全过；交互 bit-0；隔离对照 `d4xd1-004-c0` 放行（L-W3-D4xD1B）**；下一 = harvest 回填提交 + d4xd1-004 + held-out 质量（`d1-006`/L-W3-D1Q 待跑）；round-2 的 +19.0%/+24.7% 系 8 批 cell（不作主数字）；**R4 评估已收（k4 残余 4.7–5.2%/6.1–6.4%；§12）；cross-check `3e29244` PASS（建议 a 采纳 → `192554a`）；d1-004 租约 L-W3-D1R4 已批（≤0.2 GPU-h）** |
 | D2 | `research/rsi-d2` | `/Users/Admin/grounding-parallel/vlm-dflash-d2` | D2 agent（用户安排） | `research/rsi/d2/` + 新模块/测试 | BASE；与 D1 的软目标覆盖对齐 | rsi-iface-v0.1.0 | **STOP（自判+C0 采纳，`d2-001-c0`）**：REPORT/handoff/EXPERIMENTS/d2-001 到齐；pin 2×2 −6.8%（loss 四腿 bitwise）；dfly recipe 2×2（fwd −12.9/bwd −19.5ms；12 步 loss 四腿逐值相同，C0 直读 ✓）；CPU oracle **12/12（C0 复跑；更正“13”措辞）**；归因段完成（editable 遮蔽/event 伪影）；机制 DEFERRED（lane-local opt-in；再开=REPORT §8）；lane commit `bfb3635`+`d6e3c9a` ✓（worktree 净；修正三项闭环） |
 | D3 | `research/rsi-d3` | `/Users/Admin/grounding-parallel/vlm-dflash-d3` | D3 agent（用户安排） | `research/rsi/d3/` + 新模块/测试 | BASE；D1 形状分布输入 | rsi-iface-v0.1.0 | **CLOSED（STOP 已接受；最终关闭确认 2026-10-15 00:18）**：attention+mask=21.16ms/595.9ms=**3.55%** ≪20%（cap +3.7% 步 / +1.4% online）；C0 核数 ✓；交付物全（`b88cdf2`：REPORT/EXPERIMENTS/handoff/support_matrix/evidence/scripts；worktree 净）；预算自报 0.22/1.0 GPU-h；服务器清理 ✓；无集成；再开条件=REPORT §8 |
-| D4 | `research/rsi-d4` | `/Users/Admin/grounding-parallel/vlm-dflash-d4` | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | **merge-ready（平台工程级；`d4-003-c0`）**：d4-001 集成 `1f8963e`（sha1 对账一致；13+4+70/70 复跑 ✓）；**W2 收口**（F1–F4 PASS；两腿 counters 645/129/129/0/0 逐值相同；adjustments=0；lane `a8e762c`；runtime 4 文件 sha1 再核一致）；范围=静态 RAM 场景/opt-in 默认关（压力响应未验证）；预算 0.37/0.5；不自动 merge main |
+| D4 | `research/rsi-d4` | `/Users/Admin/grounding-parallel/vlm-dflash-d4` | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | **merge-ready（平台工程级；`d4-003-c0`）**：d4-001 集成 `1f8963e`（sha1 对账一致；13+4+70/70 复跑 ✓）；**W2 收口**（F1–F4 PASS；两腿 counters 645/129/129/0/0 逐值相同；adjustments=0；lane `a8e762c`；runtime 4 文件 sha1 再核一致）；范围=静态 RAM 场景/opt-in 默认关（压力响应未验证）；预算 0.37/0.5；**D4×D1 2×2 只读参与收官（`d4xd1-003-c0`）：bucket_off×cache 腿数值惰性 bit-exact（floor probe 0.0）——线不重开**；不自动 merge main |
 | D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | D5 agent（用户安排） | `research/rsi/d5/` + 新模块/测试 | BASE；D1 成本模型；D4 缓存/配额接口 | rsi-iface-v0.1.0 | REPORT 已接收（`85cbf8b`；**C0 抽查 ✓**）；sim v4 `23875e8`；**d5-001 步 2 完成（`cf74790`+duplicate guard；lane **43/43 C0 独立复跑 ✓**）；iface v0.2 候选受理（PROTOCOL §12）；G2 档位预授权（min ≈2.2 / 有价值集 ≈4.0 GPU-h）；**G2 chain2 完成 Tier 0+A+B（CHAIN2 DONE 02:13:58）**：staged_b8 ✓（762 步，kept 1012，≈1.27 GPU-h 分配口径）、sync_b8 ✓（wall 2174.5s，**vs staged −5.3%**，远低于 sim −14%；epoch-1 抽取不与训练重叠——本 build 串行）、sync_b32 ✓（01:53:29→02:13:58，768 步 final_loss=4.0625）；Tier C 倾向暂缓；**S3 追赶链 smoke_s3 02:19 假失败（worker zero-keep；事故 #7；D5 修复在途）**；harvest 须按时间戳重算 GPU-h（链脚本 107 行算式报错）；**C0 复核收据与裁定（03:45，`d5-002-c0`）：套件范围 pin `55e4e9c`（至 HEAD 7db5d93 仅文档 diff）→ 本地+服务器 88/88 复跑 ✓；数字抽查 ✓（walls/parity/step-760·768 逐位 loss 行）；staged_b32 批准（L-W3-D5B ≤0.75 GPU-h）；pinned_b8 = HOLD** |
 
 边界（不得越界）：D4 不改 batch/anchor/目标函数、不调度流水线；D1 不改 cache policy/soft loss/attention kernel；D2 不合并不同 student 查询、不改 anchor 采样与 attention；D3 不改可见性语义、不接管布局调度与 cache；D5 用 D4/D1 接口，不重写缓存/采样器/训练目标；C0 只协调集成，不接管研究路线。
@@ -378,3 +378,26 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 1. **套件复核 ✓（范围已固定）**。D5 请求复核 HEAD `55e4e9c`（88/88）。C0 固定范围：`git diff --stat 55e4e9c..7db5d93` = 仅 4 个文档（EXPERIMENTS/REPORT/STATE/handoff；+134/−1）→ 代码树与套件范围一致。复跑：本地（py3.12 venv）**88 pass**；服务器（c1vllm，lane-local `pip --target /tmp/c0-d5-pytest` 装 pytest）**88 pass、exit 0**。环境坑（备查）：c1vllm site-packages 自带 `tests` 包遮蔽仓库 `tests/` 命名空间 → PYTHONPATH 前置 shim（`/tmp/c0-d5-shim/tests/__init__.py` 内 `__path__` 重定向到仓库 tests）后全绿；之后在服务器跑 lane 套件需带 shim 或换 venv。
 2. **数字抽查 ✓**。`logs/g2_collect.json`（11 行）walls：s3_b8 1716s vs sync_b8 2174.5 **−21.1%**、vs staged_b8 2297.3 **−25.3%**；s3_b32 1074s vs sync_b32 1228.8 **−12.6%**（与声称一致）。`_split/split_report.json` parity 逐项：s3_b8 `ok=true`（regen 1012/1012、skipped 988、store 1012 全 match）；s3_b32 `ok=null, partial=true`（regen/skipped match；store=null + "online-mode canonical" 原因串，按 tri-state 不作 store-parity 证据）。**轨迹抽验**：step 760/761/762 loss 行 s3_b8 ≡ staged_b8；step 768 s3_b32 ≡ sync_b32（逐字节）。
 3. **裁定**：①复核通过（无整改要求）。②**批准 staged_b32**（新租约 L-W3-D5B，≤0.75 GPU-h，offline 单卡）——目的 = 关闭 s3_b32 store parity 盲区 + 补齐 b32 离线静态基线行；跑毕执行 `runner.split_verify.verify_against(g2_s3_b32_1015_0304, g2_staged_b32_*)`，输出路径入 EXPERIMENTS + handoff；建议实测 avail ≥15G 起步、跑后 prune。③**pinned_b8 = HOLD（不批）**：H1 预期 ~3% 增量、磁盘全程紧张、静态全景已可按 {staged,sync,s3-split}×{b8,b32} 收口；若后续"多 GPU 静态分配"成为交付主张，再单批单腿并按 §11 记录。④成本感知调度线维持 STOP（同 D5 自判）。
+
+### 收口判决 `d4xd1-003-c0`（D4×D1 2×2；2026-10-15 04:10，C0）
+
+- 8/8 rc=0（重启集 = 唯一正式证据；03:34:22→04:02:42，GPU3）；C0 独立重算（`tools/d4xd1_recompute.py`；输出 `evidence/c0_d4xd1_recompute_out_20261015.json`）与 D1 harvest 逐项一致。
+- **判决（冻结门，不放宽）**：W3 cell——bucket_off 两腿 PASS（0.0）；**bucket_on 两腿 F1-as-registered FAIL**（max **1.2475e-2@11**；steps 11–14 超门；中位 1.854e-3/p90 4.290e-3）。MIX cell——**全过**（bucket_on max 6.1262e-3@37 ≤7.5e-3）。F2（W3 616/192/192/0；MIX 471/335/335/0）、F3（0.5324/0.5408）、F4（1.0217/1.0281；1.0138/1.2168）全 PASS；anchors 4/4 腿 cell 内一致（104 calls；尾随 sha1 `150a67a8…`/`1de1d7b3…`）；identity 8/8（≤5.7e-8，tol 1e-6）；floor probe grads/updated/loss **全 0.0**（跨进程确定性 + 缓存数值惰性，硬谓词成立）。
+- **交互 = 0（bit 级）**：bucket_on 两 cache 水平逐位一致 → 全部偏差属布局（regroup）足迹，与 cache 无关。
+- **映射（预登记执行）**：W3 cell F1 败 → **组合数值相容性声明按原注册不成立；cache×regroup 暂禁（正确性阻断）**；另立项 = `d4xd1-004-c0`（W3 损失路径隔离单腿，L-W3-D4xD1B ≤0.10）。MIX cell 相容性成立（单体）。
+- 归因注记（数据后；不改门）：W3 超门主体 = 「regroup fp32 权重损失路径 vs 出厂 bf16」已知差类 + 在线动力学（未隔离 → 004）；grads parity 名义超限（b50/b100）由小范数张量主导（≤0.3% 全向量范数），语义注记；update 轴类一致性读法未见 anomaly（ρ 跨点 ≤6.7× 波动，无数量级跳跃）。
+- 预算：初跑 0.26（void，含 smoke）+ 重启 ≈0.50（腿墙 0.472 + 修复 smoke ≈0.03）→ **L-W3-D4xD1 累计 ≈0.76/1.5（余额 ≈0.74）**。
+- 全文：`proposals/d4xd1-003-c0.md`。
+
+### 预注册 `d4xd1-004-c0`（W3 损失路径隔离对照；L-W3-D4xD1B）
+
+- **单腿**：W3、cache_off、bucket_on（grid/sub2）+ **`train.regroup.fp32_weights=false`**；ref 复用（不重跑）；同 seed/行集/锁步协议/GPU3。
+- **F1B 门（冻结）**：timed 2..101 max loss_rel ≤7.5e-3 → PASS；否则 FAIL。映射：PASS→归因收敛（超门=损失路径类；在线分组本身在带内；组合声明重建与否由 C0 另裁，不撤销 003 记录）；FAIL→在线分组本身超带，阻断加深（转机制排查）。
+- **租约 L-W3-D4xD1B**：≤0.10 GPU-h（实测同型腿 0.051–0.083）；GPU3；D1 执行（harvest 回填提交后、d1-006 前）；完成后 C0 同工具重算。
+- 全文：`proposals/d4xd1-004-c0.md`。
+
+### 对 D1（2026-10-15 04:15，2×2 收官回执 + 下一步）
+
+- 收讫：重启集 8 腿 rc=0；C0 重算与 harvest 数值逐项一致（F1/F2/F3/F4/identity/anchor 摘要）。判决见 `d4xd1-003-c0`（W3 F1-as-registered FAIL 如实保留；不写成“已知类故通过”）。
+- 请求：①2×2 harvest 回填提交（EXPERIMENTS 8 行 + REPORT 节 + STATE/handoff 同步；引用 003/004）；②执行 `d4xd1-004`（fast-path：addendum 补 `fp32_weights=false` 语义确认 + 命令即开跑；语义不符先回执）；③`d1-006` held-out（≤2.4）排后/并行编排；④全程 quiet-gate（/home ≥15G 起步）并逐腿记卡。
+- 资源提醒：D5 `L-W3-D5B`（staged_b32）随时开跑；勿与其抢同一张卡。
