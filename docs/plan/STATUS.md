@@ -15,6 +15,17 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
 
 ## Now
 
+- **CVPR-route phase-1 round (2026-10-14, branch `cvpr-route`, CPU only - 0
+  new GPU-h; budget 4.10/8.00):** route-document §15 items 1-7 delivered -
+  `upstream_dspark` faithful objective (`a80f564`), per-method
+  training-signal declarations (`64cef1d`), multimodal-supervision design
+  note + invariants (`b5691e5`) - plus the self-contained package
+  `docs/plan/phase1/` (report, claim ledger, run manifest, resource
+  estimate, profiling, cache decision, competitive audit, GO_NO_GO). CPU
+  regression 443 passed / 6 skipped. Verdict there: **NO-GO for the formal
+  matrix / big-compute request**; the bounded pending list (1.3-2.35 GPU-h)
+  is the recommended next spend. Start with
+  `docs/plan/phase1/LOCAL_PILOT_REPORT.md`.
 - **Review remediation round (2026-10-14, branch `review-remediation` off
   `950b394`): R1-R6 implemented.** R1 collision-safe media + audit script
   (`7cc9e5b`), R4 ordered segments + explicit unsupported-media rejection

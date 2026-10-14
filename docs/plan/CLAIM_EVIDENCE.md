@@ -4,6 +4,10 @@ No public claim is made until the evidence column is filled from recorded
 runs. Engineering completeness is tracked separately (TASK_LEDGER.md) and does
 not by itself constitute paper evidence.
 
+Phase-1 (CVPR-route) view of the same claims, with per-claim evidence tags
+and the claims explicitly **not** made: `phase1/CLAIM_EVIDENCE.md` (P1-P9);
+gate assessment: `phase1/GO_NO_GO.md`.
+
 | # | Candidate claim | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- |
 | C1 | The repo is a reusable, reproducible training infra for VLM block-parallel drafters (7 algorithms, unified train/eval/export) | engineering DONE / paper evidence weak | SUPPORT_MATRIX, RELEASE_VALIDATION, zoo releases | needs the paper-side framing: protocol + cost data |

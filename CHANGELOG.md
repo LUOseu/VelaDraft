@@ -65,6 +65,12 @@
 - The export config and model card record the draft's visual conditioning
   (`visual_conditioning`: cached vectors per layer + adapter type), so a
   serving stack can see that the checkpoint expects image-token spans.
+- The route-document §15 audit package lands self-contained in
+  `docs/plan/phase1/`: LOCAL_PILOT_REPORT, CLAIM_EVIDENCE (P1-P9),
+  RUN_MANIFEST, RESOURCE_ESTIMATE, PROFILING, CACHE_DECISION,
+  COMPETITIVE_AUDIT and GO_NO_GO (verdict: NO-GO for the formal
+  matrix / big-compute request; the bounded pending list is the
+  recommended next spend).
 
 ### DSpark faithful objective (`train_recipe: upstream_dspark`)
 

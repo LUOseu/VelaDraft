@@ -243,6 +243,31 @@ the env conventions of the target configs (`VLM_DFLASH_TARGET`, plus
      --out /tmp/wp5/divergence_margins_v2.json
    ```
 
+5. **`train_recipe: upstream_dspark` GPU smoke** (new 2026-10-14, `cvpr-route`):
+   the recipe's loss math is CPU-pinned (`tests/test_objectives.py`,
+   `tests/test_dspark.py`); this run proves the trainer path on GPU - chunked
+   teacher-logits reconstruction from the stored final hidden states and
+   confidence-head gradient flow. Not a quality run; do not quote AL from it.
+
+   ```bash
+   # reuse the capture-v2 JetSpec 2K store ([1,17,33] + final hidden, 1050 rows)
+   VLM_DFLASH_TARGET=<Qwen2.5-VL-3B dir> \
+     python -m vlm_dflash.cli train \
+       --config configs/dspark/qwen2_5_vl_3b_2k_recipe.yaml \
+       --features ~/vlm-dflash/runs/qwen25vl3b_jetspec_2k/features \
+       --steps 16 --set train.overfit_sanity.enabled=false \
+       --run-dir runs/dspark/recipe_smoke
+   python -m vlm_dflash.cli export runs/dspark/recipe_smoke --out-dir /tmp/dspark_export  # CPU
+   ```
+
+   Pass criteria: `nan_seen=false`; `train_summary.json` ->
+   `train_recipe.name == upstream_dspark`; train-log rows carry finite
+   `confidence_bce` / `markov_bias_abs_mean`; `train/gradient_coverage.json`
+   covers the confidence head; `train/confidence_calibration.json` written;
+   the log records the `--features` reuse (regen + capture skipped); export
+   metadata carries the recipe. Optional: 4-prompt `demo --drafter` reload
+   token-exact. Estimate 0.2-0.4 GPU-h (`docs/plan/phase1/RESOURCE_ESTIMATE.md`).
+
 ## Delivery checklist (review section 6)
 
 - Per-R commits, change descriptions and test evidence: table above.

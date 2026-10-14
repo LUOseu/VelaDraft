@@ -3,6 +3,18 @@
 Statuses: `DONE` / `IN_PROGRESS` / `PENDING` / `GPU_PENDING` / `BLOCKED`.
 Baseline `9137de0`. Every "done" line points at code/tests/runs, not prose.
 
+## CVPR-route phase 1 (2026-10-14, branch `cvpr-route`, CPU only)
+
+A CVPR-route audit round layered over this plan (route-document §15): DSpark's
+faithful upstream objective (`train_recipe: upstream_dspark`, `a80f564`),
+per-method training-signal declarations (`64cef1d`), multimodal-supervision
+design note + invariants (`b5691e5`), and the self-contained deliverable
+package `docs/plan/phase1/` - LOCAL_PILOT_REPORT (start there), CLAIM_EVIDENCE
+(P1-P9), RUN_MANIFEST, RESOURCE_ESTIMATE, PROFILING, CACHE_DECISION,
+COMPETITIVE_AUDIT, GO_NO_GO. Its verdict: NO-GO for the formal training
+matrix / big-compute request; the bounded pending list (1.3-2.35 GPU-h,
+`REVIEW_REMEDIATION.md` GPU_PENDING) is the recommended next spend.
+
 ## Capability gap table (verified against the worktree on 2026-10-14)
 
 | Capability | Verified baseline state | This plan |
