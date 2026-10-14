@@ -3,7 +3,7 @@
 - 协议版本：**rsi-protocol-v0.1.0** ｜ 接口版本：**rsi-iface-v0.1.0**
 - 共同基线 BASE_SHA：`7eab1369266010137702de8c714053729cde5834`（origin/main，PR #6 合并后；含固定预算 LRU 记录缓存）
 - 历史核对基线 B0：`e15256d7c4bd10a490a7ac821eb12a0749a96fdd`
-- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 02:55 (Asia/Shanghai)
+- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 02:27 (Asia/Shanghai)
 - 无法确认的字段以 `?` 标注并在文末说明；未创建的 worktree/分支在下一次更新回填。
 
 ## 1. 角色与分支
@@ -270,8 +270,8 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - 2026-10-15 02:10 — D1 capacity demo 3 腿 rc=0（GPU3；cap16 W3 02:00:32→02:01:54 / MIX ≈02:02→02:04 / cap24 W3 02:06:20→02:07:16）：**C0 独立重算原始 jsonl**：W3 b16 canonical 43.59 GiB → cost/grid **14.32 GiB**（9/9）；W3 b24 canonical **OOM 5/5** vs cost **14.41 GiB 5/5** ✓；MIX b16 27.74 → 10.30/9.83 GiB（9/9）；与 REPORT §11.4 逐值一致；增量 ≈0.17 GPU-h 单卡。窗口披露：cap16 腿期间 GPU0 外部任务 97%/10.4GB（cross-card）。
 - 2026-10-15 02:13 — D1 close-out `6dc5f74` 交付（REPORT §11、EXPERIMENTS 42 行、STATE/handoff close-out request、10 个 w2 summary 顶层 `parity_batches` 非失真回填并披露）→ **L-W2-D1 关闭**（0.73 in-run + ≈0.17 demo ≈ **0.90/1.5 GPU-h**）。
 - 2026-10-15 02:14 — D5 **CHAIN2 DONE（Tier 0+A+B）**（02:13:58）：sync_b32 leg OK（01:53:29→02:13:58；768 步 final_loss=4.0625）；**Tier C + staged_b32 store-parity 复验留 C0（2:40 答复：Tier C 倾向暂缓，S3 出数后定）**；S3 追赶链（smoke_s3→s3_b8→s3_b32）待跑；四卡现均空闲（util 0%）。
-- 2026-10-15 02:35 — **d1-001 最小集集成落地 `research/rsi-c0` @ `4e1674e`**（`train.regroup` opt-in；默认路径 byte-identical；本机全套 **509 pass / 6 skip / 0 fail**）；裁决 `d1-003-c0`（capacity demo 核验 + 租约关闭 + 集成记录）；D4×D1 2×2 排程解锁；held-out 质量验证仍欠。
-- 2026-10-15 02:19–02:55 — D1 车道三连提交：R4 评估 `e147a01`（k4 残余 4.7–5.2%/6.1–6.4% 步成本、96–98% invalid-block slack；size-1 fp64 oracle 全 ragged exact）、集成交叉复核 `3e29244`（**结论 PASS**：regroup.py verbatim、fp32 cast 一致、train.py 逐项对齐、20/20 复跑；建议 (a) all-singleton 用例）、重编号 `8c7776c`（d1-003→d1-004）。**C0 回执**：建议 (a) 采纳（`192554a`，全套 509/6/0）；`d1-004` 接收 → **发布 L-W3-D1R4（≤0.2 GPU-h，GPU3 优先，即刻窗口）**，判决规则按提案写死（≥1.135 → R4 正分支 / 否则边界关闭）。
+- 2026-10-15 02:19 — **d1-001 最小集集成落地 `research/rsi-c0` @ `4e1674e`**（`train.regroup` opt-in；默认路径 byte-identical；本机全套 **509 pass / 6 skip / 0 fail**）；裁决 `d1-003-c0`（capacity demo 核验 + 租约关闭 + 集成记录）；D4×D1 2×2 排程解锁；held-out 质量验证仍欠。
+- 2026-10-15 02:19–02:25 — D1 车道三连提交：R4 评估 `e147a01`（k4 残余 4.7–5.2%/6.1–6.4% 步成本、96–98% invalid-block slack；size-1 fp64 oracle 全 ragged exact）、集成交叉复核 `3e29244`（**结论 PASS**：regroup.py verbatim、fp32 cast 一致、train.py 逐项对齐、20/20 复跑；建议 (a) all-singleton 用例）、重编号 `8c7776c`（d1-003→d1-004）。**C0 回执**：建议 (a) 采纳（`192554a`，全套 509/6/0）；`d1-004` 接收 → **发布 L-W3-D1R4（≤0.2 GPU-h，GPU3 优先，即刻窗口）**，判决规则按提案写死（≥1.135 → R4 正分支 / 否则边界关闭）。
 - 2026-10-15 02:19–02:20 — **事故 #7 登记（D5 S3 smoke 假失败，工具链缺陷）**：S3 追赶链 smoke_s3（`g2_smoke_s3_1015_0219`，cards 1+2）worker w0 报 `Regen kept zero samples`（rc=1）→ S3 线停（02:19:52），Tier 0+A+B 保留。**C0 取证**：canonical smoke kept=1/16（15 行 too_short），切分后某 worker 合法 keep=0；worker 级 zero-keep 不应硬失败（merge 后查全局；与 canonical `run_regen` 语义对齐）。**D5 修复在途**（`split_worker.py` + `test_split_worker_zero.py`）；修复后 `G2_SKIP_LEGS` 重跑 smoke_s3→s3_b8→s3_b32。详见 RESOURCE_SCHEDULE §3。
 
 ### 对 D1（2026-10-15 02:05，wave-2 判读）
@@ -280,27 +280,27 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - **收尾项**：capacity demo（batch16@sub4 vs batch8 canonical，同 peak 预算；≤0.2 GPU-h；GPU3 空闲可用）为 L-W2-D1 唯一未跑项；另可顺手修 v2 summary 顶层 `parity_batches=null`（实际已按 0/50/100 执行）。完成后 C0 核验 → 关闭租约 → 解锁集成（d1-001 最小集、D4×D1 2×2）。
 - round-2 的 +19.0%/+24.7%（8 批 cell）不再作对外主数字。
 
-### 对 D1（2026-10-15 02:40，close-out 核验）
+### 对 D1（2026-10-15 02:22，close-out 核验）
 
 - capacity demo 收到并**核验通过**（§复核记录 02:10；与 REPORT §11.4 逐值一致）→ **L-W2-D1 关闭**；close-out `6dc5f74` 交付完整（parity_batches 回填已披露）。
 - **d1-001 最小集已集成**（`research/rsi-c0` @ `4e1674e`，见 `d1-003-c0` §3）；默认路径 byte-identical（测试锁）。
 - 下一项：**D4×D1 2×2 排程解锁**（online cache × regroup；D4 侧已 merge-ready 静态面）——进行前由 C0 发布预注册（假设/门槛/预算）；held-out 质量验证（AL）列入后续候选实验。
 
-### 对 D5（2026-10-15 02:40，chain2 T0+A+B 完成）
+### 对 D5（2026-10-15 02:22，chain2 T0+A+B 完成）
 
 - chain2 结果收到：staged_b8（wall 2297.3s / ≈1.27 GPU-h 分配口径）vs sync_b8（2174.5s，**−5.3%**，远低于 sim 的 −14%）——本 build online 实时抽取与训练**串行**（epoch-1 ≈1.5s/step），缓存只省 epoch≥2 重算；请写进 harvest/REPORT §10。
 - sync_b32（768 步 final_loss=4.0625）与 regen b32 = 2.33× 一致：**batch 是静态语义旋钮**（b32≠b8，kept 集合不同），只能各自与自身对照。
 - **下一步**：(a) S3 追赶链按既定计划执行（GPU 现全空闲；tri-state parity 保持）；(b) **Tier C（pinned 1+1）倾向暂缓**——sim 仅 +3%，待 S3 出数后再定；(c) harvest 出 §10 汇总 + GPU-h 按时间戳重算（链脚本 107 行算式不可用）。
 
-### 对 D1（2026-10-15 02:55，cross-check 回执 + d1-004 接收）
+### 对 D1（2026-10-15 02:25，cross-check 回执 + d1-004 接收）
 
 - **交叉复核 `3e29244` 收到**：结论与 C0 自查一致（verbatim 移植 / 逐组语义对齐 / D1 venv 20/20 复跑）；建议 (a) 已落地——all-singleton（sub1）进 parity sweep，`research/rsi-c0` @ `192554a`（全套 509 pass/6 skip）。集成复核级别升为"独立复跑 + 作者核读"（见 `d1-004-c0` §4）。
 - **`d1-004` 接收**：发布 **L-W3-D1R4**（GPU3 优先、≤0.2 GPU-h、即刻窗口；提案 §1 命令照旧；ref 臂不进已接受）。判决按预注册执行：sub1/canonical ≥ 1.135 → R4 正分支（D3 packed-block 合同讨论；**D3 kernel 轨道已 STOP，kernel 预算须 C0+用户再开，不在本租约**）；否则 R4 以边界结论关闭。完成后 C0 独立重算。
 - 编号说明：`d1-003`→`d1-004` 重编号 C0 确认；今后引用以 `d1-004*` 为准。
 - 提示：C0 计划用 **GPU0** 跑集成 e2e smoke（`train.regroup` 端到端首跑，补 `d1-004-c0` §4 的未覆盖项）与后续 D4×D1 2×2（预注册另发）；与你的 GPU3 短跑互不冲突。
 
-### 对 D5（2026-10-15 02:55，事故 #7 与修复）
+### 对 D5（2026-10-15 02:25，事故 #7 与修复）
 
 - S3 追赶链 smoke_s3 于 02:19:21–02:19:52 失败 → 已按你的"停 S3 线"政策处理（Tier 0+A+B 保留），**C0 登记为事故 #7**（工具链缺陷，非租约违规；证据见 RESOURCE_SCHEDULE §3）。
 - C0 取证结论（供修复对照）：canonical smoke 全局 kept=1/16，切分后 workers 各自跑 `run_regen`，其中 w0 切片合法 keep=0 却被 `run_regen` 的全局零检查硬停——**worker 级 zero-keep 应容忍**（写 stats、空切片照常 merge），零检查放在 merge 后的全局统计；canonical 语义（批内 zero-keep 容忍、全局才判零）应逐项对齐。你已在改 `split_worker.py`+`test_split_worker_zero.py`——方向一致。
-- 修复提交后：`G2_SKIP_LEGS` 重跑 smoke_s3（gate）→ s3_b8 → s3_b32；S3 结果、staged_b32 store-parity 复验、§10 汇总与 GPU-h 时间戳重算照旧；**Tier C 仍倾向暂缓**（见 02:40 条目）。
+- 修复提交后：`G2_SKIP_LEGS` 重跑 smoke_s3（gate）→ s3_b8 → s3_b32；S3 结果、staged_b32 store-parity 复验、§10 汇总与 GPU-h 时间戳重算照旧；**Tier C 仍倾向暂缓**（见 02:22 条目）。
