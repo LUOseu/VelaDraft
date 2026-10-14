@@ -70,6 +70,8 @@
 - 2026-10-14 23:29 — D3 `w0_log10` spans run 完成（23:28–23:29，`/tmp/d3run3/w0_log10/out/spans.json` 28.6KB）；该 run 与外部 xs 同卡（contended），待 D3 自评。
 - 2026-10-14 23:30 — C0 抽查 D4 `cap10` 实测腿（**抽查通过，数值级**）：hits=7 / misses=767 / stores=767 / evictions=755、peak=87,056,736B、capacity=87,065,429B（≈10% 档），与仿真 exact-capacity 预测逐值一致；leg wall=209s。**注意**：off(301s) > cap10(209s) 的 wall 差异与缓存机制无关（hits 仅 7/774）——疑似首腿编译/冷启动顺序效应——D4 声明 cache 收益前必须先扣除 warm-up 顺序混淆（同机同类腿交替）。
 - 2026-10-14 23:32 — C0 只读审计（D2 本地 worktree）：存在**未申报的共享面改动**——`vlm_dflash/dflash/trainer_core.py`（+54）、`vlm_dflash/jetspec/factory.py`（+7）、`vlm_dflash/jetspec/trainer.py`（+80）、新模块 `vlm_dflash/teacher_dedup.py`（exact teacher-projection dedup，按 hidden-row id 去重、按 query gather 复用）。这些改动**未走提案、未提交**；不进入共同基线、不作为已复核结论。要求见 §7 D2 条目 (5)。
+- 2026-10-14 23:33 — D5 重跑链：**leg 16 exit=0**（23:30:33→23:32:34，wall≈121s；此前“消失行”单副本重测通过）；**leg 32 于 23:32:36 启动**（GPU3，开跑 free=15G）。注意 leg wall：b8=176s > b16=121s——首腿含编译/冷启动，harvest 时须按“首次加载/编译与 warm 分开”口径处理，不得直接当 scaling 结论。
+- 2026-10-14 23:33 — D4 `cap25` 腿 exit=0（wall=208s；hits/misses/stores/evictions=24/750/750/718、peak=217,654,164B、capacity=217,663,573B≈25%），与仿真 exact-capacity 预测 24/750/718 **逐值一致**（连续第二档精确匹配）；cap10(209s)≈cap25(208s) → 先前 off(301s)>cap10 的差确认为首腿编译/冷启动顺序效应，非缓存收益。
 
 ## 7. 请求与应答（C0）
 
@@ -120,4 +122,5 @@
 ### 复核记录（C0 抽查，引用级）
 
 - 2026-10-14 23:24 — D4 W1 仿真：s3_sim_sweep.jsonl 全容量行与 s3 b_on 记录逐字段一致（命中/存储/峰值字节）；不足容量命中率序列合理（10/25/50% → 0.4/2.9/13.0%）。结论：LRU/字节模型对这组访问序列**成立**；未独立重跑仿真。
+- 2026-10-14 23:33 — D4 `cap25` 实测 vs 仿真（**抽查通过，数值级**）：hits/misses/evictions=24/750/718 逐值一致；连续两档（10%/25%）精确匹配 → 仿真的逐计数预测能力在实测腿上成立；剩余 50%/8MiB 档待跑。
 - D3：BASE 已确认（含 flex 主 kernel pin、LRU 语义）；profiling 结论决定 wave 2 是否给 kernel 预算（门槛：attention+mask ≥20% 整步）。
