@@ -134,6 +134,7 @@
 - 2026-10-15 04:27–04:32 — **C0 收尾 sweep**：收讫 D1 harvest（`e7ea0cf` / `9990a0f`；数字与重算逐项一致；grid-ulp 披露复算一致）；整合分支 HEAD 套件刷新 **515/509/6/0**（exit 0；`evidence/pytest_rsi_c0_head_20261015.{log,xml}`）；**D1 `d1-006` 与 D5 `staged_b32` 截 04:32 均未启动**（4 卡全空、/home 20G）——待 D1/D5 开跑；C0 复核路径就绪（D5 `research/rsi/d5/runner/split_verify.py`）。
 
 - 2026-10-15 04:31–04:33 — **D1 开跑 `d1-006`（L-W3-D1Q）**：`d1q_val64` 构建 ✓（64 行/48 图/记录 `d1q_val64_v1`）；addendum `96709e6`（C0 ack，无整改）；04:32:19 `d1q_smoke` 开跑（GPU3）→ **exit=0 @04:33:06**（visual passed）→ Stage-1 canonical×{42,43} 排队。**D5 `staged_b32` 仍未启动**（GPU1/2 空）。C0 收算待四腿落地。
+- 2026-10-15 04:37–04:44 — **事故 #8（L-W3-D1Q 守卫自碰撞 + 编排链死亡；C0 取证）**：s42 eval 副本 A（编排器 `d1q_stage1.sh` 启动，04:37:25）attempts 1–4 因 `/home` 11G<15G 被误分类为 "transient spike" 空转重试；04:38:40 **外部第二副本 B** 启动（disk 已回 19G，guard 通过；来源未证，疑似 D1/用户手启；现 PPID=1 孤儿）并开始 eval；04:38:49 A 的 attempt=5 将 B 的 7.8GiB 占用误判 **"GUARD FAIL (tenant)"** → A exit 1。**双误报**：(a) 磁盘不足被标为 GPU 瞬态（标签错误）；(b) 守卫不识别"同一租约已有活动副本"，自锁成 tenant。编排器已不在 ps、status log 无 done/FAIL 行 → **链死（s43/Stage-2 不会自动开始）**。s42 训练产物完好（exit=0 @04:37:25）；s42 eval 由 B 继续（04:42:31 speculative 阶段）。**恢复**：D1 04:42 就位 `d1q_run_leg.sh`（幂等逐腿）+ `build_d1q_band.py`；待 D1 串行补 s43→regroup×2（每腿开跑前 `/home`≥15G、单副本）。C0 转发文本 `research/rsi/_coord/messages/20261015_d1q_recovery.md`。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
