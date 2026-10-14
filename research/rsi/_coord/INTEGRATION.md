@@ -58,17 +58,17 @@
 
 优先给 D1/D2 研究资源，D4 提供实用 backend；按真实证据调整排序。
 
-### 4.1 Wave-1 台账（滚动；更新 2026-10-15 00:05）
+### 4.1 Wave-1 台账（滚动；更新 2026-10-15 00:08）
 
 | 路线 | wave-1 证据 | 门槛核验 | 当前判定 |
 |---|---|---|---|
 | D1 | 浪费审计（ctx pad 12.6%、block pad 6.0%）；R3-prereq oracle（**C0 复跑 ✓**：dloss 4.9e-7、grad_rel 1.7e-7）；R3 冒烟 ✓（dual peak 12.5GB）；**W1 store 建成（exit=0；192→191 kept；features 1.8G；已登记共享资产）**；W1 首跑曾被 SIGTERM（事故 #4） | 整步收益待测（W2/W3 待建；R3 正式 A/B 待跑） | HOLD（W2/W3 + 正式 R3 A/B + d1-001；W1 资产已可被 D4/D5 引用） |
-| D2 | rho=6.83（N≈7750/U≈1135）；13 项 CPU 测试；步级两臂 fwd -5.5%（ab 路径）；**phase 配对（base4→dedup4 fwd 188.3→189.3）未复现 -5.5%——归因中** | ρ≥2 ✓；步级占比待定论（复现差异未决） | HOLD（复现差异未决 + REPORT/handoff 缺；wave-2 判定待清算） |
+| D2 | rho=6.83；13 项 CPU 测试；ab 两臂 fwd -5.5%；**pin 2×2 fwd 188.3→175.5（-6.8%），loss 四腿 bitwise；phase dedup4 异常单点（189.3）待归因** | ρ≥2 ✓；步级占比待定论（收益方向已确立） | HOLD（归因/记录欠；门槛对照待 D2 申述） |
 | D3 | trace + Amdahl：attention+mask=21.16ms/595.9ms=**3.55%**（cap +3.7% 步 / +1.4% online），**C0 核数 ✓** | ≥20% ✗（远未达） | **STOP**（kernel 轨；re-open 条件已登记） |
 | D4 | W1 五腿 counters 逐值一致（**C0 5/5 ✓**）+ harvest 回填（REPORT §W1/§W2）；W2 CPU 压力轨迹（证伪→修复；零越界） | 无提速声称（安全阀）；d4-001 集成与 real-sensor A/B 待完成 | HOLD→集成路径明确（ACCEPTED 条件；L-W2-D4 ≤1.5 GPU-h）；平台工程候选，非收益项 |
-| D5 | trace 分解 + sim v3；regen 真测 1.66×/2.33×（±1.1%，step-1 bitwise 复现）；静态分裂 sim 1.70×（未实测）；cost-aware sim +0.8–2.1% | cost-aware ✗（≪15%）；静态 split 待真实 ladder | HOLD（cost-aware=STOP；split=wave-2 条件项） |
+| D5 | trace 分解 + sim v3/v4；regen 真测 1.66×/2.33×；静态分裂 sim 1.70×（未实测）；cost-aware sim +0.8–2.1%；**d5-001 步 2（cf74790，C0 41/41 复跑 ✓）** | cost-aware ✗（≪15%）；静态 split 待真实 ladder | HOLD（cost-aware=STOP；split=wave-2 条件项；CPU 步 2 已收） |
 
-未决：D2 phase 复现差异归因 + REPORT/handoff（第 8 次）+ 预算盘点；D1 W2/W3 + 正式 R3 A/B + d1-001；D4 lane commit → C0 集成 + L-W2-D4 窗口执行；事故 #5 已记录（0→28G 清理）；预算实耗：D3 0.22/0.5、D4 0.31/0.5（+≤1.5 条件项）、D5 ≤0.4/1.0、D1 待自报、D2 待盘点。
+未决：D2 归因段 + REPORT/handoff + 预算盘点；D1 W2 运行中（GPU3）→ W3 + 正式 R3 A/B + d1-001；D4 lane commit 对账 + L-W2-D4 窗口执行；D5 步 3–4 等 L-W2-G2；预算实耗：D3 0.22/0.5、D4 0.31/0.5（+≤1.5 条件项）、D5 ≤0.4/1.0、D1 待自报、D2 待盘点。
 
 ## 5. 组合与复核（只做相关组合）
 
@@ -102,10 +102,10 @@
 | 路线 | 当前判定 | 关键证据 | 平台 / 论文 | 解除或关闭条件 |
 |---|---|---|---|---|
 | D1 | HOLD（最高候选） | W1 store（server `/home/lyh/rsi-d1/runs/d1_w1_probe/`，kept 191/192，已登记共享资产）；`research/rsi/d1/evidence/w0_waste_v2.json`；oracle/parity 复跑（REGISTRY §6）；R3 冒烟 `r3_ab_w0_smoke3.jsonl` | 平台：probe store 资产；论文：潜力最高（双轴组织 + R3） | W2/W3 store；正式 R3 A/B（≥3 交替）；`d1-001.md`；整步 ≥15% 或显存 ≥25% 才进 wave-2 配对 |
-| D2 | HOLD（差异未清） | rho `~/d2-rsi/rho_jetspec2k_b4.json`；`ab_base1/ab_dedup1.json`；phase 配对 `phase_base4.json` vs `phase_dedup4.json`（fwd 188.3→189.3，未复现 -5.5%） | 论文：待归因；平台：否 | 复现差异归因 + REPORT/handoff（第 8 次）+ 预算盘点；相对 15%/25% 门槛出 wave-2 条件或 STOP |
+| D2 | HOLD（收益方向确立，归因/记录欠） | rho `~/d2-rsi/rho_jetspec2k_b4.json`；ab 两臂；**pin 2×2（fwd 188.3→175.5 = -6.8%；loss 四腿 bitwise）**；phase dedup4 异常单点待归因 | 论文：局部优化候选（<15% 门槛）；平台：否 | 归因段 + REPORT/handoff + 预算盘点 → 门槛对照出 wave-2 条件或 STOP |
 | D3 | STOP（已接受） | REPORT `b88cdf2`：attention+mask=3.55%（C0 核数 ✓）；/tmp 已清 | 论文：否 | 再开条件：W2 长答 ~15% 外推 / b16 / S≥2.5–4k |
 | D4 | HOLD → 已集成（merge 待验证） | W1 五腿 counter-exact（C0 5/5 ✓）；REPORT §W1/§W2；**d4-001 集成 `1f8963e`（sha1 对账一致；复跑 13+4 ✓）** | 平台：adaptive 安全阀（opt-in）；论文：低（无提速声称） | D4 lane commit 对账；L-W2-D4 ≤1.5 GPU-h real-sensor A/B → 然后可评 merge-ready |
-| D5 | HOLD（条件项） | REPORT `85cbf8b` + sim v4 `23875e8`（可实现 backfill ≤+1.8%；oracle 变体才达 floor +14.6/18.1/20.6%）；regen 真测 1.66×/2.33× | 平台：producer 链/trace 工具；论文：低（H2 负） | 静态分裂实测需 L-W2-G2 窗口 + 真实 ladder；否则保留为 wave-2 条件项 |
+| D5 | HOLD（条件项；CPU 步 2 已收） | REPORT `85cbf8b` + sim v4 `23875e8` + **d5-001 步 2 `cf74790`（lane 41/41 C0 独立复跑 ✓；已驱动真 train_dflash）**；regen 真测 1.66×/2.33× | 平台：runner 语义级可驱动真 trainer；论文：低（H2 负） | 步 3–4 等 L-W2-G2；静态分裂=wave-2 条件项 |
 
 跨路线观察：D5 v4 的 keep-oracle 变体需要“生成前已知 keep”的预测器——若 D1 双轴组织能提供此类信号，仅作为 **D1×D5 条件组合的讨论项**（未批准；须双方有共同监督位置才立项）。
 
