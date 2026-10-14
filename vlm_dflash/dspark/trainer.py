@@ -272,6 +272,12 @@ class DSparkTrainerModule(DFlashTrainerModule):
                     loss_mask=batch["loss_mask"],
                     image_mask=batch["image_mask"],
                     multimodal_position_ids=batch["position3"],
+                    # Capture-v2 stores carry the target's final hidden states;
+                    # the analytic (upstream_dspark) confidence objective needs
+                    # them here exactly as the training forward does (R-18 ran
+                    # the calibration pass without them and crashed after
+                    # training had already finished).
+                    teacher_hidden=batch.get("final_hidden"),
                 )
             collected = self.calibration_sink
         finally:

@@ -507,6 +507,46 @@ def test_dspark_faithful_recipe_requires_the_teacher_signal():
         module(input_ids=input_ids, hidden_states=hidden, loss_mask=loss_mask)
 
 
+def test_calibration_report_upstream_recipe_passes_the_teacher_signal():
+    """The calibration pass must feed ``final_hidden`` like the training forward.
+
+    R-18 (2026-10-14) trained 16 GPU steps, then crashed in
+    ``calibration_report``: it ran the module forward without
+    ``teacher_hidden`` while ``train_recipe: upstream_dspark`` needs the
+    target's final hidden states. The training loop already passes
+    ``batch["final_hidden"]`` (``dflash/train.py``); the calibration loader
+    builds its batches with the same collate, so the same key is available.
+    """
+    input_ids, loss_mask, hidden = _tiny_batch(batch_size=4, seq_len=48)
+    module = _tiny_dspark_module(train_recipe=_dspark_recipe())
+    batch = {
+        "input_ids": input_ids,
+        "loss_mask": loss_mask,
+        "hidden": hidden,
+        "image_mask": torch.zeros_like(loss_mask, dtype=torch.bool),
+        "position3": torch.zeros(3, input_ids.shape[0], input_ids.shape[1], dtype=torch.long),
+        "final_hidden": _teacher_hidden(input_ids),
+    }
+    report = module.calibration_report([batch], torch.device("cpu"))
+    assert report is not None
+    assert report["supervised_slots"] == 8
+    assert len(report["per_slot_pred_mean"]) == 8
+
+
+def test_calibration_report_upstream_recipe_requires_the_teacher_signal():
+    input_ids, loss_mask, hidden = _tiny_batch(batch_size=4, seq_len=48)
+    module = _tiny_dspark_module(train_recipe=_dspark_recipe())
+    batch = {
+        "input_ids": input_ids,
+        "loss_mask": loss_mask,
+        "hidden": hidden,
+        "image_mask": torch.zeros_like(loss_mask, dtype=torch.bool),
+        "position3": torch.zeros(3, input_ids.shape[0], input_ids.shape[1], dtype=torch.long),
+    }
+    with pytest.raises(ValueError, match="final hidden states"):
+        module.calibration_report([batch], torch.device("cpu"))
+
+
 def test_dspark_faithful_recipe_keeps_the_upstream_confidence_weight():
     input_ids, loss_mask, hidden = _tiny_batch()
     module = _tiny_dspark_module(train_recipe=_dspark_recipe(), confidence_head_alpha=2.0)
