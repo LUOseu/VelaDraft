@@ -31,6 +31,35 @@ Baseline `9137de0`. Every "done" line points at code/tests/runs, not prose.
 | WP6 | One non-Qwen VLM family, DFlash first | DONE (single-image smoke) | family adapter `vlm_dflash/adapters/smolvlm.py` + contract/capture/eval/regen/visual-check hooks (`ef07b41`, `0f45fa1` + fixes); 14 CPU tests in `tests/test_smolvlm_adapter.py`; `R-20261014-17` PASS: regen 16/16 kept, capture image-token check 1377/1377 + `visual_path_check`, 32-step train, eval token-exact 4/4 on both checkpoints; gaps (schema-v2 multi-turn template drift, multi-image, online mode untested, smoke-scale only) in `docs/plan/WP6_REPORT.md` |
 | WP7 | Reference weights, fixed experiments, model cards, paper outline + evidence table | DONE (CPU/docs, no GPU charge) | reference weights: `zoo-v0.3.1` + `zoo-v0.3.2` live, staged recipe tarball sha256 matches `SHA256SUMS` (`7d72357d...`, re-checked 2026-10-14), re-download validations `R-09`/`R-13`; model cards: 9 under `docs/zoo/` = README-linked set; fixed experiments recap E0-E4 (all landed, `RUN_LOG.md`); `docs/plan/PAPER_OUTLINE.md` (per-claim evidence table with engineering vs paper-evidence status, positioning, upgrade paths) + `WP7_REPORT.md` |
 
+### Open items carried out of the review `950b394` (NOT done; keep visible)
+
+These stay open per the review's rule that unfinished original-scope items
+must remain in the ledger; none of them invalidates the delivered evidence
+above. Details, status labels and GPU commands: `REVIEW_REMEDIATION.md`.
+
+- **WP2 data split isolation (pending):** `prepare` splits by row; the
+  original image/conversation group split is not implemented, so one image
+  with different captions (or slices of one conversation) can straddle
+  train/val. Pre-existing scope item, not a regression.
+- **WP4 bucketing + bounded OOM retry (pending):** length / visual-token
+  bucketing and the original bounded OOM fallback are not implemented; the
+  narrow length distribution of the smoke data does not demonstrate the
+  long-tail workload. Paired single-vs-batched re-timing under the R2
+  boundary is GPU_PENDING #2.
+- **WP6 export closure (pending):** single-image export -> fresh-process
+  reload -> same-condition eval evidence is missing (GPU_PENDING #3); a
+  second algorithm on the family and the multi-image / online boundaries for
+  it are untested.
+- **Public evidence bundle (pending):** compact scrubbed bundle for this
+  remediation not yet assembled/published - needs GPU-host access (SSH was
+  unreachable at wrap-up) and a publication decision; commands in
+  `REVIEW_REMEDIATION.md`.
+- **Original WP-file alignment (blocked - missing inputs):**
+  `VelaDraft_02_WORK_PACKAGES.md`, `03_EXPERIMENTS.md`, `04_ACCEPTANCE.md`
+  and `EXECUTION_CONFIG.yaml` were never delivered; per-item traceability
+  against the original definitions cannot be completed and the E0-E4
+  protocol stays labelled reconstructed.
+
 ## Fixed experiment protocol (E0-E4, reconstructed)
 
 Executed in order; each has a fixed run ID, budget and success criterion in

@@ -340,3 +340,55 @@ def test_llava_source_rejects_mid_text_placeholder(tmp_path):
     }
     with pytest.raises(ValueError, match="leading|start"):
         build_dataset(cfg, tmp_path / "out")
+
+
+def _fake_hf_datasets(monkeypatch, rows):
+    import types
+
+    fake = types.ModuleType("datasets")
+    fake.load_dataset = lambda *args, **kwargs: rows
+    monkeypatch.setitem(sys.modules, "datasets", fake)
+
+
+def test_hf_source_rejects_mid_text_placeholder(tmp_path, monkeypatch):
+    """The v1 hf reader runs the same shared layout check as jsonl/llava."""
+    _fake_hf_datasets(
+        monkeypatch,
+        [{"image": Image.new("RGB", (8, 8), (1, 2, 3)), "question": "A <image> B", "answer": "a"}],
+    )
+    cfg = {
+        "dataset": {
+            "source": "hf",
+            "hf": {"path": "fake/dataset", "split": "train"},
+            "hf_image_cache": str(tmp_path / "hf_images"),
+            "slice": 1,
+            "val_size": 0,
+            "seed": 42,
+        }
+    }
+    with pytest.raises(ValueError, match="leading|start"):
+        build_dataset(cfg, tmp_path / "out")
+
+
+def test_hf_source_accepts_leading_placeholder(tmp_path, monkeypatch):
+    """Leading-placeholder hf rows materialise unchanged (no silent reorder)."""
+    _fake_hf_datasets(
+        monkeypatch,
+        [{"image": Image.new("RGB", (8, 8), (5, 6, 7)), "question": "<image>\nWhat?", "answer": "a square"}],
+    )
+    cfg = {
+        "dataset": {
+            "source": "hf",
+            "hf": {"path": "fake/dataset", "split": "train"},
+            "hf_image_cache": str(tmp_path / "hf_images"),
+            "slice": 1,
+            "val_size": 0,
+            "seed": 42,
+        }
+    }
+    build_dataset(cfg, tmp_path / "out")
+    rows = read_jsonl(tmp_path / "out" / "data.jsonl")
+    assert len(rows) == 1
+    human = next(turn for turn in rows[0]["conversations"] if turn["from"] == "human")
+    assert human["value"].startswith("<image>"), human["value"]
+    assert "What?" in human["value"]
