@@ -99,6 +99,21 @@ original E numbering reserved, do not redefine the original protocol to
 claim completion - is honoured: the mapping below is explicitly the
 **reconstructed** one and is not represented as the original acceptance.
 
+Review section 6-E labels per work package (`implemented` /
+`CPU-verified` / `GPU-smoke` / `pending` / `blocked`; a work package can carry
+several):
+
+| WP | Status labels (review section 6-E) |
+| --- | --- |
+| WP0 | implemented / CPU-verified; pending: alignment against the original WP definitions (missing input files) |
+| WP1 | implemented / CPU-verified; GPU evidence recorded (canonical E4 `R-20261014-11`) |
+| WP2 | R1/R3/R4 fixes CPU-verified; recorded GPU-smoke (E2); pending: group/leakage-aware split, post-R3/R4 GPU recheck (GPU_PENDING #1) |
+| WP3 | GPU-smoke recorded (pinned DocVQA/ChartQA, E3); pending: fixed caption set, public multi-image/multi-turn workload, full cost ledger |
+| WP4 | implemented / CPU-verified; GPU-smoke recorded (timing superseded by R2 -> pending paired re-measurement, GPU_PENDING #2); pending: bucketing + bounded OOM retry |
+| WP5 | blocked (token-exact gate 5/32; root cause unresolved; same-engine diagnosis = GPU_PENDING #4) |
+| WP6 | GPU-smoke recorded (single-image, `R-20261014-17`); pending: export closure (GPU_PENDING #3), second algorithm, multi-image/online boundaries |
+| WP7 | implemented / CPU-verified (docs/releases/matrix); pending: original E0-E4 alignment (missing inputs), public evidence bundle |
+
 | Work package | Branch state | Review verdict | This round | Still open |
 | --- | --- | --- | --- | --- |
 | WP0 | Task/resource/run/evidence ledgers (`TASK_LEDGER.md`, `COORDINATION.md`, `RUN_LOG.md`, `CLAIM_EVIDENCE.md`, `RESOURCE_LEDGER.md`) | Base delivered, needs alignment with the original definitions | this traceability doc; claim ledger re-checked while narrowing R5/R6 claims | per-item traceability against the *original* WP definitions is impossible while the WP source files are missing - recorded, not fabricated |
@@ -125,8 +140,24 @@ claim completion - is honoured: the mapping below is explicitly the
 4. **Public evidence bundle for this remediation:** the runs involved are
    archived on the training host (`~/recipe-smoke-config/*.tar.gz`); a
    publishable compact bundle (resolved configs, commits, data manifest
-   hashes, result JSONs, parity summaries, environment) has not been
-   published yet - needs a manual packaging/publishing step (no GPU work).
+   hashes, result JSONs, per-sample parity summaries, environment - private
+   paths scrubbed, weights referenced from the checksummed zoo releases)
+   has not been published yet. It needs (a) GPU-host access - SSH to
+   `a6000xuyang` was unreachable from the remediation host at wrap-up time
+   (connection closed, direct and via proxy) - and (b) a user decision on
+   the publication target. No GPU compute required.
+
+   ```bash
+   # on the GPU host, once reachable:
+   mkdir -p /tmp/evidence && cd /tmp/evidence
+   for a in e1_evidence e2_final_evidence e3_evidence e4_evidence \
+            wp4_ab1 wp4_ab4 wp5_evidence e6_evidence; do
+     tar -xzf ~/recipe-smoke-config/${a}.tar.gz -C /tmp/evidence --one-top-level=${a}
+   done
+   # strip host paths/credentials, keep configs + result JSONs + manifests +
+   # parity samples + environment records; then (after user approval):
+   #   gh release create remediation-evidence-v1 /tmp/evidence/bundle.tar.gz
+   ```
 
 ## GPU_PENDING (review section 6-F) - commands only, nothing auto-scheduled
 
@@ -134,30 +165,93 @@ Budget note: 4.10 / 8.00 GPU-h used; these items are **not authorised** by
 this remediation and must not be launched without an explicit resource
 decision. Order follows the review:
 
+All commands assume the `review-remediation` checkout on the GPU host and
+the env conventions of the target configs (`VLM_DFLASH_TARGET`, plus
+`VLM_DFLASH_E2_SOURCE` / `VLM_DFLASH_E2_IMAGES` for E2 data).
+
 1. **Qwen2.5-VL DFlash small multi-image/multi-turn correctness** under the
-   post-R3/R4 protocol (regenerated data, new segment layout): rerun the E2
-   smoke equivalent on `configs/smoke_multiturn.yaml` and check token-exact
-   eval + capture span checks. Purpose: verify the R3/R4 semantics on GPU,
-   not to chase quality.
+   post-R3/R4 protocol (regenerated data, new segment layout). Verify the
+   R3/R4 semantics on GPU; not a quality run.
+
+   ```bash
+   python scripts/make_wp2_smoke_data.py --out data/e2_smoke --train 16 --val 4
+   VLM_DFLASH_TARGET=<Qwen2.5-VL-3B dir> \
+   VLM_DFLASH_E2_SOURCE=data/e2_smoke/source.jsonl \
+   VLM_DFLASH_E2_IMAGES=data/e2_smoke/images \
+     python -m vlm_dflash.cli train --config configs/smoke_multiturn.yaml \
+     --run-dir runs/e2/smoke_multiturn_postfix
+   python -m vlm_dflash.cli eval runs/e2/smoke_multiturn_postfix \
+     --config configs/smoke_multiturn.yaml
+   ```
+
+   Pass criteria: eval `token_exact` 4/4 on both checkpoints; capture
+   `visual_path_check` passed; `regen/regen_stats.json` shows 2 turns/row,
+   16/16 kept; index manifest `schema_version: 2`.
+
 2. **Paired single-vs-batched online re-timing** under the unified boundary
-   (R2): same fixed rows, warmup pass dropped or recorded, CUDA-synchronised
-   `prepare_seconds`/`forward_seconds`, identical checkpoints/IO; report
-   `prepare`/`forward` split and peak memory; do not re-use the superseded
+   (R2): same fixed rows, warmup pass dropped or recorded explicitly,
+   CUDA-synchronised `prepare_seconds`/`forward_seconds`, identical
+   checkpoints/IO.
+
+   ```bash
+   VLM_DFLASH_TARGET=<Qwen2.5-VL-3B dir> \
+   VLM_DFLASH_E2_SOURCE=data/e2_smoke/source.jsonl \
+   VLM_DFLASH_E2_IMAGES=data/e2_smoke/images \
+     python -m vlm_dflash.cli train --config configs/smoke_multiturn.yaml \
+     --mode online --set train.online_batch_size=1 --run-dir runs/wp4/ab1_v2
+   # repeat the same command with --set train.online_batch_size=4 --run-dir runs/wp4/ab4_v2
+   ```
+
+   Compare `train/train_summary.json` -> `feature_source`:
+   `extraction_prepare_seconds_total`, `extraction_forward_seconds_total`,
+   `extraction_wall_seconds_total`, `fast_forward_items_total`, plus
+   bit-identical step losses between legs. Do not re-use the superseded
    `-18.8%`.
+
 3. **SmolVLM2 single-image export -> new-process reload -> same-condition
-   eval**: proves the WP6 family's export closure; explicitly label other
-   layouts as untested.
+   eval**; explicitly label other layouts untested.
+
+   ```bash
+   python -m vlm_dflash.cli export runs/e6/smoke_smolvlm --out-dir /tmp/e6_export
+   python -m vlm_dflash.cli demo --drafter /tmp/e6_export \
+     --target <SmolVLM2 dir> --num-prompts 4          # run in a fresh process
+   python -m vlm_dflash.cli eval runs/e6/smoke_smolvlm \
+     --config configs/smoke_smolvlm.yaml
+   ```
+
+   Record: reload demo token-exact vs target-only greedy, exported metadata
+   carries the SmolVLM contract, and the eval numbers match the pre-export
+   checkpoint run.
+
 4. **vLLM same-engine first-divergence diagnosis:** instrument vLLM 0.22.1's
    dflash proposer/verify path (or an equivalent in-engine dump) for
    per-step candidate logits, accepted positions and KV/position metadata on
    the same 32 prompts; keep the token-exact gate at 5/32 until closed; no
    large-scale throughput runs before the divergence is understood.
 
+   ```bash
+   # baseline reproduction (recorded as R-20261014-14)
+   python scripts/vllm_bridge_check.py --target <Qwen2.5-VL-3B> \
+     --draft /tmp/wp5/vllm_draft --source runs/qwen25vl3b_2k/data/val.jsonl \
+     --images-dir runs/qwen25vl3b_2k/data/images --num-prompts 32 \
+     --max-new-tokens 128 --min-pixels 200704 --max-pixels 1003520 \
+     --out /tmp/wp5/bridge_check.json
+   # then dump per-step verify candidates inside vLLM and re-read with the
+   # HF-assisted v2 probe (does not establish root cause by itself):
+   python scripts/probe_divergence_margin.py --run-dir /tmp/wp5/run_1d \
+     --bridge-json /tmp/wp5/bridge_check.json --max-cases 4 \
+     --out /tmp/wp5/divergence_margins_v2.json
+   ```
+
 ## Delivery checklist (review section 6)
 
-- Per-R commits, change descriptions and test evidence: table above;
-  `git log --oneline 950b394..HEAD` lists `7cc9e5b`, `47b0075`, `c2d98e5`,
-  `7038c56`, `7a44301`, `b3730d7` plus this doc's commit.
+- Per-R commits, change descriptions and test evidence: table above.
+  `git log --oneline 950b394..HEAD` lists (oldest first) `7cc9e5b` (R1),
+  `47b0075` (R4), `c2d98e5` (R3), `7038c56` (R2), `7a44301` (R5),
+  `b3730d7` (R6), `d9a202c` (traceability + GPU_PENDING), `3beafcf`
+  (README), `5db73c7` (DFly docs), plus this status-label/command update
+  (the branch tip). Baseline `950b394` is untouched; `main` history was
+  never rewritten.
 - CPU regression: `pytest -o addopts="" -q` on this branch =
   **411 passed, 6 skipped** (skips: `tests/test_contract_integration.py`
   real-model integration, requiring `VLM_DFLASH_TEST_MODEL` / a local
