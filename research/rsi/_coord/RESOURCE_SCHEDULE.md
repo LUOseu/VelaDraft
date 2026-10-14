@@ -80,6 +80,7 @@
 - 2026-10-14 23:52 — D1 的 R3 A/B 冒烟在 GPU3 空闲窗口完成（23:49:0x–23:49:4x，冒烟级；dhz ~23:50 起占用 GPU3）。磁盘仍 5.0G（D2 prune 第 2 次要求；若 D2 无窗口→请用户代删 `runs/*/train/ckpt_*.pt`）。程序 GPU 排队：GPU2 空闲待 D1 W1 重启（等磁盘）。
 - 2026-10-14 23:53 — GPU3 外部 dhz 任务结束（23:52:10 实测 18MiB/0%）→ 可用卡 **GPU2+GPU3**。随即 **D2 `phase_base1`→GPU2**（18.4GB/100%）、**D1 smoke3→GPU3**（21.4GB）——各占一卡、无共卡；两 run 均在 free 4.1–5.0G 启动，**未达 >10G 守卫**；`/home` 4.1G free。
 - 2026-10-14 23:53 — 磁盘第 3 令升级用户：`rm -f /home/lyh/d2-rsi/runs/{ab_base1,ab_dedup1,probe_js_base,probe_js_prof,probe_js_smoke}/train/ckpt_*.pt`（≈23.4GB；保留 json/log/summary 与运行中 `phase_base1`）→ 预计 free ≈27G；为 L-W1-D1-R2 硬前置。
+- 2026-10-14 23:56 — **事故 #5：0 字节事件**（D2 `phase_base2` ckpt_init 截断 454MB@ENOSPC 崩溃；窗口 ~23:55:5x–23:56:2x，共享卷写入普遍受影响风险）。**C0 紧急清理**第 3 令五目录 stale ckpt → free **0→28G**；D2 随后自清 phase_base1/2 目录。租约：**L-W1-D1-R2 生效**（D1 23:56:43 起 GPU3 运行 W1 build，启动自检 free=28G/gpu_idle=0%）；GPU2 空闲；GPU0/1 外部 xs。后续任何启动仍需 free≥10G + 逐卡实测。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 

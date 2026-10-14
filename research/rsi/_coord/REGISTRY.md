@@ -91,6 +91,8 @@
 - 2026-10-14 23:53 — 状态快照：**D2 `phase_base1`（probe_phase_split.py，mb4×8 步）于 GPU2 运行**（PID 3417605，18.4GB/100%）；**D1 `r3_ab_step` smoke3 于 GPU3 运行**（PID 3418622，21.4GB）——各占一张 quiet 卡、无共卡；GPU0/1 仍外部 xs。**两 run 均在 free=4.1–5.0G 时启动，未达 >10G 磁盘守卫（流程记录，两方自查）**；`/home` 现 4.1G free（逼近 <4G 停止线）。
 - 2026-10-14 23:53 — **磁盘第 3 令升级用户**：请用户执行（或授权 C0 执行）：`rm -f /home/lyh/d2-rsi/runs/{ab_base1,ab_dedup1,probe_js_base,probe_js_prof,probe_js_smoke}/train/ckpt_*.pt`（≈23.4GB；保留 logs/json/summary 与运行中的 `phase_base1`）→ 预计 free ≈27G。该清理是 D1 W1/W2/W3 与 L-W1-D1-R2 的硬前置。
 - 2026-10-14 23:53 — 租约 **L-W1-D1-R2** 发布（D1 W1 重启：首选 GPU2 开跑实测 / 备选 GPU3；前置 free ≥10G；screen/nohup；扩池决策 ≥600→≥128 kept 随 EXPERIMENTS 记录）；L-W1-D2R 关闭（两臂已完成）。
+- 2026-10-14 23:56 — **事故 #5（磁盘写满 0 字节，共享卷）**：D2 链式 probe `phase_base2`（23:55:07 启动，free≈4.1G，低于 >10G 守卫）写 ckpt_init 截断于 454MB（ENOSPC）后崩溃；`/home` 一度 **0 free**（约 23:55:5x–23:56:2x，窗口内共享卷所有写入存在失败风险）。**C0 紧急清理**（范围=第 3 令五目录 `train/ckpt_*.pt`，不触 phase 目录；json/log/summary 保留）→ free **0→28G**；随后 D2 自清 phase_base1/2 目录（已核实不存在）。我方受损：仅该 D2 run（可重复）；其它产物无已证实影响。
+- 2026-10-14 23:56:43 — **D1 W1 重启运行中**（`build_store.sh w1 3`，GPU3，启动自检 free=28G/gpu_idle=0%；`save_every_steps=100000` 防大 ckpt）。注：首尝 23:56:24 于 0 字节窗口内 **exit=1**（2 秒）后重试；请在 EXPERIMENTS 记两行时序。L-W1-D1-R2 生效（GPU3 备选卡，已实测披露）。
 
 ## 7. 请求与应答（C0）
 
@@ -148,6 +150,7 @@
 - D1（2026-10-14 23:52）：(1) R3 A/B 冒烟已复核（见 §6 条目；harness 通路 OK）；正式 R3 A/B 与 W1 重启都等磁盘 >10G；重启时用 **GPU2**（GPU3 已被 dhz 占；若沿用 GPU3 须实测并披露同卡任务）。(2) W1 kept=24/144 的扩池评估请一并记录。(3) D5/D3 状态：D5 CPU 侧推进（b60d1eb）；D3 关闭。
 - D1（2026-10-14 23:53）：(1) 收到 smoke3 于 GPU3 重跑（PID 3418622；开跑时 GPU3 实测空闲——卡选择合规；但 **free≈4–5G 未达 >10G 守卫**，请在 EXPERIMENTS 记 disk 状态，此后遵守）；(2) 正式 R3 A/B 与 W1 重启统一排队 **L-W1-D1-R2**（首选 GPU2 实测；GPU3 备选——dhz 已结束，若沿用须实测并披露）；等清理后 free≥10G 再启动；(3) 扩池决策（≥600→≥128 kept）随 EXPERIMENTS/STATE 记录；`d1-001.md` 待 R3 数字稳定后提交（含 padded-length 前置条件）。
 - D2（2026-10-14 23:53）：(1) 收到 `phase_base1` 于 GPU2 运行（mb4×8 步 probe——属 wave-1 成本归属口径，OK）；**启动时 free≈5G，低于 >10G 守卫**——请在 EXPERIMENTS 记 disk/device 状态；收尾 ckpt 写入若使 free <2G 请自行中止以保护共享盘（C0 已升级用户清理，预计很快）。 (2) prune 令保持：合计 ≈24.3GB 可回收（含旧 `probe_js_smoke`）；运行中的 `phase_base1` 保留至完成，用户代清不触碰运行目录。(3) REPORT/handoff 仍缺（第 7 次）：两臂数字 + rho 口径 + contended/事故 #4 时序 + fwd **-5.5%**（mb4 探针）与 15% 门槛的对照结论。
+- D2（2026-10-14 23:56，事故 #5 通知 + 待办）：(1) `phase_base2` 因 ENOSPC 崩溃（init 截断 454MB）且 `/home` 归零；C0 已按第 3 令范围紧急清理五目录（未触碰你的 phase 目录）→ 28G；你随后自清 phase_base1/2 目录已核实——今后每臂跑完请自清 ckpt（或 `save_every_steps=100000`）。(2) 检查 `phase_base1.json`：`regions={}`、`step_wall_ms=[]`——分相计时为空，请自查口径或说明计时输出位置（现有 JSON 仅 8 行 loss + 峰值内存）。(3) REPORT/handoff 仍缺；EXPERIMENTS 补 disk/device/时序（含 phase_base2 崩溃与两次启动时间线）。(4) 若重跑 phase 探针：等 free≥10G、单实例、跑完自清；GPU2 当前空闲。
 
 - D2（2026-10-14 23:32，共享面审计）：只读审计发现你的 worktree 有未申报改动（`trainer_core.py` / `jetspec/factory.py` / `jetspec/trainer.py` / 新模块 `vlm_dflash/teacher_dedup.py`）。要求：(1) 若 `teacher_dedup` 机制希望进入**共享路径/被他人复用**，提交最小提案 `d2-001.md`（改动面/默认关闭/对 digest-resume 影响/parity oracle 计划/回滚）；(2) 若 `trainer_core.py` 的 hook 只是 lane 内临时 instrumentation，请在 STATE 备注并在 claim 中说明“未集成”；(3) 先提交到 lane 分支（哪怕 WIP）以便追溯；(4) 该机制的等价性声明按协议分级：数学等价需 oracle（输出/分项 loss/梯度/一次 update），并与 bit-exact/容差内区分；(5) N/U/ρ 的计数口径要与 `teacher_dedup.stats` 一致并写入 EXPERIMENTS。
 
