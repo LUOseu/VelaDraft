@@ -35,14 +35,20 @@
 
 | 轮次 id | 角色 | 假设（一句话） | 预算上限 | 资源租约 | 状态 |
 |---|---|---|---|---|---|
-| W1-D1 | D1 | 两轴 (C,A) 分布对 block drafter 成本有额外解释力 | ≤1.0 GPU-h | 单卡（见 RESOURCE_SCHEDULE） | 已放行 |
+| W1-D1 | D1 | 两轴 (C,A) 分布对 block drafter 成本有额外解释力 | ≤1.0→**≤1.5**（提升依据见下） | 单卡（见 RESOURCE_SCHEDULE） | 已放行 |
 | W1-D2 | D2 | N/U 重复与 teacher/head/loss 占比可测且可观 | ≤1.0 GPU-h | 单卡 | 已放行 |
 | W1-D3 | D3 | attention+mask 占比与形状构成可解释 | ≤0.5 GPU-h | 单卡（profiling） | 已放行 |
 | W1-D4 | D4 | 缓存/存储容量与命中率边界可测 | ≤0.5 GPU-h | 单卡/CPU | 已放行 |
 | W1-D5 | D5 | 静态流水线 trace 可建立、成本可分解 | ≤0.5 GPU-h | 单卡（trace） | 已放行 |
-| W2-* | 通过门槛者 | 由 wave 1 证据决定 | ≤4 GPU-h/方向 | C0 批准后分配 | 未放行 |
+| W2-D1 | D1 | 布局重排（regroup）机制开发（过 wave-1 证据门槛） | ≤1.5 GPU-h（依据：`d1-001-c0` 接收 + parity oracle 通过） | GPU3 单卡 | 已关闭（L-W2-D1；实耗 0.90/1.5） |
+| W3-D1R4 | D1 | R4 sub1 边界 A/B | ≤0.2 GPU-h（依据：`d1-004-c0`） | GPU3 | 已关闭：负分支（实耗 0.108；`d1-005-c0`） |
+| W3-D4xD1 | D1 | D4×D1 2×2（online cache × regroup 组合） | ≤1.5 GPU-h（依据：`d4xd1-001-c0`；wave-2 GO + capacity demo + e2e smoke） | GPU3 优先 | 已放行（D1 执行 8 腿） |
+| W3-D1Q | D1 | held-out 质量（AL/acc band-first；d1-006 接收） | ≤2.4 GPU-h，staged（依据：band-first 设计；2×2 后顺序执行） | GPU3 顺序 | 已接收（先 Stage-1 建带再 Stage-2） |
+| W2-* 其余 | —— | 未过证据门槛的方向 | —— | —— | 未放行（按门槛纪律保持） |
 
 每轮开始前：角色在自己的 STATE.md 写假设/反例/指标/上限/预算；跑完把 run 证据写入 `EXPERIMENTS.jsonl` 并在 `handoff.md` 给 C0 一行摘要；C0 更新本表状态。
+
+**预算提升证据（任务 2 记录）**：D1 wave-1 `≤1.0→≤1.5`（W0-only 无法证伪 P1、需真实混合池；§7 条目；实耗 0.92）；L-W2-D1 `≤1.5`（`d1-001-c0`；实耗 0.90 关闭）；L-W3-D1R4 `≤0.2`（`d1-004-c0`；0.108 负分支关闭）；L-W3-D4xD1 `≤1.5`（`d4xd1-001-c0`；已放行待执行）；L-W3-D1Q `≤2.4 staged`（d1-006 接收记录；2×2 后执行）。其余角色本轮无预算提升，已有租约条目见 §7/§8 与 RESOURCE_SCHEDULE。
 
 ## 5. 通信
 
