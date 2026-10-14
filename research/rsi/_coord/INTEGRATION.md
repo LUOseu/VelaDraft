@@ -58,17 +58,17 @@
 
 优先给 D1/D2 研究资源，D4 提供实用 backend；按真实证据调整排序。
 
-### 4.1 Wave-1 台账（滚动；更新 2026-10-15 00:22）
+### 4.1 Wave-1 台账（滚动；更新 2026-10-15 00:56）
 
 | 路线 | wave-1 证据 | 门槛核验 | 当前判定 |
 |---|---|---|---|
-| D1 | 浪费审计（ctx pad 12.6%、block pad 6.0%）；R3-prereq oracle（**C0 复跑 ✓**）；**W1/W2/W3 store 全 ✓（W3 00:30:29；192/192 全多轮；摘要 `95ef12e4…`）**；**R3 正式扫掠进行中**（k2 四 store 完成 + w1_k2 运行 + k4 排队；k2 初验：mix **1.24×** wall、显存 −30~38%；W1 首跑曾被 SIGTERM=事故 #4） | **显存门 ≥25% 初测达标（k2 全 store）**；wall 门待整步口径；grad/update parity 记录待修正 | HOLD（R3 收口 + d1-001 + 预算；W1/W2/W3 资产可被 D4/D5 引用） |
+| D1 | 浪费审计 + oracle（C0 复跑 ✓）；**store 全 ✓（W1 191/W2 144/W3 192/MIX 335）**；**R3 全矩阵完成：W3 k4 +19.0% / MIX k4 +24.7%（C0 抽查 ✓）；peak −30~58%**；EXPERIMENTS 24 条（device 全填）；`d1-001` 已提（接收） | **整步门 ≥15% ✓（W3 真实混合）；显存门 ≥25% ✓**；parity bf16-class（grad 口径待修正） | **GO（wave-2 放行，`d1-001-c0`）**：≥3 交替 100–200 更新配对 + capacity demo；集成排 wave-2 后 |
 | D2 | rho=6.83；**12 项 CPU 测试（C0 复跑 12/12 ✓）**；pin 2×2 fwd -6.8%（loss 四腿 bitwise）；**dfly recipe 2×2 完成：fwd −12.9ms、bwd −19.5ms（12 步 loss 四腿逐值相同，C0 直读 ✓）**；phase dedup4 归因完成（editable install 遮蔽=空对照；未钉卡 event 伪影已修） | ρ≥2 ✓；**收益 −3.0%（Jetspec）/ −5.6%（DFly recipe）≪15%；显存无降** | **STOP（D2 自判，C0 采纳；d2-001-c0）**→DEFERRED（lane-local opt-in；再开条件=REPORT §8） |
 | D3 | trace + Amdahl：attention+mask=21.16ms/595.9ms=**3.55%**（cap +3.7% 步 / +1.4% online），**C0 核数 ✓** | ≥20% ✗（远未达） | **STOP**（kernel 轨；re-open 条件已登记） |
-| D4 | W1 五腿 counters 逐值一致（**C0 5/5 ✓**）+ harvest 回填；W2 CPU 压力轨迹（证伪→修复；零越界）；**W2 降级验证 off/on 完成（GPU2，counters 逐值相同、无调整）** | 无提速声称（安全阀）；d4-001 已集成（`1f8963e`）且 **lane commit `208f422` 对账 ✓（sha1 全一致）**；环境探测→B 降级验证已跑 | HOLD→集成路径明确（缺 cgroup 真压力验证=环境限制，已在 `d4-002-c0` 记录）；平台工程候选，非收益项；收口：REPORT 标注 `cgroup_limit=unavailable`/`sensor=meminfo` |
+| D4 | W1 五腿 counters 逐值一致（**C0 5/5 ✓**）；W2 CPU 压力轨迹（零越界）；**W2 降级 B 收口（F1–F4 PASS；两腿 counters 645/129/129/0/0 相同；adjustments=0；lane `a8e762c`）** | 无提速声称（安全阀）；d4-001 集成 `1f8963e`（sha1 4 文件再核一致；13+4+70/70 ✓） | **merge-ready（平台工程级，`d4-003-c0`）**：静态 RAM 场景 / opt-in 默认关；压力响应未验证（环境限制）；不自动 merge main |
 | D5 | trace 分解 + sim v3/v4；regen 真测 1.66×/2.33×；静态分裂 sim 1.70×；cost-aware sim +0.8–2.1%；**d5-001 步 2 + 两卡 split 接线（lane 79/79 C0 独立复跑 ✓，含 36 parity 项；Tier 0 smoke 批准）** | cost-aware ✗（≪15%）；静态 split 待真实 ladder | HOLD（split=wave-2 条件项；G2 分档预授权等窗口） |
 
-未决：D2 **lane commit（零提交）**+“13→12”措辞更正（其余收讫，STOP 已采纳）；D1 W3 运行中（W2 ✓ 144/144，摘要 `5980f77b…`）→ 正式 R3 A/B + d1-001 + 预算自报；D4 lane commit 对账 + L-W2-D4 降级验证 B（d4-002-c0 已批，等窗口）；D5 步 3–4 等 G2 窗口（档位预授权）；iface v0.2 候选已录入 PROTOCOL §12（`teacher_src_pos` 已确认、`host_ram_budget_gb` 待 D4）；预算实耗：D3 0.22/0.5、D4 0.31/0.5（+≤0.3 降级项）、D5 ≤0.4/1.0、D1 待自报、D2 ≤1.0 待盘点确认。
+未决：D1 wave-2 配对（L-W2-D1 ≤1.5 GPU-h，窗口执行）→ `d1-001` 集成排程（默认全关、wave-2 结论后）；D4 收口标注（`cgroup_limit=unavailable`/`sensor=meminfo`、adaptive 字段口径）+ lane 追记 → merge-readiness 评估；D5 chain2 Tier A/B 进行中（staged_b8 运行；S3 线待修 split 图像暂存后补跑；Tier C 待 C0）；iface v0.2（D1 增量已登记候选；`host_ram_budget_gb` 待 D4）；预算实耗：**D1 0.70/1.5**、D2 0.5/1.0、D3 0.22/1.0、D4 0.31/0.5（+≤0.3 降级项已跑）、D5 进行中（自报待收）。
 
 ## 5. 组合与复核（只做相关组合）
 
@@ -95,26 +95,26 @@
 7. 声明审计：抽查 2–3 个关键数字与原始日志/JSON 一致；限制与反证条件写明；负结果保留。
 8. 复现：EXPERIMENTS 字段齐全、依赖 SHA 固定、复现命令可执行；外部引用标明“引用、未独立复核”。
 
-## 8. Wave-1 收口（滚动草稿 · 更新 2026-10-15 00:25）
+## 8. Wave-1 收口（滚动草稿 · 更新 2026-10-15 00:56）
 
-> wave-1 尚未关闭（D1 W2/W3+R3、D2 归因与记录、D4 集成+W2 A/B、D5 G2 窗口均未定）。本节是 C0 的滚动台账：给每条**当前判定 / 证据路径 / 解除条件**；最终 GO/HOLD/STOP/BLOCKED 在关闭时冻结。平台工程价值与论文贡献潜力分列，不互相折算。
+> wave-1 尚未关闭（D1 wave-2 配对、D4 收口标注、D5 Tier A/B 进行中）。本节是 C0 的滚动台账：给每条**当前判定 / 证据路径 / 解除条件**；最终 GO/HOLD/STOP/BLOCKED 在关闭时冻结。平台工程价值与论文贡献潜力分列，不互相折算。
 
 | 路线 | 当前判定 | 关键证据 | 平台 / 论文 | 解除或关闭条件 |
 |---|---|---|---|---|
-| D1 | HOLD（最高候选；R3 扫掠中） | **W1/W2/W3 store 全 ✓（W3 00:30:29；192/192 多轮；摘要 `95ef12e4…`）**（server `/home/lyh/rsi-d1/runs/`）；waste 审计 + oracle（C0 复跑 ✓）；**R3 正式 k2 四 store 已出数（mix 1.242×、显存 −30~38%，C0 重算抽查 ✓）**＋k4 排队 | 平台：probe store 资产；论文：潜力最高（双轴组织 + R3） | R3 收口（含 device/parity 口径修正）+ `d1-001.md`；整步 ≥15% 或显存 ≥25% 才进 wave-2 配对 |
+| D1 | **GO（wave-2 放行；`d1-001-c0`）** | R3 全矩阵（W3 k4 +19.0% / MIX k4 +24.7%；peak −30~58%；C0 抽查 4 组 ✓）+ 24 条 EXPERIMENTS + oracle/pipeline 复跑 ✓；预算 0.70/1.5 | 平台：布局重排引擎 + probe stores；论文：候选（wave-2 配对 + 质量证据后定） | wave-2：L-W2-D1 配对跑 → 通过则 C0 集成 d1-001；条件（同表 replay / 字段口径）见 `d1-001-c0` |
 | D2 | **STOP（自判+采纳；机制 DEFERRED；已全收口）** | `research/rsi/d2/` @ lane `bfb3635`（+`d6e3c9a` 记录提交；REPORT/EXPERIMENTS/handoff 全量含失败与归因段；“12/12”笔误已更正；预算 0.5/1.0 GPU-h 已记）；pin 2×2（−6.8%，loss bitwise）+ dfly recipe 2×2（−12.9/−19.5ms，12 步 loss 逐值相同） | 论文：否（−3.0%/−5.6% ≪15%；Amdahl 上限 ~5–6%）；平台：opt-in 旋钮（lane 存档，不集成） | **已关闭**；再开=REPORT §8 条件 |
 | D3 | STOP（已接受） | REPORT `b88cdf2`：attention+mask=3.55%（C0 核数 ✓）；/tmp 已清 | 论文：否 | 再开条件：W2 长答 ~15% 外推 / b16 / S≥2.5–4k |
-| D4 | HOLD → 已集成（merge 待验证） | W1 五腿 counter-exact（C0 5/5 ✓）；REPORT §W1/§W2；**d4-001 集成 `1f8963e`（sha1 对账一致；复跑 13+4 ✓）** | 平台：adaptive 安全阀（opt-in）；论文：低（无提速声称） | D4 lane commit 对账；L-W2-D4 ≤1.5 GPU-h real-sensor A/B → 然后可评 merge-ready |
-| D5 | HOLD（条件项；Tier 0 冒烟：canon ✓ / s3 导入 bug 停链，待修重跑） | REPORT `85cbf8b` + sim v4 `23875e8` + d5-001 步 2 + 两卡 split 接线（lane 79/79 C0 复跑 ✓）+ G2 链记录（含 0.16 GPU-h 事故留档） | 平台：runner 语义级可驱动真 trainer；论文：低（H2 负） | 步 3–4=G2 窗内 Tier 0→A（预授权 ≈3.2–3.4 GPU-h）；B 条件续、C 需 C0；先修 `split_pipeline.py` import |
+| D4 | **merge-ready（平台工程级；`d4-003-c0`；不动 main）** | W1 五腿 counter-exact（C0 5/5 ✓）；**d4-001 集成 `1f8963e`（sha1 核对 ✓；13+4+70/70 ✓）**；**W2-B 收口**（F1–F4 PASS；两腿 counters 相同、adjustments=0；lane `a8e762c`；0.062 GPU-h） | 平台：adaptive 安全阀（opt-in、默认关、静态 RAM 场景）；论文：低（无提速声称；压力响应未验证） | 无待办；推进 main 由消费方/用户决定（按 INTEGRATION §7 checklist，不自动 merge） |
+| D5 | HOLD（条件项；chain2 进行中：Tier0 canon ✓ / smoke_s3 二败（图像暂存）→ S3 线停；非 S3 legs 跑中） | REPORT `85cbf8b` + sim v4 `23875e8` + d5-001 步 2 + lane 79/79（C0 复跑 ✓；82/82 待复核）+ G2 链记录（含 0.16 GPU-h 事故 + smoke_s3 两败） | 平台：runner 语义级可驱动真 trainer；论文：低（H2 负） | Tier A/B：staged_b8→sync_b8→sync_b32 出数（进行中）；S3 线修好暂存后补跑；Tier C 需 C0 |
 
 跨路线观察：D5 v4 的 keep-oracle 变体需要“生成前已知 keep”的预测器——若 D1 双轴组织能提供此类信号，仅作为 **D1×D5 条件组合的讨论项**（未批准；须双方有共同监督位置才立项）。
 
 **共同基线与资产**
 - BASE `7eab136`（复核无漂移）；协议/接口 v0.1.0；B0=`e15256d`。
-- 共享资产：D1 W1 store（指纹 `e044f488…`）+ W2 store（复合 sha256 `5980f77b…`，144 行/seq 2048；均引用级）；D5 CPU LivePipeline（`b60d1eb`，lane）；D4 fixed-LRU（已随 PR #6 合入）。
+- 共享资产：D1 W1 store（`e044f488…`）+ W2 store（`5980f77b…`）+ **W3 store（`95ef12e4…`，192 行多轮）+ MIX store（335 行 = W1+W2 交织）**；D5 CPU LivePipeline（`b60d1eb`，lane）；D4 fixed-LRU（已随 PR #6 合入）。
 - 集成分支：**`research/rsi-c0` 本身**；d4-001 集成 commit `1f8963e`；验证（本机 dflare venv）：`pytest tests/test_cache_budget.py` 13/13、`pytest tests/test_online_mode.py` **70/70（BASE 66 + 新 4）**；merge-readiness 待 real-sensor A/B + lane 对账，不自动 merge main。
 
-**预算实耗（GPU-h）**：D3 0.22/0.5；D4 0.31/0.5（+L-W2-D4 ≤1.5 条件）；D5 ≤0.4/1.0；D1 待自报；D2 待盘点（上限 1.0）。
+**预算实耗（GPU-h）**：D1 **0.70/1.5**（自报入账；wave-2 L-W2-D1 ≤1.5 单列）；D2 0.5/1.0（已盘点）；D3 0.22/1.0；D4 **0.37/0.5**（W1 0.31 + W2-B 0.062）；D5 进行中（自报待收；含 0.16 事故计入）。
 
 **事故台账**：见 RESOURCE_SCHEDULE §3 / REGISTRY §6（#1–#5，均含时间线、处置与租约修正）。
 

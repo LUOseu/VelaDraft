@@ -3,7 +3,7 @@
 - 协议版本：**rsi-protocol-v0.1.0** ｜ 接口版本：**rsi-iface-v0.1.0**
 - 共同基线 BASE_SHA：`7eab1369266010137702de8c714053729cde5834`（origin/main，PR #6 合并后；含固定预算 LRU 记录缓存）
 - 历史核对基线 B0：`e15256d7c4bd10a490a7ac821eb12a0749a96fdd`
-- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 00:06 (Asia/Shanghai)
+- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 00:56 (Asia/Shanghai)
 - 无法确认的字段以 `?` 标注并在文末说明；未创建的 worktree/分支在下一次更新回填。
 
 ## 1. 角色与分支
@@ -11,10 +11,10 @@
 | 角色 | branch | worktree | 负责人 | 可改范围 | 依赖 | 接口版本 | 状态 |
 |---|---|---|---|---|---|---|---|
 | C0 | `research/rsi-c0` | `/Users/Admin/grounding-parallel/veladraft-c0` | C0 agent（本会话） | `research/rsi/_coord/` + 经批准的共享入口集成 | 五条路线输入；用户转发 | rsi-iface-v0.1.0 | ACTIVE：BASE 已冻结；v0.1.0 已发布（origin `research/rsi-c0`） |
-| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | IN PROGRESS：**W1 store ✓（23:59:42；191/192）＋W2 store ✓（00:08:25 exit=0；144/144；自清 ckpt）＋W3 build 运行中（00:08:39 起，GPU3）**；R3-prereq oracle **C0 复跑 ✓**；R3 冒烟 ✓；W1 首跑事故 #4 记录在案；`d1-001.md` 待 R3 数字稳定后提交 |
+| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | **GO（wave-2 放行；`d1-001-c0`）**：round-2 全收（`56b6563`）——**R3 全矩阵（W3 k4 +19.0% / MIX k4 +24.7%；peak −30~58%；W0/W1 中性边界；C0 抽查 4 组 ✓）**；EXPERIMENTS 24 条（device 全填）；预算 **0.70/1.5 GPU-h**（自报入账）；`d1-001` 接收（条件=同表 replay / grad 字段口径 / git_sha 注记）；**L-W2-D1 ≤1.5 GPU-h**（GPU3 优先）；MIX store 登记 |
 | D2 | `research/rsi-d2` | `/Users/Admin/grounding-parallel/vlm-dflash-d2` | D2 agent（用户安排） | `research/rsi/d2/` + 新模块/测试 | BASE；与 D1 的软目标覆盖对齐 | rsi-iface-v0.1.0 | **STOP（自判+C0 采纳，`d2-001-c0`）**：REPORT/handoff/EXPERIMENTS/d2-001 到齐；pin 2×2 −6.8%（loss 四腿 bitwise）；dfly recipe 2×2（fwd −12.9/bwd −19.5ms；12 步 loss 四腿逐值相同，C0 直读 ✓）；CPU oracle **12/12（C0 复跑；更正“13”措辞）**；归因段完成（editable 遮蔽/event 伪影）；机制 DEFERRED（lane-local opt-in；再开=REPORT §8）；**欠 lane commit** |
 | D3 | `research/rsi-d3` | `/Users/Admin/grounding-parallel/vlm-dflash-d3` | D3 agent（用户安排） | `research/rsi/d3/` + 新模块/测试 | BASE；D1 形状分布输入 | rsi-iface-v0.1.0 | **CLOSED（STOP 已接受；最终关闭确认 2026-10-15 00:18）**：attention+mask=21.16ms/595.9ms=**3.55%** ≪20%（cap +3.7% 步 / +1.4% online）；C0 核数 ✓；交付物全（`b88cdf2`：REPORT/EXPERIMENTS/handoff/support_matrix/evidence/scripts；worktree 净）；预算自报 0.22/1.0 GPU-h；服务器清理 ✓；无集成；再开条件=REPORT §8 |
-| D4 | `research/rsi-d4` | `/Users/Admin/grounding-parallel/vlm-dflash-d4` | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | **d4-001 已集成 `1f8963e`**（sha1 对账一致；13+4 与在线 70/70 复跑 ✓）；**d4-002 处理：降级验证 B 批准（≤0.3 GPU-h；`d4-002-c0`）**；W2 CPU S3 轨迹（1012 行、0 违反）；**欠 lane commit**；预算 0.31/0.5（+≤0.3 降级项） |
+| D4 | `research/rsi-d4` | `/Users/Admin/grounding-parallel/vlm-dflash-d4` | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | **merge-ready（平台工程级；`d4-003-c0`）**：d4-001 集成 `1f8963e`（sha1 对账一致；13+4+70/70 复跑 ✓）；**W2 收口**（F1–F4 PASS；两腿 counters 645/129/129/0/0 逐值相同；adjustments=0；lane `a8e762c`；runtime 4 文件 sha1 再核一致）；范围=静态 RAM 场景/opt-in 默认关（压力响应未验证）；预算 0.37/0.5；不自动 merge main |
 | D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | D5 agent（用户安排） | `research/rsi/d5/` + 新模块/测试 | BASE；D1 成本模型；D4 缓存/配额接口 | rsi-iface-v0.1.0 | REPORT 已接收（`85cbf8b`；**C0 抽查 ✓**）；sim v4 `23875e8`；**d5-001 步 2 完成（`cf74790`+duplicate guard；lane **43/43 C0 独立复跑 ✓**；驱动真 train_dflash）**；**iface v0.2 候选受理（PROTOCOL §12）**；**G2 档位预授权**（min ≈2.2 GPU-h / 有价值集 ≈4.0）；静态分裂=wave-2 条件项（等窗口）；预算 ≤0.4/1.0 GPU-h |
 
 边界（不得越界）：D4 不改 batch/anchor/目标函数、不调度流水线；D1 不改 cache policy/soft loss/attention kernel；D2 不合并不同 student 查询、不改 anchor 采样与 attention；D3 不改可见性语义、不接管布局调度与 cache；D5 用 D4/D1 接口，不重写缓存/采样器/训练目标；C0 只协调集成，不接管研究路线。
@@ -192,6 +192,21 @@
 
   （k2=sub_batch 4；k4=sub_batch 2；w3_k4 独立重算：652.7→548.4ms=1.190×、peak 25.0→10.6GB、loss_rel 4.79e-3；mix_k4：315.4→253.0=1.247×、−46.6%。）**EXPERIMENTS 回填已核**：w0-k2 条目含物理卡（GPU1 独占；W3 并行在 GPU3、GPU0 外部）与修正后的 parity 口径——**regroup vs ref 漂移仅 2.7–5.4e-5；canonical-vs-ref 4.9e-3 系 canonical 自身 bf16 权重量化（cp 隔离至 1.5e-7）**；grad_rel ≤4.5e-3 / update_rel ≤6.2e-8。**剩余**：全 run 条目补齐（w1/mix/w3/k4）+ REPORT Round-2 + `d1-001.md` + 预算（r3 每 run ≈0.02 GPU-h 已入条目）+ summary `grad=0.0` 字段修正说明。
 
+### 对 D1（2026-10-15 00:52，round-2 交付应答）
+
+REPORT Round-2 / EXPERIMENTS（24 条，hardware 全填）/ `proposals/d1-001.md` / 预算自报 **≈0.70/1.5 GPU-h** 全部到齐；`tests/oracle_regroup_parity.py` + `tests/test_bucketing_pipeline.py` C0 复跑 **rc=0**。**裁决：`proposals/d1-001-c0.md`——接收（条件）+ wave-2 GO。**
+
+1. **门槛核验 ✓（C0 抽查 4 组一致）**：W3 k4 整步 **+19.0%**（≥15%）/ MIX k4 **+24.7%**；峰值显存 **−30~−58%**（≥25%）；W0/W1 中性（诚实边界）。
+2. **L-W2-D1 发布**：单卡 ≤1.5 GPU-h；**优先 GPU3**、quiet-gate 照旧、逐 run 记卡号；**不得抢 D5 的 1+2**（G2 窗优先）；范围/臂集/重复数见裁决 §2；capacity demo 单列不乘。
+3. **必带条件**（详见 `d1-001-c0` §3）：① control 臂同表 replay（差异只允许来自分组）+ 数值开关两臂一致；② summary `grad_rel_err_max=0.0` 聚合缺陷修正/标注，wave-2 须 >1 批位 grad/update parity + loss 轨迹；③ `d1-r3-*` `git_sha` 注 "later committed as 56b6563"。
+4. **资产**：MIX store `d1_mix_w1w2/features`（335 行）登记为共享资产（只读、引用级）；W1/W2/W3 已登记。
+5. **事故 #6**：check→launch 竞态 OOM 入台账（重试成功；未杀他人进程；建议自检↔launch 间隔最小化 + 启动后 10s 复核）。
+6. **集成排程**：d1-001 共享面最小集（默认全关、逐字节不变）**排在 wave-2 结论后**；iface 增量登记 v0.2 候选（PROTOCOL §12）。D4×D1 2×2 列为 wave-2 条件组合项（待 D4 收口；不占本轮租约）。
+
+### 对 D4（2026-10-15 00:56，W2 收口应答）
+
+`d4-003` 收讫（00:46）。C0 独立核验（00:52）：lane `a8e762c`（含 `208f422`）worktree 净；runtime 4 文件 sha1 与集成版逐一致（`3d48e108`/`fc019296`/`1c5c2a64`/`69071557`）；`w2_gpu_fcheck.txt` F1–F4 逐项 PASS；两腿 counters `645/129/129/0/0`、peak=current=870,653,628（=sim 预测）；`adaptive_budget` 字段（cap=budget=allowed=1GiB、adjustments=0、reserve 27.0GB、sensor=meminfo available 219.0GB）与 `execution_mode`/`limitation` 标注到位。**裁决：`proposals/d4-003-c0.md`——收口接收 + merge-readiness READY（平台工程级；范围=静态 RAM 场景 / opt-in 默认关 / 不动 main）。** 压力响应/收缩回涨时延类主张不得基于本轮（实机未验证）。`host_ram_budget_gb` 命名与语义**确认**（默认 null）；PROTOCOL §12 已更新。预算 W1 0.31 + W2-B 0.062 ≈ **0.37/0.5 GPU-h**；L-W2-D4 关闭；无待办（可选升级 A 保持 HOLD，再开需用户条件 + 新预注册）。
+
 ### 复核记录（C0 抽查，引用级）
 
 - 2026-10-14 23:24 — D4 W1 仿真：s3_sim_sweep.jsonl 全容量行与 s3 b_on 记录逐字段一致（命中/存储/峰值字节）；不足容量命中率序列合理（10/25/50% → 0.4/2.9/13.0%）。结论：LRU/字节模型对这组访问序列**成立**；未独立重跑仿真。
@@ -220,3 +235,8 @@
 - 2026-10-15 00:36 — D1 R3 抽查（C0 独立重算，`r3_mix_w1w2_k4`，sub_batch=2）：canonical 315.4 → cost 254.4（**1.240×**）/ grid 253.0（1.247×）/ split 266.7（1.183×）；**peak 15.3→8.2GB（−46%）**——k4 与 k2 墙钟相近、显存更深（k2: −30%）。w3_k4 运行中（GPU3）。
 - 2026-10-15 00:37 — D4 W2 降级验证复核（引用级）：on 腿 config `online_feature_cache_adaptive=true`（off=false）确认；两腿 fc counters 与 final_loss 一致——与"无压力→无调整"预注册期望相符；`adaptive` 汇总字段为 null，待 D4 收口时给口径。
 - 2026-10-15 00:38 — D1 R3 抽查（C0 独立重算，`r3_w3_k4`）：652.7→cost 548.4（**1.190×**）/ grid 549.4；peak 25.0→**10.6GB（−57.5%）**；loss_rel max 4.79e-3（逐批重算一致）。**D1 修正口径已核（w0-k2 EXPERIMENTS 条目）**：regroup-vs-ref 漂移 2.7–5.4e-5、grad_rel≤4.5e-3、update_rel≤6.2e-8、cp 隔离 canonical 的 bf16 权重量化（4.9e-3→1.5e-7）——此前"summary grad=0.0"矛盾已按此解释修正（字段本身仍建议修）。
+- 2026-10-15 00:43 — D1 round-2 复核（C0 独立复跑，worktree `56b6563`）：`tests/oracle_regroup_parity.py` **rc=0**（fp64：canonical 与 3 种重排 + 全 mode，dloss≤4.9e-7/grad_rel≤1.7e-7；float32 同阶）；`tests/test_bucketing_pipeline.py` **rc=0**（Z 记账解析一致、6 样本权重核对通过）。EXPERIMENTS 24 条全量、`hardware` 无缺；R3 7 条含卡位/co-resident 叙述 ✓。**遗留**：`git_sha` 应注明 round-2 后续提交为 `56b6563`；summary `grad_rel_err_max=0.0` 与 jsonl 实测（parity 批七臂 grad≈5.07–5.15e-3、upd≈6.6e-8）不符——聚合缺陷，列为 `d1-001-c0` §3 修正项。
+- 2026-10-15 00:42 — **事故 #6（check→launch 竞态，D1 自报）**：D1 R3 W0-k2 首跑在 quiet 自检后、启动瞬间被外部进程抢占 GPU1 → OOM 失败；无他人进程被杀；等待后重试成功，以重跑为准。处置建议：自检与 launch 间隔最小化 + 启动后 10s 复核；纪律不变（不新增守卫）。
+- 2026-10-15 00:50 — D1 **MIX store** 登记为共享资产：`/home/lyh/rsi-d1/runs/d1_mix_w1w2/features/`（335 行 = W1 191 + W2 144 硬链接交织 index；脚本 `scripts/make_mixed_store.py`；model fp `e044f488…`；只读、引用级）。
+- 2026-10-15 00:47 — **L-W2-D1 发布**（RESOURCE_SCHEDULE §4）：单卡 ≤1.5 GPU-h、GPU3 优先（D5 链动态对排除 3）、quiet-gate 照旧；wave-2 配对（W3+MIX、k=4、5 臂、≥3 交替、100–200 更新 + capacity demo）；与 D5 chain2 并行不冲突（D5 用 1/2、D1 用 3）。
+- 2026-10-15 00:52 — D4 W2 收口复核（C0）：lane `a8e762c`；4 文件 sha1 与集成 `1f8963e` 一致；F1–F4 PASS（counters 645/129/129/0/0；adjustments=0；sensor meminfo；exit=0；自清 ✓）；merge-ready 评估见 `d4-003-c0`。

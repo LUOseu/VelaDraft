@@ -84,4 +84,6 @@ D5 提交的跨层命名（REGISTRY §7 00:20 回合），C0 接受为候选。*
 | `plan_position` | 候选（D5） | 该 epoch demand 序列内 0-based 位次；= D1 `logical_batch_index*micro_per_batch + micro_batch_index` 扁平化 |
 | `regen_digest` | 候选（D5） | 行生成记录 digest；幂等键 = (`sample_id`,`epoch_index`,`plan_position`,`regen_digest`)；受 D5 REPORT §7 生成冻结协议约束 |
 | `teacher_src_pos` | 已确认（D2 handoff §1；待 d1-001 合并冻结） | = D1 `slot_pos` − 1（`TeacherLogitsStream` 语义：slot k 读 position−1 hidden；D2 口径 = `label_indices−1` clamp，与 D1 contract v0 一致） |
-| `host_ram_budget_gb` | **待 D4 确认** | launcher 级 host RAM 预算（与 D4 cache 份额联动；product 侧只读；不进 `training_plan_digest`） |
+| `host_ram_budget_gb` | **已确认（D4 00:46；默认 null；冻结走 §11）** | launcher 级 host RAM 总预算；D4 cache payload 与 D5 queue/staging 记入同一份额；product 侧只读；不进 `training_plan_digest`；接线需提案 |
+
+补充（00:52，D1 `d1-001` 接收后）：v0.2 主体另含 D1 增量——可选 forward kwargs `anchor_table`/`sample_weights`、可选 config 块 `train.regroup.{mode,sub_batch,cost_weight,fp32_weights}`（默认全关、行为逐字节不变）、layout contract v0.2 字段组（D1 handoff "Layout contract v0.2"；C0 已阅）。冻结仍走 §11 流程。

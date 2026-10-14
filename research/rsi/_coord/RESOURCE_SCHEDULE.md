@@ -56,6 +56,7 @@
 | L-W1-D1-R2 | D1 | **GPU2**（首选；开跑实测 quiet）｜GPU3 备选（dhz 已结束，若沿用须实测披露） | → W2/W3 store + 正式 R3 A/B 完成或卡被占 | **W1 已建成（23:59:42，kept 191/192）**；剩余 W2/W3 store 与 R3 A/B 同租约；前置 free≥10G（当前 22G）；逐腿 quiet 自检、**跑后清 train ckpt（~4.6G/腿）**；计入 W1-D1 ≤1.5 GPU-h |
 | L-W2-D4 | D4 | 任一实测 quiet 单卡（util≤5%、mem_free≥40GiB、磁盘≥10G；非他人有效租约卡） | → capped-process real-sensor A/B 完成或卡被占 | **条件批准 ≤1.5 GPU-h**（d4-001 条件照旧：MemoryMax/ulimit 隔离、预注册压力轨迹+证伪条件、只报 wall/内存/命中率、自清 ckpt）；**00:20 起预授权窗口**：预计 ≥1.5h 即可开跑，D4 自记卡号+quiet 证据；单卡窗口优先 D4、双卡优先 D5-G2；平台工程验证定位，非论文增量 |
 | L-W2-G2 | **D5 步 3–4（静态 ladder）优先**；D4×D5 producer 重测次之 | 2 张实测 quiet 卡（同上 quiet 口径；非有效租约卡） | → 预登记 leg 集完成或卡被占 | **00:25 版档位（取代 00:20 值）**：Tier 0 smoke ≈0.2 GPU-h（窗内第一门；parity 失败即停 S3 线）/ Tier A `staged_b8+sync_b8+s3_b8` ≈3.0–3.2 / Tier B `+sync_b32+s3_b32` ≈4.2–4.4 / Tier C 全矩阵 ≈6.6–7.2。**预授权：双卡 quiet 即开 Tier 0→A**；A 后两卡仍静且预计 ≥2.5h → 可续 B；**C 需 C0 确认**。D5 自记卡号+quiet 证据入 EXPERIMENTS；冲突时 C0 回收。 |
+| L-W2-D1 | D1 wave-2 配对（双轴重排） | **单卡；优先 GPU3**（D5 链动态对排除 3）；任一实测 quiet（util≤5%、mem_free≥40GiB、磁盘≥10G） | → 配对集完成或卡被占 | **批准 ≤1.5 GPU-h**（00:47）：W3+MIX、k=4、臂 {canonical,split,token,cost,grid}、≥3 交替、100–200 更新 + capacity demo（batch16@sub4 vs batch8，单列）；条件=双臂同表 replay、数值开关一致、grad 口径修正（`d1-001-c0`）；逐 run 记卡号/co-residents；与 D5 不共卡（D5 用 1/2/0；D1 用 3）；冲突时 C0 回收 |
 
 ### 观察记录（C0 只读，未独立复核）
 
@@ -96,6 +97,9 @@
 - 2026-10-15 00:35 — D1 k4：**mix_k4 完成**（315.4→253.0–254.4ms；peak 15.3→8.2GB，**−46%**），**w3_k4 运行中（GPU3）**；D4 W2 降级腿于 00:30:30 完成（GPU2 释放）；D5 chain2 于 00:33:04 因 smoke_s3 导入 bug 停链（GPU 未再占用）。当前：GPU0 外部 ~15.9GB / GPU1 空 / GPU2 空 / GPU3 D1。
 - 2026-10-15 00:38 — **D1 R3 扫掠全部完成**（w3_k4 @00:37；k2×5+k4×2），GPU3 释放；每个 run ≈0.02 GPU-h（D1 条目）。**GPU1/2/3 三卡全空**（GPU0 外部 ~15.9GB）——L-W2-G2 窗口出现（D5 若修好 import 可即时开 Tier 0→A；卡规则照旧）。磁盘 17G free（守卫 ≥10G）。
 - 2026-10-15 00:39 — **窗口被 D5 及时使用**：chain2 二次起链（00:38:24）：smoke_canon 复用 ✓；smoke_s3 再败（split 图像暂存缺文件）→ S3 线停、非 S3 legs 继续：**staged_b8 00:38:55 起于 GPU1+2**；sync_b8/sync_b32 排队。当前：GPU0 外部 / GPU1+2 = D5 / GPU3 空。磁盘 17G。
+- 2026-10-15 00:44 — D5 staged_b8 运行中（GPU1，regen 600/2000 @00:45，kept 154；GPU2 空备用）；GPU0 = 外部 xs（pid 3548763，15.9GB/97%）；GPU3 00:45 短暂被外部占用后已释放（18MiB/0%）；磁盘 17G。**D1 round-2 收讫**（`56b6563`；REPORT/EXPERIMENTS/`d1-001`/预算 0.70 全量），**wave-2 放行**（`d1-001-c0`）。
+- 2026-10-15 00:47 — **发布 L-W2-D1**（见上表）。**事故 #6 登记**（D1 W0-k2 首跑 ~00:20：quiet 自检后启动瞬间被外部进程抢 GPU1 → OOM；等待后重试成功；无他人进程被杀；教训=自检↔launch 间隔最小化 + 启动后 10s 复核；详见 REGISTRY 复核记录）。
+- 2026-10-15 00:46 — **D4 W2 收口**（`d4-003`）：方案 B 两腿 F1–F4 PASS（0.062 GPU-h）；lane `a8e762c`；runtime 4 文件 sha1 与集成版一致；C0 核验 ✓ → **merge-ready（平台工程级）**（`d4-003-c0`）；**L-W2-D4 关闭**（未追加）。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
