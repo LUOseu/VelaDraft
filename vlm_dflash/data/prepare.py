@@ -21,6 +21,7 @@ Outputs (under ``<run>/data``): ``data.jsonl``, ``val.jsonl``, copied images,
 
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 
@@ -194,6 +195,41 @@ _SOURCES = {
 }
 
 
+def _safe_sample_component(sample_id: str) -> str:
+    """A filesystem-safe stem for the sample id (path separators etc. removed)."""
+    cleaned = re.sub(r"[^0-9A-Za-z._-]+", "_", str(sample_id)).strip("._")
+    return cleaned or "sample"
+
+
+def _materialise_media(src_image: Path, *, sample_id: str, images_out: Path) -> tuple[str, str]:
+    """Copy one media file under a collision-free, content-verified name.
+
+    The output name embeds the sample id and the first 16 hex digits of the
+    file's sha256, so two different source files can never share an output name
+    (the old ``{id}_{basename}`` scheme silently merged ``a/same.png`` with
+    ``b/same.png``). Reusing an existing file is only allowed after verifying
+    its bytes hash to the same content; an intentional duplicate reference
+    (same bytes) therefore shares one file, while a tampered/foreign file at
+    that name is a loud error.
+
+    Returns ``(dst_name, content_sha256)``.
+    """
+    content_sha256 = sha256_file(src_image)
+    stem = _safe_sample_component(sample_id)
+    dst_name = f"{stem}_{content_sha256[:16]}{src_image.suffix.lower()}"
+    dst = images_out / dst_name
+    if dst.exists():
+        if sha256_file(dst) != content_sha256:
+            raise RuntimeError(
+                f"prepare_data: existing output image {dst_name!r} does not match source "
+                f"{str(src_image)!r} (content hash mismatch). Refusing to reuse it; remove the "
+                "stale file or rebuild into a fresh data directory."
+            )
+    else:
+        shutil.copyfile(src_image, dst)
+    return dst_name, content_sha256
+
+
 def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> dict:
     """Materialise ``data.jsonl``/``val.jsonl``/images/manifest under ``data_dir``."""
     import random
@@ -224,12 +260,13 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
             sample = pool[index]
             if sample.get("conversations") is not None:
                 dst_names = []
+                content_hashes = []
                 for src_image in sample["image_paths"]:
-                    dst_name = f"{sample['sample_id']}_{src_image.name}"
-                    dst = images_out / dst_name
-                    if not dst.exists():
-                        shutil.copyfile(src_image, dst)
+                    dst_name, content_hash = _materialise_media(
+                        src_image, sample_id=sample["sample_id"], images_out=images_out
+                    )
                     dst_names.append(dst_name)
+                    content_hashes.append(content_hash)
                 rows_out.append(
                     {
                         "id": sample["sample_id"],
@@ -246,7 +283,8 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
                         "src_index": sample["src_index"],
                         "image": dst_names[0],
                         "images": dst_names,
-                        "image_sha256_list": [sha256_file(images_out / name) for name in dst_names],
+                        "image_sha256_list": content_hashes,
+                        "image_sources": [str(path) for path in sample["image_paths"]],
                         "question_chars": sum(
                             len(turn["value"]) for turn in sample["conversations"] if turn["from"] == "human"
                         ),
@@ -255,10 +293,9 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
                 )
                 continue
             src_image = sample["image_path"]
-            dst_name = f"{sample['sample_id']}_{src_image.name}"
-            dst = images_out / dst_name
-            if not dst.exists():
-                shutil.copyfile(src_image, dst)
+            dst_name, content_hash = _materialise_media(
+                src_image, sample_id=sample["sample_id"], images_out=images_out
+            )
             row = {
                 "id": sample["sample_id"],
                 "conversations": [
@@ -274,13 +311,22 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
                     "split": "train" if jsonl_name == "data.jsonl" else "val",
                     "src_index": sample["src_index"],
                     "image": dst_name,
-                    "image_sha256": sha256_file(dst),
+                    "image_sha256": content_hash,
+                    "image_source": str(src_image),
                     "question_chars": len(sample["question"]),
                     "answer_chars": len(sample["answer"]),
                 }
             )
         return rows_out
 
+    selected_ids = [pool[index]["sample_id"] for index in chosen]
+    duplicates = sorted({sample_id for sample_id in selected_ids if selected_ids.count(sample_id) > 1})
+    if duplicates:
+        log(
+            "prepare_data: warning: duplicate sample id(s) in the selected rows "
+            f"{duplicates[:5]}{'...' if len(duplicates) > 5 else ''}; rows stay distinct in the "
+            "manifest (by src_index) and identical media bytes dedupe to one verified file."
+        )
     train_rows = materialise(train_idx, "data.jsonl")
     val_rows = materialise(val_idx, "val.jsonl")
     write_jsonl(data_dir / "data.jsonl", train_rows)
