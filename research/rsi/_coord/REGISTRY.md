@@ -264,3 +264,11 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - 2026-10-15 01:44 — D1 wave-2 **r4（MIX k4 seed43）rc=0**（01:39:04→01:44:06）：**grid 1.137（96/100）/ cost 1.152（93/100）/ token 1.118 / split 1.069**；peak 24.0→10.3 GiB（−57.1%）；parity：loss ≤9.5e-5、grad ≤5.3e-3、update ≤6.7e-8。窗口披露：同节点 D5 sync_b8（GPU1，cross-card）；外部 xs 已结束（GPU0 空闲）。
 - 2026-10-15 01:52 — D1 wave-2 **r5（W3 k4 seed44）rc=0**（01:44:06→01:52:14）：**grid 1.141（100/100）/ cost 1.133（100/100）/ token 1.115 / split 1.076**；peak 25.0→10.6 GiB（−57.6%）；parity：loss ≤4.8e-5、grad ≤4.4e-3、update ≤6.4e-8。W3 三 seed 一致（1.129/1.136/1.141，均值≈1.135）。r6（MIX seed44）01:52:14 自启（末腿）。
 - 2026-10-15 01:53 — D5 sync_b8 训练阶段完成（`train: done steps=762 final_loss=4.03125` @01:53:22；腿 01:17:14 起 wall≈36.1min；visual check/收尾进行中）；按分配 2 卡口径 ≈1.2 GPU-h，待 D5 harvest 复核。磁盘水位 16G（20G→16G，下降中；低于 10G 约束即上报）。
+- 2026-10-15 01:57 — D1 wave-2 **CHAIN DONE：6/6 rc=0**（01:17:23→01:57:26，wall 40.1min，GPU3 单卡）。聚合（C0 独立重算）：W3 grid 1.129/1.136/1.141（均值 1.135）、MIX grid 1.154/1.137/1.107（均值 1.133）；grid win 580/600；peak −57%；parity（b0/50/100 ✓）loss ≤9.5e-5 / grad ≤5.3e-3 / update ≤6.7e-8。**判读：步时 13.5%/13.3% 低于 15% 但显存 −57% 远超 25%（OR 门槛通过）** → 裁决 `d1-002-c0` = GO（修订口径）+ capacity demo 收尾。
+- 2026-10-15 01:53 — D5 **sync_b8 leg OK**（01:17:14→01:53:28，wall≈36.2min；762 步 final_loss=4.03125；drafter visual check passed=True；按分配 2 卡口径 ≈1.21 GPU-h，待 harvest 复核）；**sync_b32 于 01:53:29 启动（cards 0+2）**；链脚本第 107 行 GPU-h 算式报错（记账须按时间戳重算）；磁盘回 21G。
+
+### 对 D1（2026-10-15 02:05，wave-2 判读）
+
+- 裁决见 `d1-002-c0`：**GO（修订口径）** —— 步时均值 13.5%（W3）/13.3%（MIX）、单 seed 最高 15.4%；显存 −57%；win 580/600；parity 三批位 ✓。
+- **收尾项**：capacity demo（batch16@sub4 vs batch8 canonical，同 peak 预算；≤0.2 GPU-h；GPU3 空闲可用）为 L-W2-D1 唯一未跑项；另可顺手修 v2 summary 顶层 `parity_batches=null`（实际已按 0/50/100 执行）。完成后 C0 核验 → 关闭租约 → 解锁集成（d1-001 最小集、D4×D1 2×2）。
+- round-2 的 +19.0%/+24.7%（8 批 cell）不再作对外主数字。
