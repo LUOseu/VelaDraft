@@ -1,0 +1,7 @@
+tensors=36 elements=243811072 differing=243586904 (99.908%)
+max|delta|=0.18457 worst_tensor=layers.0.self_attn.o_proj.weight
+  layers.1.mlp.up_proj.weight: 22524336 elems, max|delta|=0.184082
+  layers.0.mlp.down_proj.weight: 22524321 elems, max|delta|=0.175293
+  layers.1.mlp.down_proj.weight: 22524302 elems, max|delta|=0.166992
+  layers.2.mlp.up_proj.weight: 22524237 elems, max|delta|=0.177246
+  layers.2.mlp.down_proj.weight: 22523958 elems, max|delta|=0.180664

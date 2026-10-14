@@ -1,0 +1,18 @@
+tensors=36 elements=243811072 differing=220384191 (90.391%)
+max|delta|=0.0446167 @ layers.1.mlp.up_proj.weight
+max d/|a| =1.5406e+07 @ layers.0.mlp.gate_proj.weight  (bf16 eps=2^-8=0.00390625)
+max d/ulp(a)=3.20445e+09 @ layers.0.mlp.gate_proj.weight
+ratio=d/ulp buckets (share of all elements):
+     0 < ratio <= 0.5 : 120994 (0.050%)
+   0.5 < ratio <= 1.0 : 39487722 (16.196%)
+   1.0 < ratio <= 2.0 : 28760654 (11.796%)
+   2.0 < ratio <= 4.0 : 37257478 (15.281%)
+   4.0 < ratio <= 8.0 : 37962721 (15.571%)
+   8.0 < ratio <= 16.0: 30644313 (12.569%)
+  16.0 < ratio <= inf : 46150309 (18.929%)
+top-5 by max d/ulp:
+  layers.0.mlp.gate_proj.weight: max d/ulp=3.204e+09 differing=20862301 max|d|=0.0352783 max rel=1.541e+07
+  layers.1.mlp.gate_proj.weight: max d/ulp=7.759e+08 differing=20755046 max|d|=0.0385132 max rel=4.041e+06
+  layers.2.mlp.gate_proj.weight: max d/ulp=7.382e+08 differing=20143453 max|d|=0.0395889 max rel=4.825e+06
+  layers.2.mlp.down_proj.weight: max d/ulp=6.543e+08 differing=20109603 max|d|=0.0422363 max rel=3.373e+06
+  layers.0.self_attn.o_proj.weight: max d/ulp=4.299e+08 differing=3657457 max|d|=0.0085144 max rel=2.774e+06

@@ -1,0 +1,32 @@
+{
+  "steps": 762,
+  "first10_mean_loss": 7.4790296052631575,
+  "last10_mean_loss": 4.05078125,
+  "final_loss": 4.03125,
+  "loss_decreased": true,
+  "nan_seen": false,
+  "skipped_no_anchor_batches": 0,
+  "resumed_from_step": 0,
+  "resume_fast_forward_batches": 0,
+  "resume_fast_forward_reduced_cost": false,
+  "wall_seconds": 548.8472685813904,
+  "peak_gpu_mem_gb": 17.390614528,
+  "gpu_name": "NVIDIA RTX A6000",
+  "overfit_sanity": {
+    "enabled": false
+  },
+  "visual_dependence": {
+    "skipped": true,
+    "reason": "features/swap_pair.pt missing (the visual capture check did not run)"
+  },
+  "confidence_calibration": null,
+  "feature_mode": "offline",
+  "dtypes": {
+    "feature_storage": "bfloat16",
+    "target_native": null,
+    "drafter_compute": "bfloat16",
+    "frozen_embed": "bfloat16",
+    "frozen_head": "bfloat16"
+  },
+  "train_recipe": null
+}

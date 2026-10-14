@@ -1,0 +1,116 @@
+[18:21:02] train: data stage present with unchanged inputs, skipping (use --force to rebuild)
+[18:21:02] train: regen stage present with unchanged inputs, skipping (use --force to rerun)
+[18:21:02] train: feature_mode=online; skipping the offline capture stage (target features are extracted live by the trainer)
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights:  14%|█▍        | 117/824 [00:00<00:01, 668.21it/s]Loading weights:  24%|██▍       | 196/824 [00:00<00:01, 608.17it/s]Loading weights:  31%|███       | 257/824 [00:00<00:01, 539.28it/s]Loading weights:  66%|██████▋   | 547/824 [00:00<00:00, 1264.61it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 1310.37it/s]
+[18:22:33] train: feature_mode=online (live huggingface target on cuda:0; 129 samples, seq 2048; target resident for the whole run)
+[18:22:37] visual_path_check: passed=True replay_bitwise=True span_changed=True downstream_changed=True
+[18:22:48] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'bfloat16', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[18:23:06] gradient coverage: 36/36 trainable tensors with grad (1.000 of trainable elements)
+[18:23:06]   draft_model.fc: trainable=1 tensors/12582912 elements with_grad=1 grad_norm=40.2
+[18:23:06]   draft_model.hidden_norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.8106
+[18:23:06]   draft_model.layers: trainable=33 tensors/231224064 elements with_grad=33 grad_norm=81.81
+[18:23:06]   draft_model.norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.5832
+[18:23:07] step 1/102 loss=12.2500 acc=0.000 al=1.00
+[18:23:08] step 2/102 loss=19.3750 acc=0.000 al=1.00
+[18:23:10] step 3/102 loss=15.4375 acc=0.000 al=1.00
+[18:23:11] step 4/102 loss=13.8125 acc=0.063 al=1.06
+[18:23:13] step 5/102 loss=8.2500 acc=0.047 al=1.05
+[18:23:14] step 6/102 loss=9.2500 acc=0.034 al=1.03
+[18:23:15] step 7/102 loss=7.8125 acc=0.034 al=1.03
+[18:23:17] step 8/102 loss=9.2500 acc=0.005 al=1.01
+[18:23:18] step 9/102 loss=8.8125 acc=0.045 al=1.05
+[18:23:20] step 10/102 loss=7.5312 acc=0.065 al=1.07
+[18:23:21] step 11/102 loss=8.6875 acc=0.055 al=1.05
+[18:23:23] step 12/102 loss=8.6875 acc=0.058 al=1.06
+[18:23:24] step 13/102 loss=7.8438 acc=0.062 al=1.06
+[18:23:26] step 14/102 loss=7.6562 acc=0.046 al=1.05
+[18:23:27] step 15/102 loss=7.4375 acc=0.061 al=1.06
+[18:23:29] step 16/102 loss=7.5000 acc=0.031 al=1.03
+[18:23:31] step 17/102 loss=7.3750 acc=0.013 al=1.01
+[18:23:32] step 18/102 loss=7.0938 acc=0.038 al=1.04
+[18:23:32] step 19/102 loss=7.5000 acc=0.034 al=1.03
+[18:23:33] step 20/102 loss=7.3750 acc=0.036 al=1.04
+[18:23:33] step 21/102 loss=7.3750 acc=0.030 al=1.03
+[18:23:34] step 22/102 loss=7.1875 acc=0.047 al=1.05
+[18:23:34] step 23/102 loss=7.2188 acc=0.051 al=1.05
+[18:23:34] step 24/102 loss=7.2188 acc=0.049 al=1.05
+[18:23:35] step 25/102 loss=7.2500 acc=0.036 al=1.04
+[18:23:35] step 26/102 loss=7.2812 acc=0.062 al=1.06
+[18:23:36] step 27/102 loss=7.1250 acc=0.065 al=1.07
+[18:23:36] step 28/102 loss=7.1250 acc=0.055 al=1.05
+[18:23:37] step 29/102 loss=7.2188 acc=0.058 al=1.06
+[18:23:37] step 30/102 loss=7.0000 acc=0.067 al=1.07
+[18:23:37] step 31/102 loss=7.1562 acc=0.063 al=1.06
+[18:23:38] step 32/102 loss=7.0312 acc=0.051 al=1.05
+[18:23:38] step 33/102 loss=6.8438 acc=0.069 al=1.07
+[18:23:38] step 34/102 loss=6.8438 acc=0.049 al=1.05
+[18:23:39] step 35/102 loss=6.8125 acc=0.038 al=1.04
+[18:23:39] step 36/102 loss=7.0938 acc=0.036 al=1.04
+[18:23:40] step 37/102 loss=7.0312 acc=0.051 al=1.05
+[18:23:40] step 38/102 loss=7.1875 acc=0.043 al=1.04
+[18:23:41] step 39/102 loss=7.0625 acc=0.047 al=1.05
+[18:23:41] step 40/102 loss=6.9688 acc=0.051 al=1.05
+[18:23:41] step 41/102 loss=7.0312 acc=0.049 al=1.05
+[18:23:42] step 42/102 loss=7.0625 acc=0.073 al=1.07
+[18:23:42] step 43/102 loss=7.0938 acc=0.062 al=1.06
+[18:23:43] step 44/102 loss=6.9688 acc=0.065 al=1.07
+[18:23:43] step 45/102 loss=7.0000 acc=0.055 al=1.05
+[18:23:44] step 46/102 loss=7.0625 acc=0.058 al=1.06
+[18:23:44] step 47/102 loss=6.8438 acc=0.067 al=1.07
+[18:23:45] step 48/102 loss=7.0312 acc=0.063 al=1.06
+[18:23:45] step 49/102 loss=6.9375 acc=0.051 al=1.05
+[18:23:45] step 50/102 loss=6.7500 acc=0.069 al=1.07
+[18:23:46] step 51/102 loss=6.7812 acc=0.049 al=1.05
+[18:23:46] step 52/102 loss=6.6875 acc=0.078 al=1.08
+[18:23:46] step 53/102 loss=7.0312 acc=0.041 al=1.04
+[18:23:47] step 54/102 loss=6.9375 acc=0.051 al=1.05
+[18:23:47] step 55/102 loss=7.0938 acc=0.043 al=1.04
+[18:23:48] step 56/102 loss=7.0000 acc=0.047 al=1.05
+[18:23:48] step 57/102 loss=6.8750 acc=0.051 al=1.05
+[18:23:49] step 58/102 loss=7.0000 acc=0.034 al=1.03
+[18:23:49] step 59/102 loss=7.0312 acc=0.034 al=1.03
+[18:23:49] step 60/102 loss=7.0000 acc=0.062 al=1.06
+[18:23:50] step 61/102 loss=6.9375 acc=0.065 al=1.07
+[18:23:50] step 62/102 loss=6.9062 acc=0.055 al=1.05
+[18:23:51] step 63/102 loss=6.9688 acc=0.058 al=1.06
+[18:23:51] step 64/102 loss=6.8125 acc=0.067 al=1.07
+[18:23:52] step 65/102 loss=6.9688 acc=0.063 al=1.06
+[18:23:52] step 66/102 loss=6.9062 acc=0.051 al=1.05
+[18:23:52] step 67/102 loss=6.6875 acc=0.069 al=1.07
+[18:23:53] step 68/102 loss=6.7188 acc=0.045 al=1.05
+[18:23:53] step 69/102 loss=6.6875 acc=0.078 al=1.08
+[18:23:53] step 70/102 loss=7.0312 acc=0.041 al=1.04
+[18:23:54] step 71/102 loss=6.9375 acc=0.051 al=1.05
+[18:23:54] step 72/102 loss=7.0625 acc=0.043 al=1.04
+[18:23:55] step 73/102 loss=7.0000 acc=0.047 al=1.05
+[18:23:55] step 74/102 loss=6.8438 acc=0.051 al=1.05
+[18:23:56] step 75/102 loss=6.9688 acc=0.061 al=1.06
+[18:23:56] step 76/102 loss=7.0312 acc=0.073 al=1.07
+[18:23:56] step 77/102 loss=6.9688 acc=0.062 al=1.06
+[18:23:57] step 78/102 loss=6.9375 acc=0.065 al=1.07
+[18:23:57] step 79/102 loss=6.9062 acc=0.055 al=1.05
+[18:23:58] step 80/102 loss=6.9688 acc=0.058 al=1.06
+[18:23:58] step 81/102 loss=6.8125 acc=0.067 al=1.07
+[18:23:59] step 82/102 loss=6.9375 acc=0.063 al=1.06
+[18:23:59] step 83/102 loss=6.9062 acc=0.051 al=1.05
+[18:24:00] step 84/102 loss=6.6875 acc=0.069 al=1.07
+[18:24:00] step 85/102 loss=6.6875 acc=0.049 al=1.05
+[18:24:00] step 86/102 loss=6.6250 acc=0.059 al=1.06
+[18:24:01] step 87/102 loss=6.9688 acc=0.045 al=1.04
+[18:24:01] step 88/102 loss=6.8750 acc=0.061 al=1.06
+[18:24:01] step 89/102 loss=7.0625 acc=0.043 al=1.04
+[18:24:02] step 90/102 loss=7.0000 acc=0.047 al=1.05
+[18:24:02] step 91/102 loss=6.8438 acc=0.051 al=1.05
+[18:24:03] step 92/102 loss=6.9688 acc=0.049 al=1.05
+[18:24:03] step 93/102 loss=6.9688 acc=0.041 al=1.04
+[18:24:04] step 94/102 loss=6.9688 acc=0.062 al=1.06
+[18:24:04] step 95/102 loss=6.8750 acc=0.064 al=1.07
+[18:24:04] step 96/102 loss=6.9062 acc=0.055 al=1.05
+[18:24:05] step 97/102 loss=6.9375 acc=0.058 al=1.06
+[18:24:05] step 98/102 loss=6.7500 acc=0.067 al=1.07
+[18:24:06] step 99/102 loss=6.9375 acc=0.063 al=1.06
+[18:24:06] step 100/102 loss=6.8438 acc=0.051 al=1.05
+[18:24:07] step 101/102 loss=6.6875 acc=0.069 al=1.07
+[18:24:07] step 102/102 loss=6.6250 acc=0.049 al=1.05
+[18:24:10] drafter visual check: logits_diff=0.0625 ce_delta_swap=0.0007863 ce_delta_perturb=0.0002522 correction_delta=None passed=True
+[18:24:10] train: done with steps=102 final_loss=6.625

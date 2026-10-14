@@ -157,6 +157,56 @@ resume (including the placeholder fast-forward) is unaffected.
   compute dominates on that slice (profiling: render ~17 ms vs forward
   129-139 ms/row).
 
+## Host-RAM record cache (`train.online_feature_cache_gb`, opt-in)
+
+With a frozen target and pre-generated regen answers, a row's extracted record
+is epoch-invariant when the extraction grouping is unchanged: re-extracting it
+in a later epoch with the same grouping reproduces the same bytes (measured
+2026-10-14: fixed-order runs are bit-identical end to end).
+`train.online_feature_cache_gb: <GiB>` (default `0` = disabled) keeps
+extracted records in a byte-bounded host-RAM store inside the online source,
+so later reads of the same row are served from RAM instead of re-running the
+target. The store is LRU-evicted at the byte cap and never persisted; the
+train / overfit-sanity / calibration phases share it; a record larger than the
+whole cap is not retained (it would evict every other entry for one hit).
+
+The cache does not change which rows are consumed, their order, or the
+grouping of any forward it executes: hits return the stored tensors bitwise,
+and a miss (cold start, eviction, or a cap below the working set) re-extracts
+exactly as the reference path would. It stays out of the feature digest and
+the training-plan digest. A resume — exact or not — starts from a cold cache
+and re-extracts; it is functionally resumable, but under a shuffling loader
+it is not guaranteed bit-exact to an uninterrupted cached run, because
+post-resume re-extraction uses the resumed epoch's batch grouping instead of
+the original epoch-1 grouping the uninterrupted run's cache held (drift stays
+in the same bf16-rounding class as the caveat below).
+`train_summary.json` reports it under `feature_source.feature_cache`
+(capacity, hits, misses, stores, evictions, retained/peak bytes). Use it on
+multi-epoch online runs when host RAM can hold the record set (the lane's
+1012-row 2K slice retained 6.4 GiB — as an offline store the same rows take
+7.0G on disk) — it removes the per-epoch re-extraction for every row that
+fits. In the lane's paired offline baseline (2026-10-14), training from the
+already-written store took 548.8 s vs this cache's 470.9 s train stage, with
+zero disk bytes.
+
+Caveat (measured on the lane's 129-row and 2K-row slices, 2026-10-14): the
+default shuffled loader draws a different row order every epoch, so the
+per-epoch grouping — and with it the batched teacher forward's padding
+numerics — changes, and a cached run drifts from a re-extracting run at the
+bf16-rounding scale from the first hit onward (deterministic; OFF/OFF and
+ON/ON runs are each bit-identical). Measured: 129 rows / 6 epochs → max
+|delta| 2⁻⁷ in weights, loss identical 102/102; 2K rows / 6 epochs / 762
+steps → max |delta| 0.0446, global relative-L2 4.26%, loss identical 740/762
+(rest ≤ 2 display ulp), valid_tokens identical throughout. The downstream
+acceptance eval (128 prompts) is functionally identical (mean acceptance
+length equal to 10 decimals; token-exact both ways), and a seed-change
+control puts the weight drift 30–90× below the pipeline's own run-to-run
+variation. A fixed epoch order restores full bit-identity (end-to-end
+`ckpt_final.pt` sha256 match) — measured with a lane-only diagnostic patch
+that pins the loader order (not part of this change). The cache itself is
+value-exact either way: hits return the stored tensors bitwise. See
+`research/system_optimization/REPORT.md` §4.3-§4.6.
+
 ## Exact resume
 
 An "exact" resume means: same mode, algorithm, feature source, identity and

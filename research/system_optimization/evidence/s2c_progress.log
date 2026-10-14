@@ -1,0 +1,6 @@
+[2026-10-14 18:09:11] s2c_a_off start (cache_gb=0, GPU 0, free 8G)
+[2026-10-14 18:20:59] s2c_a_off exit=0 (log /home/lyh/vlm-systems/logs/s2c_a_off.log)
+[2026-10-14 18:20:59] s2c_b_on start (cache_gb=8, GPU 0, free 3G)
+[2026-10-14 18:24:14] s2c_b_on exit=0 (log /home/lyh/vlm-systems/logs/s2c_b_on.log)
+[2026-10-14 18:24:17] S2c: ckpt sha256 MATCH (52d25648d79a4351fc8d387f13b40f22ae033c5509821a4b268be7da01616917) — fixed-order ON reproduces OFF bitwise
+[2026-10-14 18:24:17] S2c DONE

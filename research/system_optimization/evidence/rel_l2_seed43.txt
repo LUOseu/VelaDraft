@@ -1,0 +1,12 @@
+a-vs-c (order+init): GLOBAL relL2=1.314783
+  layers.0.mlp.up_proj.weight: relL2=144.2169%
+  layers.0.mlp.down_proj.weight: relL2=143.3108%
+  layers.0.self_attn.o_proj.weight: relL2=141.8580%
+  layers.1.mlp.up_proj.weight: relL2=141.8540%
+  layers.1.mlp.down_proj.weight: relL2=141.8508%
+c-vs-d (cache @43): GLOBAL relL2=0.014536
+  layers.2.mlp.gate_proj.weight: relL2=2.2155%
+  layers.2.mlp.down_proj.weight: relL2=2.1406%
+  layers.2.mlp.up_proj.weight: relL2=2.0835%
+  layers.1.mlp.down_proj.weight: relL2=1.8494%
+  layers.1.mlp.gate_proj.weight: relL2=1.7267%

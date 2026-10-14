@@ -2903,3 +2903,203 @@ def test_cli_resume_preflight_external_features_dependency_chain(monkeypatch, tm
     monkeypatch.setattr(cli_module, "stage_status", regen_missing)
     with pytest.raises(SystemExit, match="regen"):
         cli_module._preflight_resume(cfg, run_dir, SimpleNamespace(limit=None, steps=2, force=False), "offline", None)
+
+
+# --------------------------------------------------------------------------- #
+# 5. bounded host-RAM record cache (train.online_feature_cache_gb)
+# --------------------------------------------------------------------------- #
+
+def _cache_cfg(cache_gb: float, *, online_batch_size: int | None = None) -> dict:
+    cfg = _stub_cfg(online_batch_size=online_batch_size)
+    cfg["train"]["online_feature_cache_gb"] = cache_gb
+    return cfg
+
+
+def _stub_source_with_cfg(monkeypatch, run_dir, cfg, *, contract=None, target=None):
+    contract = contract or _stub_contract()
+    target = target or _StubTarget()
+    monkeypatch.setattr(online_module, "load_target", lambda cfg_, contract_: (target, object()))
+    return online_module.OnlineFeatureSource(cfg, contract, run_dir)
+
+
+def _prepare_calls(calls: list) -> int:
+    return sum(1 for entry in calls if entry[0] == "prepare")
+
+
+def _forward_calls(calls: list) -> int:
+    return sum(1 for entry in calls if entry[0] == "forward")
+
+
+def test_online_cache_default_off_extracts_every_read(monkeypatch, tmp_path):
+    """No knob -> the reference path: every read re-extracts; accounting stays zero."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls)
+    run_dir = _write_online_run_dir(tmp_path, rows=2, answer_len=8)
+    source = _stub_source_with_cfg(monkeypatch, run_dir, _stub_cfg())
+    dataset = source.dataset()
+    dataset[0]
+    dataset[0]
+    assert _forward_calls(calls) == 2
+    assert source.cache_enabled() is False
+    assert source.cache_stats["hits"] == 0 and source.cache_stats["stores"] == 0
+    assert source.cache_current_bytes() == 0
+    summary = source.summary()["feature_cache"]
+    assert summary["enabled"] is False and summary["hits"] == 0
+
+
+def test_online_cache_rejects_invalid_settings(monkeypatch, tmp_path):
+    run_dir = _write_online_run_dir(tmp_path, rows=1, answer_len=4)
+    for bad in (-1.0, "many"):
+        cfg = _stub_cfg()
+        cfg["train"]["online_feature_cache_gb"] = bad
+        monkeypatch.setattr(online_module, "load_target", lambda cfg_, contract_: (_StubTarget(), object()))
+        with pytest.raises(ValueError, match="online_feature_cache_gb"):
+            online_module.OnlineFeatureSource(cfg, _stub_contract(), run_dir)
+
+
+def test_online_cache_second_read_is_free_and_bit_identical(monkeypatch, tmp_path):
+    """A cached read issues no target work and returns the first extraction's bytes."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls)
+    run_dir = _write_online_run_dir(tmp_path, rows=2, answer_len=8)
+    source = _stub_source_with_cfg(monkeypatch, run_dir, _cache_cfg(1.0))
+    dataset = source.dataset()
+    first = dataset[0]
+    assert _forward_calls(calls) == 1
+    second = dataset[0]
+    assert _forward_calls(calls) == 1  # cache hit: no new target forward
+    assert _prepare_calls(calls) == 1  # and no re-render
+    _assert_same_record(first, second)
+    assert source.cache_stats["hits"] == 1 and source.cache_stats["misses"] == 1
+
+    # Value equivalence against a fresh extraction on a cache-off source.
+    fresh_calls: list = []
+    _install_batched_stub(monkeypatch, fresh_calls)
+    fresh = _stub_source_with_cfg(monkeypatch, run_dir, _stub_cfg())
+    _assert_same_record(first, fresh.dataset()[0])
+
+
+def test_online_cache_lru_eviction_respects_byte_cap(monkeypatch, tmp_path):
+    """Records are retained under an LRU byte cap; evicted rows re-extract."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    run_dir = _write_online_run_dir(tmp_path, rows=6, answer_len=12)
+    # Normalized record bytes per row: input_ids 18*8 + loss_mask 18*4 +
+    # hidden 18*4*2 + position3 3*18*8 = 792; a 1584-byte cap retains 2.
+    source = _stub_source_with_cfg(monkeypatch, run_dir, _cache_cfg(1584 / (1 << 30)))
+    dataset = source.dataset()
+    for index in range(6):
+        dataset[index]
+    assert source.cache_stats["stores"] == 6
+    assert source.cache_stats["evictions"] == 4
+    assert source.cache_current_bytes() == 1584
+    assert source.cache_stats["peak_bytes"] == 1584
+    # Index 0 was evicted (LRU order 0..5): the next read re-extracts and evicts 4.
+    forwards = _forward_calls(calls)
+    dataset[0]
+    assert _forward_calls(calls) == forwards + 1
+    assert source.cache_stats["evictions"] == 5
+    assert source.cache_current_bytes() == 1584
+    # close() drops the retained records.
+    source.close()
+    assert source.cache_current_bytes() == 0
+
+
+def test_online_cache_eviction_recompute_matches_fresh_extraction(monkeypatch, tmp_path):
+    """Capacity below the working set: evicted rows recompute to the reference bytes.
+
+    The second pass over six rows is a mixed hit/miss pass -- the retained
+    tail (rows 4, 5) serves free, the evicted head (rows 0..2) pays one
+    forward per row and must still return the first extraction's bytes.
+    """
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    run_dir = _write_online_run_dir(tmp_path, rows=6, answer_len=12)
+    # 792 bytes per normalized record -> a two-record cap keeps {4, 5}
+    # after the first pass over rows 0..5 (evicting 0..3).
+    source = _stub_source_with_cfg(monkeypatch, run_dir, _cache_cfg(1584 / (1 << 30)))
+    dataset = source.dataset()
+    first_pass = [dataset[index] for index in range(6)]
+    forwards = _forward_calls(calls)
+    assert forwards == 6 and source.cache_stats["evictions"] == 4
+
+    hits_before = source.cache_stats["hits"]
+    misses_before = source.cache_stats["misses"]
+    retained = [dataset[index] for index in (4, 5)]
+    assert _forward_calls(calls) == forwards  # pure hits: no target work
+    evicted = [dataset[index] for index in (0, 1, 2)]
+    assert _forward_calls(calls) == forwards + 3  # one recompute per evicted row
+    assert source.cache_stats["hits"] == hits_before + 2
+    assert source.cache_stats["misses"] == misses_before + 3
+    assert source.cache_current_bytes() <= 1584
+    for record, reference in zip(retained, (first_pass[4], first_pass[5])):
+        _assert_same_record(record, reference)
+    for record, reference in zip(evicted, (first_pass[0], first_pass[1], first_pass[2])):
+        _assert_same_record(record, reference)
+
+    # Recomputed rows are byte-identical to a cache-off extraction as well.
+    fresh_calls: list = []
+    _install_batched_stub(monkeypatch, fresh_calls, context_hidden=4)
+    fresh = _stub_source_with_cfg(monkeypatch, run_dir, _stub_cfg())
+    fresh_dataset = fresh.dataset()
+    for record, index in zip(evicted, (0, 1, 2)):
+        _assert_same_record(record, fresh_dataset[index])
+
+
+def test_online_cache_fetch_batch_hits_and_skips_prepare(monkeypatch, tmp_path):
+    """The batched path serves cached rows without prepare or forward work."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls)
+    run_dir = _write_online_run_dir(tmp_path, rows=4, answer_len=8)
+    source = _stub_source_with_cfg(monkeypatch, run_dir, _cache_cfg(1.0, online_batch_size=2))
+    dataset = source.dataset()
+    first = dataset.fetch_batch([0, 1])
+    assert _forward_calls(calls) == 1 and _prepare_calls(calls) == 2
+    second = dataset.fetch_batch([1, 0])
+    assert _forward_calls(calls) == 1 and _prepare_calls(calls) == 2
+    assert second[0] is first[1] and second[1] is first[0]
+    assert source.cache_stats["hits"] == 2
+
+
+def test_online_cache_never_stores_placeholders(monkeypatch, tmp_path):
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls)
+    run_dir = _write_online_run_dir(tmp_path, rows=2, answer_len=8)
+    source = _stub_source_with_cfg(monkeypatch, run_dir, _cache_cfg(1.0))
+    dataset = source.dataset()
+    dataset.start_fast_forward(1)
+    placeholder = dataset[0]
+    assert str(placeholder["sample_id"]).startswith("fast-forward:")
+    assert source.cache_stats["stores"] == 0 and source.cache_current_bytes() == 0
+    dataset.end_fast_forward()
+    dataset[0]
+    assert source.cache_stats["stores"] == 1
+    assert source.cache_current_bytes() > 0
+
+
+def test_online_cache_real_tiny_model_second_epoch_is_free(monkeypatch, tmp_path):
+    """End-to-end cache check on the real tiny Qwen2.5-VL extraction path."""
+    model, processor = _tiny_qwen25_vl_model(seed=0)
+    contract = _tiny_contract()
+    run_dir = _sync_online_run_dir(tmp_path, model, processor, rows=3, answer_len=10)
+    monkeypatch.setattr(online_module, "load_target", lambda cfg_, contract_: (model, processor))
+    source = online_module.OnlineFeatureSource(_cache_cfg(1.0), contract, run_dir)
+    dataset = source.dataset()
+    epoch1 = [dataset[index] for index in range(len(source.rows))]
+    forwards = source.stats["train"]["target_forwards"]
+    assert forwards == len(source.rows)
+    epoch2 = [dataset[index] for index in range(len(source.rows))]
+    assert source.stats["train"]["target_forwards"] == forwards  # epoch 2: zero target work
+    for left, right in zip(epoch1, epoch2):
+        _assert_same_record(left, right)
+
+    # A cache-off source reproduces the same record bytes from a fresh forward.
+    fresh = online_module.OnlineFeatureSource(_stub_cfg(), contract, run_dir)
+    fresh_dataset = fresh.dataset()
+    for cached_record, index in zip(epoch1, range(len(source.rows))):
+        _assert_same_record(cached_record, fresh_dataset[index])
+
+    summary = source.summary()["feature_cache"]
+    assert summary["enabled"] is True
+    assert summary["hits"] == len(source.rows) and summary["misses"] == len(source.rows)
+    assert summary["current_bytes"] > 0 and summary["current_bytes"] == summary["peak_bytes"]

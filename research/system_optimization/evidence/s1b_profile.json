@@ -1,0 +1,99 @@
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights:  92%|█████████▏| 754/824 [00:00<00:00, 7517.07it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 7478.53it/s]
+{
+  "counters": {
+    "train": {
+      "forward_seconds": 229.1393578182906,
+      "prepare_seconds": 3.4465232398360968,
+      "target_device_peak_gb": 10.803609088,
+      "target_forwards": 759,
+      "target_samples": 1935,
+      "wall_seconds": 232.5858810581267
+    }
+  },
+  "device": "cuda:0",
+  "forward": [
+    {
+      "forward_ms": 126.81,
+      "forwards": 129,
+      "group": 1,
+      "median_wall_seconds": 16.3581,
+      "passes_seconds": [
+        16.8339,
+        15.2172,
+        16.3581
+      ],
+      "sample_ms": 126.81,
+      "samples": 129,
+      "target_device_peak_gb": 7.919
+    },
+    {
+      "forward_ms": 229.09,
+      "forwards": 65,
+      "group": 2,
+      "median_wall_seconds": 14.891,
+      "passes_seconds": [
+        17.128,
+        14.891,
+        14.8342
+      ],
+      "sample_ms": 115.43,
+      "samples": 129,
+      "target_device_peak_gb": 8.105
+    },
+    {
+      "forward_ms": 436.73,
+      "forwards": 33,
+      "group": 4,
+      "median_wall_seconds": 14.4121,
+      "passes_seconds": [
+        14.4121,
+        14.1953,
+        14.6222
+      ],
+      "sample_ms": 111.72,
+      "samples": 129,
+      "target_device_peak_gb": 8.498
+    },
+    {
+      "forward_ms": 850.07,
+      "forwards": 17,
+      "group": 8,
+      "median_wall_seconds": 14.4512,
+      "passes_seconds": [
+        18.2037,
+        14.2326,
+        14.4512
+      ],
+      "sample_ms": 112.02,
+      "samples": 129,
+      "target_device_peak_gb": 9.244
+    },
+    {
+      "forward_ms": 1575.94,
+      "forwards": 9,
+      "group": 16,
+      "median_wall_seconds": 14.1835,
+      "passes_seconds": [
+        15.5196,
+        14.1835,
+        14.1404
+      ],
+      "sample_ms": 109.95,
+      "samples": 129,
+      "target_device_peak_gb": 10.804
+    }
+  ],
+  "render": {
+    "note": "per-sample render (image decode + processor + drift check), no target work; a render cache removes the warm pass after the first epoch",
+    "passes_seconds": [
+      1.8463,
+      1.6039
+    ],
+    "sample_ms": 14.31,
+    "warm_sample_ms": 12.43
+  },
+  "rows": 129,
+  "run_dir": "/home/lyh/vlm-systems/runs/s1b/real256",
+  "seq_length": 2048,
+  "storage_dtype": "bfloat16"
+}
