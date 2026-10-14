@@ -310,9 +310,10 @@ speculative decoding must reproduce the target's own greedy tokens exactly
 
 - **Inputs:** image(s) + text, single- or multi-turn, greedy decoding. Schema
   v2 (multiple images per row, images attachable to any user turn) is
-  validated end-to-end for DFlash on the recorded E2 smoke; the other
-  algorithms share the same data path — see the
-  [support matrix](SUPPORT_MATRIX.md) footnote.
+  implemented for every algorithm and recorded end-to-end for DFlash as a GPU
+  smoke only (E2, `R-20261014-08`, one 2-image/2-turn smoke protocol); the
+  other algorithms have no individually recorded multi-image run — see the
+  [support matrix](SUPPORT_MATRIX.md) evidence records.
 - **Targets:** the two Qwen-VL targets listed above; SmolVLM2-2.2B-Instruct
   additionally passed a single-image engineering smoke through the full stack
   (no release claim - see the [WP6 report](docs/plan/WP6_REPORT.md)); other
