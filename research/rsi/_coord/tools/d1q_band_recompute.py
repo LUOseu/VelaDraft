@@ -84,9 +84,6 @@ def compute(root: Path) -> dict:
     for k, L in legs.items():
         if not L["exists"] or "eval_file" not in L or L.get("final") is None:
             report["pending"].append(k)
-    if report["pending"]:
-        report["verdict"] = "pending: " + ",".join(report["pending"])
-        return report
 
     def _f(k, m):
         v = legs[k]["final"].get(m)
@@ -94,13 +91,19 @@ def compute(root: Path) -> dict:
             raise SystemExit(f"leg {k}: final.{m} is None (cannot compute frozen verdict)")
         return float(v)
 
-    band_al = abs(_f("c42", "mean_al") - _f("c43", "mean_al"))
-    band_acc = abs(_f("c42", "acceptance_rate") - _f("c43", "acceptance_rate"))
-    report["band"] = {
-        "al": band_al, "acc": band_acc,
-        "al_c42": _f("c42", "mean_al"), "al_c43": _f("c43", "mean_al"),
-        "acc_c42": _f("c42", "acceptance_rate"), "acc_c43": _f("c43", "acceptance_rate"),
-    }
+    if all(legs[k].get("final") is not None for k in ("c42", "c43")):
+        band_al = abs(_f("c42", "mean_al") - _f("c43", "mean_al"))
+        band_acc = abs(_f("c42", "acceptance_rate") - _f("c43", "acceptance_rate"))
+        report["band"] = {
+            "al": band_al, "acc": band_acc,
+            "al_c42": _f("c42", "mean_al"), "al_c43": _f("c43", "mean_al"),
+            "acc_c42": _f("c42", "acceptance_rate"), "acc_c43": _f("c43", "acceptance_rate"),
+        }
+
+    if report["pending"]:
+        report["verdict"] = "pending: " + ",".join(report["pending"])
+        return report
+
     compare = {}
     ok_all, undet = True, []
     for s in (42, 43):
