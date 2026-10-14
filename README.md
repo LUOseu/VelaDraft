@@ -15,359 +15,95 @@
 </p>
 
 <p align="center">
-  <a href="#quickstart">Quickstart</a> ·
-  <a href="#model-zoo">Model Zoo</a> ·
-  <a href="#train-on-your-data">Training</a> ·
-  <a href="#benchmarks">Benchmarks &amp; history</a> ·
-  <a href="#documentation">Documentation</a> ·
-  <a href="https://github.com/LUOseu/VelaDraft/blob/main/CONTRIBUTING.md">Contributing</a>
+  <a href="#-quick-start">Quick Start</a> ·
+  <a href="https://github.com/LUOseu/VelaDraft/releases">Model Zoo</a> ·
+  <a href="BENCHMARKS.md">Benchmarks</a> ·
+  <a href="docs/">Documentation</a> ·
+  <a href="SUPPORT_MATRIX.md">Support Matrix</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 <p align="center">
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-VelaDraft is a unified training toolkit for multimodal block-parallel drafters.
-It supports DFlash, DSpark, Domino, JetSpec, DFlash2, DFlare, and DFly against
-frozen Qwen-VL targets, with offline feature stores or live target feature
-extraction, resumable training, sequential output verification, and checkpoint
-export.
+<p align="center">
+  <img src="https://img.shields.io/badge/Qwen--VL-1f6feb?style=flat" alt="Qwen-VL" />
+  <img src="https://img.shields.io/badge/DFlash-30363d?style=flat" alt="DFlash" />
+  <img src="https://img.shields.io/badge/DSpark-30363d?style=flat" alt="DSpark" />
+  <img src="https://img.shields.io/badge/Domino-30363d?style=flat" alt="Domino" />
+  <img src="https://img.shields.io/badge/JetSpec-30363d?style=flat" alt="JetSpec" />
+  <img src="https://img.shields.io/badge/DFlash2-30363d?style=flat" alt="DFlash2" />
+  <img src="https://img.shields.io/badge/DFlare-30363d?style=flat" alt="DFlare" />
+  <img src="https://img.shields.io/badge/DFly-30363d?style=flat" alt="DFly" />
+  <img src="https://img.shields.io/badge/Offline%20%2B%20Online-1f6feb?style=flat" alt="Offline + Online" />
+</p>
 
-DFlare and DFly are integrated on main. DFly defaults to the shared block-CE
-training profile and can select the ported upstream two-stage recipe
-(`algorithm.train_recipe: upstream_two_stage`: LK / D-PACE cold start, then the
-end-to-end TV stage). DSpark defaults to the shared block-CE profile with the
-greedy-confidence adaptation and can select the faithful upstream objective
-(`algorithm.train_recipe: upstream_dspark`: verifier-distribution KL + analytic
-`1 - TV` confidence target, reconstructed on demand from stored final hidden
-states).
+---
 
-- **One interface for every method.** All seven drafters share the same `train` /
-  `eval` / `export` commands, checkpoint format and verification path, so method
-  comparisons stay on one foundation.
-- **Train offline or online.** By default the target is off the GPU during
-  drafter training and the trainer reads the captured feature store;
-  `--mode online` extracts frozen-target features live during training.
-- **Explicit layer capture and compatible reuse.** A capture records the ordered
-  target layers it holds; consumers slice by explicit layer id, so one store can
-  feed several methods (and draft depths) whose consumed layers fit inside it,
-  and a missing layer fails loud instead of being guessed.
-- **Recover, validate, export.** Exact-resume gates compare the resolved training
-  plan and the feature source before anything is written; sequential evaluation
-  reproduces the target's greedy tokens (`token_exact`) with per-slot
-  acceptance; exports are self-describing (weights, config, model card,
-  checksums).
+## 📍 Overview
 
-## Quickstart
+**VelaDraft** is a unified training toolkit for multimodal speculative drafters.
 
-Use an existing drafter first, then try the complete training pipeline.
-The package and command are named **`vlm-dflash`**.
+It keeps the VLM-specific plumbing shared while letting the drafter algorithm change.
 
-### Install
+- **One interface** — train, evaluate, compare, and export multiple drafter families through the same workflow.
+- **VLM-first** — processors, image spans, position semantics, target features, and provenance are handled explicitly.
+- **Offline or online** — reuse staged target features or extract frozen-target features live during training.
+- **Correctness-first** — sequential reference evaluation verifies speculative output against target greedy decoding.
+
+> `online` means live feature extraction from a frozen target during training; it is not on-policy rollout training.
+
+## 🔧 Supported Methods
+
+| Method | Core idea | Status |
+|---|---|---|
+| **DFlash** | Block-parallel drafting | Validated |
+| **DSpark** | Markov correction + confidence | Validated |
+| **Domino** | Causal GRU correction | Validated |
+| **JetSpec** | Causal block attention + forward KL | Validated* |
+| **DFlash2** | Local mixing + candidate selector | Experimental* |
+| **DFlare** | Layer-wise target fusion | Validated |
+| **DFly** | Fusion residual + hidden correction | Validated |
+
+\* See [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md) for method-specific caveats.
+
+## 🚀 Quick Start
 
 ```bash
 git clone https://github.com/LUOseu/VelaDraft.git
 cd VelaDraft
+
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[tested]"
-```
 
-The current supported installation is from source. The tested environment uses
-Python ≥3.10, PyTorch 2.10.0 and Transformers 5.12.1 on one RTX A6000 48 GB.
-See the [environment guide](docs/env-preflight.md) and
-[validation record](RELEASE_VALIDATION.md) for details.
-
-### Run a pretrained drafter
-
-Point to a **local Qwen2.5-VL-3B-Instruct checkout**, then download the released
-DFlash drafter:
-
-```bash
 export VLM_DFLASH_TARGET=/path/to/Qwen2.5-VL-3B-Instruct
 
-curl -fL -o qwen25vl-3b-dflash.tar.gz \
-  https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
-tar -xzf qwen25vl-3b-dflash.tar.gz
-
-vlm-dflash demo --target "$VLM_DFLASH_TARGET" --drafter qwen25vl-3b-dflash
+vlm-dflash train-demo \
+  --target "$VLM_DFLASH_TARGET" \
+  --steps 80
 ```
 
-The demo generates a small image sample, prints the answers, and reports
-**acceptance length, per-slot acceptance and token agreement**. No training or
-external dataset is needed. Download time depends on the network; measured
-execution times are in the [validation record](RELEASE_VALIDATION.md).
+For pretrained checkpoints, full training recipes, online mode, custom data, resume, evaluation, and export:
 
-Omit `--drafter` to run the random-init acceptance baseline.
+- 📦 [Model Zoo](https://github.com/LUOseu/VelaDraft/releases)
+- 📊 [Benchmarks](BENCHMARKS.md)
+- 📖 [Documentation](docs/)
+- ✅ [Support Matrix](SUPPORT_MATRIX.md)
 
-### Try the whole training loop
+## 📃 Citation
 
-```bash
-vlm-dflash train-demo --target "$VLM_DFLASH_TARGET" --steps 80
+```bibtex
+@misc{veladraft2026,
+  title = {VelaDraft: Multimodal Speculative Drafter Training},
+  year  = {2026},
+  url   = {https://github.com/LUOseu/VelaDraft}
+}
 ```
 
-This runs prepare → response generation → capture → tiny training → eval →
-export on generated images. It is a pipeline smoke test; use your own data
-and a full recipe for meaningful drafter quality.
-
-## How it works
+---
 
 <p align="center">
-  <img src="docs/assets/how-it-works.svg" alt="Image-text data goes through target generation and capture into a reusable feature store. An offline or online trainer selects one of seven algorithms (DFlash, DSpark, Domino, JetSpec, DFlash2, DFlare, DFly), then validates and exports its checkpoint." width="1100" />
+  <sub>VelaDraft · multimodal speculative drafter training</sub>
 </p>
-
-The expensive target-side work is separated from drafter training. Compatible
-features can feed multiple algorithms; **the target is reloaded for evaluation**.
-Each checkpoint is paired with its target contract and algorithm metadata.
-Training can also run against the live frozen target
-(`train --mode online`); see [online training](docs/online-training.md).
-
-## Supported methods
-
-All seven methods use the same train, eval and export commands.
-
-| Method | Mechanism | Training recipe in this repo |
-| --- | --- | --- |
-| [DFlash](docs/algorithms/dflash.md) | Shared FC context + block drafting | Reference block CE |
-| [DSpark](docs/algorithms/dspark.md) | Markov logit bias + confidence | CE + greedy confidence (default), or faithful upstream objective (`train_recipe: upstream_dspark`) |
-| [Domino](docs/algorithms/domino.md) | Causal GRU correction | Ported curriculum recipe |
-| [JetSpec](docs/algorithms/jetspec.md) | Causal in-block mask + teacher distillation | Forward-KL |
-| [DFlash2](docs/algorithms/dflash2.md) | Local convolutions + candidate selector | Experimental reconstructed objective |
-| [DFlare](docs/algorithms/dflare.md) | Per-draft-layer fusion + dedicated context K/V | Shared block CE |
-| [DFly](docs/algorithms/dfly.md) | FC + fusion residual + hidden correction | CE (default) or ported upstream two-stage recipe (`train_recipe`) |
-
-DFlare and DFly are **integrated on main** and validated in-repo on both
-Qwen-VL targets (full pipeline on Qwen2.5-VL-3B, reduced validation on
-Qwen3-VL-8B); their release-validation pass is tracked separately in the
-[support matrix](SUPPORT_MATRIX.md) and [release validation](RELEASE_VALIDATION.md).
-
-DFly notes: training defaults to the shared block-CE profile
-(`objective_profile=controlled_ce` in the draft config, checkpoint and export);
-setting `algorithm.train_recipe: upstream_two_stage` selects the ported
-LK/D-PACE → end-to-end TV recipe, which requires a capture-v2 store
-(`capture.store_final_hidden=true`). At inference the block backbone runs in
-parallel, while the hidden-states correction and the LM-head projection run per
-slot sequentially, conditioned on the previously proposed tokens — the
-documented local adaptation of upstream's train-time-only correction.
-
-DSpark notes: training defaults to the shared block-CE profile with the greedy
-per-slot acceptance indicator as the confidence target. Setting
-`algorithm.train_recipe: upstream_dspark` (also requires a capture-v2 store,
-`capture.store_final_hidden=true`) trains the faithful upstream objective —
-per-slot forward KL against the target's next-token distribution and the
-analytic acceptance rate `1 - TV` for the confidence head; both are computed
-on demand through the frozen output head from the stored final hidden states,
-never from stored verifier logits.
-
-DFlash2 uses an experimental reconstruction of the undisclosed upstream training
-objective, and JetSpec's production tree runtime is not ported. Per-target status
-and capability details are in the [support matrix](SUPPORT_MATRIX.md), the
-[algorithm matrix](ALGORITHM_MATRIX.md), the per-method
-[training-signal declarations](docs/TRAINING_SIGNALS.md) and the
-[upstream audits](UPSTREAM_AUDIT.md).
-
-## Model Zoo
-
-Released drafter checkpoints (reference artifacts for pipeline validation):
-
-| Drafter | Target | Download | Model card |
-| --- | --- | --- | --- |
-| **DFlash** · frozen block reference | Qwen2.5-VL-3B | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflash.md) |
-| **Domino** · GRU correction | Qwen2.5-VL-3B | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [Details](docs/zoo/qwen25vl-3b-domino.md) |
-| **DSpark** · Markov + confidence head | Qwen2.5-VL-3B | [487 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dspark.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dspark.md) |
-| **JetSpec** · forward-KL distillation | Qwen2.5-VL-3B | [370 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-jetspec.tar.gz) | [Details](docs/zoo/qwen25vl-3b-jetspec.md) |
-| **DFlash2** · experimental objective | Qwen2.5-VL-3B | [498 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflash2-exp.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflash2-exp.md) |
-| **DFlare** · learnable fusion + context K/V | Qwen2.5-VL-3B | [356 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflare.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dflare.md) |
-| **DFly** · shared-KV + hidden correction | Qwen2.5-VL-3B | [401 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dfly.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dfly.md) |
-| **DFly** · upstream two-stage recipe | Qwen2.5-VL-3B | [401 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.2/qwen25vl-3b-dfly-recipe.tar.gz) | [Details](docs/zoo/qwen25vl-3b-dfly-recipe.md) |
-| **DFlash** · 8B scale | Qwen3-VL-8B | [955 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen3vl-8b-dflash.tar.gz) | [Details](docs/zoo/qwen3vl-8b-dflash.md) |
-
-These archives are **reference artifacts for pipeline validation**: they were
-trained under the recorded development protocol and are meant for exercising
-`train → eval → export`, integration work and output-agreement checks. They
-are not tuned or benchmarked as production drafters; development measurements
-and their training protocols are recorded in
-[BENCHMARKS.md](BENCHMARKS.md). The `zoo-v0.3.0` archives were re-verified
-after download with the token-exact gate; every `zoo-v0.3.1` export is
-reloaded via `load_export` before packaging, and the `zoo-v0.3.2` archive was
-hash-verified and reloaded again after a clean re-download; see the
-[release evidence](RELEASE_VALIDATION.md).
-
-Each archive includes weights, configuration, algorithm metadata, target
-contract, training manifest, model card and file checksums. All seven
-drafters now have hosted reference checkpoints (DFly additionally as the
-upstream-recipe variant); training and exporting your own remains fully
-local.
-
-## Train on your data
-
-Use a JSONL pool of question/answer pairs. Flat records, OpenAI-style
-`messages`, and ShareGPT/LLaVA `conversations` are supported.
-
-```json
-{"id":"sample-001","image":"000001.jpg","question":"Describe this image in detail.","answer":"A red bicycle is parked beside a brick wall."}
-```
-
-Multi-image / multi-turn rows opt into schema v2 with a flat `images` list
-plus `image_turns` (the conversation index each image belongs to, same order
-as `images`); the full conversation is kept and each assistant turn is
-regenerated greedily as teacher-forced history for the next turn:
-
-```json
-{"id":"sample-002","images":["a.jpg","b.jpg"],"image_turns":[0,2],
- "conversations":[{"from":"human","value":"<image>\nWhat is in the first image?"},
-                  {"from":"gpt","value":"..."},
-                  {"from":"human","value":"<image>\nAnd the second?"},
-                  {"from":"gpt","value":"..."}],
- "schema":"vlm-dflash-data-v2"}
-```
-
-A small end-to-end example:
-
-```bash
-python examples/train_from_jsonl.py \
-  --target "$VLM_DFLASH_TARGET" \
-  --jsonl data/rows.jsonl --images-dir data/images \
-  --limit 32 --steps 60
-```
-
-For the full reference recipe, configure the dataset paths and run
-`vlm-dflash train --config configs/qwen2_5_vl_3b.yaml`. The CLI also supports
-`--algorithm`, `--resume`, and dotted `--set key=value` overrides.
-See the [examples](examples/README.md), [data schema](vlm_dflash/data/schema.py)
-and [reference guide](docs/REFERENCE.md). The multi-turn smoke config is
-`configs/smoke_multiturn.yaml` (data: `scripts/make_wp2_smoke_data.py`).
-
-### Method-specific configs
-
-The shipped configs are method entry points (also see `configs/dspark`,
-`configs/domino`, `configs/jetspec`, `configs/dflash2`); point the target and
-dataset paths at your environment first — they are recipes, not runnable
-without data preparation.
-
-```bash
-# Offline recipes
-vlm-dflash train --config configs/dflare/qwen2_5_vl_3b_2k.yaml --run-dir runs/dflare
-vlm-dflash train --config configs/dfly/qwen2_5_vl_3b_2k.yaml --run-dir runs/dfly
-
-# Same method, live target features
-vlm-dflash train --config configs/dfly/qwen2_5_vl_3b_2k.yaml --mode online --run-dir runs/dfly_online
-
-vlm-dflash eval runs/dfly
-vlm-dflash export runs/dfly
-```
-
-### Reuse a capture across runs and methods
-
-```bash
-vlm-dflash train \
-  --target "$VLM_DFLASH_TARGET" --dataset data/rows.jsonl \
-  --algorithm dspark --run-dir runs/dspark_2k \
-  --features runs/shared_2k/features --steps 792
-```
-
-Reuse is checked, not assumed: the store's target/processor/mask/MRoPE identity
-and its ordered captured-layer list must match the run, and each method consumes
-the layers it needs by explicit id (`algorithm.<method>.context_layer_ids`, or
-the draft routing). A store that lacks a consumed layer is refused with a
-recapture hint — never silently re-sliced. Declare the store's layer list in the
-run as `drafter.capture_layer_ids`; runs whose draft depth differs from the
-capture can reuse it as long as their consumed layers fit. Reuse is recorded in
-`provenance.json`. A canonical 2K capture is about **9.4 GiB** on disk.
-
-The [comparison example](examples/reuse_features_compare.py) demonstrates
-one capture followed by DFlash and DSpark training and evaluation.
-
-### Resume an interrupted run
-
-```bash
-vlm-dflash train --config configs/dfly/qwen2_5_vl_3b_2k.yaml --run-dir runs/dfly --resume
-```
-
-`--resume` runs a read-only preflight before anything is written: the feature
-source digest and the resolved training plan (seed, batch geometry, optimizer
-and schedule, dtype, drafter and method knobs, dataset length) must match the
-checkpoint exactly. A refused resume leaves the run's config, checkpoint, log
-and provenance byte-identical; a legal one continues from the recorded step and
-replays the optimizer/RNG state.
-
-### Train online (live target features)
-
-Skip the feature store and let the frozen target run alongside the trainer:
-
-```bash
-vlm-dflash train \
-  --target "$VLM_DFLASH_TARGET" --dataset data/rows.jsonl \
-  --mode online --run-dir runs/online
-```
-
-The target stays resident for the whole run and re-extracts features every
-epoch (no multi-GiB store on disk; the target forward cost is paid per epoch
-instead of once). `--features` reuse is offline-only. See the
-[online training guide](docs/online-training.md).
-
-## Benchmarks
-
-Performance measurements — acceptance length, per-slot acceptance, timing,
-token-exactness and ablations — live in the development record:
-[BENCHMARKS.md](BENCHMARKS.md), [RELEASE_VALIDATION.md](RELEASE_VALIDATION.md)
-and [docs/measured-runs.md](docs/measured-runs.md). The README intentionally
-does not surface small-scale training numbers or an algorithm ranking: the
-recorded runs are plumbing/protocol evidence under one shared recipe, not a
-claim about method quality or wall-clock speedup.
-
-What the project does verify at every scale is **correctness**: sequential
-speculative decoding must reproduce the target's own greedy tokens exactly
-(`token_exact`), together with per-slot acceptance accounting. See
-[verification modes](docs/verification-modes.md).
-
-## Scope
-
-- **Inputs:** image(s) + text, single- or multi-turn, greedy decoding. Schema
-  v2 (multiple images per row, images attachable to any user turn) is
-  implemented for every algorithm and recorded end-to-end for DFlash as a GPU
-  smoke only (E2, `R-20261014-08`, one 2-image/2-turn smoke protocol); the
-  other algorithms have no individually recorded multi-image run — see the
-  [support matrix](SUPPORT_MATRIX.md) evidence records.
-- **Targets:** the two Qwen-VL targets listed above; SmolVLM2-2.2B-Instruct
-  additionally passed a single-image engineering smoke through the full stack
-  (no release claim - see the [WP6 report](docs/plan/WP6_REPORT.md)); other
-  families need an adapter and validation.
-- **Hardware:** the measured reference is one 48 GB GPU. The 24 GB preset is
-  suggested and unvalidated on an actual 24 GB card.
-- **Serving:** no production runtime integration claim. A first bridge to
-  vLLM 0.22.1's native `dflash` method exists (`scripts/export_vllm_draft.py`;
-  status + findings on the [serving bridge](docs/serving-bridge.md) page): it
-  loads and serves the export, but engine token-for-token parity is not
-  reproducible even across same-engine reruns (bf16 tie flips + engine
-  nondeterminism), the acceptance-length gap is the open blocker, and no
-  speed number is claimed; a complete serving correctness verification
-  remains open - see the
-  [WP5 report](docs/plan/WP5_REPORT.md).
-- **Reproducibility:** data and generation protocols are reproducible; bf16
-  training is not bitwise deterministic. Acceptance numbers stay in the
-  measurement records (see [Benchmarks](#benchmarks)).
-
-## Documentation
-
-| Start here | Links |
-| --- | --- |
-| Use the project | [Environment](docs/env-preflight.md) · [Examples](examples/README.md) · [Online training](docs/online-training.md) · [Measured runs](docs/measured-runs.md) |
-| Understand the methods | [Algorithms](docs/algorithms/) · [Support matrix](SUPPORT_MATRIX.md) · [Reference](docs/REFERENCE.md) · [Upstream audits](UPSTREAM_AUDIT.md) |
-| Reproduce the evidence | [Benchmarks](BENCHMARKS.md) · [Harness](docs/benchmark.md) · [Release validation](RELEASE_VALIDATION.md) |
-| Extend the stack | [Add an algorithm](docs/adding_an_algorithm.md) · [Contributing](CONTRIBUTING.md) |
-
-## Contributing and attribution
-
-Reproduction reports, focused fixes and clear examples help the project.
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for the current release policy and
-validation requirements. Algorithms plug into `DrafterAlgorithm`; target
-families are isolated behind `VLMAdapter`.
-
-Apache-2.0. Adapted components retain their upstream attribution in
-[NOTICE](NOTICE) (including the AngelSpec-based DFlare/DFly ports, Apache-2.0
-with its third-party MIT components), with source commits and implementation
-scope documented in [UPSTREAM_AUDIT.md](UPSTREAM_AUDIT.md). Citation metadata
-is in [CITATION.cff](CITATION.cff).
-
-<sub><strong>Why Vela?</strong> Latin for sails, and the name of the constellation. A lightweight drafter moves forward on the visual context provided by its target.</sub>
