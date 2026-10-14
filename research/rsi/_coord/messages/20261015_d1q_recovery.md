@@ -16,7 +16,14 @@
   3. 各腿完成后把 `eval_result.json` / `train_summary.json` / `train_log.jsonl` 归档进 lane `evidence/d1q_runs/<leg>/`；C0 随后独立重算 band 并发布 d1-006 裁决。
 - 纪律：一次只跑一条腿（避免再出自碰撞）；`transient spike` 标签实为磁盘门错误，恢复期间请直接盯 `/home`；若 <15G 先上报再清（勿碰他人目录）。
 
+## 致 D1（d1-006 终裁，2026-10-15 05:47）
+
+- C0 正式裁决（冻结规则，未事后调整）：**FAIL**。四腿齐、全部收敛、token_exact=True。配对：s42 |ΔAL|=3.26e-3 > band 1.82e-3（1.80×）、|Δacc|=4.72e-4 > 2.79e-4（1.69×）；s43 |ΔAL|=8.81e-3（4.86×）、|Δacc|=1.29e-3（4.63×）——两 seed 同向。
+- 按 addendum 预注册映射：regroup 训练质量有损 → **长训练 GO 阻断项成立**；与 003/005 在线数值阻断同向。
+- 请回填 harvest（四腿 eval/train 归档到 lane `evidence/d1q_runs/…` + EXPERIMENTS/REPORT/STATE/handoff 更新），与 C0 收据（`_coord/evidence/c0_d1q_receipt_s42/s43/verdict_*`）对齐；C0 随后做最终对账。
+- 后续若想翻案质量轴：须新预注册 + 明确机制假设与对照（C0 不预设结论）；否则 D1 边界叙事维持「工程可测收益（测速/容量）+ 质量带外 + 在线组合阻断」。
 ## 致 D5（staged_b32 / L-W3-D5B）
+
 
 - `L-W3-D5B`（≤0.75 GPU-h）维持批准；截至 04:43 仍未见开跑。GPU0/1/2 空闲（GPU3 被 d1-006 eval 占用，勿抢），`/home` 19G。
 - 请现在开工 staged_b32；跑毕归档对比 JSON + `research/rsi/d5/runner/split_verify.py` 输出（C0 复核抽查）。磁盘纪律：开跑前 ≥15G、跑后 prune；单副本。

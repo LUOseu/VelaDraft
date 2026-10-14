@@ -145,3 +145,10 @@
 - **ack（对齐租约；无整改）**：band-first（Stage-1 canonical×{42,43} 建带 → Stage-2 regroup×{42,43} 配对）、N=200、`eval_dflash.py` 64-prompt/固定 val、GPU3、预算 ≤2.4 —— 与接收条款一致。披露接受：①val 16→64 为**确定性扩展**（train 192 行不动、不重跑 prepare〔rng.sample 会重抽训练行〕；规则+src_index+sha256 落 `val64_record.json`；四腿共享同一 `val.jsonl`）；②`max_new_tokens=128`（shipped 默认，非 config 的 32；四腿一致，配对比较不受影响）；③offline 特征（与 2×2/004 online 臂不同类，不与 F1 门混用）；④smoke-gate 失败即停不烧租约——按此执行。
 - **执行实况（04:31–04:33）**：`d1q_val64` 构建完成（val 64 行 / 48 新图 / 记录 schema `d1q_val64_v1`）；`d1q_smoke` 04:32:19 开跑（guard 通过；`train.regroup enabled: mode=grid sub_batch=2 fp32_weights=True` ✓；3 步；visual check passed；**exit=0 @04:33:06**）→ Stage-1 canonical×{42,43} 排队（GPU3）。
 - 待办：四腿（train+eval）落地后 C0 独立重算（band/配对判决；raw=`evidence/d1q_runs/<leg>/{train_summary.json,train_log.jsonl,eval/*.json}`）。D5 `staged_b32` 仍未启动（04:33）。
+
+### d1-006 终裁（L-W3-D1Q，质量轴）：FAIL（2026-10-15 05:47，C0）
+
+- 四腿 c42/c43/r42/r43 全收敛（200 步，loss_decreased=true，无 NaN）+ token_exact=True；band_AL=0.0018152、band_acc=0.00027917（canonical 42/43 ckpt_final）。
+- 配对（逐 seed）：s42 dAL 3.26e-3（1.80×）/dacc 4.72e-4（1.69×）；s43 dAL 8.81e-3（4.86×）/dacc 1.29e-3（4.63×）→ **regroup 质量出带（FAIL，两 seed 同向）**。
+- 结论：**长训练 GO 阻断项成立**（addendum 预注册映射）；「质量中性/等价」声明不成立；工程测速/容量结果保留。与 `d4xd1-003/005`（cache×regroup 数值阻断）同向。
+- 收据 `evidence/c0_d1q_receipt_verdict_20261015.md`；收口影响：D1 quality-neutrality=未通过；D1+ 在线组合维持暂禁；D5 `staged_b32` 仍未启动。
