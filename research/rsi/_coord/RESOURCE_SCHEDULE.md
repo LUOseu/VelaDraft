@@ -54,8 +54,8 @@
 | L-W1-D1 | D1 | **GPU3**（D1 自选；23:38 实测 quiet；若被外部占用改用 GPU2 并登记） | 2026-10-14 23:42 → R2 tensor probe + W1/W2/W3 stores 构建完成或卡被占 | 计入 W1-D1 ≤1.5 GPU-h；单卡串行、逐腿 quiet 自检；含 R3 步成本 A/B（5 臂×10–20 批 ≈2–5 GPU-min/组）；完成后让给 D3（可选 b16）/D2 排队 |
 | L-W1-D2R | D2 | **GPU2**（23:42 空闲；开跑前实测） | → 单次干净 step profile 完成（≤15 GPU-min） | 重做 23:24–25 的 contended run（本 run 须标 `contended=false`）；计入 W1-D2 ≤1.0 GPU-h；**23:48 步级两臂完成（fwd -5.5%）→ 关闭** |
 | L-W1-D1-R2 | D1 | **GPU2**（首选；开跑实测 quiet）｜GPU3 备选（dhz 已结束，若沿用须实测披露） | → W2/W3 store + 正式 R3 A/B 完成或卡被占 | **W1 已建成（23:59:42，kept 191/192）**；剩余 W2/W3 store 与 R3 A/B 同租约；前置 free≥10G（当前 22G）；逐腿 quiet 自检、**跑后清 train ckpt（~4.6G/腿）**；计入 W1-D1 ≤1.5 GPU-h |
-| L-W2-D4 | D4 | 任一实测 quiet 卡（当前 GPU2/GPU3 空闲；开跑前实测） | → capped-process real-sensor A/B 完成或卡被占 | **条件批准 ≤1.5 GPU-h**（d4-001 ACCEPTED 条件之一）：MemoryMax/ulimit 隔离、预注册压力轨迹+证伪条件、只报 wall/内存/命中率、自清 ckpt、free≥10G；平台工程验证定位，非论文增量 |
-| L-W2-G2 | 通过门槛者 | 2×A6000 同时空闲 ≥3–4h 窗口 | **UNCONFIRMED**（GPU1/3 被占） | wave 2 由 C0 复核证据后发布 |
+| L-W2-D4 | D4 | 任一实测 quiet 单卡（util≤5%、mem_free≥40GiB、磁盘≥10G；非他人有效租约卡） | → capped-process real-sensor A/B 完成或卡被占 | **条件批准 ≤1.5 GPU-h**（d4-001 条件照旧：MemoryMax/ulimit 隔离、预注册压力轨迹+证伪条件、只报 wall/内存/命中率、自清 ckpt）；**00:20 起预授权窗口**：预计 ≥1.5h 即可开跑，D4 自记卡号+quiet 证据；单卡窗口优先 D4、双卡优先 D5-G2；平台工程验证定位，非论文增量 |
+| L-W2-G2 | **D5 步 3–4（静态 ladder）优先**；D4×D5 producer 重测次之 | 2 张实测 quiet 卡（同上 quiet 口径；非有效租约卡） | → 预登记 leg 集完成或卡被占 | **00:20 起预授权档位**：最小可裁剪集 `staged_b8+sync_b8` ≈2.2 GPU-h（双卡 quiet 即开）；最小有价值集 `+pinned_b8+sync_b32` ≈4.0 GPU-h（预计窗口 ≥3.5h）；全矩阵 4.6–5.2 GPU-h 需 C0 窗口时确认。D5 自记卡号+quiet 证据入 EXPERIMENTS；冲突时 C0 回收。 |
 
 ### 观察记录（C0 只读，未独立复核）
 
@@ -86,6 +86,11 @@
 - 2026-10-15 00:00 — **D2 phase 配对首批**（base4 vs dedup4，mb4：fwd 188.3→189.3 未见 -5.5% 复现；loss 三腿 bitwise 同值；ckpt KB 级自清生效）；**GPU2/GPU3 空闲**（GPU0/1 外部 xs）。**D4 d4-001 ACCEPTED（条件）** + **L-W2-D4 ≤1.5 GPU-h 条件批准**（等窗口）；D1 W2/W3+R3 同租约排队。
 - 2026-10-15 00:05 — **GPU0 空闲**（外部 xs 完成）→ 门开给 L-W2-D4 与 D1 W2/W3（按实测 quiet）；GPU2 = D2 pin 系列（运行中）；GPU3 = 外部 dhz racer repro 回归（~14.3GB）。D1 清 W1 train ckpt 生效（free 27G）。
 - 2026-10-15 00:06 — D2 pin 2×2 完成（fwd -6.8% 复现、loss bitwise；GPU2 已释放）；**D1 W2 build 于 GPU3 运行**（00:05:45 起；guard 27G / gpu_idle=0% ✓）；D5 lane 41/41 C0 复跑 ✓（CPU）。当前：GPU0 空闲 / GPU1 xs / GPU2 空闲 / GPU3 D1；磁盘 27G。
+- 2026-10-15 00:09 — D1 W2 store 建成（00:08:25 exit=0；kept 144/144；自清 ckpt，free 21→25G）；**W3 build 00:08:39 于 GPU3 启动**（regen 阶段较长，多轮真实行）。
+- 2026-10-15 00:12 — D2 **dfly 系列**：base1/2 完成（fwd 215.1/213.3、bwd 382.8/382.3；42 张量 dfly 图）；**dedup 腿 rc=1**（`algorithm.dfly.teacher_dedup` 不受支持——服务器副本缺其 factory 补丁；同步问题非机制异常）→ 待同步重跑；GPU2 随后空闲。
+- 2026-10-15 00:14 — D5 lane 43/43 C0 独立复跑 ✓（CPU、no-write）；W2 store 复合摘要登记（`5980f77b…`）。当前：GPU0 外部 ≈18GB/97%；GPU1 空闲；GPU2 空闲；GPU3 D1 W3；磁盘 25G。
+- 2026-10-15 00:20 — 更新 L-W2-D4 / L-W2-G2 行为**预授权窗口**（见上表）；D1 W3 继续（GPU3）。
+- 2026-10-15 00:33 — **D2 dfly 系列完成校核**：dedup1 首败=服务器副本缺 factory 补丁（同步问题）；chain 重跑 **rc=0**（00:12–00:13），四腿有效：fwd 215.1/213.3→200.9/201.7、bwd 382.8/382.3→363.6/364.4；**12 步 loss 四腿逐值相同**（C0 直读）。D2 交付 REPORT/handoff/EXPERIMENTS/d2-001（自判 STOP）；C0 裁决 d2-001-c0.md。**D1 W3 regen 进行中**（多轮行，~5–7s/行，00:08:39 起）。GPU1 被外部占用（~8GB），GPU2 空闲。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 

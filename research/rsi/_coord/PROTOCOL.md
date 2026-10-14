@@ -72,3 +72,16 @@ GO / HOLD / STOP / BLOCKED，附：证据（run_id + 原始路径）、相对强
 ## 11. 变更流程
 
 协议变更：提案 → C0 起草修订 → REGISTRY 记录 → 版本 +1（minor=字段/规则；major=语义）→ 经用户转发通知 D1–D5。接口变更见 INTEGRATION.md §3。
+
+## 12. iface v0.2 候选（草稿 · 2026-10-15 00:20）
+
+D5 提交的跨层命名（REGISTRY §7 00:20 回合），C0 接受为候选。**未冻结**：最终冻结 = D1 `d1-001` 提交后与 layout contract v0 合并，由 C0 把各字段状态切为"已发布"（走 §11 流程）。所有字段**可选、默认行为不变**。
+
+| 字段 | 状态 | 语义 / 备注 |
+|---|---|---|
+| `sample_id` | 候选（D5） | 数据集/manifest 行身份；取代 d5-001 §4 的 `row_key` |
+| `epoch_index` | 候选（D5） | 0-based |
+| `plan_position` | 候选（D5） | 该 epoch demand 序列内 0-based 位次；= D1 `logical_batch_index*micro_per_batch + micro_batch_index` 扁平化 |
+| `regen_digest` | 候选（D5） | 行生成记录 digest；幂等键 = (`sample_id`,`epoch_index`,`plan_position`,`regen_digest`)；受 D5 REPORT §7 生成冻结协议约束 |
+| `teacher_src_pos` | 已确认（D2 handoff §1；待 d1-001 合并冻结） | = D1 `slot_pos` − 1（`TeacherLogitsStream` 语义：slot k 读 position−1 hidden；D2 口径 = `label_indices−1` clamp，与 D1 contract v0 一致） |
+| `host_ram_budget_gb` | **待 D4 确认** | launcher 级 host RAM 预算（与 D4 cache 份额联动；product 侧只读；不进 `training_plan_digest`） |
