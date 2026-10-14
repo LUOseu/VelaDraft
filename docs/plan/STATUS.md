@@ -15,6 +15,18 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
 
 ## Now
 
+- **Review remediation round (2026-10-14, branch `review-remediation` off
+  `950b394`): R1-R6 implemented.** R1 collision-safe media + audit script
+  (`7cc9e5b`), R4 ordered segments + explicit unsupported-media rejection
+  (`47b0075`), R3 `last_turn_only` regen default with `all_turns` opt-in
+  (`c2d98e5`), R2 unified online timing boundary + WP4 supersession
+  (`7038c56`), R5 frozen-prefix probe v2 + narrowed vLLM attribution
+  (`7a44301`), R6 support matrix capability vs evidence (`b3730d7`).
+  Full CPU regression 411 passed / 6 skipped; no new GPU jobs (budget
+  4.10/8.00 GPU-h) - GPU re-checks listed in
+  `docs/plan/REVIEW_REMEDIATION.md` (GPU_PENDING section). WP5 stays BLOCKED
+  at 5/32 token-exact with the root cause unresolved.
+
 - WP0 done: capability gap table + ledgers below; CPU baseline suite green
   (321 tests collected, all pass; `pytest tests/ -q`).
 - WP1 done, pushed: upstream two-stage DFly recipe on branch
