@@ -36,9 +36,9 @@
 
 | 轮次 | 上限 | 依据 |
 |---|---|---|
-| W1-D1 两轴 probe | ≤1.5 GPU-h（23:32 由 1.0 上调：+W1/W2/W3 真实 probe stores；见 REGISTRY §7 对 D1 的应答） | R2 tensor probes + 三个 128–256 行 probe store；旧 lane 参考：129 行 × 6 epochs 两腿 ≈0.24 GPU-h |
+| W1-D1 两轴 probe | ≤1.5 GPU-h（23:17 由 1.0 上调：+W1/W2/W3 真实 probe stores；见 REGISTRY §7 对 D1 的应答） | R2 tensor probes + 三个 128–256 行 probe store；旧 lane 参考：129 行 × 6 epochs 两腿 ≈0.24 GPU-h |
 | W1-D2 N/U + teacher 成本 | ≤1.0 GPU-h | 计数与成本占比，128–256 样本 |
-| W1-D3 attention/mask profile | ≤1.0 GPU-h（23:32 由 0.5 上调：需 warm/编译基线与 span 网格；依据 D3 round-1 计划 ≤4 短 run） | 仅 profiling；未证明瓶颈（attention+mask ≥20% 整步）不写 kernel |
+| W1-D3 attention/mask profile | ≤1.0 GPU-h（23:17 由 0.5 上调：需 warm/编译基线与 span 网格；依据 D3 round-1 计划 ≤4 短 run） | 仅 profiling；未证明瓶颈（attention+mask ≥20% 整步）不写 kernel |
 | W1-D4 收尾/容量探针 | ≤0.5 GPU-h | 容量/命中率为主，优先 CPU/trace |
 | W1-D5 静态流水线/trace 可行性 | ≤1.0 GPU-h（单卡；23:12 由 0.5 上调，依据 D5 handoff 的 regen scaling probe） | 静态 trace + 单卡模拟；不建多 GPU 系统 |
 | **wave 1 合计** | **≤4.0 GPU-h** | 当前 2 张空闲卡 + 紧张磁盘下的可执行上界 |
@@ -54,8 +54,10 @@
 ### 观察记录（C0 只读，未独立复核）
 
 - 2026-10-14 23:19 — 四卡全部在用：**GPU1** = D5 regen 批量 probe（`/home/lyh/vlm-d5/repo`，--limit 128 --steps 1，regen.batch_size=8，pid 3311115）；**GPU2** = D3 attention/mask profiler（profile_drafter_step.py，limit 16/10 steps，pid 3317651）；**GPU0** = 外部用户 xs 的 Qwen2.5-Math eval（pid 3298367）；**GPU3** = 外部 dongzp（pid 3094389，44.3GB/100%）。无空闲卡 → D1/D2/D4 的 GPU probe 需等窗口。`/home` 29GB free。
-- 2026-10-14 23:32 — D3 profiler 已退出（GPU2 释放，18MiB/0%）；GPU0 外部任务结束（287MiB/0%，近空闲）；D5 probe 仍在 GPU1（11.8GB/2%）；GPU3 外部继续（44.3GB/100%）。`/home` 27GB free（D5/D3 小量写入）。D1/D2/D4 可用 GPU0/GPU2 窗口。
-- 2026-10-14 23:36 — GPU1 = D5（10.4GB）+ **D2（27GB，并发，未登记租约）**；GPU0 = 外部 xs（14.9GB）+ D2（264MiB）；GPU2 空闲；GPU3 外部。重负载定义：alloc > 4GB 或 util > 50%；同卡禁止两个未声明的重负载任务。受影响的计时标 `contended`。
+- 2026-10-14 23:17 — D3 profiler 已退出（GPU2 释放，18MiB/0%）；GPU0 外部任务结束（287MiB/0%，近空闲）；D5 probe 仍在 GPU1（11.8GB/2%）；GPU3 外部继续（44.3GB/100%）。`/home` 27GB free（D5/D3 小量写入）。D1/D2/D4 可用 GPU0/GPU2 窗口。
+- 2026-10-14 23:18 — GPU1 = D5（10.4GB）+ **D2（27GB，并发，未登记租约）**；GPU0 = 外部 xs（14.9GB）+ D2（264MiB）；GPU2 空闲；GPU3 外部。重负载定义：alloc > 4GB 或 util > 50%；同卡禁止两个未声明的重负载任务。受影响的计时标 `contended`。
+- **23:19 事故（D5×D2 共卡）**：D5 的 regen 批量 probe（GPU1，CUDA_VISIBLE_DEVICES=1）b8 腿 **OOM 失败**（`torch.OutOfMemoryError ... Process 3313721 has 26.36 GiB in use`，即 D2 同卡）；b8 exit=1；b16 于 23:18:47 启动后进程无退出记录消失（日志止于权重加载）。**处理：b8 作废（contended/OOM）；b16 按未完成处理；整链需独占卡重跑；失败 run 计入 GPU-hours、不计入有效结果。**
+- 2026-10-14 23:21（当前占用）：GPU0 = 外部 xs（15.8GB，98%）；**GPU1 = D2 新 run（显式 `--device cuda:1`，pid 3331562）**；**GPU2 = D4 W1 legs（screen `d4w1`，cache-off 腿 `s2b/off`，启动前 quiet 自检通过）**；GPU3 = 外部 dongzp（44.3GB，99%）。`/home` 19GB free（较 23:14 的 29G 明显下降，注意 prune）。D5 重跑需等独占卡。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
