@@ -329,7 +329,10 @@ def test_weighted_regroup_matches_canonical(dtype, name, dloss_tol, grel_tol):
     stats = [SampleStat(key=_key_of(rows[i]["ids"]), C=rows[i]["C"],
                         A=len(table[_key_of(rows[i]["ids"])]), Z=z_rows[i], index=i)
              for i in range(len(rows))]
-    for mode, size in (("token", 2), ("dual", 2), ("cost", 4), ("grid", 2)):
+    # size=1 = all-singleton groups (= the R4 `--sub-batch 1` boundary config;
+    # added per D1's cross-check of 4e1674e, suggestion (a)).
+    for mode, size in (("token", 2), ("dual", 2), ("cost", 4), ("grid", 2),
+                       ("token", 1), ("cost", 1), ("grid", 1)):
         groups = plan_groups(stats, mode, size)
         loss_c, grads_c, upd_c, _ = _run_arm(
             base, groups, rows, dtype, table, weighted=True, weights=weights)
