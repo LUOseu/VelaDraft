@@ -131,4 +131,6 @@ class DrafterAlgorithm(ABC):
         Raising when the contract is required but missing is intentional: a
         digest computed without it could silently disagree with the gate.
         """
-        return {}
+        from ..objectives import plan_recipe_knobs
+
+        return plan_recipe_knobs(cfg, self.name)

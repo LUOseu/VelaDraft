@@ -34,17 +34,24 @@ keeps its native compute dtype.
 
 from __future__ import annotations
 
+import math
 import time
 from pathlib import Path
 
 import torch
 from torch.utils.data import Dataset
 
-from ..data.sharegpt import load_sharegpt, row_image_path
+from ..data.sharegpt import load_sharegpt, row_image_paths
 from ..provenance import identity_from_contract
 from ..utils import read_json, sha256_file, sha256_json
 from .load import load_target
-from .sample_capture import build_sample_record, extract_target_head, storage_dtype
+from .sample_capture import (
+    build_sample_record,
+    extract_target_head,
+    finalize_prepared_records,
+    prepare_sample_record,
+    storage_dtype,
+)
 
 #: Version tag for the online content digest. Checkpoints that record a
 #: different (or missing) version cannot be resumed exactly; the gate in
@@ -54,16 +61,18 @@ ONLINE_DIGEST_VERSION = "vlm-dflash-online-source-digest-v2"
 
 
 def _manifest_image_hashes(run_dir: Path) -> dict[str, str]:
-    """``id -> image_sha256`` from the data stage, when the manifest exists."""
+    """``id -> image_sha256`` (or the per-image list for multi-image rows) from the data stage."""
     path = Path(run_dir) / "data" / "manifest.json"
     if not path.exists():
         return {}
     manifest = read_json(path)
-    return {
-        str(row.get("id")): str(row["image_sha256"])
-        for row in manifest.get("rows", [])
-        if row.get("image_sha256")
-    }
+    out: dict = {}
+    for row in manifest.get("rows", []):
+        if row.get("image_sha256_list"):
+            out[str(row.get("id"))] = [str(value) for value in row["image_sha256_list"]]
+        elif row.get("image_sha256"):
+            out[str(row.get("id"))] = str(row["image_sha256"])
+    return out
 
 
 def load_online_rows(run_dir: str | Path, limit: int | None = None) -> tuple[list[dict], Path]:
@@ -97,43 +106,71 @@ def online_source_digest(cfg: dict, contract: dict, rows: list[dict], media_dir,
     recorded_hashes = _manifest_image_hashes(run_dir)
     content = []
     for row in rows:
-        image_path = row_image_path(row, Path(media_dir))
-        if not image_path.exists():
-            raise FileNotFoundError(
-                f"feature_mode=online: image for row {row.get('id')!r} is missing ({image_path}); "
-                "re-run the prepare/regen stages or point the run at the original media directory."
-            )
-        image_sha256 = sha256_file(image_path)
+        image_paths = row_image_paths(row, Path(media_dir))
+        image_hashes = []
+        for image_path in image_paths:
+            if not image_path.exists():
+                raise FileNotFoundError(
+                    f"feature_mode=online: image for row {row.get('id')!r} is missing ({image_path}); "
+                    "re-run the prepare/regen stages or point the run at the original media directory."
+                )
+            image_hashes.append(sha256_file(image_path))
         recorded = recorded_hashes.get(str(row.get("id")))
-        if recorded is not None and recorded != image_sha256:
-            raise RuntimeError(
-                f"feature_mode=online: image bytes for row {row.get('id')!r} no longer match "
-                "data/manifest.json (the staged data changed after prepare). Re-run prepare/regen "
-                "or start a new run directory."
+        if recorded is not None:
+            expected = [recorded] if isinstance(recorded, str) else list(recorded)
+            if expected != image_hashes:
+                raise RuntimeError(
+                    f"feature_mode=online: image bytes for row {row.get('id')!r} no longer match "
+                    "data/manifest.json (the staged data changed after prepare). Re-run prepare/regen "
+                    "or start a new run directory."
+                )
+        regen = row["regen"]
+        if "turns" in regen:
+            content.append(
+                {
+                    "turns": [
+                        {
+                            "prompt_ids": [int(token) for token in turn["prompt_ids"]],
+                            "answer_ids": [int(token) for token in turn["answer_ids"]],
+                        }
+                        for turn in regen["turns"]
+                    ],
+                    "full_ids": [int(token) for token in regen["full_ids"]],
+                    "image_sha256": image_hashes,
+                }
             )
-        content.append(
-            {
-                "prompt_ids": [int(token) for token in row["regen"]["prompt_ids"]],
-                "answer_ids": [int(token) for token in row["regen"]["answer_ids"]],
-                "image_sha256": image_sha256,
-            }
-        )
+        else:
+            content.append(
+                {
+                    "prompt_ids": [int(token) for token in regen["prompt_ids"]],
+                    "answer_ids": [int(token) for token in regen["answer_ids"]],
+                    "image_sha256": image_hashes[0],
+                }
+            )
     identity = identity_from_contract(contract)
     identity.pop("target_model_path", None)
+    settings = {
+        "seq_length": int(cap_cfg.get("seq_length", 2048)),
+        "storage_dtype": str(storage_dtype(cap_cfg.get("dtype", "bfloat16"))).replace("torch.", ""),
+        "store_final_hidden": bool(cap_cfg.get("store_final_hidden", False)),
+        "draft_layer_ids": [int(layer) for layer in contract["layers"]["draft_layer_ids"]],
+        "target_dtype": str(target_cfg.get("dtype", "bfloat16")),
+        "attn_implementation": str(target_cfg.get("attn_implementation", "sdpa")),
+    }
+    # The per-sample path keeps its original digest scheme (no extra field for
+    # batch size 1). A batched run folds its batch size into the digest: batch
+    # composition changes the padding/numerics, so an exact resume must not
+    # silently switch to a different grouping.
+    online_batch_size = int((cfg.get("train") or {}).get("online_batch_size", 1) or 1)
+    if online_batch_size > 1:
+        settings["online_batch_size"] = online_batch_size
     return sha256_json(
         {
             "version": ONLINE_DIGEST_VERSION,
             "backend": OnlineFeatureSource.backend,
             "identity": identity,
             "content": content,
-            "settings": {
-                "seq_length": int(cap_cfg.get("seq_length", 2048)),
-                "storage_dtype": str(storage_dtype(cap_cfg.get("dtype", "bfloat16"))).replace("torch.", ""),
-                "store_final_hidden": bool(cap_cfg.get("store_final_hidden", False)),
-                "draft_layer_ids": [int(layer) for layer in contract["layers"]["draft_layer_ids"]],
-                "target_dtype": str(target_cfg.get("dtype", "bfloat16")),
-                "attn_implementation": str(target_cfg.get("attn_implementation", "sdpa")),
-            },
+            "settings": settings,
         }
     )
 
@@ -146,10 +183,19 @@ class OnlineFeatureDataset(Dataset):
     ``image_span`` / ``sample_id`` / optional ``final_hidden``) that
     ``FeatureDataset`` reads from a captured store, with the same dtypes, so
     both sources feed the identical collator and training loop.
+
+    ``fetch_batch`` serves the same records for a list of indices with one
+    batched target forward; the trainer's online iterator uses it when
+    ``train.online_batch_size > 1`` (see ``OnlineBatchIterator``).
     """
 
     #: Guard read by the training loop: this dataset requires the main process.
     require_main_process = True
+
+    @property
+    def batched_capture(self) -> bool:
+        """Whether the trainer should fetch via ``fetch_batch`` (train.online_batch_size > 1)."""
+        return self.source.online_batch_size > 1
 
     def __init__(self, source: "OnlineFeatureSource"):
         self.source = source
@@ -185,6 +231,38 @@ class OnlineFeatureDataset(Dataset):
         record = self.source.extract(int(index))
         return self._normalize(record)
 
+    def fetch_batch(self, indices: list[int]) -> list[dict]:
+        """Records for ``indices``, in order, with one batched target forward.
+
+        Every real item is rendered first (no target call), then finalized in
+        a single padded forward; fast-forward placeholders stay per-item and
+        consume no target work. Output order matches ``indices`` exactly, so
+        the collated batch is identical to fetching the same indices one by
+        one.
+        """
+        if torch.utils.data.get_worker_info() is not None:
+            raise RuntimeError(
+                "OnlineFeatureDataset must run in the main process; feature_mode=online requires "
+                "train.num_workers=0 (the target model cannot be copied into DataLoader workers)."
+            )
+        records: list[dict | None] = [None] * len(indices)
+        prepared, positions = [], []
+        for position, index in enumerate(indices):
+            if self._placeholder_remaining > 0:
+                self._placeholder_remaining -= 1
+                records[position] = self._placeholder_record(str(index))
+            else:
+                prepared.append(self.source.prepare(int(index)))
+                positions.append(position)
+        if prepared:
+            extracted = self.source.extract_prepared(prepared)
+            for position, record in zip(positions, extracted):
+                records[position] = self._normalize(record)
+        missing = [position for position, record in enumerate(records) if record is None]
+        if missing:
+            raise RuntimeError(f"fetch_batch left positions {missing} unresolved.")
+        return records  # type: ignore[return-value]
+
     def _placeholder_record(self, index: str) -> dict:
         length = 2
         return {
@@ -216,6 +294,11 @@ class OnlineFeatureDataset(Dataset):
         }
         if record.get("final_hidden") is not None:
             out["final_hidden"] = record["final_hidden"].detach().clone()
+        if record.get("image_spans") is not None:
+            out["image_spans"] = [tuple(span) for span in record["image_spans"]]
+            out["n_turns"] = int(record.get("n_turns", 1))
+        if record.get("turn_spans") is not None:
+            out["turn_spans"] = [tuple(span) for span in record["turn_spans"]]
         return out
 
 
@@ -257,8 +340,10 @@ class OnlineFeatureSource:
         self.layer_ids = contract_capture_layer_ids(contract)
         self.hidden_size = int(contract["text"]["hidden_size"])
         self.image_token_id = int(contract["tokens"]["image_token_id"])
-        self.merge_size = int(contract["image"]["merge_size"])
+        self.merge_size = contract["image"].get("merge_size")
         self.fused_hidden_size = len(self.layer_ids) * int(contract["text"]["hidden_size"])
+        # Rows per batched capture forward; 1 is the per-sample reference path.
+        self.online_batch_size = max(1, int((cfg.get("train") or {}).get("online_batch_size", 1) or 1))
         target_cfg = cfg.get("target", {}) or {}
         self.target_dtype = str(target_cfg.get("dtype", "bfloat16"))
         self.attn_implementation = str(target_cfg.get("attn_implementation", "sdpa"))
@@ -338,8 +423,42 @@ class OnlineFeatureSource:
         )
         entry = self.stats.setdefault(self.phase, {"target_forwards": 0, "wall_seconds": 0.0})
         entry["target_forwards"] += 1
+        entry["target_samples"] = int(entry.get("target_samples", 0)) + 1
         entry["wall_seconds"] += time.perf_counter() - started
         return record
+
+    def prepare(self, index: int) -> dict:
+        """Render one row without a target forward (half of ``extract``)."""
+        return prepare_sample_record(
+            self.processor,
+            self.rows[index],
+            self.media_dir,
+            seq_length=self.seq_length,
+        )
+
+    def extract_prepared(self, prepared_list: list[dict]) -> list[dict]:
+        """One batched target forward for already-prepared rows.
+
+        Counters record one target forward call and ``len(prepared_list)``
+        samples, so a summary distinguishes forward calls from extracted rows
+        once ``train.online_batch_size > 1``.
+        """
+        started = time.perf_counter()
+        records = finalize_prepared_records(
+            self.model,
+            prepared_list,
+            layer_ids=self.layer_ids,
+            image_token_id=self.image_token_id,
+            merge_size=self.merge_size,
+            dtype=self.dtype,
+            store_final_hidden=self.store_final_hidden,
+            tokenizer=getattr(self.processor, "tokenizer", None),
+        )
+        entry = self.stats.setdefault(self.phase, {"target_forwards": 0, "wall_seconds": 0.0})
+        entry["target_forwards"] += 1
+        entry["target_samples"] = int(entry.get("target_samples", 0)) + len(prepared_list)
+        entry["wall_seconds"] += time.perf_counter() - started
+        return records
 
     # -- trainer-facing surface ----------------------------------------------
     def dataset(self) -> OnlineFeatureDataset:
@@ -361,6 +480,7 @@ class OnlineFeatureSource:
             "feature_mode": "online",
             "backend": self.backend,
             "num_samples": len(self.rows),
+            "online_batch_size": self.online_batch_size,
             "seq_length": self.seq_length,
             "storage_dtype": str(self.dtype).replace("torch.", ""),
             "stores_final_hidden": self.store_final_hidden,
@@ -380,6 +500,7 @@ class OnlineFeatureSource:
         # if ``close()`` never runs; idempotent afterwards.
         self._close_peak_window()
         total_forwards = sum(entry["target_forwards"] for entry in self.stats.values())
+        total_samples = sum(int(entry.get("target_samples", 0)) for entry in self.stats.values())
         total_wall = sum(entry["wall_seconds"] for entry in self.stats.values())
         return {
             **self.manifest(),
@@ -387,7 +508,12 @@ class OnlineFeatureSource:
             "target_resident_bytes": self.target_resident_bytes,
             "extractions": {phase: dict(entry) for phase, entry in sorted(self.stats.items())},
             "target_forwards_total": total_forwards,
+            "target_samples_total": total_samples,
             "extraction_wall_seconds_total": total_wall,
+            "target_forwards_note": (
+                "target_forwards counts model forward calls; target_samples counts extracted rows. "
+                "They differ when train.online_batch_size > 1 (one forward per capture group)."
+            ),
             "extraction_wall_seconds_note": (
                 "per-phase counters cover train / overfit sanity / calibration extraction; the "
                 "startup visual-path check runs a fixed 3 capture forwards outside these "
@@ -419,3 +545,59 @@ class OnlineFeatureSource:
         self.processor = None
         self.embed_weight = None
         self.lm_head_weight = None
+
+
+class OnlineBatchIterator:
+    """Epoch iterator that yields extracted + collated batches for the trainer.
+
+    Replaces the ``DataLoader`` on the online path when
+    ``train.online_batch_size > 1``: it walks the same
+    ``RandomSampler`` + ``BatchSampler`` sequence the per-sample ``DataLoader``
+    would (same generator, ``drop_last=False``), so batch composition is
+    identical to the per-sample path for a given seed, but every batch is
+    extracted with one batched target forward via ``dataset.fetch_batch``.
+    ``test_online_batch_iterator_reproduces_dataloader_order`` pins the
+    equivalence against a real ``DataLoader``.
+
+    ``capture_batch`` (``train.online_batch_size``) caps how many rows share
+    one target forward: a training batch larger than it is split into
+    consecutive capture groups (each fetched with its own padded forward and
+    concatenated back in order), so the effective group size is
+    ``min(online_batch_size, micro_batch_size)``.
+    """
+
+    def __init__(self, dataset: "OnlineFeatureDataset", collate, *, batch_size: int, shuffle: bool,
+                 generator, capture_batch: int | None = None, fetch_batch=None):
+        self.dataset = dataset
+        self.collate = collate
+        self.batch_size = max(1, int(batch_size))
+        self.capture_batch = max(1, int(capture_batch) if capture_batch else self.batch_size)
+        self.shuffle = bool(shuffle)
+        self.generator = generator
+        self.num_samples = len(dataset)
+        # Sampler indices address ``dataset``; ``fetch_batch`` defaults to the
+        # dataset's own batched extraction and is overridden by the trainer
+        # when a Subset wrapper needs its indices mapped back to base indices.
+        self.fetch_batch = fetch_batch if fetch_batch is not None else dataset.fetch_batch
+
+    def __len__(self) -> int:
+        return max(1, math.ceil(self.num_samples / self.batch_size))
+
+    def __iter__(self):
+        from torch.utils.data import BatchSampler, RandomSampler, SequentialSampler
+
+        if self.shuffle:
+            # The DataLoader's iterator draws one int64 base seed from the
+            # generator before the sampler draws its permutations (a torch
+            # internal, pinned by the parity test); consume the same draw so
+            # the epoch order matches the per-sample path exactly.
+            torch.empty((), dtype=torch.int64).random_(generator=self.generator)
+            sampler = RandomSampler(self.dataset, generator=self.generator)
+        else:
+            sampler = SequentialSampler(self.dataset)
+        for indices in BatchSampler(sampler, self.batch_size, drop_last=False):
+            indices = list(indices)
+            records: list[dict] = []
+            for start in range(0, len(indices), self.capture_batch):
+                records.extend(self.fetch_batch(indices[start : start + self.capture_batch]))
+            yield self.collate(records)

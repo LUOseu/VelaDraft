@@ -1,10 +1,12 @@
-"""Runtime model contract resolution for Qwen-VL-family targets.
+"""Runtime model contract resolution for VLM-family targets.
 
 Every value the DFlash pipeline depends on (mask token id, MRoPE sections,
 draft layer routing, image pixel bounds, special tokens) is resolved from the
 target model directory at runtime and validated against the YAML defaults.
-Nothing is hard-coded downstream: a YAML default that disagrees with the
-resolved model contract raises :class:`ContractError`.
+Family specifics (token names, rope layout, image-token semantics) come from
+the target-family adapter; nothing is hard-coded downstream: a YAML default
+that disagrees with the resolved model contract raises
+:class:`ContractError`.
 """
 
 from __future__ import annotations
@@ -196,28 +198,9 @@ def resolve_contract(
     head_dim = int(getattr(text_config, "head_dim", hidden_size // int(text_config.num_attention_heads)))
 
     # ---- special tokens -------------------------------------------------
-    def tid(token: str) -> int:
-        value = tokenizer.convert_tokens_to_ids(token)
-        if value is None or value < 0:
-            raise ContractError(f"Tokenizer does not define required special token {token!r}.")
-        return int(value)
-
-    tokens = {
-        "image_token_id": tid("<|image_pad|>"),
-        "vision_start_token_id": tid("<|vision_start|>"),
-        "vision_end_token_id": tid("<|vision_end|>"),
-        "im_start_token_id": tid("<|im_start|>"),
-        "im_end_token_id": tid("<|im_end|>"),
-        "endoftext_token_id": tid("<|endoftext|>"),
-    }
-    for cfg_key in ("image_token_id", "vision_start_token_id", "vision_end_token_id"):
-        cfg_value = getattr(text_config, cfg_key, None)
-        if cfg_value is None and text_config is not config:
-            cfg_value = getattr(config, cfg_key, None)
-        if cfg_value is not None and int(cfg_value) != tokens[cfg_key]:
-            raise ContractError(
-                f"Token config disagrees with tokenizer for {cfg_key}: config={cfg_value} tokenizer={tokens[cfg_key]}"
-            )
+    # Family-specific resolution (token names + config cross-checks) lives in
+    # the adapter; only ``image_token_id`` is consumed downstream.
+    tokens = adapter.resolve_tokens(tokenizer, config, text_config)
 
     # ---- mask token -----------------------------------------------------
     mask_token_id = defaults.get("mask_token_id")
@@ -227,61 +210,18 @@ def resolve_contract(
     if not 0 <= mask_token_id < vocab_size:
         raise ContractError(f"mask_token_id {mask_token_id} outside embedding range [0, {vocab_size}).")
     mask_token_str = tokenizer.convert_ids_to_tokens(mask_token_id)
-    if mask_token_str is not None:
-        raise ContractError(
-            f"mask_token_id {mask_token_id} resolves to tokenizer token {mask_token_str!r}; "
-            "the mask must live on a reserved embedding row that the tokenizer can never emit. "
-            "Pick an id >= tokenizer.vocab_size."
-        )
+    mask_policy = adapter.review_mask_token(mask_token_str)
     for name, value in tokens.items():
-        if mask_token_id == value:
+        if value is not None and mask_token_id == value:
             raise ContractError(f"mask_token_id collides with {name}={value}.")
 
-    # ---- MRoPE sections -------------------------------------------------
-    # transformers >=5 moved rope settings onto the text sub-config
-    # (``text_config.rope_parameters``); older layouts keep ``rope_scaling`` at
-    # the top level. Search all known locations and record where it came from.
-    rope, rope_source = None, None
-    for holder, holder_name, attr in (
-        (text_config, "text_config", "rope_parameters"),
-        (text_config, "text_config", "rope_scaling"),
-        (config, "config", "rope_scaling"),
-        (config, "config", "rope_parameters"),
-    ):
-        value = getattr(holder, attr, None)
-        if isinstance(value, dict) and value:
-            rope, rope_source = value, f"{holder_name}.{attr}"
-            break
-    if not isinstance(rope, dict):
-        raise ContractError("Target config has no rope_scaling/rope_parameters mapping.")
-    sections = rope.get("mrope_section")
-    if sections is None:
-        raise ContractError("Target config rope scaling has no mrope_section.")
-    sections = [int(s) for s in sections]
-    default_sections = defaults.get("spatial_rope_sections")
-    if default_sections is not None and [int(s) for s in default_sections] != sections:
-        raise ContractError(
-            f"YAML spatial_rope_sections {default_sections} disagree with target mrope_section {sections}."
-        )
-    if 2 * sum(sections) != head_dim:
-        raise ContractError(
-            f"mrope_section {sections} doubled sum must equal head_dim {head_dim} for spatial-rope DFlash."
-        )
-    interleaved = bool(rope.get("mrope_interleaved", False))
-    default_interleaved = defaults.get("spatial_rope_interleaved")
-    if default_interleaved is not None and bool(default_interleaved) != interleaved:
-        raise ContractError(
-            f"YAML spatial_rope_interleaved {bool(default_interleaved)} disagrees with target "
-            f"mrope_interleaved {interleaved}."
-        )
-    if interleaved:
-        half = head_dim // 2
-        for axis in (1, 2):
-            if 3 * sections[axis] > half:
-                raise ContractError(
-                    f"Interleaved MRoPE needs 3*mrope_section[axis] <= head_dim/2; axis {axis} has "
-                    f"3*{sections[axis]} > {half}."
-                )
+    # ---- rope -----------------------------------------------------------
+    # Family-specific: MRoPE families validate ``mrope_section`` against
+    # head_dim (and the YAML defaults); 1-D families report mode="1d" with
+    # sections=None. transformers >=5 moved rope settings onto the text
+    # sub-config; adapters search all known locations.
+    rope_info = adapter.resolve_rope(config, text_config, head_dim, defaults)
+    sections = rope_info["sections"]
 
     # ---- draft layer routing -------------------------------------------
     draft_layers = int(defaults.get("draft_num_hidden_layers", 3))
@@ -326,19 +266,31 @@ def resolve_contract(
     max_pixels = int(defaults.get("image_max_pixels") or proc_max)
     if not 0 < min_pixels <= max_pixels:
         raise ContractError(f"Invalid image pixel bounds: min={min_pixels} max={max_pixels}.")
-    image_processor = getattr(processor, "image_processor", None)
-    patch_size = int(getattr(image_processor, "patch_size", 14))
-    merge_size = int(getattr(image_processor, "merge_size", 2))
-    if min_pixels % (patch_size * patch_size) != 0 or max_pixels % (patch_size * patch_size) != 0:
-        raise ContractError(
-            f"Image pixel bounds must be multiples of patch_size^2={patch_size * patch_size} "
-            f"(got min={min_pixels}, max={max_pixels})."
-        )
-    tokens_per_patch = (patch_size * merge_size) ** 2
-    image_token_bounds = {
-        "min_tokens": min_pixels // tokens_per_patch,
-        "max_tokens": max_pixels // tokens_per_patch,
-    }
+    grid_tokens = adapter.info.image_token_mode == "grid"
+    if grid_tokens:
+        image_processor = getattr(processor, "image_processor", None)
+        patch_size = int(getattr(image_processor, "patch_size", 14))
+        merge_size = int(getattr(image_processor, "merge_size", 2))
+        if min_pixels % (patch_size * patch_size) != 0 or max_pixels % (patch_size * patch_size) != 0:
+            raise ContractError(
+                f"Image pixel bounds must be multiples of patch_size^2={patch_size * patch_size} "
+                f"(got min={min_pixels}, max={max_pixels})."
+            )
+        tokens_per_patch = (patch_size * merge_size) ** 2
+        image_token_bounds = {
+            "min_tokens": min_pixels // tokens_per_patch,
+            "max_tokens": max_pixels // tokens_per_patch,
+        }
+        sequence_length_per_tile = None
+    else:
+        # Tile-encoded families: no patch grid; token count = tiles x fixed length.
+        patch_size = merge_size = tokens_per_patch = None
+        image_token_bounds = {"min_tokens": None, "max_tokens": None}
+        sequence_length_per_tile = int(getattr(processor, "image_seq_len", 0) or 0) or None
+        if sequence_length_per_tile is None:
+            raise ContractError(
+                "Tile-encoded family without processor.image_seq_len; cannot derive image-token counts."
+            )
 
     # ---- fingerprints ---------------------------------------------------
     model_files = _file_fingerprint(model_dir, _MODEL_FILES)
@@ -370,15 +322,16 @@ def resolve_contract(
         "mask": {
             "token_id": mask_token_id,
             "token_str": mask_token_str,
-            "policy": "reserved embedding row outside tokenizer vocabulary",
+            "policy": mask_policy,
             "tokenizer_vocab_size": int(tokenizer.vocab_size),
             "source": "config default validated against tokenizer",
         },
         "rope": {
-            "type": rope.get("type") or rope.get("rope_type"),
+            "type": rope_info["type"],
+            "mode": rope_info["mode"],
             "sections": sections,
-            "interleaved": interleaved,
-            "source": f"target {rope_source}.mrope_section + mrope_interleaved (absent = False)",
+            "interleaved": rope_info["interleaved"],
+            "source": rope_info["source"],
         },
         "layers": {
             "num_target_layers": num_target_layers,
@@ -398,11 +351,13 @@ def resolve_contract(
             "processor_min_pixels": proc_min,
             "processor_max_pixels": proc_max,
             "processor_bounds_source": bounds["source"],
+            "token_count_mode": adapter.info.image_token_mode,
             "patch_size": patch_size,
             "merge_size": merge_size,
             "tokens_per_patch": tokens_per_patch,
             "min_tokens": image_token_bounds["min_tokens"],
             "max_tokens": image_token_bounds["max_tokens"],
+            "sequence_length_per_tile": sequence_length_per_tile,
             "source": "config override validated against processor; processor defaults recorded",
         },
         "tokens": {**tokens, "source": "tokenizer, cross-checked against target config"},
@@ -448,15 +403,27 @@ def validate_yaml_against_contract(cfg: dict, contract: dict, where: str = "conf
                 f"{expected_capture}."
             )
     sections = [int(s) for s in (cfg.get("drafter", {}).get("spatial_rope_sections") or [])]
-    if sections and sections != [int(s) for s in contract["rope"]["sections"]]:
+    contract_sections = contract["rope"].get("sections")
+    if contract_sections is None:
+        if sections:
+            raise ContractError(
+                f"{where}: drafter.spatial_rope_sections {sections} set but the target family has no "
+                "mrope_section (1-D positions)."
+            )
+    elif sections and sections != [int(s) for s in contract_sections]:
         raise ContractError(
-            f"{where}: drafter.spatial_rope_sections {sections} disagree with contract {contract['rope']['sections']}."
+            f"{where}: drafter.spatial_rope_sections {sections} disagree with contract {contract_sections}."
         )
     interleaved = cfg.get("drafter", {}).get("spatial_rope_interleaved")
     if interleaved is not None and bool(interleaved) != bool(contract["rope"].get("interleaved", False)):
         raise ContractError(
             f"{where}: drafter.spatial_rope_interleaved {bool(interleaved)} disagrees with contract "
             f"{bool(contract['rope'].get('interleaved', False))}."
+        )
+    if contract["rope"].get("mode") == "1d" and (cfg.get("drafter", {}) or {}).get("spatial_rope_enabled") is not False:
+        raise ContractError(
+            f"{where}: drafter.spatial_rope_enabled must be false for a 1-D-position family "
+            "(the target has no mrope_section)."
         )
     for key in ("image_min_pixels", "image_max_pixels"):
         value = cfg.get("target", {}).get(key)

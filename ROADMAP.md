@@ -53,14 +53,26 @@ reference algorithm; the other four plug in through the registry.
       Qwen3-VL reduced runs (DFlare 1.185, DFly 1.226) recorded; the
       target-family columns in `SUPPORT_MATRIX.md` are updated (Qwen2.5-VL
       validated, Qwen3-VL reduced validation).
-- [ ] DFly upstream two-stage objective (LK / D-PACE cold start, then e2e TV):
-      not implemented; DFly runs currently train the shared decayed block CE.
+- [x] DFly upstream two-stage objective (LK / D-PACE cold start, then e2e TV):
+      ported as the config-selectable `algorithm.train_recipe:
+      upstream_two_stage` (exact loss math in `vlm_dflash/objectives.py`;
+      CPU-tested for formula parity, stage switching and resume gating, and
+      exercised end to end on the tiny fixture). Runs without `train_recipe`
+      keep the shared decayed block CE; a canonical GPU recipe run and its AL
+      comparison are the next record to land.
+- [x] Schema v2 (multi-image / multi-turn): rows with `image_turns` keep the
+      full conversation; per-turn greedy regen with incremental `full_ids`
+      (asserted against one full-conversation render), multi-span capture
+      (`image_spans`, `turn_spans`, multi-segment `loss_mask`). Recorded E2
+      smoke `R-20261014-08` (2-image / 2-turn, 16 + 4 rows, token-exact 4/4
+      for trained + init checkpoints); DFlash scope note in
+      `SUPPORT_MATRIX.md`.
 
 ## Later (not on the critical path)
 - DFlash2 objective isolation (`unary_loss: ce` control) if the number is
   quoted as a method claim; JetSpec production parallel-tree runtime.
-- Multi-image, video, vLLM/SGLang interop, latency breakdowns, hardware
-  presets validated by measurement.
+- Video, vLLM/SGLang interop, latency breakdowns, hardware presets validated
+  by measurement; multi-image batched online capture (WP4).
 
 Rules
 - No support checkbox without a run: implemented / tested / validated /

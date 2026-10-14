@@ -1,9 +1,37 @@
-# Serving bridge — proposal (not implemented)
+# Serving bridge — first build (vLLM 0.22.1), strict gate not passed
 
-Status: **proposal / roadmap**. Nothing in this document is a feature claim;
-the repo today trains, evaluates and exports drafters, and the only token-exact
-inference path is the in-repo sequential verifier. This page records what a
-first runtime bridge would have to solve and what is already in place.
+Status (2026-10-14): **builder implemented and load-verified; the token-exact
+gate is NOT passed; no vLLM/SGLang support claim.** The repo trains,
+evaluates and exports drafters; the only token-exact inference path is the
+in-repo sequential verifier. A converter +
+check harness for vLLM's native `dflash` method now exists (see below), and
+WP5 measured exactly how far it gets and where it stops — full numbers,
+divergence analysis and registered gaps in
+[`plan/WP5_REPORT.md`](plan/WP5_REPORT.md) (runs R-20261014-14/15/16).
+
+## Build status (2026-10-14)
+
+- vLLM **0.22.1** ships a native `dflash` speculative-decoding method
+  (`DFlashProposer` + `DFlashDraftModel`) that consumes the same draft
+  architecture this repo ports: block mask tokens embedded via the target's
+  input embeddings, auxiliary target hidden states, shared target
+  embed_tokens/lm_head.
+- Implemented here: `vlm_dflash/export/vllm_bridge.py` (export ->
+  speculators-format draft, weights copied unchanged, tensor
+  names/shapes validated, `bridge.json` + `VLLM_DRAFT.md` written),
+  `scripts/export_vllm_draft.py` (CLI), `scripts/vllm_bridge_check.py`
+  (two-phase target-only vs dflash greedy check + `llm.get_metrics()`
+  spec-decode accounting), `scripts/probe_divergence_margin.py` (near-tie
+  forensics), 5 CPU tests.
+- Verified end-to-end on the frozen 3B DFlash checkpoint: the draft loads
+  (`DFlashDraftModel`, aux layers `(2, 18, 34)` -> internal `(1, 17, 33)`,
+  mask 151669, n_spec 7), generation runs, metrics are readable.
+- **Not achieved:** token-exact greedy output. On 32 pinned prompts,
+  vLLM-dflash matched its own target-only output on 5/32; AL 1.4059 vs
+  in-repo sequential 1.6866/1.6924 on identical weights (+ margin probe shows
+  the traced flips are bf16 ulp-scale near-ties on the runtime verify path).
+  The remaining AL gap (-17%) is registered as the open blocker; until it is
+  closed, no vLLM number is quotable.
 
 ## Why "exported checkpoint" ≠ "serving-compatible"
 
@@ -30,7 +58,7 @@ different head than the one recorded in `target_contract.json`
 without any error. Any bridge must therefore consume `target_contract.json` and
 fail loudly on mismatch, exactly like `train`/`eval`/`export` already do.
 
-## Smallest honest first step
+## Smallest honest first step (status 2026-10-14: steps 1-3 implemented; step 4 gate NOT passed; step 5 not reached)
 
 Pick **one** target, **one** drafter, **one** runtime and build a thin adapter:
 
@@ -49,6 +77,11 @@ Pick **one** target, **one** drafter, **one** runtime and build a thin adapter:
 5. Only then measure latency (time-to-first-token, inter-token, tokens/forward)
    and state hardware + verification mode next to every number.
 
+What the WP5 build actually used: vLLM 0.22.1's native `dflash` method on
+Qwen2.5-VL-3B-Instruct (steps 1-3 done via the converter + harness); the
+step-4 gate failed (5/32 token-exact) and the residual AL gap is the
+registered blocker (`plan/WP5_REPORT.md`).
+
 ## What must not be claimed until it is real
 
 - No "vLLM/SGLang support" line in the README before a token-exact run exists
@@ -58,6 +91,9 @@ Pick **one** target, **one** drafter, **one** runtime and build a thin adapter:
 - No re-labeled AL: runtime acceptance must be measured with the same
   `AL = new_tokens / target_verification_steps` definition and the same prompt
   set as the in-repo numbers, otherwise the tables are not comparable.
+- No vLLM AL or latency table until the registered AL gap (1.4059 vs
+  1.6866/1.6924 on identical weights, `plan/WP5_REPORT.md`) is resolved and
+  the run is token-exact on the pinned prompt set.
 
 ## What the repo already provides for the bridge
 

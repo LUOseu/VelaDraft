@@ -146,6 +146,13 @@ class FeatureDataset(Dataset):
         # (the teacher signal for distillation trainers). Old stores return None.
         if record.get("final_hidden") is not None:
             item["final_hidden"] = record["final_hidden"]
+        # Multi-image / multi-turn records additionally carry the full span and
+        # turn bookkeeping; v1 stores (and their online equivalents) lack them.
+        if record.get("image_spans") is not None:
+            item["image_spans"] = [tuple(span) for span in record["image_spans"]]
+            item["n_turns"] = int(record.get("n_turns", 1))
+        if record.get("turn_spans") is not None:
+            item["turn_spans"] = [tuple(span) for span in record["turn_spans"]]
         return item
 
 

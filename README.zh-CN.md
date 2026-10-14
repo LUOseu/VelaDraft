@@ -30,8 +30,9 @@ VelaDraft 是面向多模态 block-parallel drafter 的统一训练工具，支�
 DSpark、Domino、JetSpec、DFlash2、DFlare 和 DFly。针对冻结的 Qwen-VL target，
 提供离线特征复用、在线特征提取、断点恢复、逐 token 输出验证和 checkpoint 导出。
 
-DFlare 与 DFly 已集成到 main。当前 DFly 使用共享的 block-CE 训练配方，
-上游两阶段训练配方作为独立能力继续补全。
+DFlare 与 DFly 已集成到 main。DFly 默认使用共享的 block-CE 训练配方，
+并可选择已移植的上游两阶段配方（`algorithm.train_recipe: upstream_two_stage`：
+LK / D-PACE 冷启动，随后 end-to-end TV 阶段）。
 
 - **多方法统一接口。** 七种 drafter 共用同一套 `train` / `eval` / `export`
   命令、checkpoint 格式与验证路径，方法对比建立在同一基底上。
@@ -112,16 +113,19 @@ vlm-dflash train-demo --target "$VLM_DFLASH_TARGET" --steps 80
 | [JetSpec](docs/algorithms/jetspec.md) | 因果块内 mask + teacher distillation | forward-KL |
 | [DFlash2](docs/algorithms/dflash2.md) | 局部卷积 + candidate selector | 实验性重建目标 |
 | [DFlare](docs/algorithms/dflare.md) | 逐 draft 层融合 + 独立 context K/V | 共享 block CE |
-| [DFly](docs/algorithms/dfly.md) | FC + fusion residual + hidden correction | CE 适配，上游完整配方待接入 |
+| [DFly](docs/algorithms/dfly.md) | FC + fusion residual + hidden correction | 默认 CE，或选择已移植的上游两阶段配方（`train_recipe`） |
 
 DFlare 与 DFly 已 **集成到 main**，并在两个 Qwen-VL target 上完成仓库内验证
 （Qwen2.5-VL-3B 全流程、Qwen3-VL-8B 小规模验证）；发布验证状态单独记录在
 [支持矩阵](SUPPORT_MATRIX.md)与[发布验证](RELEASE_VALIDATION.md)中。
 
-DFly 说明：训练使用共享 block-CE 配方（draft config、checkpoint 与导出中记录
-机器可读的 `objective_profile=controlled_ce`）；上游 LK/D-PACE → end-to-end TV
-配方未移植。推理时 block backbone 并行执行，hidden-states correction 与 LM-head
-投影按 slot 顺序、基于此前实际提议的 token 逐个执行——这是已说明的本地适配。
+DFly 说明：训练默认使用共享 block-CE 配方（draft config、checkpoint 与导出中
+记录机器可读的 `objective_profile=controlled_ce`）；设置
+`algorithm.train_recipe: upstream_two_stage` 可选择已移植的 LK/D-PACE →
+end-to-end TV 两阶段配方（需要 capture-v2 特征存储，
+`capture.store_final_hidden=true`）。推理时 block backbone 并行执行，
+hidden-states correction 与 LM-head 投影按 slot 顺序、基于此前实际提议的 token
+逐个执行——这是已说明的本地适配。
 
 DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpec 的生产 tree runtime
 未移植。各 target 的状态与能力细节见[支持矩阵](SUPPORT_MATRIX.md)、
@@ -129,28 +133,48 @@ DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpe
 
 ## 模型下载
 
-已发布的 **Qwen2.5-VL-3B-Instruct** drafter：
+已发布的 drafter 参考 checkpoint：
 
-| Drafter | 下载 | Model card |
-| --- | --- | --- |
-| **DFlash** · 冻结块草稿参考实现 | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash.md) |
-| **Domino** · GRU 修正 | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [详情](docs/zoo/qwen25vl-3b-domino.md) |
+| Drafter | Target | 下载 | Model card |
+| --- | --- | --- | --- |
+| **DFlash** · 冻结块草稿参考实现 | Qwen2.5-VL-3B | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash.md) |
+| **Domino** · GRU 修正 | Qwen2.5-VL-3B | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [详情](docs/zoo/qwen25vl-3b-domino.md) |
+| **DSpark** · Markov + confidence head | Qwen2.5-VL-3B | [487 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dspark.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dspark.md) |
+| **JetSpec** · forward-KL 蒸馏 | Qwen2.5-VL-3B | [370 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-jetspec.tar.gz) | [详情](docs/zoo/qwen25vl-3b-jetspec.md) |
+| **DFlash2** · 实验性训练目标 | Qwen2.5-VL-3B | [498 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflash2-exp.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash2-exp.md) |
+| **DFlare** · 可学习融合 + 专属 context K/V | Qwen2.5-VL-3B | [356 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflare.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflare.md) |
+| **DFly** · 共享 KV + hidden 修正 | Qwen2.5-VL-3B | [401 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dfly.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dfly.md) |
+| **DFlash** · 8B 规模 | Qwen3-VL-8B | [955 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen3vl-8b-dflash.tar.gz) | [详情](docs/zoo/qwen3vl-8b-dflash.md) |
 
 这些权重是**流水线验证用的参考产物**：按已记录的开发协议训练，用于跑通
-`训练 → 评测 → 导出`、集成工作和输出一致性检查，并非面向生产调优或充分训练的 drafter；
-它们产生的接受指标属于开发期测量，与训练协议及其余运行一并记录在
-[BENCHMARKS.md](BENCHMARKS.md)。两个 export 均在下载后重新通过 token-exact gate；见[发布证据](RELEASE_VALIDATION.md)。
+`训练 → 评测 → 导出`、集成工作和输出一致性检查，并非面向生产调优的 drafter；
+开发期测量与训练协议一并记录在 [BENCHMARKS.md](BENCHMARKS.md)。
+`zoo-v0.3.0` 的两个 export 在下载后重新通过 token-exact gate；`zoo-v0.3.1`
+的每个 export 在打包前均通过 `load_export` 重载校验；见[发布证据](RELEASE_VALIDATION.md)。
 
 每个压缩包包括权重、配置、算法 metadata、target contract、training manifest、model card 与文件校验值。
-其他算法可在本地训练并导出，当前未托管其 canonical checkpoints。
+七种 drafter 现在都有托管的参考 checkpoint；本地训练与导出不受影响。
 
 ## 训练自己的数据
 
-使用每行包含一张图片和一对问答的 JSONL 数据池。
+使用每行包含图片与问答的 JSONL 数据池。
 支持扁平字段、OpenAI 风格 `messages` 与 ShareGPT/LLaVA 风格 `conversations`。
 
 ```json
 {"id":"sample-001","image":"000001.jpg","question":"Describe this image in detail.","answer":"A red bicycle is parked beside a brick wall."}
+```
+
+多图 / 多轮行通过 schema v2 启用：扁平的 `images` 列表加 `image_turns`
+（每张图片所属的 conversation 下标，顺序与 `images` 一致）；整段对话会被保留，
+每个 assistant 轮次按 teacher-forced 历史逐轮贪心重生成：
+
+```json
+{"id":"sample-002","images":["a.jpg","b.jpg"],"image_turns":[0,2],
+ "conversations":[{"from":"human","value":"<image>\n第一张图里是什么？"},
+                  {"from":"gpt","value":"..."},
+                  {"from":"human","value":"<image>\n第二张呢？"},
+                  {"from":"gpt","value":"..."}],
+ "schema":"vlm-dflash-data-v2"}
 ```
 
 小规模端到端示例：
@@ -165,6 +189,7 @@ python examples/train_from_jsonl.py \
 完整参考配方：配置数据路径后运行 `vlm-dflash train --config configs/qwen2_5_vl_3b.yaml`。
 CLI 同时支持 `--algorithm`、`--resume` 与 `--set key=value` 覆盖。
 详见[示例](examples/README.md)、[数据 schema](vlm_dflash/data/schema.py)与[参考指南](docs/REFERENCE.md)。
+多轮 smoke 配置为 `configs/smoke_multiturn.yaml`（数据生成：`scripts/make_wp2_smoke_data.py`）。
 
 ### 方法专属 config
 
@@ -242,7 +267,9 @@ README 有意不展示小规模训练数字和算法排名：已记录的运行�
 
 ## 支持范围
 
-- **输入：** 单张图片 + 文本、单轮、贪心解码。
+- **输入：** 图片（一张或多张）+ 文本，单轮或多轮，贪心解码。schema v2（每行
+  多张图片、图片可挂到任意 user 轮次）已在记录的 E2 smoke 上为 DFlash
+  端到端验证；其余算法共用同一数据路径——见[支持矩阵](SUPPORT_MATRIX.md)脚注。
 - **Target：** 上述两种 Qwen-VL 模型；其他家族需要 adapter 和验证。
 - **硬件：** 实测参考为单张 48 GB GPU；24 GB preset 是建议配置，尚未在实际 24 GB 卡上验证。
 - **Serving：** 生产 vLLM/SGLang 集成仍为后续工作；[serving bridge](docs/serving-bridge.md)描述拟议交接方式。

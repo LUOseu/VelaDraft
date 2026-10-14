@@ -67,11 +67,15 @@ def _stub_contract(**overrides) -> dict:
     return contract
 
 
-def _stub_cfg(*, store_final_hidden: bool = False, seq_length: int = 64) -> dict:
+def _stub_cfg(*, store_final_hidden: bool = False, seq_length: int = 64,
+              online_batch_size: int | None = None) -> dict:
+    train: dict = {}
+    if online_batch_size is not None:
+        train["online_batch_size"] = int(online_batch_size)
     return {
         "target": {"dtype": "bfloat16", "attn_implementation": "sdpa"},
         "capture": {"seq_length": seq_length, "dtype": "bfloat16", "store_final_hidden": store_final_hidden},
-        "train": {},
+        "train": train,
     }
 
 
@@ -168,13 +172,16 @@ def _install_stub_extraction(monkeypatch, calls: list, *, store_final_hidden: bo
 
 
 def _stub_source(monkeypatch, run_dir, *, limit=None, contract=None, store_final_hidden=False,
-                 tied=True, target=None):
+                 tied=True, target=None, online_batch_size=None):
     contract = contract or _stub_contract()
     target = target or _StubTarget(tied=tied)
     processor = object()
     monkeypatch.setattr(online_module, "load_target", lambda cfg, contract_: (target, processor))
     return online_module.OnlineFeatureSource(
-        _stub_cfg(store_final_hidden=store_final_hidden), contract, run_dir, limit=limit
+        _stub_cfg(store_final_hidden=store_final_hidden, online_batch_size=online_batch_size),
+        contract,
+        run_dir,
+        limit=limit,
     )
 
 
@@ -641,6 +648,283 @@ def test_online_dataset_record_contract_and_reextraction(monkeypatch, tmp_path):
     assert not (run_dir / "features").exists()
 
 
+def _record_for_row(row: dict, *, context_hidden: int = 16) -> dict:
+    """Deterministic per-row stub record: the same row always yields the same tensors."""
+    prompt_len = len(row["regen"]["prompt_ids"])
+    answer_len = len(row["regen"]["answer_ids"])
+    length = prompt_len + answer_len
+    seed = sum(ord(character) for character in str(row.get("id", "")))
+    generator = torch.Generator().manual_seed(seed)
+    with torch.inference_mode():
+        return {
+            "input_ids": torch.arange(length, dtype=torch.int32),
+            "hidden": torch.randn(length, context_hidden, generator=generator, dtype=torch.bfloat16),
+            "position3": torch.zeros(3, length, dtype=torch.int32),
+            "image_span": (1, 4),
+            "n_image_tokens": 4,
+            "n_image_tokens_expected": 4,
+            "loss_mask": torch.cat(
+                (
+                    torch.zeros(prompt_len, dtype=torch.bool),
+                    torch.ones(answer_len, dtype=torch.bool),
+                )
+            ),
+            "sample_id": row.get("id"),
+        }
+
+
+def _install_batched_stub(monkeypatch, calls: list, *, context_hidden: int = 16):
+    """Stub both extraction halves with row-deterministic records.
+
+    The single-row path keeps its ``build_sample_record`` seam; the batched
+    path is stubbed at ``prepare`` (render half) and
+    ``finalize_prepared_records`` (forward half), so the real
+    ``extract_prepared`` plumbing and its counters stay under test.
+    """
+
+    def fake_build(model, processor, row, media_dir, *, layer_ids, image_token_id, merge_size,
+                   dtype, seq_length, store_final_hidden):
+        calls.append(("single", row.get("id")))
+        return _record_for_row(row, context_hidden=context_hidden)
+
+    def fake_prepare(self, index):
+        return {"row": self.rows[int(index)]}
+
+    def fake_finalize(model, prepared_list, *, layer_ids, image_token_id, merge_size, dtype,
+                      store_final_hidden, tokenizer=None):
+        calls.append(("batch", [item["row"].get("id") for item in prepared_list]))
+        return [_record_for_row(item["row"], context_hidden=context_hidden) for item in prepared_list]
+
+    monkeypatch.setattr(online_module, "build_sample_record", fake_build)
+    monkeypatch.setattr(online_module.OnlineFeatureSource, "prepare", fake_prepare)
+    monkeypatch.setattr(online_module, "finalize_prepared_records", fake_finalize)
+
+
+def _assert_same_record(left: dict, right: dict, *, ulp_scale: float | None = None) -> None:
+    """Compare two records; bf16 tensors may differ within ``ulp_scale`` bf16 steps.
+
+    The stub records must match bitwise (``ulp_scale=None``). Real bf16 target
+    forwards may round differently when a row shares one padded batch with a
+    longer row (attention reductions include masked positions), so the
+    tiny-model test allows a couple of bf16 mantissa steps on stored features
+    while still pinning every other field exactly.
+    """
+    assert set(left) == set(right)
+    for key, value in left.items():
+        other = right[key]
+        if not torch.is_tensor(value):
+            assert value == other, key
+        elif ulp_scale is not None and value.dtype == torch.bfloat16:
+            left_f, right_f = value.float(), other.float()
+            bound = torch.maximum(left_f.abs(), right_f.abs()) * (2.0**-8 * ulp_scale) + 2.0**-133
+            assert bool(((left_f - right_f).abs() <= bound).all()), key
+        else:
+            assert torch.equal(value, other), key
+
+
+def test_online_batched_fetch_matches_per_sample_records(monkeypatch, tmp_path):
+    """One batched forward must produce the same records as per-sample reads."""
+    run_dir = _write_online_run_dir(tmp_path)
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls)
+    source = _stub_source(monkeypatch, run_dir, online_batch_size=2)
+    assert source.dataset().batched_capture is True
+
+    per_sample = source.dataset()
+    single_zero = per_sample[0]
+    single_two = per_sample[2]
+    batched = source.dataset().fetch_batch([0, 2])
+    assert [record["sample_id"] for record in batched] == ["s0", "s2"]
+    _assert_same_record(single_zero, batched[0])
+    _assert_same_record(single_two, batched[1])
+
+    # Index order is preserved, not batch order.
+    reversed_records = source.dataset().fetch_batch([2, 0])
+    assert [record["sample_id"] for record in reversed_records] == ["s2", "s0"]
+
+    assert calls == [
+        ("single", "s0"),
+        ("single", "s2"),
+        ("batch", ["s0", "s2"]),
+        ("batch", ["s2", "s0"]),
+    ]
+    summary = source.summary()
+    assert summary["online_batch_size"] == 2
+    # Three target forward calls served four rows: the counters keep the
+    # forward-per-batch vs rows-per-batch distinction observable.
+    assert summary["target_forwards_total"] == 4
+    assert summary["target_samples_total"] == 6
+    assert summary["extractions"]["train"]["target_forwards"] == 4
+    assert summary["extractions"]["train"]["target_samples"] == 6
+
+
+def test_online_batched_fetch_fast_forward_placeholders(monkeypatch, tmp_path):
+    run_dir = _write_online_run_dir(tmp_path)
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls)
+    source = _stub_source(monkeypatch, run_dir, online_batch_size=2)
+    dataset = source.dataset()
+
+    dataset.start_fast_forward(1)
+    records = dataset.fetch_batch([0, 1, 2])
+    assert records[0]["sample_id"].startswith("fast-forward:")
+    assert [record["sample_id"] for record in records[1:]] == ["s1", "s2"]
+    # Only the real rows hit the batched extraction; the placeholder is free.
+    assert calls == [("batch", ["s1", "s2"])]
+
+    # A fully-skipped batch performs no target work at all.
+    dataset.start_fast_forward(2)
+    records = dataset.fetch_batch([0, 1])
+    assert all(record["sample_id"].startswith("fast-forward:") for record in records)
+    assert calls == [("batch", ["s1", "s2"])]
+    dataset.end_fast_forward()
+
+    records = dataset.fetch_batch([3])
+    assert records[0]["sample_id"] == "s3"
+    summary = source.summary()
+    assert summary["target_forwards_total"] == 2
+    assert summary["target_samples_total"] == 3
+
+
+class _OrderRecordDataset(torch.utils.data.Dataset):
+    """Index-only dataset used to pin sampler order; records every batched fetch."""
+
+    def __init__(self, size: int):
+        self.size = size
+        self.fetches: list[list[int]] = []
+
+    def __len__(self) -> int:
+        return self.size
+
+    def __getitem__(self, index):
+        return {"index": torch.tensor([int(index)])}
+
+    def fetch_batch(self, indices):
+        self.fetches.append([int(index) for index in indices])
+        return [self[int(index)] for index in indices]
+
+
+def test_online_batch_iterator_reproduces_dataloader_order():
+    """The batched iterator must chunk exactly like the DataLoader it replaces."""
+    from torch.utils.data import DataLoader, default_collate
+
+    from vlm_dflash.target.online import OnlineBatchIterator
+
+    def index_orders(loader) -> list[list[int]]:
+        return [batch["index"].flatten().tolist() for batch in loader]
+
+    for shuffle in (False, True):
+        for size, batch_size in ((7, 3), (6, 3), (2, 4)):
+            reference = DataLoader(
+                _OrderRecordDataset(size),
+                batch_size=batch_size,
+                shuffle=shuffle,
+                generator=torch.Generator().manual_seed(11),
+                drop_last=False,
+                num_workers=0,
+            )
+            iterator = OnlineBatchIterator(
+                _OrderRecordDataset(size),
+                default_collate,
+                batch_size=batch_size,
+                shuffle=shuffle,
+                generator=torch.Generator().manual_seed(11),
+            )
+            assert len(iterator) == len(reference)
+            # Two epochs: the shared generator must advance identically too.
+            for _ in range(2):
+                assert index_orders(iterator) == index_orders(reference)
+
+
+def test_online_batch_iterator_splits_training_batches_into_capture_groups():
+    """online_batch_size caps rows per target forward: a batch of 5 with N=2 fetches 2+2+1."""
+    from torch.utils.data import default_collate
+
+    from vlm_dflash.target.online import OnlineBatchIterator
+
+    dataset = _OrderRecordDataset(5)
+    iterator = OnlineBatchIterator(
+        dataset,
+        default_collate,
+        batch_size=5,
+        shuffle=False,
+        generator=torch.Generator().manual_seed(0),
+        capture_batch=2,
+    )
+    batches = [batch["index"].flatten().tolist() for batch in iterator]
+    assert batches == [[0, 1, 2, 3, 4]]
+    assert dataset.fetches == [[0, 1], [2, 3], [4]]
+
+    # A capture group larger than the training batch is capped by the batch.
+    dataset = _OrderRecordDataset(5)
+    iterator = OnlineBatchIterator(
+        dataset,
+        default_collate,
+        batch_size=5,
+        shuffle=False,
+        generator=torch.Generator().manual_seed(0),
+        capture_batch=16,
+    )
+    assert [batch["index"].flatten().tolist() for batch in iterator] == [[0, 1, 2, 3, 4]]
+    assert dataset.fetches == [[0, 1, 2, 3, 4]]
+
+
+class _BatchedFetchDataset(torch.utils.data.Dataset):
+    """Online-like dataset double that only exposes the batched capture seam."""
+
+    require_main_process = True
+
+    def __init__(self, items: list[dict]):
+        self.items = items
+        self.fetches: list[list[int]] = []
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+    @property
+    def batched_capture(self) -> bool:
+        return True
+
+    def fetch_batch(self, indices):
+        self.fetches.append([int(index) for index in indices])
+        return [self.items[int(index)] for index in indices]
+
+    def __getitem__(self, index):
+        raise AssertionError("the batched path must fetch batches, not index samples")
+
+
+def test_training_loop_maps_subset_indices_for_batched_online_capture():
+    """A Subset (overfit-sanity slice) samples subset-local indices; batch fetch maps them back."""
+    from torch.utils.data import Subset
+
+    dataset = _BatchedFetchDataset(_tiny_train_items(count=4))
+    order = [2, 0, 3, 1]
+    run_training_loop(
+        _tiny_dflash_module(),
+        Subset(dataset, order),
+        {
+            "train": {
+                "micro_batch_size": 2,
+                "grad_accumulation_steps": 1,
+                "num_epochs": 1,
+                "lr": 1e-3,
+                "log_every_steps": 0,
+                "max_grad_norm": 1.0,
+                "warmup_ratio": 0.1,
+                "min_lr_ratio": 0.1,
+                "draft_dtype": "float32",
+            }
+        },
+        {"tokens": {"image_token_id": 999999}},
+        torch.device("cpu"),
+        total_steps=2,
+        seed=11,
+        shuffle=False,
+        log_path=None,
+    )
+    assert [index for batch in dataset.fetches for index in batch] == order
+
+
 def test_online_source_refuses_unfrozen_or_empty_inputs(monkeypatch, tmp_path):
     run_dir = _write_online_run_dir(tmp_path)
     calls: list = []
@@ -673,6 +957,26 @@ def test_online_digest_tracks_data_and_ignores_model_path(monkeypatch, tmp_path)
     other_run = _write_online_run_dir(tmp_path / "other", rows=4, answer_len=16)
     assert _stub_source(monkeypatch, other_run).digest() != first
     assert _stub_source(monkeypatch, run_dir, limit=2).digest() != first
+
+
+def test_online_digest_records_online_batch_size(monkeypatch, tmp_path):
+    """A batched run must not resume into a per-sample one (grouping changes numerics)."""
+    run_dir = _write_online_run_dir(tmp_path)
+    _install_stub_extraction(monkeypatch, [])
+    default = _stub_source(monkeypatch, run_dir)
+    assert default.online_batch_size == 1
+    assert default.dataset().batched_capture is False
+
+    # Explicit batch size 1 stays byte-identical to the historical digest
+    # (the field is only folded in when > 1).
+    explicit_one = _stub_source(monkeypatch, run_dir, online_batch_size=1)
+    assert explicit_one.digest() == default.digest()
+
+    batched = _stub_source(monkeypatch, run_dir, online_batch_size=3)
+    assert batched.online_batch_size == 3
+    assert batched.dataset().batched_capture is True
+    assert batched.digest() != default.digest()
+    assert batched.summary()["online_batch_size"] == 3
 
 
 def test_online_digest_v2_covers_token_values_and_image_bytes(monkeypatch, tmp_path):
@@ -1054,6 +1358,178 @@ def test_tiny_qwen25_online_capture_matches_offline_store(monkeypatch, tmp_path)
         assert torch.equal(online_batch[key], offline_batch[key]), key
 
 
+class _FakeCharProcessor:
+    """Char-level processor with a strictly concatenative chat template (WP2 contract).
+
+    Unlike ``_FakeVLProcessor`` (single image), this double expands every
+    ``<IMG>`` marker into its own vision span / pixel rows, so schema-v2
+    multi-image rows render exactly like a real Qwen-VL processor would.
+    """
+
+    image_token_id = 500
+    vision_start_token_id = 501
+    vision_end_token_id = 502
+    patch = 14
+    temporal = 2
+    merge = 2
+
+    def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=True):
+        assert not tokenize
+        parts = []
+        for message in messages:
+            parts.append("\x01" if message["role"] == "user" else "\x02")
+            content = message["content"]
+            if isinstance(content, list):
+                for part in content:
+                    parts.append("<IMG>" if part["type"] == "image" else part["text"])
+            else:
+                parts.append(content)
+            parts.append("\x03")
+        if add_generation_prompt:
+            parts.append("\x02")
+        return "".join(parts)
+
+    def _image(self, image):
+        import numpy as np
+
+        array = np.asarray(image.convert("RGB"), dtype="float32") / 255.0
+        grid_h, grid_w = image.height // self.patch, image.width // self.patch
+        patches = array.reshape(grid_h, self.patch, grid_w, self.patch, 3)
+        patches = patches.transpose(0, 2, 1, 3, 4).reshape(grid_h * grid_w, self.patch * self.patch * 3)
+        pixels = torch.tensor(patches).repeat(1, self.temporal)
+        grid = torch.tensor([[1, grid_h, grid_w]], dtype=torch.long)
+        tokens = grid_h * grid_w // (self.merge * self.merge)
+        return tokens, pixels, grid
+
+    def __call__(self, text, images, return_tensors="pt"):
+        assert return_tensors == "pt"
+        text = text[0] if isinstance(text, (list, tuple)) else text
+        images = list(images)
+        ids, mm_types, pixel_rows, grids = [], [], [], []
+        position, image_index = 0, 0
+        while position < len(text):
+            if text.startswith("<IMG>", position):
+                tokens, pixels, grid = self._image(images[image_index])
+                ids.extend([self.vision_start_token_id, *([self.image_token_id] * tokens), self.vision_end_token_id])
+                mm_types.extend([0, *([1] * tokens), 0])
+                pixel_rows.append(pixels)
+                grids.append(grid)
+                image_index += 1
+                position += 5
+                continue
+            ids.append(ord(text[position]))
+            mm_types.append(0)
+            position += 1
+        assert image_index == len(images), "fewer <IMG> markers than images passed"
+        return {
+            "input_ids": torch.tensor([ids], dtype=torch.long),
+            "attention_mask": torch.ones((1, len(ids)), dtype=torch.long),
+            "pixel_values": torch.cat(pixel_rows, dim=0) if pixel_rows
+            else torch.zeros((0, self.patch * self.patch * 3 * self.temporal)),
+            "image_grid_thw": torch.cat(grids, dim=0) if grids else torch.zeros((0, 3), dtype=torch.long),
+            "mm_token_type_ids": torch.tensor([mm_types], dtype=torch.long),
+        }
+
+
+def _write_mixed_online_rows(tmp_path: Path, processor) -> Path:
+    """Run dir with one v1 single-image row and one v2 two-image two-turn row."""
+    from vlm_dflash.target.prompts import encode_prompt, messages_from_row, render_conversation
+
+    run_dir = tmp_path / "run"
+    media_dir = run_dir / "data" / "images"
+    media_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "data" / "meta.json").write_text(json.dumps({"media_dir": "images"}), encoding="utf-8")
+    Image.new("RGB", (56, 56), (10, 20, 30)).save(media_dir / "a.png")
+    Image.new("RGB", (84, 84), (60, 70, 80)).save(media_dir / "b.png")
+
+    single = {
+        "id": "s-single",
+        "conversations": [
+            {"from": "human", "value": "q-single"},
+            {"from": "gpt", "value": "answer"},
+        ],
+        "images": ["a.png"],
+        "regen": {
+            "prompt_ids": encode_prompt(processor, "q-single", Image.open(media_dir / "a.png"))["input_ids"][
+                0
+            ].tolist(),
+            "answer_ids": [100 + step for step in range(12)],
+        },
+    }
+
+    multi = {
+        "id": "s-multi",
+        "schema": "vlm-dflash-data-v2",
+        "conversations": [
+            {"from": "human", "value": "<image>\nq0"},
+            {"from": "gpt", "value": "dataset0"},
+            {"from": "human", "value": "q1 <image>"},
+            {"from": "gpt", "value": "dataset1"},
+        ],
+        "images": ["a.png", "b.png"],
+        "image_turns": [0, 2],
+    }
+    images = [Image.open(media_dir / name).convert("RGB") for name in multi["images"]]
+    overrides: dict[int, str] = {}
+    turns, full_ids, spans = [], [], []
+    for message_index, answer in zip((1, 3), ("one", "two")):
+        messages, image_indices = messages_from_row(multi, assistant_overrides=overrides, upto=message_index)
+        text = render_conversation(processor, messages, add_generation_prompt=True)
+        inputs = processor(text=[text], images=[images[position] for position in image_indices])
+        prompt_ids = inputs["input_ids"][0].tolist()
+        answer_ids = [ord(character) for character in answer] + [3]
+        full_ids.extend(prompt_ids[len(full_ids) :])
+        full_ids.extend(answer_ids)
+        spans.append([len(full_ids) - len(answer_ids), len(full_ids)])
+        overrides[message_index] = answer
+        turns.append(
+            {
+                "prompt_ids": prompt_ids,
+                "answer_ids": answer_ids,
+                "answer_text": answer,
+                "stop_token_id": 3,
+                "forced_stop": False,
+            }
+        )
+    multi["regen"] = {"turns": turns, "full_ids": full_ids, "answer_spans": spans, "n_turns": 2, "forced_stop": 0}
+
+    write_jsonl(run_dir / "regen" / "target_data.jsonl", [single, multi])
+    return run_dir
+
+
+def test_tiny_qwen25_batched_capture_matches_per_sample(monkeypatch, tmp_path):
+    """Batched capture must reproduce per-sample records, padding and multi-span included."""
+    model, _ = _tiny_qwen25_vl_model()
+    processor = _FakeCharProcessor()
+    contract = _tiny_contract()
+    run_dir = _write_mixed_online_rows(tmp_path, processor)
+    monkeypatch.setattr(online_module, "load_target", lambda cfg, contract_: (model, processor))
+    source = online_module.OnlineFeatureSource(_stub_cfg(store_final_hidden=True), contract, run_dir)
+
+    per_sample = source.dataset()
+    single = per_sample[0]
+    multi = per_sample[1]
+    assert single["input_ids"].numel() != multi["input_ids"].numel()  # batching must pad
+    assert multi["n_turns"] == 2 and len(multi["image_spans"]) == 2
+    assert multi["final_hidden"].shape[0] == multi["input_ids"].numel()
+
+    batched = source.dataset().fetch_batch([0, 1])
+    assert [record["sample_id"] for record in batched] == ["s-single", "s-multi"]
+    _assert_same_record(single, batched[0], ulp_scale=2.0)
+    _assert_same_record(multi, batched[1], ulp_scale=2.0)
+    # Padded positions never reach a record: lengths stay per-row.
+    assert batched[0]["input_ids"].numel() == single["input_ids"].numel()
+    assert batched[1]["input_ids"].numel() == multi["input_ids"].numel()
+
+    reversed_records = source.dataset().fetch_batch([1, 0])
+    assert [record["sample_id"] for record in reversed_records] == ["s-multi", "s-single"]
+    _assert_same_record(multi, reversed_records[0], ulp_scale=2.0)
+
+    summary = source.summary()
+    assert summary["target_forwards_total"] == 4  # 2 per-sample + 2 batched calls
+    assert summary["target_samples_total"] == 6
+
+
 def _dflash_module_from_online_source(source, contract, *, block_size=8, num_anchors=16):
     """Mirror factory.build_trainer_module: frozen head copies in target dtype."""
     from vlm_dflash.dflash.draft_model import Qwen3DFlashDraftModel
@@ -1194,7 +1670,7 @@ def test_online_capture_rejects_prompt_drift_and_token_count_mismatch(monkeypatc
     from vlm_dflash.target import sample_capture as sample_capture_module
 
     def fake_forward(model_, inputs, full_ids, layer_ids, image_token_id, dtype, merge_size=2,
-                     store_final_hidden=False):
+                     store_final_hidden=False, tokenizer=None):
         length = int(full_ids.numel())
         return {
             "input_ids": full_ids.to(torch.int32),

@@ -35,7 +35,7 @@ class DFlashAlgorithm(DrafterAlgorithm):
             "port_notes": "docs/REFERENCE.md",
             "algorithm_doc": "docs/algorithms/dflash.md",
         },
-        capabilities={"image": True, "multi_image": False, "video": False, "eval": True, "export": True},
+        capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "validated"},
     )
 
@@ -61,6 +61,9 @@ class DFlashAlgorithm(DrafterAlgorithm):
         gamma = float(drafter.get("loss_decay_gamma", 7.0))
         if gamma <= 0:
             raise ValueError(f"drafter.loss_decay_gamma must be > 0, got {gamma}.")
+        from ..objectives import assert_recipe_capture, resolve_recipe
+
+        assert_recipe_capture(resolve_recipe(cfg, self.name), cfg, algorithm_name=self.name)
 
     # ------------------------------------------------------------------ #
     # training side
@@ -80,13 +83,22 @@ class DFlashAlgorithm(DrafterAlgorithm):
         lm_head_weight: torch.Tensor | None = None,
     ):
         from ..dflash.factory import build_trainer_module
+        from ..objectives import resolve_recipe
 
         return build_trainer_module(
-            draft_config, contract, cfg, embed_weight, lm_head_weight=lm_head_weight
+            draft_config,
+            contract,
+            cfg,
+            embed_weight,
+            lm_head_weight=lm_head_weight,
+            module_kwargs={"train_recipe": resolve_recipe(cfg, self.name)},
         )
 
     def checkpoint_metadata(self, contract: dict, cfg: dict, draft_config) -> dict:
+        from ..objectives import resolve_recipe
+
         drafter = cfg["drafter"]
+        recipe = resolve_recipe(cfg, self.name)
         return {
             "draft_config": draft_config.to_dict(),
             "attention_backend": str(drafter.get("attention_backend", "flex_attention")),
@@ -95,6 +107,7 @@ class DFlashAlgorithm(DrafterAlgorithm):
             "num_anchors": int(drafter.get("num_anchors", 256)),
             "loss_decay_gamma": float(drafter.get("loss_decay_gamma", 7.0)),
             "target_layer_ids": [int(x) for x in contract["layers"]["draft_layer_ids"]],
+            "train_recipe": None if recipe is None else recipe.as_dict(),
         }
 
     # ------------------------------------------------------------------ #

@@ -104,16 +104,21 @@ def _iter_jsonl(cfg: dict) -> list[dict]:
     dataset = cfg["dataset"]
     images_dir = dataset.get("jsonl_images_dir") or dataset.get("images_dir")
     examples = iter_jsonl(dataset["path"], images_dir=images_dir)
-    return [
-        {
+    pool = []
+    for example in examples:
+        entry = {
             "src_index": example.src_index,
             "sample_id": example.id,
             "question": example.question,
             "answer": example.answer,
             "image_path": example.image_path,
         }
-        for example in examples
-    ]
+        if example.is_conversation:
+            entry["conversations"] = example.conversations
+            entry["image_paths"] = example.image_paths
+            entry["image_turns"] = example.image_turns
+        pool.append(entry)
+    return pool
 
 
 def _iter_hf(cfg: dict) -> list[dict]:
@@ -143,15 +148,18 @@ def _iter_hf(cfg: dict) -> list[dict]:
             example = normalize_row(raw, index=src_index, row_dir=image_root)
             if len(example.answer) < min_chars:
                 continue
-            pool.append(
-                {
-                    "src_index": src_index,
-                    "sample_id": example.id,
-                    "question": example.question,
-                    "answer": example.answer,
-                    "image_path": example.image_path,
-                }
-            )
+            entry = {
+                "src_index": src_index,
+                "sample_id": example.id,
+                "question": example.question,
+                "answer": example.answer,
+                "image_path": example.image_path,
+            }
+            if example.is_conversation:
+                entry["conversations"] = example.conversations
+                entry["image_paths"] = example.image_paths
+                entry["image_turns"] = example.image_turns
+            pool.append(entry)
         return pool
 
     question_col = hf.get("question_col", "question")
@@ -214,6 +222,38 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
         rows_out = []
         for index in indices:
             sample = pool[index]
+            if sample.get("conversations") is not None:
+                dst_names = []
+                for src_image in sample["image_paths"]:
+                    dst_name = f"{sample['sample_id']}_{src_image.name}"
+                    dst = images_out / dst_name
+                    if not dst.exists():
+                        shutil.copyfile(src_image, dst)
+                    dst_names.append(dst_name)
+                rows_out.append(
+                    {
+                        "id": sample["sample_id"],
+                        "conversations": sample["conversations"],
+                        "images": dst_names,
+                        "image_turns": list(sample["image_turns"]),
+                        "schema": "vlm-dflash-data-v2",
+                    }
+                )
+                manifest_rows.append(
+                    {
+                        "id": sample["sample_id"],
+                        "split": "train" if jsonl_name == "data.jsonl" else "val",
+                        "src_index": sample["src_index"],
+                        "image": dst_names[0],
+                        "images": dst_names,
+                        "image_sha256_list": [sha256_file(images_out / name) for name in dst_names],
+                        "question_chars": sum(
+                            len(turn["value"]) for turn in sample["conversations"] if turn["from"] == "human"
+                        ),
+                        "answer_chars": len(sample["answer"]),
+                    }
+                )
+                continue
             src_image = sample["image_path"]
             dst_name = f"{sample['sample_id']}_{src_image.name}"
             dst = images_out / dst_name

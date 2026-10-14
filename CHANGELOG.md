@@ -5,6 +5,75 @@
 - Repository renamed to `github.com/LUOseu/VelaDraft` (old `vlm-dflash` URLs
   redirect); the distribution name and CLI stay `vlm-dflash`.
 
+### CI / packaging fix: `num2words` dependency
+
+- `num2words` is now a declared runtime dependency (`pyproject.toml`): the
+  transformers SmolVLM processor requires it at construction time (so the
+  SmolVLM2 target path needs it), and the CPU-test CI environment - which
+  installs `.[tested,dev]` - was missing it, erroring all five
+  `tests/test_smolvlm_adapter.py` tests with `ImportError`.
+
+### Schema v2: multi-image / multi-turn
+
+- Data schema v2: rows with `image_turns` (or the `vlm-dflash-data-v2`
+  marker) keep the full conversation and a flat `images` list; every image is
+  rendered at the start of the turn it is attached to. v1 rows and every v1
+  record stay byte-compatible (`vlm_dflash/data/schema.py`,
+  `data/sharegpt.py`, `data/prepare.py`).
+- Regen generates each assistant turn greedily conditioned on the
+  previously *generated* turns, stores per-turn ids plus an incremental
+  `full_ids`, and asserts the concatenation against one full-conversation
+  render (fail-loud on chat-template drift). Answers that hit
+  `max_new_tokens` get the primary stop appended (counted as `forced_stop` in
+  `regen_stats.json`).
+- Capture records `image_spans` / `n_images` / per-image expected token
+  counts, `turn_spans` and a multi-segment `loss_mask`; `index.jsonl` rows
+  gain `image_spans` + `n_turns`, manifests gain `schema_version` +
+  `num_multi_turn`. The visual-path swap check, eval prompts, online digest
+  and FeatureDataset/OnlineFeatureDataset pass the new fields through;
+  collate and trainers are unchanged (loss_mask/image_mask were already
+  multi-segment capable).
+- Algorithms declare `multi_image: true`; the support-matrix footnote scopes
+  the evidence.
+- Tests: 14 new CPU tests (`tests/test_wp2_multiturn.py`, 349 total).
+- Recorded evidence: E2 smoke `R-20261014-08` - synthetic 2-image / 2-turn
+  JSONL (16 train + 4 val) through prepare -> regen -> capture ->
+  32-step train -> sequential verify; capture visual swap check passed
+  (512/512 image tokens across two spans, replay bitwise equal) and eval
+  token-exact 4/4 for both `ckpt_final` and `ckpt_init`
+  (`configs/smoke_multiturn.yaml`). Smoke-scale only; no quality or speed
+  claim follows from it.
+
+### DocVQA / ChartQA benchmark adapters
+
+- `scripts/prepare_benchmark.py` gains `--workload docvqa` (`lmms-lab/DocVQA`
+  DocVQA/validation) and `--workload chartqa` (`lmms-lab/ChartQA` test):
+  deterministic 128-prompt seeded exports (seed 42) with per-shard /
+  per-row question/image hashes, pinned prompt set definitions under
+  `benchmarks/prompts/`, images named by content suffix. Adapter export is
+  covered by CPU tests on synthetic parquet fixtures.
+- Manifests `03_docvqa` / `04_chartqa` are `validated`: E3
+  (`R-20261014-10`) ran both 128-prompt / 64-token protocols against the
+  frozen 3B/2K DFlash checkpoint - DocVQA AL 1.201, ChartQA AL 1.221, both
+  token-exact 128/128 (sequential parity). Numbers in `BENCHMARKS.md`.
+
+### Batched online capture
+
+- `feature_mode=online` gains an opt-in batched capture forward
+  (`train.online_batch_size: N`, default 1 = the per-sample reference path):
+  rows are rendered per sample, one padded target forward serves the batch,
+  and each record keeps its row's own length / spans (padding never reaches a
+  record). The trainer uses an internal iterator that reproduces the
+  per-sample `DataLoader` order (same seeded `RandomSampler` + `BatchSampler`
+  sequence), so enabling batching does not change batch composition.
+- `train_summary.json` / the online manifest now expose
+  `online_batch_size` and `target_samples` / `target_samples_total` next to
+  the forward counters (they diverge only when batching is on); a batch size
+  > 1 is folded into the online source digest so exact resume cannot switch
+  grouping. CPU tests pin batched-vs-per-sample record equality on a tiny
+  Qwen2.5-VL target (single-image + schema-v2 multi-image/multi-turn rows)
+  and DataLoader order parity across epochs.
+
 ### DFlare / DFly (AngelSpec ports)
 
 - New algorithms `dflare` and `dfly`, ported from `Tencent/AngelSpec @
@@ -15,7 +84,8 @@
   - DFly: DFlash shared-KV layers + FC context + fusion residual + zero-init
     TreeFlash hidden-states correction applied before the frozen LM head
     (`sample_from_anchor=false`); the upstream two-stage LK/D-PACE objective
-    and e2e-TV are **not** ported (documented in `docs/upstream/dfly.md`).
+    and e2e-TV are ported as the config-selectable `algorithm.train_recipe`
+    (see the subsection below; documented in `docs/upstream/dfly.md`).
 - Feature contract: explicit-id layer slicing — one capture superset
   (`[1, 9, 17, 25, 33]`) serves the matched comparison (`[1, 17, 33]`, the
   frozen DFlash routing) and the upstream 5-layer recipe;
@@ -43,6 +113,60 @@
   the hidden-states correction carries +0.113) and Qwen3-VL-8B reduced
   validation (DFlare 1.185, DFly 1.226), all token-exact; numbers in
   `BENCHMARKS.md` and `benchmarks/results/zoo_canonical.{json,csv}`.
+
+### DFly upstream training recipe (LK / D-PACE cold start -> e2e TV)
+
+- New objectives module `vlm_dflash/objectives.py`: exact ports of the
+  AngelSpec / LightSeek loss math after the pinned commit (D-PACE position
+  weights from per-position confidences, LK in `hybrid` and `alpha` forms,
+  the end-to-end multi-step TV term over the block prefix product, per-slot
+  CE), all chunked in fp32 so full-vocab tensors never materialize at once.
+- `algorithm.train_recipe` selects the objective per run (a name or
+  `{name, cold_start_fraction}`); `upstream_two_stage` runs stage 1
+  (LK + D-PACE, no CE) for the configured fraction of the planned steps and
+  stage 2 (D-PACE CE + e2e TV) after it. Default stays the shared decayed
+  block CE (`controlled_ce`), byte-identical plan digests for runs that do
+  not set the key.
+- Teacher signal: recipe stages consume the target's captured final hidden
+  states (`capture.store_final_hidden=true` / `stores_final_hidden=true`);
+  training refuses a source without it up front, checkpoints record the
+  recipe (`train_recipe`, `objective_profile` = recipe name) and exact resume
+  refuses a changed recipe/stage (plan digest + stage gate).
+- Config: `configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml` (two-stage recipe on the
+  upstream 5-layer context; reuses a same-identity capture-v2 store).
+- Tests: `tests/test_objectives.py` (36 tests: bounded resolution schema,
+  plan-digest sensitivity, formula parity against direct references, chunk
+  invariance, stage switching, teacher requirement, resume gating, and an
+  end-to-end tiny-target recipe run + refusal paths).
+- Canonical 2K result (`R-20261014-11`): AL **1.839** vs the controlled_ce
+  record 1.682 (+0.157 / +9.3%) on the same store, seed and 792-step
+  protocol - every slot above the shared-CE run, token-exact 128/128, export
+  `objective_profile=upstream_two_stage` reloads token-exact via
+  `demo --drafter`. Costs and the side-by-side table: `docs/training-costs.md`
+  (new); run details: `docs/plan/RUN_LOG.md`.
+
+### Model Zoo v0.3.1 and the demo reload path
+
+- `zoo-v0.3.1` publishes six canonical archives (DSpark, JetSpec, DFlash2-exp,
+  DFlare, DFly on Qwen2.5-VL-3B; DFlash 8B on Qwen3-VL-8B) plus `SHA256SUMS`;
+  the README zoo table and the per-archive pages under `docs/zoo/` link them
+  as reference artifacts for pipeline validation.
+- Clean re-download verification: all six archives re-fetched from the public
+  release URL are sha256-identical to the upload set and their inner
+  `checksums.json` verify; the DFly and DFlare archives reload through
+  `demo --drafter` in fresh directories, token-exact 4/4 vs target-only
+  greedy (see `RELEASE_VALIDATION.md`).
+- Fix: `demo --drafter` now adopts the drafter's recorded capture layer list
+  and, for DFlare/DFly, the consumed context subset, so exports trained on a
+  5-layer feature store load out of the box (previously refused by the target
+  identity gate); `examples/score_pretrained.py` shares the alignment and
+  regression tests cover legacy exports.
+- `zoo-v0.3.2` adds the DFly upstream-recipe checkpoint
+  (`qwen25vl-3b-dfly-recipe`, 401 MB, code commit `6ad8500`,
+  `objective_profile=upstream_two_stage`) as the recipe companion to the
+  `zoo-v0.3.1` shared-CE DFly archive; clean re-download verified (sha256,
+  inner checksums 7/7, `load_export`, fresh-dir `demo --drafter` token-exact
+  4/4).
 
 ### Online training: live target feature extraction
 

@@ -143,7 +143,7 @@ def gather_train_state(module, master_parameters, optimizer, scheduler, *, step,
     All tensors are cloned (``.cpu()`` alone does not copy on CPU devices), so
     the returned payload stays valid while training continues past the save.
     """
-    return {
+    state = {
         "format": "vlm-dflash-train-state-v1",
         "step": int(step),
         "micro_step": int(micro_step),
@@ -160,6 +160,25 @@ def gather_train_state(module, master_parameters, optimizer, scheduler, *, step,
         "torch_rng_state": torch.get_rng_state(),
         "cuda_rng_states": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
     }
+    # Recipe runs record their schedule position so a resume cannot silently
+    # cross a stage boundary. The stage is computed from the *committed* step
+    # (the same step the resumed run's progress hook will feed the module),
+    # not from the module's live index, which still refers to the stage of the
+    # step that just finished.
+    recipe = getattr(module, "train_recipe", None)
+    if recipe is not None:
+        state["recipe_stage"] = int(recipe.stage_index(int(step), int(steps_total_planned)))
+    return state
+
+
+def _expected_recipe_stage(cfg: dict, algorithm_name: str, *, step: int, total_steps: int) -> int | None:
+    """The stage a run with ``cfg`` computes at ``step`` (``None`` without a recipe)."""
+    from ..objectives import resolve_recipe
+
+    recipe = resolve_recipe(cfg, algorithm_name)
+    if recipe is None:
+        return None
+    return int(recipe.stage_index(int(step), int(total_steps)))
 
 
 def run_training_loop(
@@ -198,15 +217,45 @@ def run_training_loop(
         )
     spatial = bool(getattr(module, "uses_multimodal_position_ids", getattr(module.draft_model, "spatial_rope_enabled", False)))
     generator = torch.Generator().manual_seed(seed)
-    loader = DataLoader(
-        dataset,
-        batch_size=micro_batch,
-        shuffle=shuffle,
-        generator=generator,
-        collate_fn=lambda batch: collate_features(batch, image_token_id),
-        drop_last=False,
-        num_workers=num_workers,
-    )
+    base_fetch_batch = getattr(base_dataset, "fetch_batch", None)
+    if base_fetch_batch is not None and getattr(base_dataset, "batched_capture", False):
+        # Online batched capture: fetch_batch extracts one batch per target
+        # forward while walking the same sampler order as the per-sample path
+        # (see OnlineBatchIterator). Subset wrappers (the overfit-sanity slice)
+        # sample subset-local indices, so map them back to base indices.
+        from ..target.online import OnlineBatchIterator
+
+        subset_wrappers = []
+        node = dataset
+        while node is not base_dataset:
+            subset_wrappers.append(node)
+            node = node.dataset
+
+        def fetch_batch(indices, _wrappers=tuple(subset_wrappers), _base_fetch=base_fetch_batch):
+            mapped = [int(index) for index in indices]
+            for wrapper in _wrappers:
+                mapped = [int(wrapper.indices[item]) for item in mapped]
+            return _base_fetch(mapped)
+
+        loader = OnlineBatchIterator(
+            dataset,
+            lambda records: collate_features(records, image_token_id),
+            batch_size=micro_batch,
+            shuffle=shuffle,
+            generator=generator,
+            capture_batch=int(train_cfg.get("online_batch_size", 1)),
+            fetch_batch=fetch_batch,
+        )
+    else:
+        loader = DataLoader(
+            dataset,
+            batch_size=micro_batch,
+            shuffle=shuffle,
+            generator=generator,
+            collate_fn=lambda batch: collate_features(batch, image_token_id),
+            drop_last=False,
+            num_workers=num_workers,
+        )
     steps_per_epoch = max(1, math.ceil(len(loader) / accumulation))
     if total_steps is None:
         total_steps = steps_per_epoch * epochs
@@ -560,6 +609,7 @@ def validate_resume_state(
     contract: dict,
     plan_version: str,
     plan_digest: str,
+    recipe_stage: int | None = None,
 ) -> None:
     """Refuse resuming across algorithm / feature-mode / data / plan changes.
 
@@ -635,6 +685,24 @@ def validate_resume_state(
             "loss knobs / dataset length). Exact resume requires the original plan; start a new run "
             "directory or retrain instead."
         )
+    recorded_recipe_stage = resume_state.get("recipe_stage")
+    if (recorded_recipe_stage is None) != (recipe_stage is None):
+        written = (
+            "no recipe stage" if recorded_recipe_stage is None else f"recipe stage {int(recorded_recipe_stage)}"
+        )
+        wanted = "no recipe" if recipe_stage is None else f"recipe stage {int(recipe_stage)}"
+        raise ValueError(
+            f"Resume recipe mismatch: the checkpoint records {written} but this run resolves {wanted}. "
+            "Recipe schedules are not cross-resumable; start a new run directory or restore the original "
+            "algorithm.train_recipe."
+        )
+    if recipe_stage is not None and int(recorded_recipe_stage) != int(recipe_stage):
+        raise ValueError(
+            f"Resume recipe-stage mismatch: the checkpoint is at stage {int(recorded_recipe_stage)} for "
+            f"step {int(resume_state.get('step', 0))}, this run computes stage {int(recipe_stage)}. "
+            "The stage boundary (algorithm.train_recipe.cold_start_fraction) differs; start a new run "
+            "directory or match the original recipe."
+        )
     if resume_state.get("identity") is not None:
         assert_identity(identity_from_contract(contract), resume_state["identity"], "resume vs contract")
 
@@ -701,6 +769,9 @@ def preflight_resume(
         contract=contract,
         plan_version=plan_version,
         plan_digest=plan_digest,
+        recipe_stage=_expected_recipe_stage(
+            cfg, algorithm.name, step=int(resume_state.get("step", 0)), total_steps=total_steps
+        ),
     )
     return {
         "mode": mode,
@@ -873,6 +944,18 @@ def train_dflash(
                 "(or recapture) before training."
             )
         module.configure_feature_layout(store_capture, store_hidden_size)
+        # A teacher-distillation recipe consumes the target's final hidden
+        # states on every step; a source that never captured them would only
+        # fail deep inside the first forward, so refuse it up front.
+        if getattr(module, "recipe_needs_teacher", False) and not bool(
+            manifest.get("stores_final_hidden", False)
+        ):
+            raise RuntimeError(
+                f"algorithm={algorithm.name} train_recipe={module.train_recipe.name!r} distills the "
+                "target distribution, but this feature source does not carry the target's final hidden "
+                f"states (stores_final_hidden={manifest.get('stores_final_hidden')!r}). Recapture with "
+                "capture.store_final_hidden=true, or point --features at a store captured with it."
+            )
         init_state = {key: value.clone() for key, value in module.draft_model.state_dict().items()}
 
         train_dir = ensure_dir(run_dir / "train")
@@ -944,6 +1027,9 @@ def train_dflash(
                 contract=contract,
                 plan_version=plan_version,
                 plan_digest=plan_digest,
+                recipe_stage=_expected_recipe_stage(
+                    cfg, algorithm.name, step=int(resume_state.get("step", 0)), total_steps=total_steps
+                ),
             )
             overfit = {"enabled": True, "resumed": True}
         else:
@@ -1031,6 +1117,9 @@ def train_dflash(
             "confidence_calibration": calibration,
             "feature_mode": mode,
             "dtypes": dtype_report,
+            # Which objective recipe (if any) trained these weights — the same
+            # block the checkpoints record, echoed into train_summary.json.
+            "train_recipe": checkpoint_common.get("train_recipe"),
         }
         if online_source is not None:
             summary["feature_source"] = online_source.summary()

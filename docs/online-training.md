@@ -22,6 +22,7 @@ with `--features`.
 | Target during training | not loaded | resident for the whole run |
 | Feature store on disk | `features/shard_*.pt` + index (2K corpus ≈ 9.4 GiB) | none written |
 | Target forward cost | capture stage, once per store | every epoch, per training row |
+| Batched capture forward | n/a | opt-in via `train.online_batch_size` (default 1 = per-sample) |
 | `capture` stage | runs | skipped (config still parsed + validated) |
 | `train.num_workers` | any | must be 0 |
 | Share a capture across algorithms | yes (`--features`) | no |
@@ -113,6 +114,44 @@ A resumed online run fast-forwards already-consumed batches with cheap
 placeholders — those rows are **not** re-extracted; the new forward passes are
 counted and `train_summary.json` records `resume_fast_forward_batches` and
 `resume_fast_forward_reduced_cost`.
+
+## Batched capture (`train.online_batch_size`)
+
+By default (`train.online_batch_size: 1`) the online source runs one target
+forward per training row; this stays the reference path. Setting
+`train.online_batch_size: N` (`N > 1`) renders the rows per sample, runs
+**one padded target forward per N rows** (a training micro-batch larger than
+`N` is split into consecutive capture groups, so the effective group size is
+`min(online_batch_size, micro_batch_size)`) and slices each row's record back
+out of the batch: padding never reaches a record (`input_ids` / `hidden` /
+`loss_mask` / `position3` keep the row's own length; multi-turn rows keep
+their `image_spans`), and multi-image rows concatenate their pixel values /
+grids exactly as one forward per row would.
+
+With batching on, the trainer swaps its `DataLoader` for an internal iterator
+that walks the same `RandomSampler` + `BatchSampler` sequence with the same
+seeded generator, so batch composition is identical to the per-sample path
+for a given seed, the dataset does not write a feature store, and exact
+resume (including the placeholder fast-forward) is unaffected.
+
+- CPU tests pin batched-vs-per-sample record equality on a real tiny
+  Qwen2.5-VL target (single-image row + schema-v2 two-image / two-turn row,
+  `capture.store_final_hidden` on) and the DataLoader order equivalence
+  across epochs.
+- A batch size > 1 is folded into the online source digest: an exact resume
+  cannot silently switch grouping. Sharing one padded forward can move an
+  attention reduction by an ulp, so a resumed run must keep its batch size.
+- Counters: `target_forwards_total` counts model forward calls,
+  `target_samples_total` counts extracted rows (they differ only when
+  `online_batch_size > 1`). Fast-forward placeholders stay per-item and never
+  consume target work.
+- Measured on the registered WP2 smoke slice (`R-20261014-12`,
+  `docs/plan/WP4_MEASUREMENT.md`): 16 synthetic 2-image / 2-turn rows,
+  seq 1024, 4 steps, batch 1 vs capture group 4 - extraction wall
+  2.84 s -> 2.31 s (-18.8%), one forward per 4 rows instead of 16 forwards,
+  target peak unchanged (13.67 GB), step losses bit-identical. Prefill
+  compute dominates on that slice, so the saving is smaller than the 4x call
+  reduction.
 
 ## Exact resume
 
@@ -225,10 +264,12 @@ JetSpec flags above).
 "feature_source": {
   "backend": "huggingface",
   "digest_version": "vlm-dflash-online-source-digest-v2",
+  "online_batch_size": 1,
   "target_resident_bytes": 7507746816,
-  "extractions": {"train": {"target_forwards": 4, "wall_seconds": 2.87,
+  "extractions": {"train": {"target_forwards": 4, "target_samples": 4, "wall_seconds": 2.87,
                             "target_device_peak_gb": 13.1}},
   "target_forwards_total": 4,
+  "target_samples_total": 4,
   "extraction_wall_seconds_total": 2.87,
   "extraction_wall_seconds_note": "..."
 }
@@ -238,9 +279,12 @@ Per-phase counters cover train / overfit sanity / calibration; each phase also
 records the CUDA peak on the target's device (`target_device_peak_gb`, with a
 note in the summary: on shared devices it includes the trainer's own
 allocations, on split devices it isolates target activations that
-`target_resident_bytes` cannot show). The startup visual-path check runs a
-fixed 3 capture forwards **outside** these counters; a resumed run does not
-re-extract fast-forwarded items and reuses the recorded visual-path check.
+`target_resident_bytes` cannot show). `target_forwards` counts model forward
+calls; `target_samples` counts extracted rows (equal unless
+`train.online_batch_size > 1`, where one forward serves a whole batch). The
+startup visual-path check runs a fixed 3 capture forwards **outside** these
+counters; a resumed run does not re-extract fast-forwarded items and reuses
+the recorded visual-path check.
 
 ## Validation status
 
@@ -344,7 +388,7 @@ must not be relabelled as online.
 ## Scope of the first version (v0.3.2)
 
 - Not on-policy: supervision remains the pre-generated regen answers.
-- One Hugging Face target, one process; per-sample extraction merged into
-  batches by the shared collator (no remote producers, no batched capture
-  forward, no multi-node).
+- One Hugging Face target, one process; extraction runs per sample by default
+  or as an opt-in batched capture forward (`train.online_batch_size: N`,
+  default 1 = per-sample); no remote producers, no multi-node.
 - No serving/runtime integration; no continual learning from live traffic.

@@ -27,6 +27,7 @@ def test_default_registry_exposes_dflash():
     metadata = algorithm.metadata
     assert metadata.maturity["training"] in {"stable", "validated", "experimental", "architecture-only", "unsupported"}
     assert metadata.capabilities["image"] is True
+    assert metadata.capabilities["multi_image"] is True
     assert metadata.capabilities["video"] is False
     assert {"qwen25_vl", "qwen3_vl"} <= set(metadata.targets)
 

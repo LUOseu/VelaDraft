@@ -1,9 +1,25 @@
 {
   "name": "chartqa",
   "description": "ChartQA: structured visual reasoning over charts.",
-  "status": "planned",
-  "prompt_source": null,
+  "status": "validated",
+  "prompt_source": {
+    "type": "sharegpt_jsonl",
+    "path": "${VLM_DFLASH_BENCH_DATA:-benchmarks/data}/chartqa/chartqa_v1.jsonl",
+    "meta": "${VLM_DFLASH_BENCH_DATA:-benchmarks/data}/chartqa/meta.json"
+  },
   "num_prompts": 128,
   "max_new_tokens": 64,
-  "note": "Protocol pinned: lmms-lab/ChartQA test split, sharegpt_jsonl export. Adapter not landed yet."
+  "dataset": {
+    "id": "lmms-lab/ChartQA",
+    "split": "test",
+    "num_rows_in_split": 2500,
+    "subset": "seeded sample of 128 (seed=42) after sorting by (image path, question)",
+    "export": "python scripts/prepare_benchmark.py --workload chartqa --source <lmms-lab/ChartQA download>",
+    "rows_sha256": "e7c316e2829752476bfd286e6b07db2d6941698ac55cd9dffba50c8526f4d819",
+    "shards_sha256": {
+      "data/test-00000-of-00001.parquet": "165263505f2998aba65d819b44be832edecd92d676fee2c030645f784cd55d06"
+    },
+    "pinned_prompt_manifest": "benchmarks/prompts/chartqa_v1.jsonl"
+  },
+  "note": "Pinned protocol: lmms-lab/ChartQA test split, raw dataset question rendered through the target's chat template, chart images exported byte-identical to the upstream files, greedy decoding, max_new_tokens=64, sequential verification. Per-row question/image hashes are recorded in benchmarks/prompts/chartqa_v1.jsonl; the export is reproducible from the pinned shard hashes with the same seed. Answers are intentionally not exported (prompt-only benchmark)."
 }

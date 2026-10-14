@@ -53,6 +53,7 @@ from .mask import (
 )
 from .decay_loss import DFlashDecayLoss
 from .draft_model import Qwen3DFlashDraftModel
+from ..objectives import TeacherLogitsStream, recipe_loss
 
 
 def _context_doc_ids(seq_lens: torch.Tensor, seq_len: int, device: torch.device) -> torch.Tensor:
@@ -195,6 +196,7 @@ class DFlashTrainerModule(nn.Module):
         loss_type: str = "dflash",
         prefix_weight_base: float = 0.9,
         sample_from_anchor: bool = False,
+        train_recipe=None,
     ):
         super().__init__()
         if loss_type not in _DFLASH_LOSS_TYPES:
@@ -228,6 +230,11 @@ class DFlashTrainerModule(nn.Module):
         # Smallest visible-prefix length variable-prefix training samples (and the
         # slice point of its loss); single source of truth for both methods.
         self._min_prefix = min(2, block_size - 1)
+        # Optional training recipe (``vlm_dflash.objectives.ResolvedRecipe``).
+        # ``None`` keeps the historical decayed block-CE path byte-identical;
+        # a recipe swaps the objective (and its position weighting) per stage.
+        self.train_recipe = train_recipe
+        self._recipe_stage_index = 0 if train_recipe is not None else None
         # Feature-store layout (configured by the training script once the
         # store/source manifest is known; see ``configure_feature_layout``).
         # ``None`` keeps the legacy behavior: the batch's ``hidden`` already is
@@ -696,8 +703,11 @@ class DFlashTrainerModule(nn.Module):
             multimodal_position_ids: Optional long tensor of shape [3, batch,
                 sequence], with temporal, height, and width positions.
             teacher_hidden: Optional target final hidden states ``[batch, sequence,
-                hidden]`` from a capture-v2 feature store. Only distillation
-                algorithms (JetSpec) consume it; DFlash/DSpark/Domino ignore it.
+                hidden]`` from a capture-v2 feature store. Distillation
+                objectives consume it: JetSpec's forward-KL term, and for the
+                DFlash-family trainers any active ``train_recipe`` stage whose
+                LK / end-to-end TV terms need the teacher distribution. Other
+                algorithms ignore it.
 
         Returns:
             Scalar loss and additive DFlash training metrics.
@@ -816,7 +826,7 @@ class DFlashTrainerModule(nn.Module):
         if self.loss_type == "variable_prefix":
             return self._variable_prefix_loss(logits.view(bsz, n, bs, -1), target_ids, block_mask, prefix_lengths)
 
-        return self._block_loss_step(
+        block_kwargs = dict(
             logits=logits,
             target_ids=target_ids,
             block_mask=block_mask,
@@ -826,6 +836,14 @@ class DFlashTrainerModule(nn.Module):
             n=n,
             bs=bs,
         )
+        # Only a recipe run consumes the teacher signal in the scoring step, and
+        # recipe algorithms all use this base implementation (the Domino /
+        # DFlash2 / JetSpec overrides carry their own teacher flow through
+        # ``aux_metrics`` and do not accept these keywords).
+        if self.train_recipe is not None:
+            block_kwargs["teacher_hidden"] = teacher_hidden
+            block_kwargs["label_indices"] = label_indices
+        return self._block_loss_step(**block_kwargs)
 
     @staticmethod
     def _public_extra_metrics(aux_metrics: dict | None) -> dict | None:
@@ -846,6 +864,8 @@ class DFlashTrainerModule(nn.Module):
         bsz: int,
         n: int,
         bs: int,
+        teacher_hidden: torch.Tensor | None = None,
+        label_indices: torch.Tensor | None = None,
     ) -> DFlashStepMetrics:
         """Decay-weighted block CE and standard metrics on (possibly corrected) logits.
 
@@ -886,7 +906,39 @@ class DFlashTrainerModule(nn.Module):
             pred_mask.view(bsz, n, slots).bool(),
         )
 
-        total_loss = loss_out.total_loss if aux_loss is None else loss_out.total_loss + aux_loss
+        total_loss = loss_out.total_loss
+        recipe_metrics: dict = {}
+        recipe = self.train_recipe
+        if recipe is not None and recipe.name != "controlled_ce":
+            stage = recipe.stages[self._recipe_stage_index or 0]
+            teacher_chunk_fn = None
+            if stage.lk_coef > 0.0 or stage.e2e_tv_coef > 0.0:
+                if teacher_hidden is None or label_indices is None:
+                    raise ValueError(
+                        f"recipe stage {stage.name!r} needs the target's final hidden states (the "
+                        "teacher signal), but the batch carries none. Train from a capture with "
+                        "store_final_hidden=true / a feature store with stores_final_hidden=true."
+                    )
+                # Stream the teacher projection in bounded chunks: materializing
+                # the full [B, n, S, V] tensor costs ~8.7 GB at the canonical
+                # 16-sample sanity batch and pushes a 48 GB card into OOM.
+                teacher_chunk_fn = TeacherLogitsStream(
+                    self.lm_head, teacher_hidden, label_indices, first_slot=first
+                ).logits
+            recipe_total, recipe_metrics = recipe_loss(
+                stage,
+                student_logits=pred_logits.view(bsz, n, slots, -1),
+                target_ids=pred_targets.view(bsz, n, slots),
+                block_mask=pred_mask.view(bsz, n, slots),
+                teacher_logits=None,
+                teacher_chunk_fn=teacher_chunk_fn,
+                loss_decay_gamma=self.loss_decay_gamma,
+            )
+            recipe_metrics["recipe_stage"] = float(self._recipe_stage_index or 0)
+            total_loss = recipe_total.to(loss_out.total_loss.dtype)
+        if aux_loss is not None:
+            total_loss = total_loss + aux_loss
+        merged_extra = {**(self._public_extra_metrics(aux_metrics) or {}), **recipe_metrics}
         return DFlashStepMetrics(
             loss=total_loss,
             loss_weight=loss_weight.detach(),
@@ -898,7 +950,7 @@ class DFlashTrainerModule(nn.Module):
             valid_blocks=valid_blocks.detach(),
             pos_correct=loss_out.draft_correct_per_pos,
             pos_count=loss_out.draft_count_per_pos,
-            extra_metrics=self._public_extra_metrics(aux_metrics),
+            extra_metrics=merged_extra or None,
         )
 
     def _variable_prefix_loss(
@@ -967,3 +1019,24 @@ class DFlashTrainerModule(nn.Module):
             accept_len_sum=accept_len_sum.detach(),
             valid_blocks=valid_blocks.detach(),
         )
+
+    @property
+    def recipe_needs_teacher(self) -> bool:
+        """Whether the active recipe consumes the target's final hidden states."""
+        return bool(self.train_recipe is not None and self.train_recipe.needs_teacher)
+
+    @property
+    def recipe_stage_index(self) -> int | None:
+        """Current recipe stage (``None`` when no recipe is active)."""
+        return self._recipe_stage_index
+
+    def set_training_progress(self, step: int, total_steps: int) -> None:
+        """Training-loop progress hook (also used by Domino's curriculum).
+
+        For a recipe run this selects the stage for the upcoming step: stage
+        boundaries are a deterministic function of the plan (fraction × the
+        run's total steps), so a resumed run lands on the same stage.
+        """
+        if self.train_recipe is not None:
+            self._recipe_stage_index = self.train_recipe.stage_index(int(step), int(total_steps))
+

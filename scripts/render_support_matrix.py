@@ -53,9 +53,17 @@ COLUMNS = [
 FOOTNOTES = """\
 - "Train" is the training maturity: DFlash2 trains with an experimental
   objective reconstruction (upstream objective undisclosed) and DFly trains
-  the ported architecture with the shared DFlash objective (upstream's
-  two-stage LK/D-PACE -> e2e-TV recipe is not ported; see
-  `docs/upstream/dfly.md`); everything else is validated.
+  the ported architecture with the shared DFlash objective by default —
+  upstream's two-stage LK/D-PACE -> e2e-TV recipe is ported and selectable
+  (`algorithm.train_recipe: upstream_two_stage`) but has no canonical GPU run
+  recorded yet (see `docs/upstream/dfly.md`); everything else is validated.
+- Multi-image is the schema-v2 data path (multiple images per row, images on
+  any user turn of a multi-turn conversation). It is validated end-to-end for
+  DFlash on the recorded E2 smoke protocol (2-image / 2-turn rows, 16 train +
+  4 val, token-exact eval; `configs/smoke_multiturn.yaml`) and exercised for
+  all algorithms by the shared CPU suite; the other algorithms have not been
+  re-run on multi-image data individually. Batched online capture for
+  multi-image rows is still a WP4 measurement item.
 - JetSpec eval numbers are validated with its causal in-block mask (its
   parallel-tree production runtime is not ported); every algorithm's runtime
   story is sequential token-exact verification only.
@@ -76,8 +84,9 @@ Both are validated on single-image + text with greedy decoding. Qwen3-VL was
 validated for the four zoo algorithms at reduced scale (256-row slice,
 16-prompt sequential eval, export + reload, all token-exact - see
 `RELEASE_VALIDATION.md`); DFlash has the full 2K-protocol run there.
-Multi-image, video and extra target families are roadmap items, not support
-claims.
+Multi-image / multi-turn (schema v2) was recorded for DFlash on Qwen2.5-VL-3B
+via the E2 smoke (see the algorithm footnote); video and extra target families
+remain roadmap items, not support claims.
 
 ## Verification modes
 
@@ -106,8 +115,8 @@ offline benchmark numbers as online (see `docs/online-training.md`).
 | --- | --- | --- |
 | caption_general | scaffold | run's own val split (provisional) |
 | textvqa | validated | pinned export (lmms-lab/textvqa validation, 128-prompt seed-42 subset; `benchmarks/prompts/textvqa_v1.jsonl`) |
-| docvqa | planned | protocol pinned, adapter pending |
-| chartqa | planned | protocol pinned, adapter pending |
+| docvqa | validated | pinned export (lmms-lab/DocVQA DocVQA/validation, 128-prompt seed-42 subset; `benchmarks/prompts/docvqa_v1.jsonl`) |
+| chartqa | validated | pinned export (lmms-lab/ChartQA test, 128-prompt seed-42 subset; `benchmarks/prompts/chartqa_v1.jsonl`) |
 """
 
 
