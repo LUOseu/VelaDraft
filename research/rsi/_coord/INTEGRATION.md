@@ -95,26 +95,26 @@
 7. 声明审计：抽查 2–3 个关键数字与原始日志/JSON 一致；限制与反证条件写明；负结果保留。
 8. 复现：EXPERIMENTS 字段齐全、依赖 SHA 固定、复现命令可执行；外部引用标明“引用、未独立复核”。
 
-## 8. Wave-1 收口（滚动草稿 · 更新 2026-10-15 02:05）
+## 8. Wave-1 收口（滚动草稿 · 更新 2026-10-15 02:40）
 
-> wave-1 尚未关闭（D1 wave-2 配对——窗口已开；D5 Tier A/B 进行中；D4 已收口）。本节是 C0 的滚动台账：给每条**当前判定 / 证据路径 / 解除条件**；最终 GO/HOLD/STOP/BLOCKED 在关闭时冻结。平台工程价值与论文贡献潜力分列，不互相折算。
+> wave-1 尚未关闭（D1 wave-2 已完成并关闭租约；D5 chain2 Tier 0+A+B 已完成、S3 追赶链待跑；D4 已收口）。本节是 C0 的滚动台账：给每条**当前判定 / 证据路径 / 解除条件**；最终 GO/HOLD/STOP/BLOCKED 在关闭时冻结。平台工程价值与论文贡献潜力分列，不互相折算。
 
 | 路线 | 当前判定 | 关键证据 | 平台 / 论文 | 解除或关闭条件 |
 |---|---|---|---|---|
-| D1 | **GO（修订口径；`d1-002-c0`）** — wave-2 6/6 ✓ | wave-2 配对（C0 重算）：grid W3 1.129/1.136/1.141、MIX 1.154/1.137/1.107（均值 13.5%/13.3%；win 580/600；peak −57%；parity b0/50/100 ✓；用量 0.67/1.5 GPU-h）；round-2 的 +19.0%/+24.7% 为 8 批 cell（不再作主数字）；条件（同表 replay/字段口径）见 `d1-001-c0` | 平台：布局重排引擎（跨 seed 稳定复现）；论文：候选保持（约 +13–14% 步 + −57% 峰值→容量杠杆） | **capacity demo（§2 单列）→ 关闭 L-W2-D1** → 集成 d1-001 最小集 + D4×D1 2×2 排程 |
+| D1 | **GO（修订口径；`d1-002-c0`+`d1-003-c0`）— wave-2 全收，L-W2-D1 已关闭** | wave-2 配对（C0 重算）：grid W3 1.129/1.136/1.141、MIX 1.154/1.137/1.107（均值 13.5%/13.3%；win 580/600；peak −57%；parity b0/50/100 ✓）；**capacity demo ✓ C0 逐值重算**（W3 b16 43.59→14.32 GiB；b24 canonical OOM 5/5 → cost 14.41 GiB 5/5；MIX b16 27.74→9.83 GiB）；用量 ≈0.90/1.5 GPU-h；round-2 的 +19.0%/+24.7% 为 8 批 cell（不再作主数字） | 平台：布局重排引擎（跨 seed 稳定复现；容量杠杆=同卡逻辑 batch ×2–3）；论文：候选保持（+13–14% 步 + −57% 峰值），novelty 定位待辨 | **已完成**：L-W2-D1 关闭；集成落地 `4e1674e`（opt-in、默认 byte-identical、509/6 全绿）→ 下一 = **D4×D1 2×2 排程（已解锁）** + held-out 质量验证（欠） |
 | D2 | **STOP（自判+采纳；机制 DEFERRED；已全收口）** | `research/rsi/d2/` @ lane `bfb3635`（+`d6e3c9a` 记录提交；REPORT/EXPERIMENTS/handoff 全量含失败与归因段；“12/12”笔误已更正；预算 0.5/1.0 GPU-h 已记）；pin 2×2（−6.8%，loss bitwise）+ dfly recipe 2×2（−12.9/−19.5ms，12 步 loss 逐值相同） | 论文：否（−3.0%/−5.6% ≪15%；Amdahl 上限 ~5–6%）；平台：opt-in 旋钮（lane 存档，不集成） | **已关闭**；再开=REPORT §8 条件 |
 | D3 | STOP（已接受） | REPORT `b88cdf2`：attention+mask=3.55%（C0 核数 ✓）；/tmp 已清 | 论文：否 | 再开条件：W2 长答 ~15% 外推 / b16 / S≥2.5–4k |
 | D4 | **merge-ready（平台工程级；`d4-003-c0`；不动 main）** | W1 五腿 counter-exact（C0 5/5 ✓）；**d4-001 集成 `1f8963e`（sha1 核对 ✓；13+4+70/70 ✓）**；**W2-B 收口**（F1–F4 PASS；两腿 counters 相同、adjustments=0；lane `a8e762c`；0.062 GPU-h） | 平台：adaptive 安全阀（opt-in、默认关、静态 RAM 场景）；论文：低（无提速声称；压力响应未验证） | 无待办；推进 main 由消费方/用户决定（按 INTEGRATION §7 checklist，不自动 merge） |
-| D5 | HOLD（条件项；G2 链进行中） | REPORT `85cbf8b` + sim v4 `23875e8` + d5-001 步 2 + lane 85/85（C0 ✓）；**Tier0 canon ✓；staged_b8 ✓（762 步，kept 1012，≈1.27 GPU-h 分配口径）；sync_b8 ✓（01:53:28 leg OK；762 步 final_loss=4.03125；visual check passed=True；≈1.21 GPU-h）；sync_b32 运行中（01:53:29，cards 0+2）**；S3 修复已合入（`2cc57c6`/`daf6b1d`） | 平台：runner 语义级可驱动真 trainer；论文：低（H2 负） | Tier A/B 出数后 harvest（GPU-h 按时间戳重算——链脚本 107 行算式报错）；S3 追赶链接力；Tier C 需 C0 |
+| D5 | HOLD（条件项；chain2 T0+A+B 完成） | REPORT `85cbf8b` + sim v4 `23875e8` + d5-001 步 2 + lane 85/85（C0 ✓）；**Tier0 ✓；staged_b8 ✓（762 步，kept 1012，≈1.27 GPU-h 分配口径）；sync_b8 ✓（wall 2174.5s，vs staged −5.3%，远低于 sim −14%；762 步 final_loss=4.03125）；sync_b32 ✓（01:53:29→02:13:58；768 步 final_loss=4.0625）**；S3 修复已合入（`2cc57c6`/`daf6b1d`） | 平台：runner 语义级可驱动真 trainer（本 build 抽取与训练串行）；论文：低（H2 负） | **S3 追赶链（GPU 全空闲）**；harvest 出 §10 汇总（GPU-h 按时间戳重算）；Tier C 倾向暂缓（sim +3%，S3 出数后定） |
 
 跨路线观察：D5 v4 的 keep-oracle 变体需要“生成前已知 keep”的预测器——若 D1 双轴组织能提供此类信号，仅作为 **D1×D5 条件组合的讨论项**（未批准；须双方有共同监督位置才立项）。
 
 **共同基线与资产**
 - BASE `7eab136`（复核无漂移）；协议/接口 v0.1.0；B0=`e15256d`。
 - 共享资产：D1 W1 store（`e044f488…`）+ W2 store（`5980f77b…`）+ **W3 store（`95ef12e4…`，192 行多轮）+ MIX store（335 行 = W1+W2 交织）**；D5 CPU LivePipeline（`b60d1eb`，lane）；D4 fixed-LRU（已随 PR #6 合入）。
-- 集成分支：**`research/rsi-c0` 本身**；d4-001 集成 commit `1f8963e`；验证（本机 dflare venv）：`pytest tests/test_cache_budget.py` 13/13、`pytest tests/test_online_mode.py` **70/70（BASE 66 + 新 4）**；merge-readiness 待 real-sensor A/B + lane 对账，不自动 merge main。
+- 集成分支：**`research/rsi-c0` 本身**；d4-001 集成 commit `1f8963e`（13/13 + 70/70）与 **d1-001 集成 commit `4e1674e`**（opt-in `train.regroup`；默认路径 byte-identical；全套 **509 pass/6 skip/0 fail**）——均不自动 merge main。
 
-**预算实耗（GPU-h）**：D1 **0.92/1.5**（round-2.1 后更新）；wave-2 单列 **0.67/1.5**（GPU3 单卡 6/6；capacity demo 待跑）；D2 0.5/1.0（已盘点）；D3 0.22/1.0；D4 **0.37/0.5**（W1 0.31 + W2-B 0.062）；D5 进行中：staged_b8 ≈1.27 + sync_b8 ≈1.21（分配 2 卡口径，待 harvest 复核；含 0.16 事故计入）。
+**预算实耗（GPU-h）**：D1 wave-1 **0.92/1.5**；**wave-2 单列 0.90/1.5（关闭：in-run 0.73 + capacity demo ≈0.17；GPU3 单卡）**；D2 0.5/1.0（已盘点）；D3 0.22/1.0；D4 **0.37/0.5**（W1 0.31 + W2-B 0.062）；D5 进行中：staged_b8 ≈1.27 + sync_b8 ≈1.21 + sync_b32 ≈0.68（分配 2 卡口径：2×20.5min；待 harvest 复核；含 0.16 事故计入）。
 
 **事故台账**：见 RESOURCE_SCHEDULE §3 / REGISTRY §6（#1–#5，均含时间线、处置与租约修正）。
 

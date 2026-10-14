@@ -3,7 +3,7 @@
 - 协议版本：**rsi-protocol-v0.1.0** ｜ 接口版本：**rsi-iface-v0.1.0**
 - 共同基线 BASE_SHA：`7eab1369266010137702de8c714053729cde5834`（origin/main，PR #6 合并后；含固定预算 LRU 记录缓存）
 - 历史核对基线 B0：`e15256d7c4bd10a490a7ac821eb12a0749a96fdd`
-- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 01:02 (Asia/Shanghai)
+- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 02:40 (Asia/Shanghai)
 - 无法确认的字段以 `?` 标注并在文末说明；未创建的 worktree/分支在下一次更新回填。
 
 ## 1. 角色与分支
@@ -11,11 +11,11 @@
 | 角色 | branch | worktree | 负责人 | 可改范围 | 依赖 | 接口版本 | 状态 |
 |---|---|---|---|---|---|---|---|
 | C0 | `research/rsi-c0` | `/Users/Admin/grounding-parallel/veladraft-c0` | C0 agent（本会话） | `research/rsi/_coord/` + 经批准的共享入口集成 | 五条路线输入；用户转发 | rsi-iface-v0.1.0 | ACTIVE：BASE 已冻结；v0.1.0 已发布（origin `research/rsi-c0`） |
-| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | **GO（wave-2 放行；`d1-001-c0`）**：round-2 全收（`56b6563`）——**R3 全矩阵（W3 k4 +19.0% / MIX k4 +24.7%；peak −30~58%；W0/W1 中性边界；C0 抽查 4 组 ✓）**；EXPERIMENTS 24 条（device 全填）；预算 **0.92/1.5 GPU-h**（`a193ef8` 更新；自报入账）；`d1-001` 接收（条件=同表 replay / grad 字段口径 / git_sha 注记）；**L-W2-D1 ≤1.5 GPU-h**（GPU3 优先）；MIX store 登记；**round-2.1 p3 收尾 7/7**（tail-guard 补跑 rc=0）；**wave-2 运行中**（01:17 起 GPU3；100 批 parity@0/50/100） |
+| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | **GO（修订口径；`d1-002-c0`+`d1-003-c0`；wave-2 全收）**：wave-2 6/6 rc=0（{W3,MIX}×3 seeds；grid 配对均值 1.135/1.133、win 580/600、peak −57%、parity b0/50/100 ✓，C0 重算）；**capacity demo ✓ C0 逐值重算**（W3 b16 43.59→14.32 GiB；**b24 canonical OOM 5/5 vs cost 14.41 GiB 5/5**；MIX b16 27.74→9.83 GiB）→ **L-W2-D1 关闭（≈0.90/1.5）**；close-out `6dc5f74`（REPORT §11 / EXPERIMENTS 42）；**d1-001 最小集已集成**：`research/rsi-c0` @ `4e1674e`（opt-in、默认 byte-identical；全套 509 pass/6 skip）；下一 = **D4×D1 2×2（已解锁）** + held-out 质量（欠）；round-2 的 +19.0%/+24.7% 系 8 批 cell（不作主数字） |
 | D2 | `research/rsi-d2` | `/Users/Admin/grounding-parallel/vlm-dflash-d2` | D2 agent（用户安排） | `research/rsi/d2/` + 新模块/测试 | BASE；与 D1 的软目标覆盖对齐 | rsi-iface-v0.1.0 | **STOP（自判+C0 采纳，`d2-001-c0`）**：REPORT/handoff/EXPERIMENTS/d2-001 到齐；pin 2×2 −6.8%（loss 四腿 bitwise）；dfly recipe 2×2（fwd −12.9/bwd −19.5ms；12 步 loss 四腿逐值相同，C0 直读 ✓）；CPU oracle **12/12（C0 复跑；更正“13”措辞）**；归因段完成（editable 遮蔽/event 伪影）；机制 DEFERRED（lane-local opt-in；再开=REPORT §8）；lane commit `bfb3635`+`d6e3c9a` ✓（worktree 净；修正三项闭环） |
 | D3 | `research/rsi-d3` | `/Users/Admin/grounding-parallel/vlm-dflash-d3` | D3 agent（用户安排） | `research/rsi/d3/` + 新模块/测试 | BASE；D1 形状分布输入 | rsi-iface-v0.1.0 | **CLOSED（STOP 已接受；最终关闭确认 2026-10-15 00:18）**：attention+mask=21.16ms/595.9ms=**3.55%** ≪20%（cap +3.7% 步 / +1.4% online）；C0 核数 ✓；交付物全（`b88cdf2`：REPORT/EXPERIMENTS/handoff/support_matrix/evidence/scripts；worktree 净）；预算自报 0.22/1.0 GPU-h；服务器清理 ✓；无集成；再开条件=REPORT §8 |
 | D4 | `research/rsi-d4` | `/Users/Admin/grounding-parallel/vlm-dflash-d4` | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | **merge-ready（平台工程级；`d4-003-c0`）**：d4-001 集成 `1f8963e`（sha1 对账一致；13+4+70/70 复跑 ✓）；**W2 收口**（F1–F4 PASS；两腿 counters 645/129/129/0/0 逐值相同；adjustments=0；lane `a8e762c`；runtime 4 文件 sha1 再核一致）；范围=静态 RAM 场景/opt-in 默认关（压力响应未验证）；预算 0.37/0.5；不自动 merge main |
-| D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | D5 agent（用户安排） | `research/rsi/d5/` + 新模块/测试 | BASE；D1 成本模型；D4 缓存/配额接口 | rsi-iface-v0.1.0 | REPORT 已接收（`85cbf8b`；**C0 抽查 ✓**）；sim v4 `23875e8`；**d5-001 步 2 完成（`cf74790`+duplicate guard；lane **43/43 C0 独立复跑 ✓**；驱动真 train_dflash）**；**iface v0.2 候选受理（PROTOCOL §12）**；**G2 档位预授权**（min ≈2.2 GPU-h / 有价值集 ≈4.0）；静态分裂=wave-2 条件项（窗口使用中）；预算 ≤0.4/1.0 GPU-h；**G2 chain2 运行中**（staged_b8 腿 01:17 完成：762 步/kept 1012/≈0.64 GPU-h 单卡；sync_b8 01:17 起；S3 追赶链待接力） |
+| D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | D5 agent（用户安排） | `research/rsi/d5/` + 新模块/测试 | BASE；D1 成本模型；D4 缓存/配额接口 | rsi-iface-v0.1.0 | REPORT 已接收（`85cbf8b`；**C0 抽查 ✓**）；sim v4 `23875e8`；**d5-001 步 2 完成（`cf74790`+duplicate guard；lane **43/43 C0 独立复跑 ✓**）；iface v0.2 候选受理（PROTOCOL §12）；G2 档位预授权（min ≈2.2 / 有价值集 ≈4.0 GPU-h）；**G2 chain2 完成 Tier 0+A+B（CHAIN2 DONE 02:13:58）**：staged_b8 ✓（762 步，kept 1012，≈1.27 GPU-h 分配口径）、sync_b8 ✓（wall 2174.5s，**vs staged −5.3%**，远低于 sim −14%；epoch-1 抽取不与训练重叠——本 build 串行）、sync_b32 ✓（01:53:29→02:13:58，768 步 final_loss=4.0625）；**Tier C + staged_b32 store-parity + S3 追赶链留 C0/D5**；harvest 须按时间戳重算 GPU-h（链脚本 107 行算式报错） |
 
 边界（不得越界）：D4 不改 batch/anchor/目标函数、不调度流水线；D1 不改 cache policy/soft loss/attention kernel；D2 不合并不同 student 查询、不改 anchor 采样与 attention；D3 不改可见性语义、不接管布局调度与 cache；D5 用 D4/D1 接口，不重写缓存/采样器/训练目标；C0 只协调集成，不接管研究路线。
 
@@ -267,8 +267,25 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - 2026-10-15 01:57 — D1 wave-2 **CHAIN DONE：6/6 rc=0**（01:17:23→01:57:26，wall 40.1min，GPU3 单卡）。聚合（C0 独立重算）：W3 grid 1.129/1.136/1.141（均值 1.135）、MIX grid 1.154/1.137/1.107（均值 1.133）；grid win 580/600；peak −57%；parity（b0/50/100 ✓）loss ≤9.5e-5 / grad ≤5.3e-3 / update ≤6.7e-8。**判读：步时 13.5%/13.3% 低于 15% 但显存 −57% 远超 25%（OR 门槛通过）** → 裁决 `d1-002-c0` = GO（修订口径）+ capacity demo 收尾。
 - 2026-10-15 01:53 — D5 **sync_b8 leg OK**（01:17:14→01:53:28，wall≈36.2min；762 步 final_loss=4.03125；drafter visual check passed=True；按分配 2 卡口径 ≈1.21 GPU-h，待 harvest 复核）；**sync_b32 于 01:53:29 启动（cards 0+2）**；链脚本第 107 行 GPU-h 算式报错（记账须按时间戳重算）；磁盘回 21G。
 
+- 2026-10-15 02:10 — D1 capacity demo 3 腿 rc=0（GPU3；cap16 W3 02:00:32→02:01:54 / MIX ≈02:02→02:04 / cap24 W3 02:06:20→02:07:16）：**C0 独立重算原始 jsonl**：W3 b16 canonical 43.59 GiB → cost/grid **14.32 GiB**（9/9）；W3 b24 canonical **OOM 5/5** vs cost **14.41 GiB 5/5** ✓；MIX b16 27.74 → 10.30/9.83 GiB（9/9）；与 REPORT §11.4 逐值一致；增量 ≈0.17 GPU-h 单卡。窗口披露：cap16 腿期间 GPU0 外部任务 97%/10.4GB（cross-card）。
+- 2026-10-15 02:13 — D1 close-out `6dc5f74` 交付（REPORT §11、EXPERIMENTS 42 行、STATE/handoff close-out request、10 个 w2 summary 顶层 `parity_batches` 非失真回填并披露）→ **L-W2-D1 关闭**（0.73 in-run + ≈0.17 demo ≈ **0.90/1.5 GPU-h**）。
+- 2026-10-15 02:14 — D5 **CHAIN2 DONE（Tier 0+A+B）**（02:13:58）：sync_b32 leg OK（01:53:29→02:13:58；768 步 final_loss=4.0625）；**Tier C + staged_b32 store-parity 复验留 C0（2:40 答复：Tier C 倾向暂缓，S3 出数后定）**；S3 追赶链（smoke_s3→s3_b8→s3_b32）待跑；四卡现均空闲（util 0%）。
+- 2026-10-15 02:35 — **d1-001 最小集集成落地 `research/rsi-c0` @ `4e1674e`**（`train.regroup` opt-in；默认路径 byte-identical；本机全套 **509 pass / 6 skip / 0 fail**）；裁决 `d1-003-c0`（capacity demo 核验 + 租约关闭 + 集成记录）；D4×D1 2×2 排程解锁；held-out 质量验证仍欠。
+
 ### 对 D1（2026-10-15 02:05，wave-2 判读）
 
 - 裁决见 `d1-002-c0`：**GO（修订口径）** —— 步时均值 13.5%（W3）/13.3%（MIX）、单 seed 最高 15.4%；显存 −57%；win 580/600；parity 三批位 ✓。
 - **收尾项**：capacity demo（batch16@sub4 vs batch8 canonical，同 peak 预算；≤0.2 GPU-h；GPU3 空闲可用）为 L-W2-D1 唯一未跑项；另可顺手修 v2 summary 顶层 `parity_batches=null`（实际已按 0/50/100 执行）。完成后 C0 核验 → 关闭租约 → 解锁集成（d1-001 最小集、D4×D1 2×2）。
 - round-2 的 +19.0%/+24.7%（8 批 cell）不再作对外主数字。
+
+### 对 D1（2026-10-15 02:40，close-out 核验）
+
+- capacity demo 收到并**核验通过**（§复核记录 02:10；与 REPORT §11.4 逐值一致）→ **L-W2-D1 关闭**；close-out `6dc5f74` 交付完整（parity_batches 回填已披露）。
+- **d1-001 最小集已集成**（`research/rsi-c0` @ `4e1674e`，见 `d1-003-c0` §3）；默认路径 byte-identical（测试锁）。
+- 下一项：**D4×D1 2×2 排程解锁**（online cache × regroup；D4 侧已 merge-ready 静态面）——进行前由 C0 发布预注册（假设/门槛/预算）；held-out 质量验证（AL）列入后续候选实验。
+
+### 对 D5（2026-10-15 02:40，chain2 T0+A+B 完成）
+
+- chain2 结果收到：staged_b8（wall 2297.3s / ≈1.27 GPU-h 分配口径）vs sync_b8（2174.5s，**−5.3%**，远低于 sim 的 −14%）——本 build online 实时抽取与训练**串行**（epoch-1 ≈1.5s/step），缓存只省 epoch≥2 重算；请写进 harvest/REPORT §10。
+- sync_b32（768 步 final_loss=4.0625）与 regen b32 = 2.33× 一致：**batch 是静态语义旋钮**（b32≠b8，kept 集合不同），只能各自与自身对照。
+- **下一步**：(a) S3 追赶链按既定计划执行（GPU 现全空闲；tri-state parity 保持）；(b) **Tier C（pinned 1+1）倾向暂缓**——sim 仅 +3%，待 S3 出数后再定；(c) harvest 出 §10 汇总 + GPU-h 按时间戳重算（链脚本 107 行算式不可用）。
