@@ -1,0 +1,15 @@
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights:  99%|█████████▉| 816/824 [00:00<00:00, 8133.54it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 8170.50it/s]
+prepared lengths: {0: 423, 1: 423, 20: 475, 40: 424, 60: 380, 80: 384, 100: 379, 120: 378}
+target=0 (len 423) short=120 (len 378) long=20 (len 475)
+== target alone vs target+short ==
+  alone vs +short: hidden DIFF elems=2671574/3416064 max_abs=6.0000e+00 at (pos=336, dim=5970) values -136.0000 vs -142.0000
+     differing positions: [0, 1, 2, 3, 4] ... [551, 552, 553, 554, 555] (n=556 of 556)
+== target alone vs target+long ==
+  alone vs +long: hidden DIFF elems=3104752/3416064 max_abs=5.3000e+01 at (pos=290, dim=5915) values 154.0000 vs 101.0000
+     differing positions: [0, 1, 2, 3, 4] ... [551, 552, 553, 554, 555] (n=556 of 556)
+== target alone vs 8-group ==
+  alone vs g8: hidden DIFF elems=2577387/3416064 max_abs=4.8000e+01 at (pos=4, dim=4414) values -2272.0000 vs -2224.0000
+     differing positions: [0, 1, 2, 3, 4] ... [551, 552, 553, 554, 555] (n=556 of 556)
+== target+short vs 8-group ==
+  +short vs g8: hidden DIFF elems=2693513/3416064 max_abs=4.8000e+01 at (pos=4, dim=4414) values -2272.0000 vs -2224.0000
+     differing positions: [0, 1, 2, 3, 4] ... [551, 552, 553, 554, 555] (n=556 of 556)

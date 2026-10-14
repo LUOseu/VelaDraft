@@ -1,0 +1,176 @@
+{
+  "steps": 762,
+  "first10_mean_loss": 7.469572368421052,
+  "last10_mean_loss": 3.70703125,
+  "final_loss": 3.28125,
+  "loss_decreased": true,
+  "nan_seen": false,
+  "skipped_no_anchor_batches": 0,
+  "resumed_from_step": 0,
+  "resume_fast_forward_batches": 0,
+  "resume_fast_forward_reduced_cost": false,
+  "wall_seconds": 1113.7024495601654,
+  "peak_gpu_mem_gb": 25.022444032,
+  "gpu_name": "NVIDIA RTX A6000",
+  "overfit_sanity": {
+    "enabled": false
+  },
+  "visual_dependence": {
+    "correction": {
+      "enabled": false,
+      "applied_in_diagnostic": true,
+      "delta_abs_mean": null
+    },
+    "full": {
+      "swap": {
+        "logits_max_abs_diff": 8.4453125,
+        "logits_mean_abs_diff": 0.24867267906665802,
+        "block_ce_a": 3.069932699203491,
+        "block_ce_b": 3.3632781505584717,
+        "block_ce_delta": 0.29334545135498047
+      },
+      "perturb_span": {
+        "logits_max_abs_diff": 1.09765625,
+        "logits_mean_abs_diff": 0.02005774900317192,
+        "block_ce_a": 3.069932699203491,
+        "block_ce_perturbed": 3.0695409774780273,
+        "block_ce_delta": 0.0003917217254638672
+      }
+    },
+    "backbone": {
+      "swap": {
+        "logits_max_abs_diff": 8.4453125,
+        "logits_mean_abs_diff": 0.24867267906665802,
+        "block_ce_a": 3.069932699203491,
+        "block_ce_b": 3.3632781505584717,
+        "block_ce_delta": 0.29334545135498047
+      },
+      "perturb_span": {
+        "logits_max_abs_diff": 1.09765625,
+        "logits_mean_abs_diff": 0.02005774900317192,
+        "block_ce_a": 3.069932699203491,
+        "block_ce_perturbed": 3.0695409774780273,
+        "block_ce_delta": 0.0003917217254638672
+      }
+    },
+    "full_vs_backbone": {
+      "logits_max_abs_diff": 0.0,
+      "logits_mean_abs_diff": 0.0
+    },
+    "draft_logits_differ": true,
+    "loss_changes_on_swap": true,
+    "loss_changes_on_perturb": true,
+    "passed": true
+  },
+  "confidence_calibration": null,
+  "feature_mode": "online",
+  "dtypes": {
+    "feature_storage": "bfloat16",
+    "target_native": "bfloat16",
+    "drafter_compute": "bfloat16",
+    "frozen_embed": "bfloat16",
+    "frozen_head": "bfloat16"
+  },
+  "train_recipe": null,
+  "feature_source": {
+    "format": "vlm-dflash-online-source-v1",
+    "digest_version": "vlm-dflash-online-source-digest-v2",
+    "feature_mode": "online",
+    "backend": "huggingface",
+    "num_samples": 1012,
+    "online_batch_size": 8,
+    "seq_length": 2048,
+    "storage_dtype": "bfloat16",
+    "stores_final_hidden": false,
+    "draft_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "capture_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "hidden_size": 2048,
+    "hidden_layout": "concat_capture_layers",
+    "target_dtype": "bfloat16",
+    "attn_implementation": "sdpa",
+    "target_device": "cuda:0",
+    "target_train_device": "cuda:0",
+    "digest": "bc4b888cba5931a192bf994df678df9c8589192adf23048c729c0d91c5db9f50",
+    "target_resident_params": 3754622976,
+    "target_resident_bytes": 7509245952,
+    "extractions": {
+      "overfit": {
+        "target_forwards": 0,
+        "wall_seconds": 0.0,
+        "target_device_peak_gb": 7.638321664
+      },
+      "train": {
+        "target_forwards": 762,
+        "wall_seconds": 754.5376532152295,
+        "target_device_peak_gb": 25.022444032,
+        "prepare_seconds": 94.24373340420425,
+        "target_samples": 6072,
+        "forward_seconds": 660.2939198110253
+      },
+      "visual_check": {
+        "target_forwards": 0,
+        "wall_seconds": 0.0,
+        "target_device_peak_gb": 7.852731392
+      }
+    },
+    "target_forwards_total": 762,
+    "target_samples_total": 6072,
+    "extraction_wall_seconds_total": 754.5376532152295,
+    "extraction_prepare_seconds_total": 94.24373340420425,
+    "extraction_forward_seconds_total": 660.2939198110253,
+    "fast_forward_items_total": 0,
+    "feature_cache": {
+      "capacity_bytes": 0,
+      "hits": 0,
+      "misses": 0,
+      "stores": 0,
+      "evictions": 0,
+      "skipped_too_large": 0,
+      "peak_bytes": 0,
+      "enabled": false,
+      "current_bytes": 0,
+      "note": "opt-in bounded host-RAM retention of extracted records across epochs (train.online_feature_cache_gb; 0 = disabled). A cache hit replaces the target forward for that row; hits/misses are per lookup, evictions are LRU byte-cap evictions, and the cache is runtime-only."
+    },
+    "target_forwards_note": "target_forwards counts model forward calls; target_samples counts extracted rows. They differ when train.online_batch_size > 1 (one forward per capture group).",
+    "extraction_wall_seconds_note": "wall_seconds is the full extraction boundary for one row: render/decode + processor (prepare_seconds) plus the teacher-forced target forward and record finalisation (forward_seconds), with the target device synchronized around each timed stage. Per-sample reads (extract) and batched reads (fetch_batch) charge the same boundary, so their extraction_wall_seconds_total values are comparable. Counters are per phase (train / overfit sanity / calibration); the startup visual-path check runs a fixed 3 capture forwards outside these counters, and a resumed run answers fast-forwarded items with cheap placeholders that consume no target work (counted as fast_forward_items, never as wall_seconds)",
+    "target_device_peak_note": "target_device_peak_gb is the CUDA peak on the target's device during that phase (reset per phase). When target.device == train.device the phase peak includes the trainer's own allocations; on split devices it isolates the target, which target_resident_bytes (weights only) cannot show."
+  },
+  "visual_path_check": {
+    "sample_id": "000000456658",
+    "swap_sample_id": "000000514558",
+    "expected_image_tokens": 391,
+    "found_image_tokens": 391,
+    "span_ok": true,
+    "replay_bitwise_equal": true,
+    "replay_max_abs_diff": 0.0,
+    "swap_token_count_match": true,
+    "swap_deltas": {
+      "span": {
+        "max_abs_diff": 160.25,
+        "mean_abs_diff": 2.7685022354125977,
+        "min_cosine": 0.2244010865688324,
+        "changed_positions": 391
+      },
+      "downstream": {
+        "max_abs_diff": 1567.625,
+        "mean_abs_diff": 0.4100390076637268,
+        "min_cosine": 0.6532485485076904,
+        "changed_positions": 145
+      }
+    },
+    "thresholds": {
+      "min_downstream_changed": 16,
+      "min_span_cosine_drop": 0.001
+    },
+    "passed": true
+  },
+  "draft_device": "cuda:0"
+}

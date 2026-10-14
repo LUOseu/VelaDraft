@@ -1,0 +1,276 @@
+{
+  "a": "runs/s3/a_off/train/ckpt_final.pt",
+  "b": "runs/s3/b_on/train/ckpt_final.pt",
+  "tensors": 36,
+  "elements": 243811072,
+  "differing": 220384191,
+  "max_abs": 0.04461669921875,
+  "max_abs_tensor": "layers.1.mlp.up_proj.weight",
+  "max_rel": 15406000.23076923,
+  "max_rel_tensor": "layers.0.mlp.gate_proj.weight",
+  "max_ulp_ratio": 3204448048.0,
+  "max_ulp_ratio_tensor": "layers.0.mlp.gate_proj.weight",
+  "ulp_buckets": {
+    "(0,0.5]": 120994,
+    "(0.5,1.0]": 39487722,
+    "(1.0,2.0]": 28760654,
+    "(2.0,4.0]": 37257478,
+    "(4.0,8.0]": 37962721,
+    "(8.0,16.0]": 30644313,
+    ">16": 46150309
+  },
+  "per_tensor": [
+    {
+      "key": "layers.0.mlp.gate_proj.weight",
+      "max_ulp_ratio": 3204448048.0,
+      "differing": 20862301,
+      "max_abs": 0.0352783203125,
+      "max_rel": 15406000.23076923
+    },
+    {
+      "key": "layers.1.mlp.gate_proj.weight",
+      "max_ulp_ratio": 775946432.0,
+      "differing": 20755046,
+      "max_abs": 0.03851318359375,
+      "max_rel": 4041387.6666666665
+    },
+    {
+      "key": "layers.2.mlp.gate_proj.weight",
+      "max_ulp_ratio": 738197657.0,
+      "differing": 20143453,
+      "max_abs": 0.03958892822265625,
+      "max_rel": 4824821.287581699
+    },
+    {
+      "key": "layers.2.mlp.down_proj.weight",
+      "max_ulp_ratio": 654311618.0,
+      "differing": 20109603,
+      "max_abs": 0.042236328125,
+      "max_rel": 3372740.2989690723
+    },
+    {
+      "key": "layers.0.self_attn.o_proj.weight",
+      "max_ulp_ratio": 429916005.0,
+      "differing": 3657457,
+      "max_abs": 0.008514404296875,
+      "max_rel": 2773651.64516129
+    },
+    {
+      "key": "layers.0.mlp.down_proj.weight",
+      "max_ulp_ratio": 167772393.0,
+      "differing": 21055339,
+      "max_abs": 0.0411376953125,
+      "max_rel": 792826.756097561
+    },
+    {
+      "key": "layers.0.mlp.up_proj.weight",
+      "max_ulp_ratio": 135266489.0,
+      "differing": 20934422,
+      "max_abs": 0.038238525390625,
+      "max_rel": 731170.2108108108
+    },
+    {
+      "key": "layers.1.mlp.up_proj.weight",
+      "max_ulp_ratio": 128974720.0,
+      "differing": 20835896,
+      "max_abs": 0.04461669921875,
+      "max_rel": 1007615.0
+    },
+    {
+      "key": "layers.2.self_attn.q_proj.weight",
+      "max_ulp_ratio": 101187402.0,
+      "differing": 3735229,
+      "max_abs": 0.00311279296875,
+      "max_rel": 555974.7362637363
+    },
+    {
+      "key": "layers.0.self_attn.q_proj.weight",
+      "max_ulp_ratio": 91750548.0,
+      "differing": 4059948,
+      "max_abs": 0.016082763671875,
+      "max_rel": 619936.1351351351
+    },
+    {
+      "key": "layers.1.mlp.down_proj.weight",
+      "max_ulp_ratio": 70778677.0,
+      "differing": 20831153,
+      "max_abs": 0.03616523742675781,
+      "max_rel": 348663.4334975369
+    },
+    {
+      "key": "layers.2.mlp.up_proj.weight",
+      "max_ulp_ratio": 49807611.0,
+      "differing": 20131880,
+      "max_abs": 0.03515625,
+      "max_rel": 198436.69721115538
+    },
+    {
+      "key": "layers.2.self_attn.o_proj.weight",
+      "max_ulp_ratio": 44040025.0,
+      "differing": 3198649,
+      "max_abs": 0.0013427734375,
+      "max_rel": 263712.7245508982
+    },
+    {
+      "key": "fc.weight",
+      "max_ulp_ratio": 25034929.0,
+      "differing": 10269829,
+      "max_abs": 0.0015869140625,
+      "max_rel": 141440.27683615818
+    },
+    {
+      "key": "layers.1.self_attn.q_proj.weight",
+      "max_ulp_ratio": 2948910.0,
+      "differing": 3781861,
+      "max_abs": 0.004024505615234375,
+      "max_rel": 18170.4358974359
+    },
+    {
+      "key": "layers.1.self_attn.o_proj.weight",
+      "max_ulp_ratio": 2654073.0,
+      "differing": 3446188,
+      "max_abs": 0.0025634765625,
+      "max_rel": 19659.8
+    },
+    {
+      "key": "layers.0.self_attn.k_proj.weight",
+      "max_ulp_ratio": 827644.0,
+      "differing": 480082,
+      "max_abs": 0.0050048828125,
+      "max_rel": 4511.202247191011
+    },
+    {
+      "key": "layers.1.self_attn.k_proj.weight",
+      "max_ulp_ratio": 745683.0,
+      "differing": 445890,
+      "max_abs": 0.0024619102478027344,
+      "max_rel": 3534.042654028436
+    },
+    {
+      "key": "layers.2.self_attn.k_proj.weight",
+      "max_ulp_ratio": 642906.0,
+      "differing": 450654,
+      "max_abs": 0.002685546875,
+      "max_rel": 3872.9277108433735
+    },
+    {
+      "key": "layers.1.self_attn.v_proj.weight",
+      "max_ulp_ratio": 581451.0,
+      "differing": 397406,
+      "max_abs": 0.001800537109375,
+      "max_rel": 3212.4364640883978
+    },
+    {
+      "key": "layers.2.self_attn.v_proj.weight",
+      "max_ulp_ratio": 429845.0,
+      "differing": 387256,
+      "max_abs": 0.00146484375,
+      "max_rel": 1829.127659574468
+    },
+    {
+      "key": "layers.0.self_attn.v_proj.weight",
+      "max_ulp_ratio": 214245.0,
+      "differing": 413763,
+      "max_abs": 0.001220703125,
+      "max_rel": 1485.6962962962964
+    },
+    {
+      "key": "norm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 23,
+      "max_abs": 0.0078125,
+      "max_rel": 0.007462686567164179
+    },
+    {
+      "key": "layers.2.self_attn.q_norm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 4,
+      "max_abs": 0.0078125,
+      "max_rel": 0.007633587786259542
+    },
+    {
+      "key": "layers.2.self_attn.k_norm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 3,
+      "max_abs": 0.0078125,
+      "max_rel": 0.007633587786259542
+    },
+    {
+      "key": "layers.2.post_attention_layernorm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 68,
+      "max_abs": 0.0078125,
+      "max_rel": 0.0078125
+    },
+    {
+      "key": "layers.2.input_layernorm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 129,
+      "max_abs": 0.0078125,
+      "max_rel": 0.0078125
+    },
+    {
+      "key": "layers.1.self_attn.q_norm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 4,
+      "max_abs": 0.0078125,
+      "max_rel": 0.007407407407407408
+    },
+    {
+      "key": "layers.1.self_attn.k_norm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 5,
+      "max_abs": 0.0078125,
+      "max_rel": 0.007751937984496124
+    },
+    {
+      "key": "layers.1.post_attention_layernorm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 107,
+      "max_abs": 0.0078125,
+      "max_rel": 0.0078125
+    },
+    {
+      "key": "layers.1.input_layernorm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 116,
+      "max_abs": 0.0078125,
+      "max_rel": 0.0078125
+    },
+    {
+      "key": "layers.0.self_attn.q_norm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 8,
+      "max_abs": 0.0078125,
+      "max_rel": 0.007751937984496124
+    },
+    {
+      "key": "layers.0.self_attn.k_norm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 9,
+      "max_abs": 0.0078125,
+      "max_rel": 0.0078125
+    },
+    {
+      "key": "layers.0.post_attention_layernorm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 130,
+      "max_abs": 0.0078125,
+      "max_rel": 0.0078125
+    },
+    {
+      "key": "layers.0.input_layernorm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 258,
+      "max_abs": 0.0078125,
+      "max_rel": 0.0078125
+    },
+    {
+      "key": "hidden_norm.weight",
+      "max_ulp_ratio": 1.0,
+      "differing": 22,
+      "max_abs": 0.0078125,
+      "max_rel": 0.007751937984496124
+    }
+  ]
+}

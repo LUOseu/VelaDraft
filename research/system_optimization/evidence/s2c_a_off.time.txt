@@ -1,0 +1,23 @@
+	Command being timed: "/home/lyh/miniforge3/envs/c1vllm/bin/python -m vlm_dflash.cli train --mode online --config configs/qwen2_5_vl_3b_2k.yaml --run-dir /home/lyh/vlm-systems/runs/s2c/a --limit 256 --set train.overfit_sanity.enabled=false --set train.log_every_steps=1 --set train.save_every_steps=100000 --set train.online_batch_size=8 --set train.online_feature_cache_gb=0"
+	User time (seconds): 842.59
+	System time (seconds): 74.83
+	Percent of CPU this job got: 129%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 11:47.42
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 4966804
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 62510
+	Minor (reclaiming a frame) page faults: 5314679
+	Voluntary context switches: 151374
+	Involuntary context switches: 2537492
+	Swaps: 0
+	File system inputs: 2032120
+	File system outputs: 2908016
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

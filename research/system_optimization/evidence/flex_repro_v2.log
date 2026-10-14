@@ -1,0 +1,11 @@
+[2026-10-14_17:24:50] flex repro v2 (H=1 masks)
+torch 2.11.0+cu130 cuda 13.0
+[base] FAIL InductorError: LoweringException: NoValidChoicesError: No choices to select. Provided reason: No choices exist for backend. please consider adding ATEN into max_autotune_gemm_backends config (defined in torch/_inductor/config.py) to al
+[force_main] OK in 0.2s out=(4, 16, 80, 128)
+[tritonb] OK in 0.2s out=(4, 16, 80, 128)
+[smallq] OK in 1.2s out=(4, 16, 16, 128)
+[static] FAIL InductorError: LoweringException: NoValidChoicesError: No choices to select. Provided reason: No choices exist for backend. please consider adding ATEN into max_autotune_gemm_backends config (defined in torch/_inductor/config.py) to al
+
+[2026-10-14_17:25:05] env probe: TORCHINDUCTOR_MAX_AUTOTUNE_GEMM_BACKENDS=ATEN
+torch 2.11.0+cu130 cuda 13.0
+[base] FAIL InductorError: LoweringException: NoValidChoicesError: No choices to select. Provided reason: No choices exist for backend. please consider adding ATEN into max_autotune_gemm_backends config (defined in torch/_inductor/config.py) to al

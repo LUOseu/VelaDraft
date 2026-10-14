@@ -1,0 +1,36 @@
+[17:28:46] prepare_data: source=jsonl pool=20
+[17:28:46] prepare_data: train=16 val=4 digest=ccdb021d9af0
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 11260.13it/s]
+[17:28:54] regen: 16 samples, batch=8, max_new=64, min_answer=8, multi_turn_mode=last_turn_only
+[17:28:57] regen: kept multi-turn sample e2_train_0000 (1 turns, 17 answer tokens)
+[17:28:57] regen: kept multi-turn sample e2_train_0001 (1 turns, 16 answer tokens)
+[17:28:58] regen: kept multi-turn sample e2_train_0002 (1 turns, 16 answer tokens)
+[17:28:59] regen: kept multi-turn sample e2_train_0003 (1 turns, 22 answer tokens)
+[17:29:00] regen: kept multi-turn sample e2_train_0004 (1 turns, 17 answer tokens)
+[17:29:01] regen: kept multi-turn sample e2_train_0005 (1 turns, 16 answer tokens)
+[17:29:01] regen: kept multi-turn sample e2_train_0006 (1 turns, 17 answer tokens)
+[17:29:02] regen: kept multi-turn sample e2_train_0007 (1 turns, 16 answer tokens)
+[17:29:03] regen: kept multi-turn sample e2_train_0008 (1 turns, 17 answer tokens)
+[17:29:03] regen: kept multi-turn sample e2_train_0009 (1 turns, 17 answer tokens)
+[17:29:04] regen: kept multi-turn sample e2_train_0010 (1 turns, 17 answer tokens)
+[17:29:04] regen: kept multi-turn sample e2_train_0011 (1 turns, 16 answer tokens)
+[17:29:05] regen: kept multi-turn sample e2_train_0012 (1 turns, 13 answer tokens)
+[17:29:06] regen: kept multi-turn sample e2_train_0013 (1 turns, 17 answer tokens)
+[17:29:06] regen: kept multi-turn sample e2_train_0014 (1 turns, 17 answer tokens)
+[17:29:07] regen: kept multi-turn sample e2_train_0015 (1 turns, 17 answer tokens)
+[17:29:07] train: feature_mode=online; skipping the offline capture stage (target features are extracted live by the trainer)
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights:  88%|████████▊ | 726/824 [00:00<00:00, 7199.76it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 7249.31it/s]
+[17:29:13] train: feature_mode=online (live huggingface target on cuda:0; 16 samples, seq 1024; target resident for the whole run)
+[17:29:14] visual_path_check: passed=True replay_bitwise=True span_changed=True downstream_changed=True
+[17:29:25] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'bfloat16', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[17:29:33] gradient coverage: 36/36 trainable tensors with grad (1.000 of trainable elements)
+[17:29:33]   draft_model.fc: trainable=1 tensors/12582912 elements with_grad=1 grad_norm=58.35
+[17:29:33]   draft_model.hidden_norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=1.163
+[17:29:33]   draft_model.layers: trainable=33 tensors/231224064 elements with_grad=33 grad_norm=108.1
+[17:29:33]   draft_model.norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7305
+[17:29:33] step 1/4 loss=13.5000 acc=0.000 al=1.00
+[17:29:34] step 2/4 loss=15.1250 acc=0.000 al=1.00
+[17:29:36] step 3/4 loss=14.6250 acc=0.000 al=1.00
+[17:29:37] step 4/4 loss=16.0000 acc=0.000 al=1.00
+[17:29:40] drafter visual check: logits_diff=0.125 ce_delta_swap=0.004255 ce_delta_perturb=0.03511 correction_delta=None passed=True
+[17:29:40] train: done with steps=4 final_loss=16.0

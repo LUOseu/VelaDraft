@@ -1,0 +1,12 @@
+[2026-10-14 13:37:59] S3 SKIPPED: S2 gate failed
+[2026-10-14 16:52:28] S3 SKIPPED: S2 gate failed
+[2026-10-14 17:56:14] S3 SKIPPED: S2 gate failed
+[2026-10-14 18:34:27] s3_a_off start (cache_gb=0, GPU 0, free 38G)
+[2026-10-14 19:20:00] s3_a_off exit=0 (log /home/lyh/vlm-systems/logs/s3_a_off.log)
+[2026-10-14 19:20:00] leg A regen rows: 1012
+[2026-10-14 19:20:07] s3_b_on start (cache_gb=16, GPU 0, free 40G)
+[2026-10-14 19:29:14] s3_b_on exit=0 (log /home/lyh/vlm-systems/logs/s3_b_on.log)
+[19:20:10] train: data stage present with unchanged inputs, skipping (use --force to rebuild)
+[2026-10-14 19:29:26] pruned ckpt_init.pt (sha256 matched)
+[2026-10-14 19:29:26] kept ckpt_final.pt (hashes absent or mismatched)
+[2026-10-14 19:29:26] S3 DONE

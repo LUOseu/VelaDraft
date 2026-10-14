@@ -1,0 +1,68 @@
+{
+  "legs": {
+    "a_off": {
+      "wall_seconds": 1167.0084478855133,
+      "steps": 762,
+      "peak_gpu_gb": 25.021110784,
+      "extraction_wall_s": 799.1046996545047,
+      "extraction_prepare_s": 134.20409488491714,
+      "extraction_forward_s": 664.9006047695875,
+      "target_forwards": 762,
+      "target_samples": 6072,
+      "feature_cache": {
+        "capacity_bytes": 0,
+        "hits": 0,
+        "misses": 0,
+        "stores": 0,
+        "evictions": 0,
+        "skipped_too_large": 0,
+        "peak_bytes": 0,
+        "enabled": false,
+        "current_bytes": 0,
+        "note": "opt-in bounded host-RAM retention of extracted records across epochs (train.online_feature_cache_gb; 0 = disabled). A cache hit replaces the target forward for that row; hits/misses are per lookup, evictions are LRU byte-cap evictions, and the cache is runtime-only."
+      },
+      "digest": "bc4b888cba5931a192bf994df678df9c8589192adf23048c729c0d91c5db9f50",
+      "host_rss_peak_gib": 5.695
+    },
+    "b_on": {
+      "wall_seconds": 470.86994671821594,
+      "steps": 762,
+      "peak_gpu_gb": 25.023226368,
+      "extraction_wall_s": 125.48879753611982,
+      "extraction_prepare_s": 13.899368138983846,
+      "extraction_forward_s": 111.58942939713597,
+      "target_forwards": 127,
+      "target_samples": 1012,
+      "feature_cache": {
+        "capacity_bytes": 17179869184,
+        "hits": 5060,
+        "misses": 1012,
+        "stores": 1012,
+        "evictions": 0,
+        "skipped_too_large": 0,
+        "peak_bytes": 6823170276,
+        "enabled": true,
+        "current_bytes": 6823170276,
+        "note": "opt-in bounded host-RAM retention of extracted records across epochs (train.online_feature_cache_gb; 0 = disabled). A cache hit replaces the target forward for that row; hits/misses are per lookup, evictions are LRU byte-cap evictions, and the cache is runtime-only."
+      },
+      "digest": "bc4b888cba5931a192bf994df678df9c8589192adf23048c729c0d91c5db9f50",
+      "host_rss_peak_gib": 9.664
+    }
+  },
+  "loss_equality": {
+    "steps_compared": 762,
+    "loss_identical": false,
+    "valid_tokens_identical": true,
+    "grad_norm_max_abs_delta": 0.04103386402130127,
+    "accuracy_max_abs_delta": 0.0032102763652801514
+  },
+  "declared_cache_gib": {
+    "a_off": 0,
+    "b_on": 16
+  },
+  "ckpt_final_hashes": {
+    "/home/lyh/vlm-systems/runs/s3/a_off/train/ckpt_final.pt": "86e0cbf72233a9e7fb437f01cd3b8410e08c9cbe19c4911c9f4aedd1c46055d7",
+    "/home/lyh/vlm-systems/runs/s3/b_on/train/ckpt_final.pt": "a88aa4957909394a2643a572189a3556692d346de8da3e430bfdb5dbab0b79cc"
+  },
+  "ckpt_final_match": false
+}

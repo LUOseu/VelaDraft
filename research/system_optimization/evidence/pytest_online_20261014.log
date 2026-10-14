@@ -1,0 +1,314 @@
+.................................................................        [100%]
+==================================== PASSES ====================================
+________________ test_cmd_train_online_regens_and_skips_capture ________________
+----------------------------- Captured stdout call -----------------------------
+[21:23:13] train: feature_mode=online; skipping the offline capture stage (target features are extracted live by the trainer)
+[21:23:13] train: done with steps=1 final_loss=1.0
+___ test_online_resume_fast_forward_skips_extraction_and_keeps_losses_exact ____
+----------------------------- Captured stdout call -----------------------------
+[21:23:13] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:13]   draft_model.fc: trainable=1 tensors/8192 elements with_grad=1 grad_norm=0.7195
+[21:23:13]   draft_model.hidden_norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=0.01356
+[21:23:13]   draft_model.layers: trainable=22 tensors/74048 elements with_grad=22 grad_norm=1.677
+[21:23:13]   draft_model.norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=12.32
+[21:23:13] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:13]   draft_model.fc: trainable=1 tensors/8192 elements with_grad=1 grad_norm=0.7195
+[21:23:13]   draft_model.hidden_norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=0.01356
+[21:23:13]   draft_model.layers: trainable=22 tensors/74048 elements with_grad=22 grad_norm=1.677
+[21:23:13]   draft_model.norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=12.32
+[21:23:13] train: resumed from step 2 (micro_step=2, skipped=0, history_rows=2)
+______ test_training_loop_maps_subset_indices_for_batched_online_capture _______
+----------------------------- Captured stdout call -----------------------------
+[21:23:14] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:14]   draft_model.fc: trainable=1 tensors/8192 elements with_grad=1 grad_norm=0.7427
+[21:23:14]   draft_model.hidden_norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=0.0158
+[21:23:14]   draft_model.layers: trainable=22 tensors/74048 elements with_grad=22 grad_norm=1.729
+[21:23:14]   draft_model.norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=12.32
+____________ test_tiny_qwen25_online_capture_matches_offline_store _____________
+----------------------------- Captured stderr call -----------------------------
+[transformers] Model config: bos_token_id must be `None` or an integer within the vocabulary (between 0 and 511), got 151643. This may result in unexpected behavior.
+[transformers] Model config: eos_token_id must be `None` or an integer within the vocabulary (between 0 and 511), got 151645. This may result in unexpected behavior.
+------------------------------ Captured log call -------------------------------
+WARNING  transformers.configuration_utils:logging.py:340 Model config: bos_token_id must be `None` or an integer within the vocabulary (between 0 and 511), got 151643. This may result in unexpected behavior.
+WARNING  transformers.configuration_utils:logging.py:340 Model config: eos_token_id must be `None` or an integer within the vocabulary (between 0 and 511), got 151645. This may result in unexpected behavior.
+________ test_tiny_qwen25_online_run_trains_drafter_and_freezes_target _________
+----------------------------- Captured stdout call -----------------------------
+[21:23:14] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:14]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7805
+[21:23:14]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01256
+[21:23:14]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=1.841
+[21:23:14]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04915
+______________ test_domino_progress_hook_runs_over_online_source _______________
+----------------------------- Captured stdout call -----------------------------
+[21:23:14] gradient coverage: 29/29 trainable tensors with grad (1.000 of trainable elements)
+[21:23:14]   draft_model.embed_proj: trainable=2 tensors/5632 elements with_grad=2 grad_norm=0
+[21:23:14]   draft_model.fc: trainable=1 tensors/8192 elements with_grad=1 grad_norm=1.26
+[21:23:14]   draft_model.hidden_norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=0.03162
+[21:23:14]   draft_model.layers: trainable=22 tensors/74048 elements with_grad=22 grad_norm=3.826
+[21:23:14]   draft_model.norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=12.36
+[21:23:14]   draft_model.prefix_gru: trainable=2 tensors/9216 elements with_grad=2 grad_norm=0
+_________________ test_train_dflash_resume_write_order_online __________________
+----------------------------- Captured stdout call -----------------------------
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:14]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7805
+[21:23:14]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01256
+[21:23:14]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=1.841
+[21:23:14]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04915
+[21:23:14] train: wrote resumable checkpoint (step 1) -> /tmp/pytest-of-lyh/pytest-134/test_train_dflash_resume_write0/run/train/ckpt_last.pt
+[21:23:14] train: wrote resumable checkpoint (step 2) -> /tmp/pytest-of-lyh/pytest-134/test_train_dflash_resume_write0/run/train/ckpt_last.pt
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: resumed from step 2 (micro_step=2, skipped=0, history_rows=2)
+[21:23:14] train: wrote resumable checkpoint (step 2) -> /tmp/pytest-of-lyh/pytest-134/test_train_dflash_resume_write0/run/train/ckpt_last.pt
+______ test_fusion_resume_refuses_changed_algorithm_knobs_online[dflare] _______
+----------------------------- Captured stdout call -----------------------------
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] gradient coverage: 29/29 trainable tensors with grad (1.000 of trainable elements)
+[21:23:14]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01833
+[21:23:14]   draft_model.layer_fusion_weights: trainable=1 tensors/4 elements with_grad=1 grad_norm=0.0007959
+[21:23:14]   draft_model.layers: trainable=26 tensors/20640 elements with_grad=26 grad_norm=1.561
+[21:23:14]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04017
+[21:23:14] train: wrote resumable checkpoint (step 1) -> /tmp/pytest-of-lyh/pytest-134/test_fusion_resume_refuses_cha0/run/train/ckpt_last.pt
+[21:23:14] train: wrote resumable checkpoint (step 2) -> /tmp/pytest-of-lyh/pytest-134/test_fusion_resume_refuses_cha0/run/train/ckpt_last.pt
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: resumed from step 2 (micro_step=2, skipped=0, history_rows=2)
+[21:23:14] train: wrote resumable checkpoint (step 2) -> /tmp/pytest-of-lyh/pytest-134/test_fusion_resume_refuses_cha0/run/train/ckpt_last.pt
+_______ test_fusion_resume_refuses_changed_algorithm_knobs_online[dfly] ________
+----------------------------- Captured stdout call -----------------------------
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] gradient coverage: 31/31 trainable tensors with grad (1.000 of trainable elements)
+[21:23:14]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.1688
+[21:23:14]   draft_model.hidden_correction: trainable=5 tensors/5184 elements with_grad=5 grad_norm=0.03263
+[21:23:14]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.0263
+[21:23:14]   draft_model.layer_fusion_weights: trainable=1 tensors/4 elements with_grad=1 grad_norm=0.001037
+[21:23:14]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=2.08
+[21:23:14]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.0491
+[21:23:14] train: wrote resumable checkpoint (step 1) -> /tmp/pytest-of-lyh/pytest-134/test_fusion_resume_refuses_cha1/run/train/ckpt_last.pt
+[21:23:14] train: wrote resumable checkpoint (step 2) -> /tmp/pytest-of-lyh/pytest-134/test_fusion_resume_refuses_cha1/run/train/ckpt_last.pt
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] train: resumed from step 2 (micro_step=2, skipped=0, history_rows=2)
+[21:23:14] train: wrote resumable checkpoint (step 2) -> /tmp/pytest-of-lyh/pytest-134/test_fusion_resume_refuses_cha1/run/train/ckpt_last.pt
+_______________ test_cli_resume_preflight_refuses_before_writing _______________
+----------------------------- Captured stdout call -----------------------------
+[21:23:14] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:14] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:14] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:14]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7805
+[21:23:14]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01256
+[21:23:14]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=1.841
+[21:23:14]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04915
+[21:23:15] train: wrote resumable checkpoint (step 1) -> /tmp/pytest-of-lyh/pytest-134/test_cli_resume_preflight_refu0/run/train/ckpt_last.pt
+[21:23:15] train: wrote resumable checkpoint (step 2) -> /tmp/pytest-of-lyh/pytest-134/test_cli_resume_preflight_refu0/run/train/ckpt_last.pt
+[21:23:15] train: resume preflight passed (step 2/2, plan 47bfd28ae6ba, source a3bb36498a87)
+_______ test_online_fp32_target_bf16_storage_trains_through_real_factory _______
+----------------------------- Captured stdout call -----------------------------
+[21:23:15] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:15]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7805
+[21:23:15]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01256
+[21:23:15]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=1.841
+[21:23:15]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04915
+_________________ test_offline_online_multistep_updates_align __________________
+----------------------------- Captured stdout call -----------------------------
+[21:23:15] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:15]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7805
+[21:23:15]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01256
+[21:23:15]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=1.841
+[21:23:15]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04915
+[21:23:15] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:15]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7805
+[21:23:15]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01256
+[21:23:15]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=1.841
+[21:23:15]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04915
+__________ test_offline_feature_digest_and_offline_resume_write_order __________
+----------------------------- Captured stdout call -----------------------------
+[21:23:15] train: features from /tmp/pytest-of-lyh/pytest-134/test_offline_feature_digest_an0/run/features (2 samples, seq 23, bfloat16, format vlm-dflash-features-v1)
+[21:23:15] train: dtypes {'feature_storage': 'bfloat16', 'target_native': None, 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:15] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:15]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7805
+[21:23:15]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01256
+[21:23:15]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=1.841
+[21:23:15]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04915
+[21:23:15] train: wrote resumable checkpoint (step 1) -> /tmp/pytest-of-lyh/pytest-134/test_offline_feature_digest_an0/run/train/ckpt_last.pt
+[21:23:15] train: wrote resumable checkpoint (step 2) -> /tmp/pytest-of-lyh/pytest-134/test_offline_feature_digest_an0/run/train/ckpt_last.pt
+[21:23:15] train: features from /tmp/pytest-of-lyh/pytest-134/test_offline_feature_digest_an0/run/features (2 samples, seq 23, bfloat16, format vlm-dflash-features-v1)
+[21:23:15] train: dtypes {'feature_storage': 'bfloat16', 'target_native': None, 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:15] train: features from /tmp/pytest-of-lyh/pytest-134/test_offline_feature_digest_an0/run/features (2 samples, seq 23, bfloat16, format vlm-dflash-features-v1)
+[21:23:15] train: dtypes {'feature_storage': 'bfloat16', 'target_native': None, 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:15] train: resumed from step 2 (micro_step=2, skipped=0, history_rows=2)
+[21:23:15] train: wrote resumable checkpoint (step 2) -> /tmp/pytest-of-lyh/pytest-134/test_offline_feature_digest_an0/run/train/ckpt_last.pt
+_________________ test_feature_store_reuse_across_draft_depth __________________
+----------------------------- Captured stdout call -----------------------------
+[21:23:15] train: features from /tmp/pytest-of-lyh/pytest-134/test_feature_store_reuse_acros0/shared_features (2 samples, seq 23, bfloat16, format vlm-dflash-features-v1)
+[21:23:15] train: dtypes {'feature_storage': 'bfloat16', 'target_native': None, 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:15] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:15]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7805
+[21:23:15]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01256
+[21:23:15]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=1.841
+[21:23:15]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04915
+[21:23:15] train: wrote resumable checkpoint (step 1) -> /tmp/pytest-of-lyh/pytest-134/test_feature_store_reuse_acros0/run/train/ckpt_last.pt
+[21:23:15] train: features from /tmp/pytest-of-lyh/pytest-134/test_feature_store_reuse_acros0/shared_features (2 samples, seq 23, bfloat16, format vlm-dflash-features-v1)
+[21:23:15] train: dtypes {'feature_storage': 'bfloat16', 'target_native': None, 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:15] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:15]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7805
+[21:23:15]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01256
+[21:23:15]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=1.841
+[21:23:15]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04915
+[21:23:15] train: wrote resumable checkpoint (step 1) -> /tmp/pytest-of-lyh/pytest-134/test_feature_store_reuse_acros0/run_b/train/ckpt_last.pt
+____________ test_pending_accumulation_across_epochs_is_not_a_stall ____________
+----------------------------- Captured stdout call -----------------------------
+[21:23:15] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:15]   draft_model.fc: trainable=1 tensors/8192 elements with_grad=1 grad_norm=1.128
+[21:23:15]   draft_model.hidden_norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=0.02222
+[21:23:15]   draft_model.layers: trainable=22 tensors/74048 elements with_grad=22 grad_norm=2.42
+[21:23:15]   draft_model.norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=12.19
+_____________ test_resume_replays_across_epoch_boundaries_exactly ______________
+----------------------------- Captured stdout call -----------------------------
+[21:23:15] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:15]   draft_model.fc: trainable=1 tensors/8192 elements with_grad=1 grad_norm=0.6113
+[21:23:15]   draft_model.hidden_norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=0.01422
+[21:23:15]   draft_model.layers: trainable=22 tensors/74048 elements with_grad=22 grad_norm=1.957
+[21:23:15]   draft_model.norm: trainable=1 tensors/64 elements with_grad=1 grad_norm=12.11
+[21:23:15] train: resumed from step 2 (micro_step=6, skipped=0, history_rows=2)
+________ test_reconcile_train_log_moves_uncommitted_tail_and_half_lines ________
+----------------------------- Captured stdout call -----------------------------
+[21:23:15] train: reconciled train log to committed step 2 (1 uncommitted rows -> train_log.uncommitted.jsonl)
+[21:23:15] train: reconciled train log to committed step 2 (1 uncommitted rows -> train_log.uncommitted.jsonl)
+______________ test_interrupted_run_resume_keeps_log_steps_unique ______________
+----------------------------- Captured stdout call -----------------------------
+[21:23:15] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:15] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:15] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:15]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7805
+[21:23:15]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01256
+[21:23:15]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=1.841
+[21:23:15]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04915
+[21:23:15] train: wrote resumable checkpoint (step 1) -> /tmp/pytest-of-lyh/pytest-134/test_interrupted_run_resume_ke0/run/train/ckpt_last.pt
+[21:23:15] train: wrote resumable checkpoint (step 2) -> /tmp/pytest-of-lyh/pytest-134/test_interrupted_run_resume_ke0/run/train/ckpt_last.pt
+[21:23:15] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:15] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:15] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:15] train: reconciled train log to committed step 2 (1 uncommitted rows -> train_log.uncommitted.jsonl)
+[21:23:15] train: resumed from step 2 (micro_step=2, skipped=0, history_rows=2)
+[21:23:15] train: wrote resumable checkpoint (step 3) -> /tmp/pytest-of-lyh/pytest-134/test_interrupted_run_resume_ke0/run/train/ckpt_last.pt
+[21:23:15] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+[21:23:15] train: feature_mode=online resume without a recorded visual-path check; skipping it
+[21:23:15] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'float32', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:15] train: resumed from step 3 (micro_step=3, skipped=0, history_rows=3)
+[21:23:15] train: wrote resumable checkpoint (step 3) -> /tmp/pytest-of-lyh/pytest-134/test_interrupted_run_resume_ke0/run/train/ckpt_last.pt
+________________ test_visual_check_failure_closes_online_source ________________
+----------------------------- Captured stdout call -----------------------------
+[21:23:15] train: feature_mode=online (live huggingface target on cpu; 2 samples, seq 64; target resident for the whole run)
+_________ test_cli_resume_preflight_external_features_dependency_chain _________
+----------------------------- Captured stdout call -----------------------------
+[21:23:15] train: features from /tmp/pytest-of-lyh/pytest-134/test_cli_resume_preflight_exte0/shared_store (2 samples, seq 23, bfloat16, format vlm-dflash-features-v1)
+[21:23:15] train: dtypes {'feature_storage': 'bfloat16', 'target_native': None, 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[21:23:15] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[21:23:15]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7805
+[21:23:15]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01256
+[21:23:15]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=1.841
+[21:23:15]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.04915
+[21:23:15] train: wrote resumable checkpoint (step 1) -> /tmp/pytest-of-lyh/pytest-134/test_cli_resume_preflight_exte0/run/train/ckpt_last.pt
+[21:23:15] train: wrote resumable checkpoint (step 2) -> /tmp/pytest-of-lyh/pytest-134/test_cli_resume_preflight_exte0/run/train/ckpt_last.pt
+[21:23:15] train: resume preflight passed (step 2/2, plan 47bfd28ae6ba, source d6f31d63838b)
+=========================== short test summary info ============================
+PASSED tests/test_online_mode.py::test_feature_mode_flag_and_defaults
+PASSED tests/test_online_mode.py::test_build_train_config_online_suffixes_the_auto_run_name
+PASSED tests/test_online_mode.py::test_feature_mode_merge_priority_and_validation
+PASSED tests/test_online_mode.py::test_cmd_train_online_refuses_features_before_any_stage
+PASSED tests/test_online_mode.py::test_cmd_train_online_regens_and_skips_capture
+PASSED tests/test_online_mode.py::test_resume_state_accepts_matching_state
+PASSED tests/test_online_mode.py::test_resume_state_legacy_checkpoint_is_not_exactly_resumable
+PASSED tests/test_online_mode.py::test_resume_state_requires_matching_training_plan
+PASSED tests/test_online_mode.py::test_resume_state_rejects_mode_algorithm_and_source_mismatch
+PASSED tests/test_online_mode.py::test_resume_state_identity_gate
+PASSED tests/test_online_mode.py::test_training_loop_refuses_dataloader_workers_for_online_datasets
+PASSED tests/test_online_mode.py::test_online_resume_fast_forward_skips_extraction_and_keeps_losses_exact
+PASSED tests/test_online_mode.py::test_online_dataset_record_contract_and_reextraction
+PASSED tests/test_online_mode.py::test_online_batched_fetch_matches_per_sample_records
+PASSED tests/test_online_mode.py::test_online_batched_fetch_fast_forward_placeholders
+PASSED tests/test_online_mode.py::test_online_extraction_boundary_fake_clock
+PASSED tests/test_online_mode.py::test_online_batch_iterator_reproduces_dataloader_order
+PASSED tests/test_online_mode.py::test_online_batch_iterator_splits_training_batches_into_capture_groups
+PASSED tests/test_online_mode.py::test_training_loop_maps_subset_indices_for_batched_online_capture
+PASSED tests/test_online_mode.py::test_online_source_refuses_unfrozen_or_empty_inputs
+PASSED tests/test_online_mode.py::test_online_digest_tracks_data_and_ignores_model_path
+PASSED tests/test_online_mode.py::test_online_digest_records_online_batch_size
+PASSED tests/test_online_mode.py::test_online_digest_covers_multi_turn_mode
+PASSED tests/test_online_mode.py::test_online_digest_v2_covers_token_values_and_image_bytes
+PASSED tests/test_online_mode.py::test_online_digest_v2_is_path_stable_and_verifies_the_data_manifest
+PASSED tests/test_online_mode.py::test_training_plan_digest_covers_semantic_fields_only
+PASSED tests/test_online_mode.py::test_training_plan_digest_resolves_every_algorithm[dflash]
+PASSED tests/test_online_mode.py::test_training_plan_digest_resolves_every_algorithm[dspark]
+PASSED tests/test_online_mode.py::test_training_plan_digest_resolves_every_algorithm[domino]
+PASSED tests/test_online_mode.py::test_training_plan_digest_resolves_every_algorithm[jetspec]
+PASSED tests/test_online_mode.py::test_training_plan_digest_resolves_every_algorithm[dflash2]
+PASSED tests/test_online_mode.py::test_online_final_hidden_flows_into_batches
+PASSED tests/test_online_mode.py::test_tiny_qwen25_online_capture_matches_offline_store
+PASSED tests/test_online_mode.py::test_tiny_qwen25_batched_capture_matches_per_sample
+PASSED tests/test_online_mode.py::test_tiny_qwen25_online_run_trains_drafter_and_freezes_target
+PASSED tests/test_online_mode.py::test_online_capture_rejects_prompt_drift_and_token_count_mismatch
+PASSED tests/test_online_mode.py::test_jetspec_dflash2_and_dspark_consume_online_batches
+PASSED tests/test_online_mode.py::test_domino_progress_hook_runs_over_online_source
+PASSED tests/test_online_mode.py::test_tiny_qwen3vl_capture_interleaved_mrope_and_untied_head
+PASSED tests/test_online_mode.py::test_online_head_extraction_reports_tied_and_untied
+PASSED tests/test_online_mode.py::test_train_dflash_resume_write_order_online
+PASSED tests/test_online_mode.py::test_fusion_resume_refuses_changed_algorithm_knobs_online[dflare]
+PASSED tests/test_online_mode.py::test_fusion_resume_refuses_changed_algorithm_knobs_online[dfly]
+PASSED tests/test_online_mode.py::test_cli_resume_preflight_refuses_before_writing
+PASSED tests/test_online_mode.py::test_cmd_train_online_rejects_num_workers_before_any_stage
+PASSED tests/test_online_mode.py::test_online_fp32_target_bf16_storage_trains_through_real_factory
+PASSED tests/test_online_mode.py::test_training_loop_refuses_frozen_head_dtype_mismatch
+PASSED tests/test_online_mode.py::test_offline_online_multistep_updates_align
+PASSED tests/test_online_mode.py::test_offline_feature_digest_and_offline_resume_write_order
+PASSED tests/test_online_mode.py::test_feature_store_reuse_across_draft_depth
+PASSED tests/test_online_mode.py::test_pending_accumulation_across_epochs_is_not_a_stall
+PASSED tests/test_online_mode.py::test_no_valid_supervision_still_stalls
+PASSED tests/test_online_mode.py::test_resume_replays_across_epoch_boundaries_exactly
+PASSED tests/test_online_mode.py::test_reconcile_train_log_moves_uncommitted_tail_and_half_lines
+PASSED tests/test_online_mode.py::test_interrupted_run_resume_keeps_log_steps_unique
+PASSED tests/test_online_mode.py::test_visual_check_failure_closes_online_source
+PASSED tests/test_online_mode.py::test_online_source_constructor_failure_closes_partial_state
+PASSED tests/test_online_mode.py::test_cli_resume_preflight_external_features_dependency_chain
+PASSED tests/test_online_mode.py::test_online_cache_default_off_extracts_every_read
+PASSED tests/test_online_mode.py::test_online_cache_rejects_invalid_settings
+PASSED tests/test_online_mode.py::test_online_cache_second_read_is_free_and_bit_identical
+PASSED tests/test_online_mode.py::test_online_cache_lru_eviction_respects_byte_cap
+PASSED tests/test_online_mode.py::test_online_cache_fetch_batch_hits_and_skips_prepare
+PASSED tests/test_online_mode.py::test_online_cache_never_stores_placeholders
+PASSED tests/test_online_mode.py::test_online_cache_real_tiny_model_second_epoch_is_free

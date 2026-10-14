@@ -1,0 +1,164 @@
+{
+  "format": "vlm-dflash-eval-v1",
+  "identity": {
+    "target_model_path": "/home/lyh/vlm-dflash/assets/models/Qwen2.5-VL-3B-Instruct",
+    "model_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+    "processor_fingerprint": "ed94e2fa5734073524651401de89882531084a817ed212300893591d6b35ff3e",
+    "mask_token_id": 151669,
+    "spatial_rope_sections": [
+      16,
+      24,
+      24
+    ],
+    "draft_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "capture_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "image_min_pixels": 200704,
+    "image_max_pixels": 1003520
+  },
+  "algorithm": "dflash",
+  "checkpoint_feature_modes": {
+    "ckpt_final.pt": "online"
+  },
+  "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)",
+  "settings": {
+    "num_prompts": 128,
+    "workload": null,
+    "max_new_tokens": 128,
+    "temperature": 0.0,
+    "dtype": "bfloat16",
+    "attn_impl": "sdpa",
+    "block_size": 8,
+    "target_tie_word_embeddings": true
+  },
+  "equivalence_check": {
+    "num_prompts": 128,
+    "token_exact": true,
+    "runs": {
+      "ckpt_final.pt": {
+        "num_prompts": 128,
+        "token_exact": true,
+        "failed_ids": []
+      }
+    },
+    "dtype": "bfloat16",
+    "attn_impl": "sdpa",
+    "max_new_tokens": 128,
+    "verification": "sequential",
+    "sequential_target_verification": true,
+    "strict_parallel_margin": null,
+    "verify_sdpa_backend": "parity",
+    "verify_backend_switch_enabled": false,
+    "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+  },
+  "parallel_diagnostic": {
+    "num_prompts": 16,
+    "token_exact": 4,
+    "token_exact_rate": 0.25,
+    "mismatches": [
+      {
+        "id": "000000312476",
+        "first_divergence": 93,
+        "target_top2_margin": 0.0
+      },
+      {
+        "id": "000000366897",
+        "first_divergence": 35,
+        "target_top2_margin": 0.0
+      },
+      {
+        "id": "000000094570",
+        "first_divergence": 54,
+        "target_top2_margin": 0.125
+      },
+      {
+        "id": "000000133532",
+        "first_divergence": 40,
+        "target_top2_margin": 0.0
+      },
+      {
+        "id": "000000046506",
+        "first_divergence": 80,
+        "target_top2_margin": 0.0
+      },
+      {
+        "id": "000000414651",
+        "first_divergence": 86,
+        "target_top2_margin": 0.125
+      },
+      {
+        "id": "000000426040",
+        "first_divergence": 105,
+        "target_top2_margin": 0.125
+      },
+      {
+        "id": "000000457796",
+        "first_divergence": 121,
+        "target_top2_margin": 0.0
+      },
+      {
+        "id": "000000151259",
+        "first_divergence": 48,
+        "target_top2_margin": 0.0
+      },
+      {
+        "id": "000000534267",
+        "first_divergence": 71,
+        "target_top2_margin": 0.25
+      },
+      {
+        "id": "000000546575",
+        "first_divergence": 61,
+        "target_top2_margin": 0.0
+      },
+      {
+        "id": "000000092092",
+        "first_divergence": 59,
+        "target_top2_margin": 0.125
+      }
+    ],
+    "note": "Reference verify backend, parallel block verification; target_top2_margin is the logit gap at the first divergent step."
+  },
+  "runs": {
+    "ckpt_final.pt": {
+      "num_samples": 128,
+      "verify_steps": 10131,
+      "new_tokens": 15462,
+      "accepted_tokens": 5288,
+      "draft_tokens": 69428,
+      "mean_al": 1.526206692330471,
+      "tokens_per_target_forward": 1.526206692330471,
+      "acceptance_rate": 0.07616523592786772,
+      "per_slot_acceptance": [
+        0.3714909235194921,
+        0.11456775351480707,
+        0.030463974346126868,
+        0.007558959887119532,
+        0.0013175230566534915,
+        0.00010198878123406426,
+        0.0001026167265264238
+      ],
+      "wall_seconds_per_sample": 4.084597644236055,
+      "target_verify_seconds_per_sample": 3.458805906176567,
+      "target_prefill_seconds_per_sample": 0.10942199820280075,
+      "draft_seconds_per_sample": 0.4616285071633756,
+      "role": "trained drafter",
+      "draft_inference_in_block_causal": false,
+      "draft_candidate_selector": false,
+      "speedup_vs_target_only": 0.8631843701080086
+    }
+  },
+  "target_only": {
+    "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+    "mean_new_tokens": 120.796875,
+    "wall_seconds_per_sample": 3.525760844684555,
+    "decode_tokens_per_second": 34.26122199471176
+  }
+}

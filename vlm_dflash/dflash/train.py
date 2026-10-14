@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
 from pathlib import Path
 
@@ -1067,10 +1068,16 @@ def train_dflash(
             device,
             total_steps=total_steps,
             seed=seed,
-            shuffle=True,
+            # Lane override for the cache A/B parity check: a fixed epoch order
+            # tests the cache against a stable extraction grouping.
+            shuffle=(os.environ.get("VLM_DFLASH_TRAIN_SHUFFLE", "1") != "0"),
             log_path=log_path,
             resume_state=resume_state,
-            on_checkpoint=write_train_state,
+            # Lane runs on a 100%-full host disk opt out of the resumable
+            # checkpoint writes (they dominate both wall and disk there).
+            on_checkpoint=(
+                None if os.environ.get("VLM_DFLASH_SKIP_RESUME_CKPT") == "1" else write_train_state
+            ),
             save_every=save_every,
         )
         torch.save({**checkpoint_common, "step": output["summary"]["steps"], "model": module.draft_model.state_dict()},

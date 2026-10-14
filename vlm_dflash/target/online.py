@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import math
 import time
+from collections import OrderedDict
 from pathlib import Path
 
 import torch
@@ -57,6 +58,15 @@ from .sample_capture import (
 #: ``validate_resume_state`` refuses them instead of comparing digests from
 #: two different schemes.
 ONLINE_DIGEST_VERSION = "vlm-dflash-online-source-digest-v2"
+
+
+def _record_nbytes(record: dict) -> int:
+    """Bytes of the tensor payload of one extracted record (cache accounting)."""
+    total = 0
+    for value in record.values():
+        if torch.is_tensor(value):
+            total += int(value.numel()) * int(value.element_size())
+    return total
 
 
 def _manifest_image_hashes(run_dir: Path) -> dict[str, str]:
@@ -233,8 +243,13 @@ class OnlineFeatureDataset(Dataset):
             self._placeholder_remaining -= 1
             self.source.note_fast_forward()
             return self._placeholder_record(str(index))
+        cached = self.source.cache_lookup(int(index))
+        if cached is not None:
+            return cached
         record = self.source.extract(int(index))
-        return self._normalize(record)
+        out = self._normalize(record)
+        self.source.cache_store(int(index), out)
+        return out
 
     def fetch_batch(self, indices: list[int]) -> list[dict]:
         """Records for ``indices``, in order, with one batched target forward.
@@ -257,13 +272,19 @@ class OnlineFeatureDataset(Dataset):
                 self._placeholder_remaining -= 1
                 self.source.note_fast_forward()
                 records[position] = self._placeholder_record(str(index))
-            else:
-                prepared.append(self.source.prepare(int(index)))
-                positions.append(position)
+                continue
+            cached = self.source.cache_lookup(int(index))
+            if cached is not None:
+                records[position] = cached
+                continue
+            prepared.append(self.source.prepare(int(index)))
+            positions.append(position)
         if prepared:
             extracted = self.source.extract_prepared(prepared)
             for position, record in zip(positions, extracted):
-                records[position] = self._normalize(record)
+                out = self._normalize(record)
+                self.source.cache_store(int(indices[position]), out)
+                records[position] = out
         missing = [position for position, record in enumerate(records) if record is None]
         if missing:
             raise RuntimeError(f"fetch_batch left positions {missing} unresolved.")
@@ -324,6 +345,21 @@ class OnlineFeatureSource:
         self.lm_head_weight = None
         self.stats: dict[str, dict] = {}
         self._peak_open = False
+        # Bounded record-cache defaults (replaced by _init when it runs); the
+        # constructor's failure path calls close(), which must be safe even
+        # when the cache was never built.
+        self.cache_capacity_bytes = 0
+        self._record_cache: "OrderedDict[int, dict]" = OrderedDict()
+        self._record_cache_bytes = 0
+        self.cache_stats: dict = {
+            "capacity_bytes": 0,
+            "hits": 0,
+            "misses": 0,
+            "stores": 0,
+            "evictions": 0,
+            "skipped_too_large": 0,
+            "peak_bytes": 0,
+        }
         try:
             self._init(cfg, contract, run_dir, limit=limit)
         except BaseException:
@@ -350,6 +386,36 @@ class OnlineFeatureSource:
         self.fused_hidden_size = len(self.layer_ids) * int(contract["text"]["hidden_size"])
         # Rows per batched capture forward; 1 is the per-sample reference path.
         self.online_batch_size = max(1, int((cfg.get("train") or {}).get("online_batch_size", 1) or 1))
+        # Optional bounded host-RAM retention of extracted records across
+        # epochs (``train.online_feature_cache_gb``; 0 = disabled, the
+        # reference behavior). With a frozen teacher and fixed regen answers a
+        # record is epoch-invariant, so epochs after the first can be served
+        # from RAM instead of re-running the target. The cache is runtime-only
+        # (never persisted), LRU-evicted at a byte cap, and changes neither the
+        # consumed rows, their order/grouping, nor any record value -- it stays
+        # out of every digest/plan gate, and a resume simply starts cold.
+        cache_gb = (cfg.get("train") or {}).get("online_feature_cache_gb", 0) or 0
+        try:
+            cache_gb = float(cache_gb)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "train.online_feature_cache_gb must be a number of GiB (0 disables the cache), "
+                f"got {cache_gb!r}."
+            ) from exc
+        if cache_gb < 0:
+            raise ValueError("train.online_feature_cache_gb must be >= 0 (0 disables the cache).")
+        self.cache_capacity_bytes = int(cache_gb * (1 << 30))
+        self._record_cache: "OrderedDict[int, dict]" = OrderedDict()
+        self._record_cache_bytes = 0
+        self.cache_stats: dict = {
+            "capacity_bytes": self.cache_capacity_bytes,
+            "hits": 0,
+            "misses": 0,
+            "stores": 0,
+            "evictions": 0,
+            "skipped_too_large": 0,
+            "peak_bytes": 0,
+        }
         target_cfg = cfg.get("target", {}) or {}
         self.target_dtype = str(target_cfg.get("dtype", "bfloat16"))
         self.attn_implementation = str(target_cfg.get("attn_implementation", "sdpa"))
@@ -493,6 +559,53 @@ class OnlineFeatureSource:
         entry["wall_seconds"] += elapsed
         return records
 
+    # -- bounded record cache ------------------------------------------------
+    def cache_enabled(self) -> bool:
+        """True when ``train.online_feature_cache_gb`` is set above zero."""
+        return self.cache_capacity_bytes > 0
+
+    def cache_lookup(self, index: int) -> dict | None:
+        """Return the retained record for ``index`` (LRU touch) or None."""
+        if not self.cache_capacity_bytes:
+            return None
+        record = self._record_cache.get(int(index))
+        if record is None:
+            self.cache_stats["misses"] += 1
+            return None
+        self._record_cache.move_to_end(int(index))
+        self.cache_stats["hits"] += 1
+        return record
+
+    def cache_store(self, index: int, record: dict) -> None:
+        """Retain a normalized record under the byte cap (LRU eviction).
+
+        Records larger than the whole capacity are not stored (they would
+        evict every other entry for a single hit); placeholders must never be
+        passed here.
+        """
+        if not self.cache_capacity_bytes:
+            return
+        index = int(index)
+        size = _record_nbytes(record)
+        if size > self.cache_capacity_bytes:
+            self.cache_stats["skipped_too_large"] += 1
+            return
+        previous = self._record_cache.pop(index, None)
+        if previous is not None:
+            self._record_cache_bytes -= _record_nbytes(previous)
+        self._record_cache[index] = record
+        self._record_cache_bytes += size
+        self.cache_stats["stores"] += 1
+        while self._record_cache_bytes > self.cache_capacity_bytes and self._record_cache:
+            _evicted_index, evicted = self._record_cache.popitem(last=False)
+            self._record_cache_bytes -= _record_nbytes(evicted)
+            self.cache_stats["evictions"] += 1
+        if self._record_cache_bytes > self.cache_stats["peak_bytes"]:
+            self.cache_stats["peak_bytes"] = self._record_cache_bytes
+
+    def cache_current_bytes(self) -> int:
+        return self._record_cache_bytes
+
     # -- trainer-facing surface ----------------------------------------------
     def dataset(self) -> OnlineFeatureDataset:
         return OnlineFeatureDataset(self)
@@ -549,6 +662,17 @@ class OnlineFeatureSource:
             "extraction_prepare_seconds_total": total_prepare,
             "extraction_forward_seconds_total": total_forward,
             "fast_forward_items_total": total_fast_forward,
+            "feature_cache": {
+                **dict(self.cache_stats),
+                "enabled": self.cache_enabled(),
+                "current_bytes": self._record_cache_bytes,
+                "note": (
+                    "opt-in bounded host-RAM retention of extracted records across epochs "
+                    "(train.online_feature_cache_gb; 0 = disabled). A cache hit replaces the "
+                    "target forward for that row; hits/misses are per lookup, evictions are "
+                    "LRU byte-cap evictions, and the cache is runtime-only."
+                ),
+            },
             "target_forwards_note": (
                 "target_forwards counts model forward calls; target_samples counts extracted rows. "
                 "They differ when train.online_batch_size > 1 (one forward per capture group)."
@@ -589,6 +713,8 @@ class OnlineFeatureSource:
         self.processor = None
         self.embed_weight = None
         self.lm_head_weight = None
+        self._record_cache.clear()
+        self._record_cache_bytes = 0
 
 
 class OnlineBatchIterator:

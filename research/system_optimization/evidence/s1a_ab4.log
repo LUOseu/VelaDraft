@@ -1,0 +1,18 @@
+[17:29:45] train: data stage present with unchanged inputs, skipping (use --force to rebuild)
+[17:29:45] train: regen stage present with unchanged inputs, skipping (use --force to rerun)
+[17:29:45] train: feature_mode=online; skipping the offline capture stage (target features are extracted live by the trainer)
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 9984.51it/s]
+[17:29:57] train: feature_mode=online (live huggingface target on cuda:0; 16 samples, seq 1024; target resident for the whole run)
+[17:29:59] visual_path_check: passed=True replay_bitwise=True span_changed=True downstream_changed=True
+[17:30:10] train: dtypes {'feature_storage': 'bfloat16', 'target_native': 'bfloat16', 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[17:30:18] gradient coverage: 36/36 trainable tensors with grad (1.000 of trainable elements)
+[17:30:18]   draft_model.fc: trainable=1 tensors/12582912 elements with_grad=1 grad_norm=58.34
+[17:30:18]   draft_model.hidden_norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=1.163
+[17:30:18]   draft_model.layers: trainable=33 tensors/231224064 elements with_grad=33 grad_norm=108.1
+[17:30:18]   draft_model.norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.7303
+[17:30:18] step 1/4 loss=13.5000 acc=0.000 al=1.00
+[17:30:19] step 2/4 loss=15.1250 acc=0.000 al=1.00
+[17:30:21] step 3/4 loss=14.6250 acc=0.000 al=1.00
+[17:30:22] step 4/4 loss=16.0000 acc=0.000 al=1.00
+[17:30:25] drafter visual check: logits_diff=0.125 ce_delta_swap=0.001531 ce_delta_perturb=0.01066 correction_delta=None passed=True
+[17:30:25] train: done with steps=4 final_loss=16.0

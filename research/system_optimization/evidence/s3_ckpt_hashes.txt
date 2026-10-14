@@ -1,0 +1,4 @@
+c5aff89e853406b0ba8eca0e2ca9ccb4a1354781cc7be6e7e6365f85b8c9cbbb  /home/lyh/vlm-systems/runs/s3/a_off/train/ckpt_init.pt
+86e0cbf72233a9e7fb437f01cd3b8410e08c9cbe19c4911c9f4aedd1c46055d7  /home/lyh/vlm-systems/runs/s3/a_off/train/ckpt_final.pt
+c5aff89e853406b0ba8eca0e2ca9ccb4a1354781cc7be6e7e6365f85b8c9cbbb  /home/lyh/vlm-systems/runs/s3/b_on/train/ckpt_init.pt
+a88aa4957909394a2643a572189a3556692d346de8da3e430bfdb5dbab0b79cc  /home/lyh/vlm-systems/runs/s3/b_on/train/ckpt_final.pt
