@@ -3,7 +3,7 @@
 - 协议版本：**rsi-protocol-v0.1.0** ｜ 接口版本：**rsi-iface-v0.1.0**
 - 共同基线 BASE_SHA：`7eab1369266010137702de8c714053729cde5834`（origin/main，PR #6 合并后；含固定预算 LRU 记录缓存）
 - 历史核对基线 B0：`e15256d7c4bd10a490a7ac821eb12a0749a96fdd`
-- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 00:03 (Asia/Shanghai)
+- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 00:16 (Asia/Shanghai)
 - 无法确认的字段以 `?` 标注并在文末说明；未创建的 worktree/分支在下一次更新回填。
 
 ## 1. 角色与分支
@@ -97,6 +97,7 @@
 - 2026-10-15 00:00 — **D2 phase-split 配对首批完成**（GPU2，mb4×8 步；`--nodedup` base4 vs `--dedup` dedup4，三腿 loss bitwise 同值 6.944609642028809）：base4 fwd/bwd/opt = 188.3/188.2/26.4ms、wall_med 0.674s；dedup4 = 189.3/189.2/26.5ms、wall_med 0.656s → **fwd 未见 -5.5% 复现（+0.5%）**；与 ab 臂（14 步 186.0→175.7）差异待 D2 归因（激活条件/步数/边界）。ckpt 卫生已修复（`ckpt_saves_skipped`）。
 - 2026-10-15 00:00 — **D4 d4-001 评审：ACCEPTED（条件）**（见 §7）；W2 租约 **L-W2-D4 条件批准 ≤1.5 GPU-h**（等安静卡；GPU2/GPU3 现空闲、GPU0/1 外部 xs）。
 - 2026-10-15 00:15 — **d4-001 集成完成**：`research/rsi-c0` commit `1f8963e`（4 文件 + `docs/online-training.md` 文档行；应用后文件 sha1 与 D4 worktree 逐一对账一致：cache_budget `3d48e108` / online.py `fc019296` / tests `1c5c2a64`、`69071557`）。复跑 13/13 + 4/4 于本 worktree。**merge-readiness 待**：D4 lane commit 对账 + L-W2-D4 real-sensor A/B。
+- 2026-10-15 00:05 — 资源更新：**GPU0 空闲**（外部 xs 完成；00:04 实测 18MiB/0%）→ L-W2-D4 与 D1 W2/W3 可按"实测 quiet"排队；D2 在 **GPU2** 跑新 pin 系列（`pin_base2` probe，运行中）；**GPU3 被外部 dhz（racer repro，~14.3GB）回归占用**。D1 已清 W1 train ckpt（run-dir 6.4G→1.9G；free 22→27G）✓。
 
 ## 7. 请求与应答（C0）
 
