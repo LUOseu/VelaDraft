@@ -64,8 +64,9 @@ starting a work package, re-read it before big steps.
 - Status update (C-01a13621, 03:15): **WP4 done + measured** (`R-20261014-12`,
   0.21 GPU-h, GPU0 only): batched online capture (`train.online_batch_size`,
   commits `95d6f2e` + `c28ad14`) - A/B on the pinned E2 smoke slice: 16 -> 4
-  target forwards, extraction wall 2.842 -> 2.308 s (-18.8%), step losses
-  bit-identical, target peak unchanged; profiling shows render ~17 ms vs
+  target forwards, step losses bit-identical, target peak unchanged (the
+  extraction-wall -18.8% figure is superseded per the R2 review finding),
+  profiling shows render ~17 ms vs
   forward 129-139 ms/row, so the optional second I/O optimization was
   resolved to zero with evidence (`docs/plan/WP4_MEASUREMENT.md`). My lane
   next: **WP5 runtime bridge** (`docs/serving-bridge.md` proposal), then

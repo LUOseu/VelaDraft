@@ -55,8 +55,9 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   forward per capture group (group size `min(N, micro_batch)`), and slices
   records back per row; the trainer walks the same sampler order as the
   per-sample `DataLoader` (parity pinned by tests). A/B on the pinned E2
-  slice: 16 -> 4 target forwards, extraction wall 2.842 -> 2.308 s (-18.8%),
-  losses bit-identical, peak unchanged; profiling `scripts/profile_online_extraction.py`
+  slice: 16 -> 4 target forwards, losses bit-identical, peak unchanged (the
+  reported extraction-wall 2.842 -> 2.308 s / "-18.8%" is superseded - R2
+  timer-boundary mismatch; re-measurement pending); profiling `scripts/profile_online_extraction.py`
   shows prefill-bound extraction (render ~17 ms vs forward 129-139 ms/row),
   so the "at most one further I/O optimization" resolved to zero with
   evidence (report `docs/plan/WP4_MEASUREMENT.md`). 342 CPU tests green.

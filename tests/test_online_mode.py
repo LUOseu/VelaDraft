@@ -135,8 +135,7 @@ def _install_stub_extraction(monkeypatch, calls: list, *, store_final_hidden: bo
     """
     teacher_hidden_dim = context_hidden if final_hidden_dim is None else final_hidden_dim
 
-    def fake_build(model, processor, row, media_dir, *, layer_ids, image_token_id, merge_size,
-                   dtype, seq_length, store_final_hidden):
+    def records_for(model, row, *, layer_ids, image_token_id, merge_size, dtype, seq_length, store_final_hidden):
         calls.append(row.get("id"))
         prompt_len = len(row["regen"]["prompt_ids"])
         answer_len = min(len(row["regen"]["answer_ids"]), seq_length - prompt_len)
@@ -168,7 +167,30 @@ def _install_stub_extraction(monkeypatch, calls: list, *, store_final_hidden: bo
                 record["final_hidden"] = torch.randn(length, teacher_hidden_dim, dtype=torch.float32).to(hidden_dtype)
         return record
 
-    monkeypatch.setattr(online_module, "build_sample_record", fake_build)
+    # The extraction boundary is prepare + finalize (R2); stub both halves so
+    # the real ``prepare``/``extract``/``extract_prepared`` timing plumbing is
+    # exercised, and hand the rendered row to the record builder above.
+    def fake_prepare(processor, row, media_dir, *, seq_length):
+        return {"row": row, "seq_length": seq_length}
+
+    def fake_finalize(model, prepared_list, *, layer_ids, image_token_id, merge_size, dtype,
+                      store_final_hidden, tokenizer=None):
+        return [
+            records_for(
+                model,
+                item["row"],
+                layer_ids=layer_ids,
+                image_token_id=image_token_id,
+                merge_size=merge_size,
+                dtype=dtype,
+                seq_length=item["seq_length"],
+                store_final_hidden=store_final_hidden,
+            )
+            for item in prepared_list
+        ]
+
+    monkeypatch.setattr(online_module, "prepare_sample_record", fake_prepare)
+    monkeypatch.setattr(online_module, "finalize_prepared_records", fake_finalize)
 
 
 def _stub_source(monkeypatch, run_dir, *, limit=None, contract=None, store_final_hidden=False,
@@ -676,27 +698,23 @@ def _record_for_row(row: dict, *, context_hidden: int = 16) -> dict:
 def _install_batched_stub(monkeypatch, calls: list, *, context_hidden: int = 16):
     """Stub both extraction halves with row-deterministic records.
 
-    The single-row path keeps its ``build_sample_record`` seam; the batched
-    path is stubbed at ``prepare`` (render half) and
-    ``finalize_prepared_records`` (forward half), so the real
-    ``extract_prepared`` plumbing and its counters stay under test.
+    Both the per-sample and the batched path run through ``prepare`` (render
+    half) and ``finalize_prepared_records`` (forward half) after R2, so
+    stubbing these two module-level functions keeps the real
+    ``prepare``/``extract``/``extract_prepared`` plumbing and its counters
+    under test.
     """
 
-    def fake_build(model, processor, row, media_dir, *, layer_ids, image_token_id, merge_size,
-                   dtype, seq_length, store_final_hidden):
-        calls.append(("single", row.get("id")))
-        return _record_for_row(row, context_hidden=context_hidden)
-
-    def fake_prepare(self, index):
-        return {"row": self.rows[int(index)]}
+    def fake_prepare(processor, row, media_dir, *, seq_length):
+        calls.append(("prepare", row.get("id")))
+        return {"row": row}
 
     def fake_finalize(model, prepared_list, *, layer_ids, image_token_id, merge_size, dtype,
                       store_final_hidden, tokenizer=None):
-        calls.append(("batch", [item["row"].get("id") for item in prepared_list]))
+        calls.append(("forward", [item["row"].get("id") for item in prepared_list]))
         return [_record_for_row(item["row"], context_hidden=context_hidden) for item in prepared_list]
 
-    monkeypatch.setattr(online_module, "build_sample_record", fake_build)
-    monkeypatch.setattr(online_module.OnlineFeatureSource, "prepare", fake_prepare)
+    monkeypatch.setattr(online_module, "prepare_sample_record", fake_prepare)
     monkeypatch.setattr(online_module, "finalize_prepared_records", fake_finalize)
 
 
@@ -743,10 +761,16 @@ def test_online_batched_fetch_matches_per_sample_records(monkeypatch, tmp_path):
     assert [record["sample_id"] for record in reversed_records] == ["s2", "s0"]
 
     assert calls == [
-        ("single", "s0"),
-        ("single", "s2"),
-        ("batch", ["s0", "s2"]),
-        ("batch", ["s2", "s0"]),
+        ("prepare", "s0"),
+        ("forward", ["s0"]),
+        ("prepare", "s2"),
+        ("forward", ["s2"]),
+        ("prepare", "s0"),
+        ("prepare", "s2"),
+        ("forward", ["s0", "s2"]),
+        ("prepare", "s2"),
+        ("prepare", "s0"),
+        ("forward", ["s2", "s0"]),
     ]
     summary = source.summary()
     assert summary["online_batch_size"] == 2
@@ -770,13 +794,13 @@ def test_online_batched_fetch_fast_forward_placeholders(monkeypatch, tmp_path):
     assert records[0]["sample_id"].startswith("fast-forward:")
     assert [record["sample_id"] for record in records[1:]] == ["s1", "s2"]
     # Only the real rows hit the batched extraction; the placeholder is free.
-    assert calls == [("batch", ["s1", "s2"])]
+    assert calls == [("prepare", "s1"), ("prepare", "s2"), ("forward", ["s1", "s2"])]
 
     # A fully-skipped batch performs no target work at all.
     dataset.start_fast_forward(2)
     records = dataset.fetch_batch([0, 1])
     assert all(record["sample_id"].startswith("fast-forward:") for record in records)
-    assert calls == [("batch", ["s1", "s2"])]
+    assert calls == [("prepare", "s1"), ("prepare", "s2"), ("forward", ["s1", "s2"])]
     dataset.end_fast_forward()
 
     records = dataset.fetch_batch([3])
@@ -784,6 +808,60 @@ def test_online_batched_fetch_fast_forward_placeholders(monkeypatch, tmp_path):
     summary = source.summary()
     assert summary["target_forwards_total"] == 2
     assert summary["target_samples_total"] == 3
+    # Fast-forwarded rows are counted separately and never add target work.
+    assert summary["fast_forward_items_total"] == 3
+
+
+def test_online_extraction_boundary_fake_clock(monkeypatch, tmp_path):
+    """R2: identical work must be charged identically per sample and batched."""
+    run_dir = _write_online_run_dir(tmp_path)
+    _install_stub_extraction(monkeypatch, [])
+    clock = {"now": 0.0}
+
+    def fake_prepare_sample(processor, row, media_dir, *, seq_length):
+        clock["now"] += 3.0  # prepare/render work
+        return {"row": row, "seq_length": seq_length}
+
+    def fake_finalize(model, prepared_list, *, layer_ids, image_token_id, merge_size, dtype,
+                      store_final_hidden, tokenizer=None):
+        clock["now"] += 2.0  # forward + finalisation work
+        return [_record_for_row(item["row"]) for item in prepared_list]
+
+    class _FakeClock:
+        @staticmethod
+        def perf_counter():
+            return clock["now"]
+
+    monkeypatch.setattr(online_module, "time", _FakeClock)
+    monkeypatch.setattr(online_module, "prepare_sample_record", fake_prepare_sample)
+    monkeypatch.setattr(online_module, "finalize_prepared_records", fake_finalize)
+
+    per_sample = _stub_source(monkeypatch, run_dir)
+    per_sample.extract(0)
+    batched = _stub_source(monkeypatch, run_dir, online_batch_size=2)
+    batched.dataset().fetch_batch([0])
+
+    for label, source in (("per-sample", per_sample), ("batched", batched)):
+        summary = source.summary()
+        # Same work (3 s prepare + 2 s forward) => the same total on both paths.
+        assert summary["extraction_wall_seconds_total"] == 5.0, label
+        assert summary["extraction_prepare_seconds_total"] == 3.0, label
+        assert summary["extraction_forward_seconds_total"] == 2.0, label
+        entry = summary["extractions"]["train"]
+        assert entry["prepare_seconds"] == 3.0 and entry["forward_seconds"] == 2.0, label
+        assert summary["extraction_wall_seconds_total"] == (
+            summary["extraction_prepare_seconds_total"] + summary["extraction_forward_seconds_total"]
+        ), label
+
+    # Resume fast-forward consumes no target work: counted, but zero wall time.
+    skipped = _stub_source(monkeypatch, run_dir)
+    dataset = skipped.dataset()
+    dataset.start_fast_forward(1)
+    dataset.fetch_batch([0])
+    summary = skipped.summary()
+    assert summary["fast_forward_items_total"] == 1
+    assert summary["extraction_wall_seconds_total"] == 0.0
+    assert summary["target_forwards_total"] == 0
 
 
 class _OrderRecordDataset(torch.utils.data.Dataset):
