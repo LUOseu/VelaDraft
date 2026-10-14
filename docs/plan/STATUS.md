@@ -16,16 +16,17 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
 ## Now
 
 - **CVPR-route phase-1 round (2026-10-14, branch `cvpr-route`, CPU only - 0
-  new GPU-h; budget 4.10/8.00):** route-document §15 items 1-7 delivered -
+  new GPU-h; budget then 4.10/8.00):** route-document §15 items 1-7 delivered -
   `upstream_dspark` faithful objective (`a80f564`), per-method
   training-signal declarations (`64cef1d`), multimodal-supervision design
   note + invariants (`b5691e5`) - plus the self-contained package
   `docs/plan/phase1/` (report, claim ledger, run manifest, resource
   estimate, profiling, cache decision, competitive audit, GO_NO_GO). CPU
-  regression 453 passed / 6 skipped. Verdict there: **NO-GO for the formal
+  regression 453 passed / 6 skipped at the package commit (464 / 6 on the
+  current branch head, `757f509`). Verdict there: **NO-GO for the formal
   matrix / big-compute request**; the bounded pending list (2.2-3.75 GPU-h,
   incl. the #7 second seed and the CPU-tested length-bucket profiler mode)
-  is the recommended next spend. Start with
+  was the recommended next spend. Start with
   `docs/plan/phase1/LOCAL_PILOT_REPORT.md`.
   The bounded pending list ran as an idempotent host queue
   (`~/recipe-smoke-config/cvpr_queue.sh`, run IDs R-18..R-23): #1 `R-19`
@@ -35,10 +36,14 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   token-exact 4/4, same-condition eval reproduces AL 1.182/1.083; demo-config
   adoption fix `6619476` + regression tests), #5 `R-18` PASS
   (`upstream_dspark` smoke, `confidence_bce` 0.2042), #6 `R-20` measured
-  (length-bucket render/forward attribution), #7 `R-23` seed-43 recipe run.
+  (length-bucket render/forward attribution), #7 `R-23` PASS (seed-43
+  recipe run: AL 1.830 vs init 1.003, token-exact 128/128 - the two-seed
+  G4 condition is now met alongside `R-11`).
   #4 (vLLM divergence) stayed interactive-only as `R-24/R-25`: no
-  bridge/acceptance defect; token-exactness retired as a criterion (bf16
-  ties + engine nondeterminism); WP5 now blocked only on the -17% AL gap.
+  bridge/acceptance logic error observed within the sampled range (5 prompts
+  / 467 spec steps); token-exactness retired as a criterion (bf16 ties +
+  engine nondeterminism); WP5 blocked on the -17% AL gap, with a complete
+  serving correctness verification outstanding.
 - **Review remediation round (2026-10-14, branch `review-remediation` off
   `950b394`): R1-R6 implemented.** R1 collision-safe media + audit script
   (`7cc9e5b`), R4 ordered segments + explicit unsupported-media rejection
@@ -46,7 +51,7 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   (`c2d98e5`), R2 unified online timing boundary + WP4 supersession
   (`7038c56`), R5 frozen-prefix probe v2 + narrowed vLLM attribution
   (`7a44301`), R6 support matrix capability vs evidence (`b3730d7`).
-  Full CPU regression 411 passed / 6 skipped; no new GPU jobs (budget
+  Full CPU regression 411 passed / 6 skipped; no new GPU jobs (budget then
   4.10/8.00 GPU-h) - GPU re-checks listed in
   `docs/plan/REVIEW_REMEDIATION.md` (GPU_PENDING section). WP5 stays BLOCKED
   (5/32 token-exact at that time, root cause then unresolved; the later
@@ -108,11 +113,12 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   Registered as BLOCKED-with-gap per the plan rule; report
   `docs/plan/WP5_REPORT.md`, converter/harness code + 5 CPU tests in this
   branch. Lane split recap in COORDINATION.md.
-  Diagnosis `R-20261014-24/25` (0.30 GPU-h): no bridge/acceptance defect -
-  same-engine reruns agree only 12/32 and the instrumented dump shows 0
-  genuine inconsistencies in 467 spec steps (14 exact bf16 ties); the
-  token-exact gate is retired as a criterion. WP5 remains BLOCKED on the
-  unexplained AL gap.
+  Diagnosis `R-20261014-24/25` (0.30 GPU-h): no bridge/acceptance logic
+  error observed within the sampled range (5 prompts / 467 spec steps;
+  same-engine reruns agree only 12/32; 0 genuine inconsistencies, 14 exact
+  bf16 ties); the token-exact gate is retired as a criterion. WP5 remains
+  BLOCKED on the unexplained AL gap, and a complete serving correctness
+  verification remains outstanding.
 - WP6 done, engineering gate PASS (`R-20261014-17`, 0.53 GPU-h): first
   non-Qwen family SmolVLM2-2.2B-Instruct through prepare -> regen (16/16) ->
   capture (image-token check **1377/1377**, `visual_path_check` passed) ->
@@ -134,9 +140,11 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
 
 ## Budget
 
-8 GPU-h first-round cap; **4.10 GPU-h charged** (E1 0.59 incl. the duplicate
+8 GPU-h first-round cap; **6.25 GPU-h charged** (E1 0.59 incl. the duplicate
 concurrent set, zoo re-download validation 0.04, E2 0.55, E3 0.15, E4 1.45,
-WP4 measurement 0.21, WP5 0.55, WP6 0.53); allocation in RESOURCE_LEDGER.md.
+WP4 measurement 0.21, WP5 0.55, WP6 0.53, cvpr-route queue R-18..R-23 1.85,
+WP5 in-engine diagnosis R-24/25 0.30); **1.75 GPU-h remaining**; allocation
+in RESOURCE_LEDGER.md.
 
 ## Blockers / risks
 

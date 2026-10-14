@@ -33,9 +33,11 @@ divergence analysis and registered gaps in
   same-engine diagnosis `R-20261014-24/25` showed the engine is not
   token-reproducible even against itself - same-engine reruns agree 12/32,
   and an instrumented rejection-sampler dump found 0 genuine inconsistencies
-  in 467 spec steps (14 exact bf16 tie-branch) - so token-exactness is
-  retired as a criterion for this stack and no bridge/acceptance defect was
-  observed). The remaining AL gap (-17%)
+  within the sampled range (5 prompts / 467 spec steps; 14 exact bf16
+  tie-branch) - so token-exactness is retired as a criterion for this stack
+  and no bridge/acceptance logic error was observed there; a complete
+  serving correctness verification remains outstanding). The remaining AL
+  gap (-17%)
   is registered as the open blocker; until it is closed, no vLLM number is
   quotable.
 

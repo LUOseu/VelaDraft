@@ -23,6 +23,19 @@ is CPU tests and docs.
 | R-20261014-14..16 | WP5 vLLM bridge / MRoPE arm / margin probe | loads + runs; token-exact **5/32** (gate NOT passed) | `/tmp/wp5/bridge_check.json`; `wp5_evidence.tar.gz` (sha `2e2687d9...`) |
 | R-20261014-17 | WP6 SmolVLM2 smoke | capture 1377/1377 tokens, train 32 steps, eval token-exact 4/4 | `e6_evidence.tar.gz` (sha256 `750db94d...`); `~/vlm-recipe-smoke/runs/e6/smoke_smolvlm` |
 
+Post-inventory jobs (executed 2026-10-14 after this manifest was written -
+the bounded pending list + its diagnostics; per-row detail in `../RUN_LOG.md`):
+
+| Run ID | Purpose | Key result | Artifacts |
+| --- | --- | --- | --- |
+| R-20261014-18 | `upstream_dspark` GPU smoke (pending #5) | PASS; `confidence_bce` 0.2042; `nan_seen=false` | `cvpr_pending/R-18*.out` |
+| R-20261014-19 | Post-R3/R4 E2 recheck (pending #1) | PASS; token-exact 4/4; flex-kernel guard | `cvpr_pending/R-19*.out` |
+| R-20261014-20 | Length-bucketed profiling (pending #6) | measured; bucket 512-1024: render 51.4 / forward 137.6 ms/row; per-token 0.227 ms/token (corrected post-hoc) | `cvpr_pending/R-20_profile.out` |
+| R-20261014-21 | Paired online re-timing (pending #2) | extraction wall -6.8%; 128 -> 32 forwards; losses not bit-identical over 32 steps | `runs/wp4/{ab1_v2,ab4_v2}` |
+| R-20261014-22 | Export closure (pending #3) | PASS; reload token-exact 4/4; eval AL 1.182/1.083 | `cvpr_pending/R-22*.out` |
+| R-20261014-23 | Second recipe seed (pending #7) | PASS; AL 1.830 vs init 1.003; token-exact 128/128 | `runs/dfly/recipe_seed43` |
+| R-20261014-24/25 | vLLM in-engine diagnosis (pending #4) | within the sampled range no bridge/acceptance logic error observed; token-exactness retired; serving correctness verification outstanding | `wp5_gpu4_evidence.tar.gz` |
+
 ## Phase-1 CPU results (this round, `cvpr-route`)
 
 | Item | Evidence | Location |
@@ -31,7 +44,7 @@ is CPU tests and docs.
 | Per-method training-signal declarations | `TrainingSignals` on `AlgorithmMetadata` + generated doc + drift test | commit `64cef1d`; `docs/TRAINING_SIGNALS.md`, `scripts/render_training_signals.py` |
 | Multimodal supervision representation | design note + 9 new tests (mask/input invariance, loss/grad connection, late-image rejection, exact resume, export round-trip) | commit `b5691e5`; `tests/test_multimodal_supervision.py`, `docs/plan/WP2_DESIGN.md` |
 | Export records visual conditioning | `visual_conditioning` block + model-card line | commit `b5691e5`; `vlm_dflash/export/hf.py` |
-| Full CPU regression | 453 passed / 6 skipped (`pytest -o addopts="" -q`; 443 at the `191da28` package commit, +10 length-bucket profiler tests) | local run 2026-10-14, this worktree |
+| Full CPU regression | 464 passed / 6 skipped at `757f509` (`pytest -o addopts="" -q`; 453 at the phase-1 package commit, +10 length-bucket profiler tests, +1 review-fix regression) | local run 2026-10-14, this worktree |
 | Competitive audit | pinned findings for 5 upstream projects | `COMPETITIVE_AUDIT.md` |
 | Profiling + cache decision | cost shares and plan comparison on recorded numbers | `PROFILING.md`, `CACHE_DECISION.md` |
 

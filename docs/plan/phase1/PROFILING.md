@@ -128,7 +128,9 @@ mode the checkpoint set is identical; the store does not exist.
    `REVIEW_REMEDIATION.md`. **Landed as `R-20261014-20`** (one bucket
    populated on the smoke slice: 512-1024, 16 rows, median 606 tokens incl.
    512 image tokens -> render 51.4 ms/row, forward 137.6 ms/row; batch groups
-   138.3 -> 127.5 ms/sample at group 4). Multi-bucket coverage at 2K scale
+   138.3 -> 127.5 ms/sample at group 4). The per-token field was corrected
+   post-hoc to **0.227 ms/token** (the raw log's 227.1 was 1000x; profiler
+   fix + test `757f509`, no GPU rerun). Multi-bucket coverage at 2K scale
    and the vision-vs-text split remain unmeasured.
 2. **Paired online/offline extraction re-timing under the unified R2
    boundary**: landed as `R-20261014-21` (extraction wall 24.57 -> 22.89 s,

@@ -60,6 +60,11 @@ vlm-dflash eval   runs/qwen25vl3b_dspark_2k --config configs/dspark/qwen2_5_vl_3
 vlm-dflash export runs/qwen25vl3b_dspark_2k
 ```
 
+`export` records the resolved training objective: when `algorithm.train_recipe`
+is set, the resolved recipe is stamped into `config.json`,
+`training_manifest.json` and the model card (regression-tested), so two
+exports over identical inputs but different recipes no longer look identical.
+
 `train` writes the standard artifacts plus two DSpark-specific ones:
 
 - `train/confidence_calibration.json` — BCE / ECE (10-bin) / AUROC of the

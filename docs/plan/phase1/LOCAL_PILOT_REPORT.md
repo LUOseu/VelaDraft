@@ -67,12 +67,15 @@ this phase: 434/6).
   WP4 A/B (with the superseded metric marked), WP5 bridge (blocked at 5/32),
   WP6 SmolVLM2 smoke. Inventory: `RUN_MANIFEST.md`.
 
-**待 GPU 验证 (registered, not run; commands in `../REVIEW_REMEDIATION.md`)**
-- Post-R3/R4 multi-image re-check (#1), paired online re-timing (#2),
-  SmolVLM export closure (#3), same-engine vLLM diagnosis (#4), the new
-  `upstream_dspark` GPU smoke (#5), length-bucketed profiling (#6) and the
-  second recipe seed (#7). Estimated 2.2-3.75 GPU-h total
-  (`RESOURCE_ESTIMATE.md`).
+**GPU-verified (executed 2026-10-14; per-row results in `../RUN_LOG.md`)**
+- Post-R3/R4 multi-image re-check (#1 -> `R-19` PASS), paired online
+  re-timing (#2 -> `R-21` measured), SmolVLM export closure (#3 -> `R-22`
+  PASS), same-engine vLLM diagnosis (#4 -> `R-24/25`: token-exact gate
+  retired; complete serving correctness verification outstanding), the new
+  `upstream_dspark` GPU smoke (#5 -> `R-18` PASS), length-bucketed profiling
+  (#6 -> `R-20` measured) and the second recipe seed (#7 -> `R-23` PASS).
+  Actual 2.15 GPU-h of the estimated 2.2-3.75 (`RESOURCE_ESTIMATE.md`);
+  total now 6.25 / 8.00 with 1.75 remaining.
 
 **Technical hypotheses (stated, not evidenced)**
 - That the visual-context budget question (route §4.2's successor idea) can
@@ -84,14 +87,19 @@ this phase: 434/6).
   a bounded constant, so the hypothesis is currently *negative*
   (`CACHE_DECISION.md`).
 - That the vLLM divergence is a fixable semantic gap rather than a
-  fundamental mismatch - unresolved (#4).
+  fundamental mismatch - (#4) `R-24/25` diagnosed the reading as bf16 tie
+  flips + engine run-to-run nondeterminism within the sampled range (5
+  prompts / 467 spec steps; no bridge/acceptance logic error observed);
+  token-exactness retired as a criterion; the AL gap (-17%) and a complete
+  serving correctness verification remain outstanding.
 
 ## What phase-2 should do first (if and when GO)
 
-1. Clear the registered pending GPU items (bounded, 2.2-3.75 GPU-h) - in
-   particular #2 (paired timing), #5 (DSpark smoke) and #7 (second seed),
-   because they feed the §6.1 execution-benefit, faithfulness and
-   learning-effectiveness gates.
+1. The bounded pending GPU items were cleared 2026-10-14 (R-18..R-23 +
+   R-24/25; 2.15 GPU-h) - #2 (paired timing) measured, #5 (DSpark smoke)
+   PASS and #7 (second seed) PASS; they feed the §6.1 execution-benefit,
+   faithfulness and learning-effectiveness gates (G4 now met; G2/G5 open -
+   see the `GO_NO_GO.md` re-evaluation).
 2. Re-run the competitive audit re-pins before writing any comparison table.
 3. Only then evaluate the §6.1 gate again (`GO_NO_GO.md`) before any
    multi-seed or multi-node request.

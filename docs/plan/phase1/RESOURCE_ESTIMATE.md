@@ -11,12 +11,13 @@ CPU only.
 | --- | ---: |
 | Charged before this phase (R-20261014-01..17) | 4.10 / 8.00 |
 | **This phase (audit, tests, docs, cache/profiling studies)** | **0.00** |
-| Remaining against the first-round cap | **3.90** |
+| Bounded pending list executed (R-18..R-23 queue 1.85 + WP5 in-engine diagnosis R-24/25 0.30) | 2.15 / 8.00 |
+| **Current total charged / remaining** | **6.25 / 8.00 -> 1.75 left** |
 
 Storage (measured 2026-10-14): GPU host `/home` 61 GB free (shared, drifting;
 `RESOURCE_LEDGER.md`). Local Mac: tests and docs only.
 
-## Estimates for the registered pending items (not authorised, order = review)
+## Estimates for the registered pending items (pre-execution estimates, order = review)
 
 Method: per-stage measured walls from `docs/training-costs.md` and
 `../WP4_MEASUREMENT.md`; ranges reflect shared-host contention (up to ~1.7x)
@@ -31,7 +32,10 @@ and first-call kernel compile. "GPU-h" = allocation x wall.
 | 5 | `train_recipe: upstream_dspark` GPU smoke (new, this phase) | 0.2-0.4 | one short recipe run on the reused store + export; mirrors R-01 scale |
 | 6 | Length-bucketed profiling (vision vs text vs finalisation split, `PROFILING.md` §7) | 0.15-0.25 | one profiling pass per length bucket on the smoke slice |
 | 7 | Second training seed for the 2K recipe (`train.seed=43`; P4 "seed 波动" / G4) | 0.9-1.4 | E4 legs: main loop 25-44 min (sanity off) + eval ~31 min |
-| | **Total** | **2.2-3.75** | fits the 3.90 remaining; little reserve, and the ledger is shared with the concurrent session - re-read it before launching |
+| | **Total** | **2.2-3.75** | actual spend 2.15 (6.25 / 8.00 charged -> 1.75 left, `RESOURCE_LEDGER.md`); the estimate fit the 3.90 remaining at staging time |
+
+All seven items were executed 2026-10-14 (R-18..R-23 host queue +
+R-20261014-24/25 interactive); outcomes per row in `../RUN_LOG.md`.
 
 Explicitly excluded from this table: any multi-seed **quality matrix** (the
 §7 formal scope). Item 7 is the single small-seed repeat the pilot itself

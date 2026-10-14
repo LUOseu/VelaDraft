@@ -138,7 +138,7 @@ Replacement diagnostic (implemented + CPU-tested):
   prefix enters the forward; off-trajectory / prompt-length-mismatch /
   non-deterministic cases excluded; missing-evidence marks; case selection).
 
-### R-24/R-25: in-engine diagnosis (GPU_PENDING #4) - no bridge defect observed
+### R-24/R-25: in-engine diagnosis (GPU_PENDING #4) - no bridge defect observed in the sampled range
 
 Constraint: the vLLM 0.22.1 dflash path exposes no sequential-parity verify
 mode, so token-exactness cannot be guaranteed on that path by construction.
@@ -164,21 +164,25 @@ torch 2.11), same 32 prompts and converted draft as R-14.
   divergence per prompt sits at margins 0.0 (p0/p2/p4), 0.125 (p1), and none
   within 128 tokens (p10).
 
-Conclusion (registered): no acceptance-logic or bridge defect was observed in
-the instrumented path; the 5/32 reading is a statistic of bf16 tie flips plus
+Conclusion (registered): within the sampled range (5 prompts / 467
+instrumented spec steps), no acceptance-logic or bridge logic error was
+observed; the 5/32 reading is consistent with bf16 tie flips plus
 engine-level nondeterminism. **The token-exact gate is not a usable
-correctness criterion for this stack as-is**; quality signals remain AL and
+correctness criterion for this stack as-is**, and a complete serving
+correctness verification remains outstanding; quality signals remain AL and
 acceptance metrics (vLLM AL is still not quotable - see the AL gap below).
 
 ## Attribution and registered gaps
 
 Ruled out as the driver: the RoPE convention (R-15, ~0.3%) and the mask-slot
-input convention (code-verified identical). Resolved by R-24/R-25: the 27/32
-token flips are **not a bridge/acceptance defect** - no genuine inconsistency
-appeared in 467 instrumented spec steps, every cross-engine divergence first
-appears at a bf16 tie or near-tie (margins 0.0/0.125), and same-engine
-reruns themselves agree only 12/32. Attribution: bf16 tie flips + engine-level
-run-to-run nondeterminism. The repo's token-exact mode works by reusing
+input convention (code-verified identical). R-24/R-25 diagnosis (sampled
+range): within 5 prompts / 467 instrumented spec steps no bridge/acceptance
+logic error was observed - 0 genuine inconsistencies, every observed
+cross-engine divergence first appears at a bf16 tie or near-tie (margins
+0.0/0.125), and same-engine reruns themselves agree only 12/32. The 27/32
+token flips are consistent with bf16 tie flips + engine-level run-to-run
+nondeterminism; a complete serving correctness verification remains
+outstanding. The repo's token-exact mode works by reusing
 `generate()`-backend logits in sequential verification, and vLLM 0.22.1
 exposes no equivalent sequential-parity verify mode; a strict token-exact
 claim under vLLM's dflash path cannot be made today (R5 + R-25 attribution).
@@ -197,15 +201,17 @@ repo-runtime-only.
 - Builder: implemented, CPU-tested, load-verified end-to-end; conversion is
   layout-exact.
 - Gate: closed as **not a usable criterion for this stack** (R-25): the
-  in-engine diagnosis found no bridge/acceptance defect, and two runs of the
-  same engine differ at the same rate as any cross-engine pair (12/32). No
+  in-engine diagnosis observed no bridge/acceptance logic error within the
+  sampled range, and two runs of the same engine differ at the same rate as
+  any cross-engine pair (12/32). No
   "vLLM/SGLang support" or speed claim is made; README/docs say "bridge
   exists; the vLLM path is not token-exact by construction and its AL gap is
   unresolved".
 - Status per plan rule (deliver the independently implementable part,
-  register the gap, do not mark done): WP5 = BLOCKED, now **on the
-  unexplained AL gap (-17%)** alone; the token-exact reading is retired as a
-  criterion (R5 + R-25). See `TASK_LEDGER.md`.
+  register the gap, do not mark done): WP5 = BLOCKED on the unexplained AL
+  gap (-17%); the token-exact reading is retired as a criterion (R5 + R-25)
+  and a complete serving correctness verification remains outstanding. See
+  `TASK_LEDGER.md`.
 
 ## Cost
 

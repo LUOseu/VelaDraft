@@ -341,7 +341,8 @@ speculative decoding must reproduce the target's own greedy tokens exactly
   loads and serves the export, but engine token-for-token parity is not
   reproducible even across same-engine reruns (bf16 tie flips + engine
   nondeterminism), the acceptance-length gap is the open blocker, and no
-  speed number is claimed - see the
+  speed number is claimed; a complete serving correctness verification
+  remains open - see the
   [WP5 report](docs/plan/WP5_REPORT.md).
 - **Reproducibility:** data and generation protocols are reproducible; bf16
   training is not bitwise deterministic. Acceptance numbers stay in the
