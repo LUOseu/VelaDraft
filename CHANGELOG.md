@@ -44,6 +44,28 @@
   (`configs/smoke_multiturn.yaml`). Smoke-scale only; no quality or speed
   claim follows from it.
 
+### Phase-1 audit deliverables: training signals + multimodal supervision
+
+- Every algorithm now declares its training-signal requirements
+  (`TrainingSignals` on `AlgorithmMetadata`: hard label, context layers,
+  teacher final hidden states, distribution / confidence objective, stage,
+  block convention), rendered to `docs/TRAINING_SIGNALS.md` by
+  `scripts/render_training_signals.py` with a drift test so the declaration
+  cannot silently diverge from the metadata.
+- The multimodal supervision representation gains its phase-1 design note
+  (`docs/plan/WP2_DESIGN.md`: the field-by-field producer/consumer contract,
+  including the deferred multi-window data-unit rule) and
+  `tests/test_multimodal_supervision.py`: supervision never lands on
+  `loss_mask == 0` positions, seeded forwards are deterministic, fully
+  unsupervised padding rows are inert, image tokens drive the loss and the
+  visual gradients while text-only batches leave the visual branch an exact
+  no-op, image spans that would leak future turns are rejected, and
+  visual-conditioned runs resume exactly (a changed visual branch is
+  refused) and export/reload with the visual branch intact.
+- The export config and model card record the draft's visual conditioning
+  (`visual_conditioning`: cached vectors per layer + adapter type), so a
+  serving stack can see that the checkpoint expects image-token spans.
+
 ### DSpark faithful objective (`train_recipe: upstream_dspark`)
 
 - New selectable recipe reproducing the speculators DSpark default objective
