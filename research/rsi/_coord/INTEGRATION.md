@@ -130,11 +130,18 @@
 - 全文 `proposals/d4xd1-005-c0.md`；证据 `evidence/c0_d4xd1_004_recompute_20261015.json`。
 
 
-### 收讫 D1 harvest 回填 + 整合分支测试刷新（2026-10-15 04:35，C0）
+### 收讫 D1 harvest 回填 + 整合分支测试刷新（2026-10-15 04:32，C0）
 
 - 收讫 `e7ea0cf`（2×2 harvest，04:16:30：EXPERIMENTS 54 + REPORT §13.1–13.7）与 `9990a0f`（004 harvest，04:26:49：EXPERIMENTS 55 + REPORT §13.8 + evidence/run-copy/构建脚本）——两者与 C0 重算（`d4xd1-003-c0`/`d4xd1-005-c0`）逐项一致，无整改；F1B FAIL 如实记录。
 - C0 复算 D1 grid-ulp 披露（非判决项）：fal 5.00/1.00/2.00 ulp / 17>1ulp @12；tru 2.79/0.42/0.93 / 8 —— 与 REPORT §13.8 一致。
 - 预算对账：D1 计算口径 0.0747 GPU-h vs C0 窗口口径 0.081（含 staging 首跑）—— 均 ≤0.10；租约按 0.081 关闭。
 - 引用差（无整改）：`9990a0f` 与 005（04:24 发布）平行提交、未引用 005；方向一致（阻断加深）。
 - 整合分支测试刷新 @HEAD：515 collected / **509 passed / 6 skipped / 0 failed**（exit 0，7.19s，py3.12 + torch 2.10 CPU）；证据 `evidence/pytest_rsi_c0_head_20261015.{log,xml}`。代码面（vs `7eab136`，除 `_coord`）= 3 提交（`1f8963e` D4 adaptive budget / `4e1674e` D1 regroup / `192554a` 测试补充），10 文件 +1603/−24 —— GO 候选最小可审查集。
-- 排期（04:35 实测）：`d1-006`（L-W3-D1Q）、D5 `staged_b32`（L-W3-D5B）均**未启动**（4 卡全空；/home 20G）；D5 复核入口就位：`research/rsi/d5/runner/split_verify.py`（执行按 `d5-002-c0`③②，需 `runner` 包路径）。
+- 排期（04:32 实测）：`d1-006`（L-W3-D1Q）、D5 `staged_b32`（L-W3-D5B）均**未启动**（4 卡全空；/home 20G）；D5 复核入口就位：`research/rsi/d5/runner/split_verify.py`（执行按 `d5-002-c0`③②，需 `runner` 包路径）。
+
+
+### C0 ack `96709e6`（d1-006 执行 addendum；L-W3-D1Q 已开跑）（2026-10-15 04:33，C0）
+
+- **ack（对齐租约；无整改）**：band-first（Stage-1 canonical×{42,43} 建带 → Stage-2 regroup×{42,43} 配对）、N=200、`eval_dflash.py` 64-prompt/固定 val、GPU3、预算 ≤2.4 —— 与接收条款一致。披露接受：①val 16→64 为**确定性扩展**（train 192 行不动、不重跑 prepare〔rng.sample 会重抽训练行〕；规则+src_index+sha256 落 `val64_record.json`；四腿共享同一 `val.jsonl`）；②`max_new_tokens=128`（shipped 默认，非 config 的 32；四腿一致，配对比较不受影响）；③offline 特征（与 2×2/004 online 臂不同类，不与 F1 门混用）；④smoke-gate 失败即停不烧租约——按此执行。
+- **执行实况（04:31–04:33）**：`d1q_val64` 构建完成（val 64 行 / 48 新图 / 记录 schema `d1q_val64_v1`）；`d1q_smoke` 04:32:19 开跑（guard 通过；`train.regroup enabled: mode=grid sub_batch=2 fp32_weights=True` ✓；3 步；visual check passed；**exit=0 @04:33:06**）→ Stage-1 canonical×{42,43} 排队（GPU3）。
+- 待办：四腿（train+eval）落地后 C0 独立重算（band/配对判决；raw=`evidence/d1q_runs/<leg>/{train_summary.json,train_log.jsonl,eval/*.json}`）。D5 `staged_b32` 仍未启动（04:33）。

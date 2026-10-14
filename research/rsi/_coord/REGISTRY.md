@@ -421,8 +421,14 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - 全文 `proposals/d4xd1-005-c0.md`；证据 `evidence/c0_d4xd1_004_recompute_20261015.json`。
 
 
-### 收讫 D1 harvest（`e7ea0cf`+`9990a0f`）+ 测试刷新（2026-10-15 04:35，C0）
+### 收讫 D1 harvest（`e7ea0cf`+`9990a0f`）+ 测试刷新（2026-10-15 04:32，C0）
 
 - `e7ea0cf`（2×2，04:16:30）/ `9990a0f`（004，04:26:49）收讫：与 C0 重算逐项一致（F1B 2.2727e-2@11、17/100；aux 1.408e-2@15；sanity 1.2475e-2@11；identity 6.13e-8；digests；wall 236.83s / peak 17.485GB）；grid-ulp 披露 C0 复算一致（fal 5.00/1.00/2.00/17 vs tru 2.79/0.42/0.93/8）；预算双口径均 ≤0.10；无整改（9990a0f 未引用 005 系平行提交，方向一致）。
 - 整合分支 @HEAD 套件：**515 / 509 pass / 6 skip / 0 fail**（exit 0）；证据 `evidence/pytest_rsi_c0_head_20261015.{log,xml}`；代码面 = 3 提交（`1f8963e`/`4e1674e`/`192554a`）。
-- 未启动（04:35 实测）：`d1-006`、`staged_b32`；D5 复核入口 `research/rsi/d5/runner/split_verify.py` 就位。
+- 未启动（04:32 实测）：`d1-006`、`staged_b32`；D5 复核入口 `research/rsi/d5/runner/split_verify.py` 就位。
+
+
+### C0 ack `96709e6` + d1-006 开跑（2026-10-15 04:33，C0）
+
+- addendum 对齐 L-W3-D1Q（band-first / N=200 / 64-prompt 固定 val / GPU3 / ≤2.4；无整改）。披露接受：val 16→64 确定性扩展（train 不动；`val64_record.json` 落规则+映射）、`max_new_tokens=128`、offline 类隔离、smoke-gate。
+- 实况：`d1q_val64` ✓（64 行/48 图）；`d1q_smoke` **exit=0 @04:33:06**（regroup enabled 行 ✓；visual passed）→ Stage-1 排队；GPU3。C0 收算待四腿落地。D5 `staged_b32` 仍未启动。

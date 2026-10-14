@@ -131,7 +131,9 @@
 - 2026-10-15 04:24 — **C0 独立重算（自 raw logs）**：F1B **FAIL**（max **2.2727e-2@11**；17/100 超门；中位 4.32e-3；门 7.5e-3）→ 发布 `d4xd1-005-c0` 终裁：**在线分组超带·阻断加深；`cache×regroup` 维持暂禁**（003 不变；机制排查须新提案）。aux：损失路径单因子翻转亦超门（1.4080e-2@15）。GPU3 释放。
 - 2026-10-15 04:24 — 编排更新：D1 待办 = harvest 回填（2×2+004）→ **`d1-006`（L-W3-D1Q，≤2.4 staged）现可启动**；**D5 `L-W3-D5B`（staged_b32 ≤0.75）已批、截至 04:24 仍未开跑**（最新 D5 run = 03:22 s3_b32）。
 
-- 2026-10-15 04:27–04:35 — **C0 收尾 sweep**：收讫 D1 harvest（`e7ea0cf` / `9990a0f`；数字与重算逐项一致；grid-ulp 披露复算一致）；整合分支 HEAD 套件刷新 **515/509/6/0**（exit 0；`evidence/pytest_rsi_c0_head_20261015.{log,xml}`）；**D1 `d1-006` 与 D5 `staged_b32` 截 04:35 均未启动**（4 卡全空、/home 20G）——待 D1/D5 开跑；C0 复核路径就绪（D5 `research/rsi/d5/runner/split_verify.py`）。
+- 2026-10-15 04:27–04:32 — **C0 收尾 sweep**：收讫 D1 harvest（`e7ea0cf` / `9990a0f`；数字与重算逐项一致；grid-ulp 披露复算一致）；整合分支 HEAD 套件刷新 **515/509/6/0**（exit 0；`evidence/pytest_rsi_c0_head_20261015.{log,xml}`）；**D1 `d1-006` 与 D5 `staged_b32` 截 04:32 均未启动**（4 卡全空、/home 20G）——待 D1/D5 开跑；C0 复核路径就绪（D5 `research/rsi/d5/runner/split_verify.py`）。
+
+- 2026-10-15 04:31–04:33 — **D1 开跑 `d1-006`（L-W3-D1Q）**：`d1q_val64` 构建 ✓（64 行/48 图/记录 `d1q_val64_v1`）；addendum `96709e6`（C0 ack，无整改）；04:32:19 `d1q_smoke` 开跑（GPU3）→ **exit=0 @04:33:06**（visual passed）→ Stage-1 canonical×{42,43} 排队。**D5 `staged_b32` 仍未启动**（GPU1/2 空）。C0 收算待四腿落地。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
