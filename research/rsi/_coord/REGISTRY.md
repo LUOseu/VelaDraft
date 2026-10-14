@@ -274,6 +274,8 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - 2026-10-15 02:19–02:25 — D1 车道三连提交：R4 评估 `e147a01`（k4 残余 4.7–5.2%/6.1–6.4% 步成本、96–98% invalid-block slack；size-1 fp64 oracle 全 ragged exact）、集成交叉复核 `3e29244`（**结论 PASS**：regroup.py verbatim、fp32 cast 一致、train.py 逐项对齐、20/20 复跑；建议 (a) all-singleton 用例）、重编号 `8c7776c`（d1-003→d1-004）。**C0 回执**：建议 (a) 采纳（`192554a`，全套 509/6/0）；`d1-004` 接收 → **发布 L-W3-D1R4（≤0.2 GPU-h，GPU3 优先，即刻窗口）**，判决规则按提案写死（≥1.135 → R4 正分支 / 否则边界关闭）。
 - 2026-10-15 02:19–02:20 — **事故 #7 登记（D5 S3 smoke 假失败，工具链缺陷）**：S3 追赶链 smoke_s3（`g2_smoke_s3_1015_0219`，cards 1+2）worker w0 报 `Regen kept zero samples`（rc=1）→ S3 线停（02:19:52），Tier 0+A+B 保留。**C0 取证**：canonical smoke kept=1/16（15 行 too_short），切分后某 worker 合法 keep=0；worker 级 zero-keep 不应硬失败（merge 后查全局；与 canonical `run_regen` 语义对齐）。**D5 修复在途**（`split_worker.py` + `test_split_worker_zero.py`）；修复后 `G2_SKIP_LEGS` 重跑 smoke_s3→s3_b8→s3_b32。详见 RESOURCE_SCHEDULE §3。
 
+- 2026-10-15 02:27–02:30 — **C0 集成 e2e smoke：`train.regroup` 产品路径首跑 PASS**（服务器 GPU0 单卡；`C0-E2E-smoke-{canon,regroup}`）：两格各 20 步 rc=0、无 NaN、loss 正常下降；**峰值 25.34→9.98 GB（−60.6%）**；逐位 loss 差 ≤6.1e-3（在 shipped 路径自身 bf16 波动带内；canonical 系 bf16 归约量化显示）；梯度覆盖 36/36 ✓。`d1-003-c0`/`d1-004-c0` 的"无端到端运行"缺口关闭。证据：`evidence/c0_e2e_regroup_smoke_20261015.md`；服务器 `/home/lyh/rsi-c0/{logs,runs}`（ckpt 已清）。
+
 ### 对 D1（2026-10-15 02:05，wave-2 判读）
 
 - 裁决见 `d1-002-c0`：**GO（修订口径）** —— 步时均值 13.5%（W3）/13.3%（MIX）、单 seed 最高 15.4%；显存 −57%；win 580/600；parity 三批位 ✓。
