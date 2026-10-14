@@ -84,6 +84,28 @@
 - GO：最小可审查分支/patch + 验证命令 + merge-readiness 说明；**不自动 push/merge main**，由用户 review 后决定。
 - STOP：保留证据与再启动条件。
 
+### 收口结论快照（2026-10-15 05:50，C0；滚动更新）
+
+**方向判定（区分平台工程 / 论文口径）**
+
+- **D1｜GO（工程口径）＋ 论文两轴 BLOCKED**。工程：wave-1/2 步时 13.5%/13.3%（grid 配对均值 1.135/1.133）、580/600 配对胜、peak −57%、容量 b24 OOM→14.41 GiB 可跑 5/5、parity b0/50/100 ✓（C0 重算）。论文：①d1-006 质量轴 **FAIL**（两 seed×两指标出带；band_AL=1.815e-3 / band_acc=2.792e-4；收据 `evidence/c0_d1q_receipt_verdict_20261015.md`）→ 长训练 GO 阻断项成立、「质量中性」不成立；②在线 `cache×regroup` 数值阻断（`d4xd1-003/005`）维持暂禁；③R4：k4 残余 4.7–5.2%/6.1–6.4%，sub1 边界跑未过门 → R4 收口为 boundary result（full removal 真实但被额外 microbatch 固定成本吃掉；packed-block kernel dormant，D3 已关）。
+- **D2｜STOP**：pin 2×2 最好 −6.8%、常见 −3.0%/−5.6%（<15% 筛选门）；−5.5% fwd 未复现（+0.5%）；质量全平（loss 四腿 bitwise、CPU oracle 12/12）。再开条件见 D2 REPORT §8。
+- **D3｜STOP（CLOSED）**：attention+mask = 3.55% 步时（≪20% 门）；k-split 自身 +0.8%。再开条件：W2/long-answer、B>8、S≈2.5–4k。
+- **D4｜merge-ready（平台工程）**：`1f8963e` 集成（sha1 对账 + 复跑）；W2 F1–F4 PASS；opt-in 默认关；0.37/0.5 GPU-h。无独立论文声称。
+- **D5｜HOLD（staged_b32 已批未跑）**：S3 静态分裂 b8 −25.3%（剔除 overfit 记账偏差后 −32.9%）/ b32 −12.6% vs sync（store parity partial 待 staged_b32 关闭）；成本感知线 STOP（sim 增量 <15%，真实 sync/staged=0.947 证伪 sim 0.86）；pinned_b8=HOLD、Tier C 暂缓。
+
+**最小可审查集成集（GO 候选）**
+
+- 分支 `research/rsi-c0`（最新见 git log；代码面 vs `7eab136` = 3 提交：`1f8963e` D4 adaptive budget / `4e1674e` D1 regroup（opt-in、默认 byte-identical）/ `192554a` 测试补充；10 文件 +1603/−24）。
+- 验证：本地套件 **515 collected / 509 passed / 6 skipped / 0 failed**（7.19s；`evidence/pytest_rsi_c0_head_20261015.{log,xml}`）；D4 最小集 sha1 对账（§5）；D1 opt-in 默认关闭的 byte-identical 由 `4e1674e` 测试覆盖。
+- merge-readiness：可合并（**不自动 merge main**）；合并前建议复跑上述套件 + 抽查 d1/d4 最小集文件。
+
+**未决（他人执行项）**
+
+- D1 harvest 回填（四腿归档 + REPORT/EXPERIMENTS/STATE）→ C0 最终对账；
+- D5 `staged_b32`（L-W3-D5B ≤0.75 GPU-h）开工 → C0 复核（`research/rsi/d5/runner/split_verify.py`）；
+- 转发文本：`_coord/messages/20261015_d1q_recovery.md`（D1 终裁通知 + D5 提醒）。
+
 ## 7. 晋级复核 checklist（wave-2 放行前 C0 逐项取证）
 
 1. 收益：相对**该路线自己登记的强基线**的配对结果（同机 A/B ≥3 交替或一个足够长的稳定窗口），原始日志可复算；microbenchmark 数字不得当训练结论。
