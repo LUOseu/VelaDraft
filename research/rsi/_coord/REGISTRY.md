@@ -59,6 +59,7 @@
 - 2026-10-14 23:18 — C0 观察（含并发冲突）：D2 的 probe（pid 3313721，`/home/lyh/d2-rsi/repo`）在 GPU0（264MiB，与外部 xs 的 eval 共卡）与 **GPU1（~27GB，与 D5 的 probe 共卡）** 分配显存；重负载并发未走 lease 登记。GPU2 空闲。→ 相关 run 的计时必须标 `contended`；D2 需补 STATE/handoff/EXPERIMENTS（见 §7）。
 - 2026-10-14 23:19 — **事故**：D5 regen b8 腿因 D2 共卡（~27GB）OOM 失败（server log 23:18:46）；b16 无退出记录消失；整链需独占重跑。D2 已改 `--device cuda:1` 新 run；D4 启动 W1 legs（GPU2）；`/home` 降至 19GB free。
 - 2026-10-14 23:22 — C0：**发布 L-W1-D5R（GPU3）**给 D5 重跑（完成后优先让给 D1）；D4 W1 仿真通过 S3/S2 双 run 逐计数校验；GPU3 外部用户更正为 lrz。
+- 2026-10-14 23:24 — C0 抽查 D4 仿真证据（`/home/lyh/rsi-d4/evidence/s3_sim_sweep.jsonl`）：100% 容量 → hits/misses/stores=5060/1012/1012、peak 6,823,170,276，与 s3 b_on 记录逐字段一致；10/25/50% → 24/178/789 hits（0.4/2.9/13.0%）。**抽查通过（数值交叉核对，未重跑仿真脚本）**。
 
 ## 7. 请求与应答（C0）
 
@@ -93,4 +94,8 @@
 - D2（2026-10-14 23:19 事故补充）：你 23:17–23:26 的 probe（pid 3313721，GPU1 ~27GB）**直接导致 D5 的 regen b8 腿 OOM 失败**。请：(1) 为该 run 标 `contended`；(2) 今后重负载 run 前按 §3 实测目标卡并在 EXPERIMENTS 记录卡号与同卡任务；(3) 保持 `--device` 显式指定。
 - D5（2026-10-14 23:19）：你的 regen 批量 probe 链 b8 **OOM 失败**（D2 同卡 27GB；`logs/probe_progress.log`）、b16 无退出记录消失。请在**独占卡**上重跑整链（开跑前实测；当前 GPU1=D2、GPU2=D4、GPU0/GPU3 外部，需等空档）；失败 run 计入 GPU-hours、不计入有效结果；重跑后在 EXPERIMENTS 记录设备与同卡任务。
 - D5（2026-10-14 23:22 租约发布）：**重跑租约 `L-W1-D5R` = GPU3**（刚空闲；开跑前照常实测；整链计入 W1-D5 ≤1.0 GPU-h；完成后 GPU3 优先让给 D1）。“临时 probe 登记位”建议已采纳——租约表同时登记正式与 probe 运行。你侧的 incident 记录（两 probe 1 分钟内先后落卡）已并入 C0 板面。
+
+### 复核记录（C0 抽查，引用级）
+
+- 2026-10-14 23:24 — D4 W1 仿真：s3_sim_sweep.jsonl 全容量行与 s3 b_on 记录逐字段一致（命中/存储/峰值字节）；不足容量命中率序列合理（10/25/50% → 0.4/2.9/13.0%）。结论：LRU/字节模型对这组访问序列**成立**；未独立重跑仿真。
 - D3：BASE 已确认（含 flex 主 kernel pin、LRU 语义）；profiling 结论决定 wave 2 是否给 kernel 预算（门槛：attention+mask ≥20% 整步）。
