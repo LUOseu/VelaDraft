@@ -342,6 +342,55 @@ def test_llava_source_rejects_mid_text_placeholder(tmp_path):
         build_dataset(cfg, tmp_path / "out")
 
 
+def test_llava_source_accepts_historical_trailing_placeholder(tmp_path):
+    """LLaVA-150k's own form ("...\\n<image>") stays supported.
+
+    About half of the dataset's rows put the placeholder last; the v1 renderer
+    strips it and renders the image first, exactly as every recorded 2K llava
+    run and capture store was built. Rejecting that form made the whole source
+    unusable (the first such row raised even when filters would drop it).
+    """
+    _save(tmp_path, "a.png")
+    rows = [
+        {
+            "id": "ok",
+            "image": "a.png",
+            "conversations": [
+                {"from": "human", "value": "Explain the scene in detail.\n<image>"},
+                {"from": "gpt", "value": "answer"},
+            ],
+        }
+    ]
+    annotation = tmp_path / "annotation.json"
+    annotation.write_text(json.dumps(rows), encoding="utf-8")
+    cfg = {
+        "dataset": {
+            "source": "llava_instruct",
+            "annotation": str(annotation),
+            "images_dir": str(tmp_path),
+            "slice": 1,
+            "val_size": 0,
+            "seed": 42,
+        }
+    }
+    manifest = build_dataset(cfg, tmp_path / "out")
+    assert (manifest["num_train"], manifest["num_val"]) == (1, 0)
+    stored = read_jsonl(tmp_path / "out" / "data.jsonl")
+    assert stored[0]["conversations"][0]["value"] == "Explain the scene in detail.\n<image>"
+
+
+def test_v1_layout_check_trailing_allowance():
+    from vlm_dflash.data.schema import check_v1_question_layout
+
+    check_v1_question_layout("q\n<image>", context="t", allow_trailing=True)
+    with pytest.raises(ValueError, match="start of the question"):
+        check_v1_question_layout("q\n<image>", context="t")
+    with pytest.raises(ValueError, match="start of the question"):
+        check_v1_question_layout("a <image> b", context="t", allow_trailing=True)
+    with pytest.raises(ValueError, match="exactly one"):
+        check_v1_question_layout("<image> a <image>", context="t", allow_trailing=True)
+
+
 def _fake_hf_datasets(monkeypatch, rows):
     import types
 

@@ -15,6 +15,16 @@
 
 ### Schema v2: multi-image / multi-turn
 
+- Data fix (2026-10-14): `llava_instruct` prepare accepts the dataset's
+  historical trailing-placeholder form (`"...question...\\n<image>"`, about
+  half of LLaVA-150k) again - the R4 layout check ran before the length/media
+  filters and raised on the first such row, making the whole source
+  unusable. The check now runs with `allow_trailing=True` for this source
+  (the v1 renderer strips the placeholder and renders the image first, as
+  every recorded 2K llava run and capture store was built); interleaved
+  (`text <image> text`) and multi-placeholder rows stay rejected
+  (`data/schema.py`, `data/prepare.py`, `tests/test_multiturn_layout.py`).
+
 - Data schema v2: rows with `image_turns` (or the `vlm-dflash-data-v2`
   marker) keep the full conversation and a flat `images` list; every image is
   rendered at the start of the turn it is attached to. v1 rows and every v1

@@ -54,7 +54,14 @@ def _iter_llava_instruct(cfg: dict) -> list[dict]:
         question, answer = conversations[0].get("value", ""), conversations[1].get("value", "")
         if "<image>" not in question:
             continue
-        check_v1_question_layout(question, context=f"llava_instruct row {row.get('id', src_index)!r}")
+        # LLaVA-150k historically puts the placeholder last ("...\n<image>";
+        # about half of the file) and the v1 renderer strips it and renders the
+        # image first either way - the layout every recorded 2K llava run and
+        # capture store was built with. Accept that trailing form; genuinely
+        # interleaved rows (text after the placeholder) stay rejected.
+        check_v1_question_layout(
+            question, context=f"llava_instruct row {row.get('id', src_index)!r}", allow_trailing=True
+        )
         image_name = row.get("image")
         if not isinstance(image_name, str) or not image_name:
             continue
