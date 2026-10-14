@@ -223,23 +223,38 @@ def main():
                 worst_u = max([v["worst_rel"] for k, v in entry.items() if k.startswith("updated") and v], default=None)
                 print(f"  parity {n.split('_',1)[1]}: worst grad_rel={worst_g} update_rel={worst_u}")
 
-        # ---- anchor invariant ----
+        # ---- anchor invariant (frozen table = first 101 calls; trailing diag calls reported) ----
+        FROZEN_CALLS = 101
         names = [leg_name(cell, ca, bu) for ca in ("off", "on") for bu in ("off", "on")]
         seqs = {n: legs[n]["anchors"] for n in names if legs[n]["exists"]}
         if len(seqs) == 4:
             mlen = min(len(v) for v in seqs.values())
-            base = None; ok = True
-            for n, v in seqs.items():
-                pref = v[:mlen]
-                if base is None:
-                    base = pref
-                elif pref != base:
-                    ok = False
-            out["anchor_invariant"] = {"full_lengths": {n: len(v) for n, v in seqs.items()},
-                                        "prefix_len": mlen, "equal": ok,
-                                        "digests": {n: anchor_digest(legs[n]) for n in seqs}}
-            print(f"  anchor invariant (4 legs, prefix {mlen}): {'EQUAL' if ok else 'MISMATCH'} "
-                  f"lengths={ {n.split('_',1)[1]: len(v) for n, v in seqs.items()} }")
+            lengths = {n: len(v) for n, v in seqs.items()}
+            if mlen < FROZEN_CALLS:
+                out["anchor_invariant"] = {"full_lengths": lengths, "prefix_len": mlen,
+                                            "equal": None, "note": f"< {FROZEN_CALLS} rows present; pending"}
+                print(f"  anchor invariant PENDING (min len {mlen} < {FROZEN_CALLS}) lengths="
+                      f"{ {n.split('_',1)[1]: len(v) for n, v in seqs.items()} }")
+            else:
+                base = None; ok = True
+                for n, v in seqs.items():
+                    pref = v[:FROZEN_CALLS]
+                    if base is None:
+                        base = pref
+                    elif pref != base:
+                        ok = False
+                tails = {}
+                for n, v in seqs.items():
+                    if len(v) > FROZEN_CALLS:
+                        payload = json.dumps(v[FROZEN_CALLS:], sort_keys=True).encode()
+                        tails[n] = {"len": len(v) - FROZEN_CALLS,
+                                    "sha1_16": hashlib.sha1(payload).hexdigest()[:16]}
+                out["anchor_invariant"] = {"full_lengths": lengths, "prefix_len": FROZEN_CALLS,
+                                            "equal": ok, "trailing": tails,
+                                            "digests": {n: anchor_digest(legs[n]) for n in seqs}}
+                print(f"  anchor invariant (frozen {FROZEN_CALLS} calls): {'EQUAL' if ok else 'MISMATCH'} "
+                      f"lengths={ {n.split('_',1)[1]: len(v) for n, v in seqs.items()} } "
+                      f"trailing={ {k.split('_',1)[1]: v for k, v in tails.items()} }")
         else:
             print(f"  anchor invariant pending ({len(seqs)}/4 legs present)")
 

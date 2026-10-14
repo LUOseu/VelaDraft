@@ -345,3 +345,22 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - 磁盘告警并自愈：s3_b8 峰值写至 avail 5G → exit=0（02:59:11，0.95 GPU-h，wall 1716s）后 D5 prune（ckpt/shard，8.0G→19.4G）；`s3_b32` 首试 rc=96 → 300s 重试（run `g2_s3_b32_1015_0259`、vs `g2_sync_b32_1015_0153`）。
 - D1：02:54 六连重试 GUARD FAIL（disk 7–9G；GPU3 本身 quiet）→ **02:59:21 空间释放后自动重启 `d4xd1_smoke`**（3 步；visual_path_check 过）→ 2×2 8 腿随后（L-W3-D4xD1 条款照旧）。留痕：D5 `logs/d5_prune.log` / `logs/d5_prune_s3b8.sh`；D1 `logs/d4xd1_smoke.log`。
 - novelty 深读 #1：`evidence/c0_novelty_deepread_d1_20261015.md`（SSRN 综述 DOI 核实 10.2139/ssrn.7343278；ACL'25/IJCAI'25/NeurIPS'24 对照；工程栈核查=HF padding-free / Megatron PackedSeqParams / torchtune packing 均 HTTP 200）。
+
+### D1 2×2：初跑中止与重启（2026-10-15 03:0x–03:2x，C0 收报）
+
+- 03:02:55 链启（GPU3）：leg1 ref rc=0（03:07:29）、leg2 rc=0（03:12:26）、leg3 rc=0（03:15:25）；leg4 03:15:25 起、03:17:31 rc=1（guard：/home 7–9G 低于当时 10G 门；非训练错误）。
+- **捕获缺陷（D1 自检发现；全披露于 addendum §5.5）**：首版 sitecustomize grads hook 写成 `p.detach()`（参数本体而非 `.grad`）——首个 parity diff 即自检矛盾（b0 全 0.0 + ‖captured‖≈338≈参数范数 ≠ train_log grad_norm 89.05）→ D1 03:17 果断停链；**4 个 W3 腿目录 + 全部 tensor 目录已删**（证据无效，正当）。
+- 修复与复核：grads 捕获移至 `clip_grad_norm_` 入口（clip 前、R4 同语义）；smoke（03:22/03:24）通过——clip trace call0：my_clone 88.956 vs clip_return 89.053 = **0.11% bf16 量化类 ✓**；链路自校 ok。
+- **初跑一切数字以 void 对待**（含 −47% 峰值、~3× 步时、任何 parity）——只作仪器调通参考；**重启集（8 腿全集）= 唯一正式证据**。
+- 重启授权 + update 轴读法：**裁定 `d4xd1-002-c0`**（3.4x 发布；本裁定在重启数据前冻结）。预算：初跑 ≈0.26 GPU-h 入账；重启 ≤1.2；合计 ≤1.5（越界披露）。guard 双卷现状：/tmp 23G、/home 17.7G（s3_b32 exit=0 + prune 后）。
+
+### 裁定 d4xd1-002-c0（update 轴读法 + 重启 GO；数据前冻结）
+
+- 请求（D1 addendum §4）：`update_rel ≤1e-7` 记录自 R4/round-2 口径（lr·‖g‖/‖p‖·grad_rel 量级），产品路径 AdamW 的 `p_after` 漂移由归一化灵敏度决定（量级更大），常数不可移植 → 请 C0 定读法。
+- 裁定要点：①raw 交付不变 + 分解 (grad_rel, update_rel, lr, ρ) 必交；②`≤1e-7` 硬谓词仅适用于 **floor probe**（cache_on×bucket_off vs ref；预期严格 0）；③bucket_on 腿 update 轴 = **类一致性读法**（健康项：恒等式 ≤0.5% 类；自洽项：ρ 与机制换算同量级；不自洽 → semantic anomaly → correctness-blocker 支线）；④**主判决门一字不动**（F1 7.5e-3 / grad 6e-3 / F2 / F3 / F4 / anchor 不变式 / rc/NaN/ckpt）；⑤依据：单位分析 + 异议在数据前 + 初跑整体作废不可用于调门 + 强声明载体不变。
+- 收口映射（预登记）：全过→相容性成立；F3 败→交互冲突；F1 败→正确性阻断；F2 败/腿废→无效窗口重跑（计租约）。重启后收口判决落 `d4xd1-003-c0`。
+
+### D5：s3_b32 收数与 G2 汇总（2026-10-15 03:2x，C0 收报）
+
+- **s3_b32 exit=0**（03:22:07；wall 1074s；alloc 0.59 GPU-h）；prune 03:22:12 释放 /home 6.2G→17.7G。`g2_collect.json`（11 行）出数：**s3_b8 1716s**（parity 全 ✓；vs sync_b8 2174.5s **−21%**、vs staged_b8 2297.3s **−25%**）；**s3_b32 1074s**（regen parity ✓、**store parity 待 staged_b32 复验**；vs sync_b32 1228.8s **−12.6%**；落在 sim 带 950–1100 内）。
+- batch 语义旋钮再确认（b8/b32 kept 集合不同；各自与自身对照）。**下一步**：staged_b32 store-parity 复验 + §10 汇总 + 三态 parity 收口 + GPU-h 时间戳重算；Tier C（pinned）暂缓照旧。
