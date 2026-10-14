@@ -13,3 +13,4 @@ C0 处理状态记录在本目录同名补充或 REGISTRY §7：RECEIVED / ACCEP
 版本化后由 C0 更新 INTEGRATION §3 并通知受影响角色。
 
 历史：D1 的“anchor 表重放 hook”与“重排权重 API 对接点”（REPORT §6 / HANDOFF 2026-10-14）等待正式提案编号。
+2026-10-14 23:30：**d5-001 已收**（producer/consumer 分片调度 runner）→ RECEIVED（部分/条件批准），答复见 `d5-001-c0.md`。

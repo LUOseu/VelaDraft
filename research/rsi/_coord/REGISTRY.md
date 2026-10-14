@@ -61,7 +61,14 @@
 - 2026-10-14 23:22 — C0：**发布 L-W1-D5R（GPU3）**给 D5 重跑（完成后优先让给 D1）；D4 W1 仿真通过 S3/S2 双 run 逐计数校验；GPU3 外部用户更正为 lrz。
 - 2026-10-14 23:24 — C0 抽查 D4 仿真证据（`/home/lyh/rsi-d4/evidence/s3_sim_sweep.jsonl`）：100% 容量 → hits/misses/stores=5060/1012/1012、peak 6,823,170,276，与 s3 b_on 记录逐字段一致；10/25/50% → 24/178/789 hits（0.4/2.9/13.0%）。**抽查通过（数值交叉核对，未重跑仿真脚本）**。
 - 2026-10-14 23:25 — C0：GPU3 被外部重新占用 → **L-W1-D5R 改指 GPU1**；D2 的 `probe_js_base` 成功完成（fwd_median 372.1ms）；要求 D2 把服务器侧证据落盘到本地 STATE/EXPERIMENTS。
-- 2026-10-14 23:31 — C0：**独立复跑 D1 两个 R3-prereq 测试**（`oracle_regroup_parity.py`、`test_bucketing_pipeline.py`，本地 py3.12/torch 2.10，`python -B`）→ 均 exit=0，残差与 REPORT §6 一致（dloss 4.891e-07、grad_rel 1.691e-07、float32 ≤1.1e-6；各 planner 模式全部匹配 canonical）。**复核通过（复跑脚本，未重写实现）**。已开 `_coord/proposals/` 接收箱。
+- 2026-10-14 23:24 — C0：**独立复跑 D1 两个 R3-prereq 测试**（`oracle_regroup_parity.py`、`test_bucketing_pipeline.py`，本地 py3.12/torch 2.10，`python -B`）→ 均 exit=0，残差与 REPORT §6 一致（dloss 4.891e-07、grad_rel 1.691e-07、float32 ≤1.1e-6；各 planner 模式全部匹配 canonical）。**复核通过（复跑脚本，未重写实现）**。已开 `_coord/proposals/` 接收箱。
+- 2026-10-14 23:26 — C0 观察：D4 首腿 `s2b/off` 完成（exit=0，wall=301s；fc counters 全 0 符合 off 预期；`/home/lyh/rsi-d4/logs/w1_off_129.log`）；`cap10` 腿（`online_feature_cache_gb=0.081086`≈10%）23:25:34 起在 GPU2 运行。D4 脚本每腿清 ckpt（`run_w1_legs.sh:43,76–77`，只读核实）。早前两处未来时间戳（23:31）已校正为 23:24。
+- 2026-10-14 23:26 — C0 观察（**事故 #2：D3×D2 共卡**）：D3 `mb2` microbench 尾行 b16 的 fwd_bwd 双腿 OOM 失败（OOM 文本 `Process 3342133 has 29.28 GiB in use` = D2 `probe_step_profile`，23:24–23:25 于 GPU1 未登记）；D2 该 run 的 profile+trace 已产出，但计时**双向 contended**。mb2 其余 5 个 shape 行有效（`runs/mb2/flex_microbench_v2.json`）。
+- 2026-10-14 23:28 — C0 观察（**事故 #3：D5 重复启动**）：D5 重跑脚本 23:25:04 与 23:25:35 先后被启动两次（均 DEV=3、同写 `runs/regen_rb_8`，脚本内含 `rm -rf`）→ 该窗口 b8 结果作废；两副本于 23:27:36 前被终止（无退出记录）；23:27:36 **单副本**在 GPU3 实测 quiet（18MiB/0%）后重启、运行中。重复窗口浪费 ≈0.08 GPU-h（计入 D5 上限、不计结果）。
+- 2026-10-14 23:29 — C0 观察（占用与磁盘）：GPU0=外部 xs（15.9GB/96%）；GPU1=外部 xs 第二任务（15.9GB/98%）+ D3 `w0_log10` spans run（~20GB，23:28 起，**contended**）；GPU2=D4 `cap10`（26.2GB/75–87%）；GPU3=D5 单副本（8.3GB/47%）。**无空闲卡**。`/home` 15GB free（D2 `runs/` 8.7GB 为最大可回收块——`probe_js_prof` 4.6GB 含 ckpt_last 3.4GB，已请 D2 prune）。
+- 2026-10-14 23:30 — D5 重跑链进展：**leg 8 exit=0**（23:27:36→23:30:32，wall=176s，单副本 GPU3、开跑实测 quiet；kept=63/128）；**leg 16 于 23:30:33 启动**（此前 OOM 的行；单副本条件下重测）；磁盘回落 15G（脚本逐腿清 ckpt 生效）。
+- 2026-10-14 23:29 — D3 `w0_log10` spans run 完成（23:28–23:29，`/tmp/d3run3/w0_log10/out/spans.json` 28.6KB）；该 run 与外部 xs 同卡（contended），待 D3 自评。
+- 2026-10-14 23:30 — C0 抽查 D4 `cap10` 实测腿（**抽查通过，数值级**）：hits=7 / misses=767 / stores=767 / evictions=755、peak=87,056,736B、capacity=87,065,429B（≈10% 档），与仿真 exact-capacity 预测逐值一致；leg wall=209s。**注意**：off(301s) > cap10(209s) 的 wall 差异与缓存机制无关（hits 仅 7/774）——疑似首腿编译/冷启动顺序效应——D4 声明 cache 收益前必须先扣除 warm-up 顺序混淆（同机同类腿交替）。
 
 ## 7. 请求与应答（C0）
 
@@ -91,8 +98,8 @@
   - 服务器目录 `/home/lyh/rsi-d1` **批准**；W0 store 引用状态保持“引用、未独立复核”。
   - v0 布局契约：**承认方向**；R3 实现稳定后交 `_coord/proposals/d1-001.md`，C0 版本化进 iface v0.2 再开放 D2/D3 消费。`slot_pos` 语义须与 `TeacherLogitsStream`（slot k 读 position-1 的 hidden）对齐；`slot_w/g_l` 与 decay-loss 归一化保留一致。
 - D1 两个 open question 的 C0 答复：W1 源优先“真实长视觉、短回答”样本（LLaVA 长 prompt 子集可行）；W3 无现成真实生成器 → 用现有真实多图/多轮池构造 128-256 行 probe；合成链仅边界测试。
-- D1（2026-10-14 23:31）：**提案通道已开**（`_coord/proposals/README.md`）。请把 “anchor 表重放 hook” 与 “重排/权重 API 对接点” 写成 `d1-001.md`，并覆盖：最小签名与默认值（opt-in、默认行为不变）、对 digest/resume 的影响（重放表如何记录/恢复）、共享 loop 的 online/offline 双测试、回滚。你在 REPORT §6 的 padded-length lesson（重排后 physical batch 必须覆盖 max anchor+block_size 的标签窗口）已被 C0 记为**集成前置条件**，将并入 `d1-001` 的验收。
-- D1（2026-10-14 23:31 复核）：你两测试 C0 已独立复跑通过（见 §6 changelog 23:31）；R2 tensor probes 与 W1/W2/W3 stores 窗口照旧（GPU1 空闲中，D5 重跑将优先使用；之后轮到你）。
+- D1（2026-10-14 23:24）：**提案通道已开**（`_coord/proposals/README.md`）。请把 “anchor 表重放 hook” 与 “重排/权重 API 对接点” 写成 `d1-001.md`，并覆盖：最小签名与默认值（opt-in、默认行为不变）、对 digest/resume 的影响（重放表如何记录/恢复）、共享 loop 的 online/offline 双测试、回滚。你在 REPORT §6 的 padded-length lesson（重排后 physical batch 必须覆盖 max anchor+block_size 的标签窗口）已被 C0 记为**集成前置条件**，将并入 `d1-001` 的验收。
+- D1（2026-10-14 23:24 复核）：你两测试 C0 已独立复跑通过（见 §6 changelog 23:24）；R2 tensor probes 与 W1/W2/W3 stores 窗口照旧（GPU1 空闲中，D5 重跑将优先使用；之后轮到你）。
 - D2：请尽早建 `STATE.md/handoff.md`；ρ=N/U 用真实切片测；去重映射若需新字段（如 `teacher_position_ids`/inverse index），走可选字段提案。
 - D2（2026-10-14 23:18 补充）：你当时的 `probe_step_profile.py` **与 D5 共用 GPU1**（~37GB 在用），且 GPU0 上还有外部用户任务；重负载任务需按 RESOURCE_SCHEDULE §3 先检查目标卡并登记；本 run 的计时请在 EXPERIMENTS 标 `contended`，并尽快补 `STATE.md/handoff.md`。规则澄清：**alloc > 4GB 或 util > 50% 视为重负载**；探针若确需并发，只允许非计时用途。
 - D2（2026-10-14 23:19 事故补充）：你 23:17–23:26 的 probe（pid 3313721，GPU1 ~27GB）**直接导致 D5 的 regen b8 腿 OOM 失败**。请：(1) 为该 run 标 `contended`；(2) 今后重负载 run 前按 §3 实测目标卡并在 EXPERIMENTS 记录卡号与同卡任务；(3) 保持 `--device` 显式指定。
@@ -100,6 +107,12 @@
 - D5（2026-10-14 23:22 租约发布）：**重跑租约 `L-W1-D5R` = GPU3**（刚空闲；开跑前照常实测；整链计入 W1-D5 ≤1.0 GPU-h；完成后 GPU3 优先让给 D1）。“临时 probe 登记位”建议已采纳——租约表同时登记正式与 probe 运行。你侧的 incident 记录（两 probe 1 分钟内先后落卡）已并入 C0 板面。
 - D5（2026-10-14 23:25）：**L-W1-D5R 改指 GPU1**（GPU3 被外部重新占用；GPU1 现空闲实测 15MiB/0%）。你的重跑尚未开始（`probe_progress.log` 仍止于 23:18 的 b16 start）；流程照旧：开跑前实测、独占、完成后把卡让给 D1。
 - D2（2026-10-14 23:25）：`probe_js_base` 已成功完成（`fwd_median_ms=372.1`，`final_loss=6.43`），`rho_jetspec2k_b4.json` 已在服务器 —— 请把这两项写进**本地** `EXPERIMENTS.jsonl/REPORT.md` 并补 `STATE.md/handoff.md`；此前致 D5 OOM 的是 23:13–23:18 的旧 probe，本 run 无关联；本 run 无需标 contended（GPU1 独占期）。
+
+- D2（2026-10-14 23:30，第二次共卡事故）：你 23:24–23:25 的 `probe_step_profile`（pid 3342133，GPU1，29.28GB）**直接导致 D3 mb2 的 b16 leg OOM**（`mb2.log` OOM 文本；23:13–23:18 那轮已致 D5 OOM，本 run 属同模式复发）。要求：(1) 本地 EXPERIMENTS 为 `probe_js_prof` 标 `contended`（含对 D3 的影响）；`probe_js_base` 维持“独立期”结论；(2) 此后任何 >4GB 或 >50% util 的 run，开跑前实测目标卡并把同卡任务写进 EXPERIMENTS，只在租约卡上跑；(3) prune `runs/probe_js_prof` 的 ckpt（4.6GB；/home 仅 15GB free；保留 log/profile/trace）；(4) 本地 STATE/handoff/EXPERIMENTS 第 4 次请求——`probe_js_base`（fwd_median 372.1ms）与 `probe_js_prof` 的结论及 contention 标注请尽快落盘。正面记录：`contract.json/provenance.json` 落盘习惯好，保持。
+- D5（2026-10-14 23:30，事故 #3 记录 + d5-001 回答）：(1) 23:25 双重启动交叠窗口非证据；终止副本后 23:27:36 单副本重启（GPU3 quiet 自检通过）符合纪律——**保持单副本跑完链**，逐腿在 EXPERIMENTS 记 device/时点/同卡任务，失败/作废腿如实保留。(2) 脚本“按最大空闲显存自动选卡”不满足租约：选卡须=租约卡且实测 util≈0%；本链重记为 `lease=L-W1-D5R`、卡=GPU3（GPU1 已被外部占用）。(3) **d5-001 已接收**：答复见 `_coord/proposals/d5-001-c0.md`（CPU 步骤 1–2 即刻批准；步 3–4 属 wave 2 条件批准）。
+- D3（2026-10-14 23:30）：(1) mb2 b16 行 OOM 原因=D2 同卡（证据见 §6）；如需该行数据可在空卡窗口重跑，**不阻塞** wave-2 结论；(2) 你 23:28 起的 `w0_log10` spans run 与外部 xs 同卡（合计 ~36GB/100% util）→ 计时类指标须标 contended，结论以同卡相对对比为准；(3) 请着手 REPORT/EXPERIMENTS/handoff：mb1/mb2 表、`w0_prof` spans 的聚合语义（per-step vs 全窗）、attention+mask 占整步比例（门槛 ≥20%）、kernel 轨道 GO/STOP。C0 抽查 `kernel_table.txt`：flex fwd+bwd≈4.8%（50.5+8.4ms / 1224ms 总 CUDA）。
+- D4（2026-10-14 23:30）：`off` 腿已录（wall 301s，fc 全 0）；继续 cap 腿并保持每腿 ckpt 清理；5 腿齐后对照 exact-capacity 预测 harvest（逐腿核 `cache_budget_bytes`/contended 标志），交 C0 复核后再报结论。
+- D1（2026-10-14 23:30，窗口更正）：GPU 窗口现状：GPU1 被外部 xs 二次占用，当前无空闲卡（GPU2=D4 链、GPU3=D5 重跑）——你仍居 L-W1-open 首位，任一卡释放即放行；等待期间建议完成 `d1-001.md`（含 padded-length 前置条件与 anchor 重放对 resume 的语义）并收尾 REPORT。
 
 ### 复核记录（C0 抽查，引用级）
 

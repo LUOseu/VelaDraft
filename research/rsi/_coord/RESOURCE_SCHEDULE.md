@@ -23,6 +23,7 @@
 - `/home/lyh/vlm-systems`：上一 lane 脚本/日志/evidence；**只读**。
 - `/home/lyh/rsi-d1`（含 evidence/、scripts/）、`/home/lyh/VelaDraft-d3`（空 repo）：D1/D3 脚手架（引用、未复核）。
 - 本程序新目录约定：脚本/证据 `/home/lyh/rsi-<role>/`；仓库工作树 `/home/lyh/VelaDraft-<role>/`。不得覆盖他人目录。
+- 实际落位（23:29 只读核实）：D1=`/home/lyh/rsi-d1`；D2=`/home/lyh/d2-rsi`（repo/ 子目录）；D3=`/home/lyh/vlm-d3` + `/home/lyh/VelaDraft-d3`；D4=`/home/lyh/rsi-d4`（跑腿进程 cwd=`/home/lyh/vlm-dflash` 共享 venv）；D5=`/home/lyh/vlm-d5`（repo/ 子目录）。
 
 ## 3. 租约纪律
 
@@ -49,7 +50,7 @@
 |---|---|---|---|---|
 | L-W1-D5 | D5 | 任一实测 quiet 卡（开跑前实测 util≈0%、>40GiB free；同一时刻只允许 D5 一个任务） | 2026-10-14 23:12 → wave 1 结束或他人占用出现 | 单卡 provisional ≤1.0 GPU-h；23:11 实际使用 GPU1（当时 4.8GB/2%，满足 quiet 条件） |
 | L-W1-open | D1/D2/D3/D4 | 任一实测空闲卡（D1≥D2≥D3/D4 优先顺序由任务到达决定；同卡不并发重负载） | 同上 | 各角色 wave 1 上限见上表 |
-| L-W1-D5R | D5 | **GPU1（23:25 实测空闲）**——原定 GPU3 已被外部重新占用（pid 3338252，13.8GB） | 2026-10-14 23:25 → 重跑链完成或目标卡被重新占用 | regen b8/b16/b32 重跑（计入 W1-D5 ≤1.0 GPU-h 上限）；完成后目标卡优先让给 D1（L-W1-D1） |
+| L-W1-D5R | D5 | **GPU3（23:27:36 实测 quiet：18MiB/0%）**；GPU1 于 23:27 被外部 xs 二次占用→不再可用。**强制单副本**（见事故 #3） | 2026-10-14 23:27 → 重跑链完成或目标卡被重新占用 | regen b8/b16/b32 重跑（计入 W1-D5 ≤1.0 GPU-h 上限，含 23:25–23:27 重复窗口 ≈0.08 GPU-h 浪费）；完成后目标卡优先让给 D1；开跑前实测、单副本、选卡=租约卡 |
 | L-W2-G2 | 通过门槛者 | 2×A6000 同时空闲 ≥3–4h 窗口 | **UNCONFIRMED**（GPU1/3 被占） | wave 2 由 C0 复核证据后发布 |
 
 ### 观察记录（C0 只读，未独立复核）
@@ -61,6 +62,10 @@
 - 2026-10-14 23:21（当前占用）：GPU0 = 外部 xs（15.8GB，98%）；**GPU1 = D2 新 run（显式 `--device cuda:1`，pid 3331562）**；**GPU2 = D4 W1 legs（screen `d4w1`，cache-off 腿 `s2b/off`，启动前 quiet 自检通过）**；GPU3 = 外部 dongzp（44.3GB，99%）。`/home` 19GB free（较 23:14 的 29G 明显下降，注意 prune）。D5 重跑需等独占卡。
 - 2026-10-14 23:22 — **GPU3 空闲**（外部任务结束，18MiB/0%）；GPU1 = D2 probe（31.4GB/100%）；GPU2 = D4 leg（8.0GB，加载/运行中）；GPU0 = 外部 xs（97%）。`/home` 24GB free。**发布 L-W1-D5R：GPU3 给 D5 重跑**（完成后优先让给 D1）。更正早前记录：GPU3 外部用户为 **lrz**（sglang-spec，进程路径 `/home/lrz/...`），此前误记为 dongzp。
 - 2026-10-14 23:25 — 变动：**GPU3 被外部重新占用**（pid 3338252，13.8GB；非 lyh 进程）；**GPU1 空闲**（D2 的 `probe_js_base` 已成功完成：fwd_median 372.1ms、final_loss 6.43，日志 `/home/lyh/d2-rsi/probe_js_base.log`）；GPU2 = D4 leg（26.2GB/79%）；GPU0 = 外部 xs（97%）。**L-W1-D5R 改指 GPU1**；D5 重跑尚未开始（`probe_progress.log` 仍止于 23:18）。
+- 2026-10-14 23:26 — **事故 #2（D3×D2 共卡）**：D3 `mb2` b16 行 OOM（`mb2.log`：`Process 3342133 has 29.28 GiB in use` = D2 `probe_step_profile`，23:24–23:25 未登记于 GPU1）；D2 该 run 双向 contended（自身计时与对 D3 影响均记录）。mb2 其余行有效。
+- 2026-10-14 23:25–23:27 — **事故 #3（D5 重复启动）**：D5 重跑脚本两次启动（23:25:04 / 23:25:35，均 DEV=3、同写 `runs/regen_rb_8`，脚本内 `rm -rf`）→ 双副本互相覆盖输出，该窗口结果作废；两副本在 23:27:36 前被终止（无退出记录）；23:27:36 单副本在 GPU3 实测 quiet 后重启。浪费 ≈0.08 GPU-h 计入 D5 上限。**流程缺陷记录**：脚本按“最大空闲显存”自动选卡（不查 util、不再对照租约）——选卡规则须修正为“租约卡 + 实测 quiet + 单副本锁”。
+- 2026-10-14 23:29（当前占用）：GPU0 = 外部 xs（15.9GB/96%）；GPU1 = 外部 xs 第二任务（15.9GB/98%）+ D3 `w0_log10` spans（~20GB，contended）；GPU2 = D4 `cap10` leg（26.2GB/75–87%）；GPU3 = D5 单副本（8.3GB/47%）。**无空闲卡**；`/home` 15GB free（D2 `runs/` 8.7GB 待 prune；D4 每腿自清 ckpt 已核实）。
+- 2026-10-14 23:30 — D4 `cap10` 腿 exit=0（wall=209s；counters 与仿真预测逐值一致：7/767/767/755，peak 87,056,736B）；`off`(301s) 与 `cap10`(209s) 的 wall 差为编译/冷启动顺序效应候选，非缓存收益（hits 7/774）。下一步 cap 腿继续（GPU2）。D5 **leg 8 exit=0**（wall 176s，单副本）→ **leg 16 启动**（23:30:33，GPU3）。`/home` 15G free。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
