@@ -3005,6 +3005,47 @@ def test_online_cache_lru_eviction_respects_byte_cap(monkeypatch, tmp_path):
     assert source.cache_current_bytes() == 0
 
 
+def test_online_cache_eviction_recompute_matches_fresh_extraction(monkeypatch, tmp_path):
+    """Capacity below the working set: evicted rows recompute to the reference bytes.
+
+    The second pass over six rows is a mixed hit/miss pass -- the retained
+    tail (rows 4, 5) serves free, the evicted head (rows 0..2) pays one
+    forward per row and must still return the first extraction's bytes.
+    """
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    run_dir = _write_online_run_dir(tmp_path, rows=6, answer_len=12)
+    # 792 bytes per normalized record -> a two-record cap keeps {4, 5}
+    # after the first pass over rows 0..5 (evicting 0..3).
+    source = _stub_source_with_cfg(monkeypatch, run_dir, _cache_cfg(1584 / (1 << 30)))
+    dataset = source.dataset()
+    first_pass = [dataset[index] for index in range(6)]
+    forwards = _forward_calls(calls)
+    assert forwards == 6 and source.cache_stats["evictions"] == 4
+
+    hits_before = source.cache_stats["hits"]
+    misses_before = source.cache_stats["misses"]
+    retained = [dataset[index] for index in (4, 5)]
+    assert _forward_calls(calls) == forwards  # pure hits: no target work
+    evicted = [dataset[index] for index in (0, 1, 2)]
+    assert _forward_calls(calls) == forwards + 3  # one recompute per evicted row
+    assert source.cache_stats["hits"] == hits_before + 2
+    assert source.cache_stats["misses"] == misses_before + 3
+    assert source.cache_current_bytes() <= 1584
+    for record, reference in zip(retained, (first_pass[4], first_pass[5])):
+        _assert_same_record(record, reference)
+    for record, reference in zip(evicted, (first_pass[0], first_pass[1], first_pass[2])):
+        _assert_same_record(record, reference)
+
+    # Recomputed rows are byte-identical to a cache-off extraction as well.
+    fresh_calls: list = []
+    _install_batched_stub(monkeypatch, fresh_calls, context_hidden=4)
+    fresh = _stub_source_with_cfg(monkeypatch, run_dir, _stub_cfg())
+    fresh_dataset = fresh.dataset()
+    for record, index in zip(evicted, (0, 1, 2)):
+        _assert_same_record(record, fresh_dataset[index])
+
+
 def test_online_cache_fetch_batch_hits_and_skips_prepare(monkeypatch, tmp_path):
     """The batched path serves cached rows without prepare or forward work."""
     calls: list = []

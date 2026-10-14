@@ -30,7 +30,6 @@ mask that enforces this is built by the trainer wrapper in
 from __future__ import annotations
 
 import inspect
-import os
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from typing import Callable, Optional, Tuple, TypedDict
 
@@ -393,17 +392,6 @@ class Qwen3DFlashAttention(nn.Module):
             # attention supports the same additive non-causal block mask without
             # that host overhead. Keep math enabled for older CUDA architectures.
             backend_context = sdpa_kernel([SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH])
-        if (
-            os.environ.get("VLM_DFLASH_FLEX_FORCE_MAIN") == "1"
-            and self.config._attn_implementation == "flex_attention"
-            and kwargs.get("kernel_options") is None
-        ):
-            # torch 2.11 can route GQA block-sparse attention (q_len < 128) to
-            # the flex-decoding Triton template, where the candidate filter
-            # (SPARSE_Q_BLOCK_SIZE % BLOCK_M) can reject every config and
-            # Inductor raises NoValidChoicesError. Opt-in: force the main
-            # flex-attention kernel instead.
-            kwargs["kernel_options"] = {"FORCE_USE_FLEX_ATTENTION": True}
         with backend_context:
             attn_output, attn_weights = attn_fn(
                 self,

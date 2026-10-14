@@ -388,11 +388,14 @@ class OnlineFeatureSource:
         self.online_batch_size = max(1, int((cfg.get("train") or {}).get("online_batch_size", 1) or 1))
         # Optional bounded host-RAM retention of extracted records across
         # epochs (``train.online_feature_cache_gb``; 0 = disabled, the
-        # reference behavior). With a frozen teacher and fixed regen answers a
-        # record is epoch-invariant, so epochs after the first can be served
-        # from RAM instead of re-running the target. The cache is runtime-only
-        # (never persisted), LRU-evicted at a byte cap, and changes neither the
-        # consumed rows, their order/grouping, nor any record value -- it stays
+        # reference behavior). Hits serve a row from RAM instead of re-running
+        # the target and return the stored tensors bitwise; a miss (cold
+        # start, eviction, oversized record) re-extracts exactly as the
+        # reference path would. The cache changes neither the consumed rows
+        # nor their order; a hit reuses the first-extraction-epoch bytes, so
+        # under a shuffling loader cached runs drift from re-extracting ones
+        # at the bf16-rounding scale (measured in docs/online-training.md).
+        # Runtime-only, never persisted, LRU-evicted at a byte cap; it stays
         # out of every digest/plan gate, and a resume simply starts cold.
         cache_gb = (cfg.get("train") or {}).get("online_feature_cache_gb", 0) or 0
         try:
@@ -565,7 +568,10 @@ class OnlineFeatureSource:
         return self.cache_capacity_bytes > 0
 
     def cache_lookup(self, index: int) -> dict | None:
-        """Return the retained record for ``index`` (LRU touch) or None."""
+        """Return the retained record for ``index`` (LRU touch) or None.
+
+        The record is shared, not copied: callers must treat it as read-only.
+        """
         if not self.cache_capacity_bytes:
             return None
         record = self._record_cache.get(int(index))

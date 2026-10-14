@@ -1,0 +1,34 @@
+.....................................................F..........ssssss.. [ 16%]
+........................................................................ [ 33%]
+........................................................................ [ 50%]
+........................................................................ [ 67%]
+........................................................................ [ 84%]
+.................................................................        [100%]
+=================================== FAILURES ===================================
+_________________ test_version_flag_and_single_version_source __________________
+
+capsys = <_pytest.capture.CaptureFixture object at 0x7f1551473650>
+
+    def test_version_flag_and_single_version_source(capsys):
+        import importlib.metadata as md
+    
+        from vlm_dflash import __version__
+    
+        parser = build_parser()
+        with pytest.raises(SystemExit) as excinfo:
+            parser.parse_args(["--version"])
+        assert excinfo.value.code == 0
+        assert capsys.readouterr().out.strip() == f"vlm-dflash {__version__}"
+        try:
+            dist_version = md.version("vlm-dflash")
+        except md.PackageNotFoundError:
+            pytest.skip("vlm-dflash is not installed as a distribution here")
+>       assert dist_version == __version__
+E       AssertionError: assert '0.1.0' == '0.3.1'
+E         
+E         - 0.3.1
+E         + 0.1.0
+
+tests/test_cli.py:71: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_cli.py::test_version_flag_and_single_version_source - Asser...
