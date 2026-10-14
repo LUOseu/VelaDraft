@@ -71,3 +71,14 @@
 - 每方向 GO/HOLD/STOP/BLOCKED + 证据（run_id、原始路径）+ 相对强基线判断 + 区分“平台工程收益”与“可能支撑论文贡献”。
 - GO：最小可审查分支/patch + 验证命令 + merge-readiness 说明；**不自动 push/merge main**，由用户 review 后决定。
 - STOP：保留证据与再启动条件。
+
+## 7. 晋级复核 checklist（wave-2 放行前 C0 逐项取证）
+
+1. 收益：相对**该路线自己登记的强基线**的配对结果（同机 A/B ≥3 交替或一个足够长的稳定窗口），原始日志可复算；microbenchmark 数字不得当训练结论。
+2. 语义：逻辑 batch / anchor 表 / loss 权重 / LR 计划未被改动；若确实重排或重组，须证明保留各原 microbatch 的归一化权重（如 decay loss 的分母 Z），并附 oracle parity（loss/分项 loss/梯度/一次 update）。
+3. 数值：parity 声明与四层证据一致（数学等价 / 容差内 / 质量一致 / bit-exact 分清）；bf16 容差为预设值。
+4. 特征与缓存：隔离实验固定同一份特征；online 实验缓存模式固定或 {off,on} 成对；partial-hit 描述精确（hit 行 vs 重算行分开）。
+5. 计量：train wall、pipeline wall、GPU-hours（含等待）、显存/RAM/存储峰值、有效监督/block 吞吐齐全；计时边界与 sync 位置明确；首次加载与 warm 分开；重叠阶段不简单相加、各层收益不乘倍率。
+6. 代码侵入：改动最小并落在角色目录/新模块；共享入口改动须有 C0 接收的提案与测试；不破坏既有 online suite（BASE 66/66）。
+7. 声明审计：抽查 2–3 个关键数字与原始日志/JSON 一致；限制与反证条件写明；负结果保留。
+8. 复现：EXPERIMENTS 字段齐全、依赖 SHA 固定、复现命令可执行；外部引用标明“引用、未独立复核”。

@@ -51,6 +51,10 @@
 | L-W1-open | D1/D2/D3/D4 | 任一实测空闲卡（D1≥D2≥D3/D4 优先顺序由任务到达决定；同卡不并发重负载） | 同上 | 各角色 wave 1 上限见上表 |
 | L-W2-G2 | 通过门槛者 | 2×A6000 同时空闲 ≥3–4h 窗口 | **UNCONFIRMED**（GPU1/3 被占） | wave 2 由 C0 复核证据后发布 |
 
+### 观察记录（C0 只读，未独立复核）
+
+- 2026-10-14 23:14 — D5 的 regen 批量 probe 正在使用 GPU0（`/home/lyh/vlm-d5/repo`，`--limit 128 --steps 1`，regen.batch_size=8）；GPU2 空闲；GPU1 外部占用降至 4.8GB/2%（状态变化中）；GPU3 仍 44.3GB/100%；/home 29GB free。
+
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
 预算增加条件：`EXPERIMENTS.jsonl` 记录 + 路线 `STATE.md` 写明下一步信息增益 + C0 在 REGISTRY 备注批准。不满足则 HOLD。
