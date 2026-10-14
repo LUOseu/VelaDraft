@@ -241,3 +241,4 @@ REPORT Round-2 / EXPERIMENTS（24 条，hardware 全填）/ `proposals/d1-001.md
 - 2026-10-15 00:47 — **L-W2-D1 发布**（RESOURCE_SCHEDULE §4）：单卡 ≤1.5 GPU-h、GPU3 优先（D5 链动态对排除 3）、quiet-gate 照旧；wave-2 配对（W3+MIX、k=4、5 臂、≥3 交替、100–200 更新 + capacity demo）；与 D5 chain2 并行不冲突（D5 用 1/2、D1 用 3）。
 - 2026-10-15 00:52 — D4 W2 收口复核（C0）：lane `a8e762c`；4 文件 sha1 与集成 `1f8963e` 一致；F1–F4 PASS（counters 645/129/129/0/0；adjustments=0；sensor meminfo；exit=0；自清 ✓）；merge-ready 评估见 `d4-003-c0`。
 - 2026-10-15 00:49 — D1 观察（只读）：自启 round-2.1 `--parity 3` 重复跑——mix k4 p3 完成（cost 1.170/grid 1.163 < 首跑 1.240/1.247，跨 run 波动待聚合）；w3 k4 p3 运行于 GPU2（quiet-guard ✓；非 C0 指令，属 wave-1 证据加强）；卡位提醒见 RESOURCE_SCHEDULE（sync 腿需 1+2；长跑优先 GPU3）。
+- 2026-10-15 00:52 — D1 round-2.1 抽样复核（C0，服务器直读）：新 summary 字段 `*_vs_ref`/`*_vs_canonical` 生效（mix k4 p3：canonical-vs-ref grad 3.66e-3=bf16 量化；各重排臂 vs-ref grad ≤5.3e-3、update ≤7.2e-8；loss vs-ref ≤2.1e-5；peak 与首跑一致）。旧 summary 的 `grad_rel_err_max=0.0` 仍须在提交里注明口径（或重生成）。
