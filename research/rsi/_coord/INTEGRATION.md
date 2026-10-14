@@ -104,7 +104,7 @@
 | D1 | HOLD（最高候选） | W1 store（server `/home/lyh/rsi-d1/runs/d1_w1_probe/`，kept 191/192，已登记共享资产）；`research/rsi/d1/evidence/w0_waste_v2.json`；oracle/parity 复跑（REGISTRY §6）；R3 冒烟 `r3_ab_w0_smoke3.jsonl` | 平台：probe store 资产；论文：潜力最高（双轴组织 + R3） | W2/W3 store；正式 R3 A/B（≥3 交替）；`d1-001.md`；整步 ≥15% 或显存 ≥25% 才进 wave-2 配对 |
 | D2 | HOLD（差异未清） | rho `~/d2-rsi/rho_jetspec2k_b4.json`；`ab_base1/ab_dedup1.json`；phase 配对 `phase_base4.json` vs `phase_dedup4.json`（fwd 188.3→189.3，未复现 -5.5%） | 论文：待归因；平台：否 | 复现差异归因 + REPORT/handoff（第 8 次）+ 预算盘点；相对 15%/25% 门槛出 wave-2 条件或 STOP |
 | D3 | STOP（已接受） | REPORT `b88cdf2`：attention+mask=3.55%（C0 核数 ✓）；/tmp 已清 | 论文：否 | 再开条件：W2 长答 ~15% 外推 / b16 / S≥2.5–4k |
-| D4 | HOLD → 集成路径明确 | W1 五腿 counter-exact（C0 5/5 ✓）；REPORT §W1/§W2；`evidence/w2_cpu/`；d4-001（ACCEPTED 条件；C0 复跑 13+4 ✓；补丁可干净应用） | 平台：adaptive 安全阀（opt-in）；论文：低（无提速声称） | D4 lane commit → C0 集成 commit（含 docs 行 + 复跑记录）；L-W2-D4 ≤1.5 GPU-h real-sensor A/B |
+| D4 | HOLD → 已集成（merge 待验证） | W1 五腿 counter-exact（C0 5/5 ✓）；REPORT §W1/§W2；**d4-001 集成 `1f8963e`（sha1 对账一致；复跑 13+4 ✓）** | 平台：adaptive 安全阀（opt-in）；论文：低（无提速声称） | D4 lane commit 对账；L-W2-D4 ≤1.5 GPU-h real-sensor A/B → 然后可评 merge-ready |
 | D5 | HOLD（条件项） | REPORT `85cbf8b` + sim v4 `23875e8`（可实现 backfill ≤+1.8%；oracle 变体才达 floor +14.6/18.1/20.6%）；regen 真测 1.66×/2.33× | 平台：producer 链/trace 工具；论文：低（H2 负） | 静态分裂实测需 L-W2-G2 窗口 + 真实 ladder；否则保留为 wave-2 条件项 |
 
 跨路线观察：D5 v4 的 keep-oracle 变体需要“生成前已知 keep”的预测器——若 D1 双轴组织能提供此类信号，仅作为 **D1×D5 条件组合的讨论项**（未批准；须双方有共同监督位置才立项）。
@@ -112,7 +112,7 @@
 **共同基线与资产**
 - BASE `7eab136`（复核无漂移）；协议/接口 v0.1.0；B0=`e15256d`。
 - 共享资产：D1 W1 store（指纹 `e044f488…`；引用级）；D5 CPU LivePipeline（`b60d1eb`，lane）；D4 fixed-LRU（已随 PR #6 合入）。
-- 集成分支：待建（d4-001 用；倾向 `research/rsi-integration`；附验证命令与 merge-readiness，不自动 merge main）。
+- 集成分支：**`research/rsi-c0` 本身**（角色表已含"经批准的共享入口集成"）；d4-001 集成 commit `1f8963e`；验证命令 `pytest tests/test_cache_budget.py tests/test_online_mode.py -k cache_budget` + `-k adaptive`（本机 dflare venv 已验证 13+4）；merge-readiness 待 real-sensor A/B + lane 对账，不自动 merge main。
 
 **预算实耗（GPU-h）**：D3 0.22/0.5；D4 0.31/0.5（+L-W2-D4 ≤1.5 条件）；D5 ≤0.4/1.0；D1 待自报；D2 待盘点（上限 1.0）。
 

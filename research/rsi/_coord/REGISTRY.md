@@ -96,6 +96,7 @@
 - 2026-10-14 23:59:42 — **D1 W1 store 建成（exit=0；wall≈179s）**：候选 192 → **kept 191**（skip 1=too_short；冻结协议 max_new 64/min 32；早前 24/144 → 扩池决策成功）；features/ 1.8G（manifest.json + index.jsonl 191 行 + 6 shards），run-dir 6.4G（含 train ckpt ~4.6G 可回收）。**登记为共享资产**：`/home/lyh/rsi-d1/runs/d1_w1_probe/features/`（model_fingerprint `e044f488…`；D4/D5 只读引用需注指纹；引用级）。
 - 2026-10-15 00:00 — **D2 phase-split 配对首批完成**（GPU2，mb4×8 步；`--nodedup` base4 vs `--dedup` dedup4，三腿 loss bitwise 同值 6.944609642028809）：base4 fwd/bwd/opt = 188.3/188.2/26.4ms、wall_med 0.674s；dedup4 = 189.3/189.2/26.5ms、wall_med 0.656s → **fwd 未见 -5.5% 复现（+0.5%）**；与 ab 臂（14 步 186.0→175.7）差异待 D2 归因（激活条件/步数/边界）。ckpt 卫生已修复（`ckpt_saves_skipped`）。
 - 2026-10-15 00:00 — **D4 d4-001 评审：ACCEPTED（条件）**（见 §7）；W2 租约 **L-W2-D4 条件批准 ≤1.5 GPU-h**（等安静卡；GPU2/GPU3 现空闲、GPU0/1 外部 xs）。
+- 2026-10-15 00:15 — **d4-001 集成完成**：`research/rsi-c0` commit `1f8963e`（4 文件 + `docs/online-training.md` 文档行；应用后文件 sha1 与 D4 worktree 逐一对账一致：cache_budget `3d48e108` / online.py `fc019296` / tests `1c5c2a64`、`69071557`）。复跑 13/13 + 4/4 于本 worktree。**merge-readiness 待**：D4 lane commit 对账 + L-W2-D4 real-sensor A/B。
 
 ## 7. 请求与应答（C0）
 
@@ -169,3 +170,4 @@
 - 2026-10-14 23:42 — D3 核数复核（**通过**）：独立重算 `kernel_table_w0_prof.txt`：flex fwd 8.41ms + bwd 50.46ms + 归约 1.12ms（9 calls = 3 层×3 步）→ 20.0ms/step；+ mask 1.166ms → 21.16ms；÷ 步 595.9ms = 3.55%，cap +3.68% —— 与 REPORT §3.2/§4 一致；`spans_w0_run2.json` 重读：mask_build p50=1.166ms、step_wall p50≈598ms 一致。STOP 判定依据成立。
 - D3：BASE 已确认（含 flex 主 kernel pin、LRU 语义）；profiling 结论决定 wave 2 是否给 kernel 预算（门槛：attention+mask ≥20% 整步）。
 - 2026-10-15 00:05 — D4 d4-001 复跑（C0 独立，本机 dflare venv；no-write 模式）：`tests/test_cache_budget.py` **13/13 通过**；`tests/test_online_mode.py -k adaptive` **4/4 通过**；`git apply --check`（4 文件 +693/−9）在 `research/rsi-c0` **干净可应用**。全量 489/6/0 引用 D4 日志 `evidence/w2_cpu/pytest_full_w2_20261014.log`（未逐条独立复核，子集已独立复跑）。
+- 2026-10-15 00:15 — d4-001 集成复跑（C0，集成后树 `1f8963e`）：`tests/test_cache_budget.py` 13/13、`tests/test_online_mode.py -k adaptive` 4/4 再次通过；在线套件其余部分依赖服务器环境，留待集成验证清单（不阻塞集成）。
