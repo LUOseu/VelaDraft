@@ -3,7 +3,7 @@
 - 协议版本：**rsi-protocol-v0.1.0** ｜ 接口版本：**rsi-iface-v0.1.0**
 - 共同基线 BASE_SHA：`7eab1369266010137702de8c714053729cde5834`（origin/main，PR #6 合并后；含固定预算 LRU 记录缓存）
 - 历史核对基线 B0：`e15256d7c4bd10a490a7ac821eb12a0749a96fdd`
-- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 00:16 (Asia/Shanghai)
+- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 00:06 (Asia/Shanghai)
 - 无法确认的字段以 `?` 标注并在文末说明；未创建的 worktree/分支在下一次更新回填。
 
 ## 1. 角色与分支
@@ -96,7 +96,7 @@
 - 2026-10-14 23:59:42 — **D1 W1 store 建成（exit=0；wall≈179s）**：候选 192 → **kept 191**（skip 1=too_short；冻结协议 max_new 64/min 32；早前 24/144 → 扩池决策成功）；features/ 1.8G（manifest.json + index.jsonl 191 行 + 6 shards），run-dir 6.4G（含 train ckpt ~4.6G 可回收）。**登记为共享资产**：`/home/lyh/rsi-d1/runs/d1_w1_probe/features/`（model_fingerprint `e044f488…`；D4/D5 只读引用需注指纹；引用级）。
 - 2026-10-15 00:00 — **D2 phase-split 配对首批完成**（GPU2，mb4×8 步；`--nodedup` base4 vs `--dedup` dedup4，三腿 loss bitwise 同值 6.944609642028809）：base4 fwd/bwd/opt = 188.3/188.2/26.4ms、wall_med 0.674s；dedup4 = 189.3/189.2/26.5ms、wall_med 0.656s → **fwd 未见 -5.5% 复现（+0.5%）**；与 ab 臂（14 步 186.0→175.7）差异待 D2 归因（激活条件/步数/边界）。ckpt 卫生已修复（`ckpt_saves_skipped`）。
 - 2026-10-15 00:00 — **D4 d4-001 评审：ACCEPTED（条件）**（见 §7）；W2 租约 **L-W2-D4 条件批准 ≤1.5 GPU-h**（等安静卡；GPU2/GPU3 现空闲、GPU0/1 外部 xs）。
-- 2026-10-15 00:15 — **d4-001 集成完成**：`research/rsi-c0` commit `1f8963e`（4 文件 + `docs/online-training.md` 文档行；应用后文件 sha1 与 D4 worktree 逐一对账一致：cache_budget `3d48e108` / online.py `fc019296` / tests `1c5c2a64`、`69071557`）。复跑 13/13 + 4/4 于本 worktree。**merge-readiness 待**：D4 lane commit 对账 + L-W2-D4 real-sensor A/B。
+- 2026-10-15 00:04 — **d4-001 集成完成**：`research/rsi-c0` commit `1f8963e`（4 文件 + `docs/online-training.md` 文档行；应用后文件 sha1 与 D4 worktree 逐一对账一致：cache_budget `3d48e108` / online.py `fc019296` / tests `1c5c2a64`、`69071557`）。复跑 13/13 + 4/4 于本 worktree。**merge-readiness 待**：D4 lane commit 对账 + L-W2-D4 real-sensor A/B。
 - 2026-10-15 00:05 — 资源更新：**GPU0 空闲**（外部 xs 完成；00:04 实测 18MiB/0%）→ L-W2-D4 与 D1 W2/W3 可按"实测 quiet"排队；D2 在 **GPU2** 跑新 pin 系列（`pin_base2` probe，运行中）；**GPU3 被外部 dhz（racer repro，~14.3GB）回归占用**。D1 已清 W1 train ckpt（run-dir 6.4G→1.9G；free 22→27G）✓。
 
 ## 7. 请求与应答（C0）
@@ -171,4 +171,5 @@
 - 2026-10-14 23:42 — D3 核数复核（**通过**）：独立重算 `kernel_table_w0_prof.txt`：flex fwd 8.41ms + bwd 50.46ms + 归约 1.12ms（9 calls = 3 层×3 步）→ 20.0ms/step；+ mask 1.166ms → 21.16ms；÷ 步 595.9ms = 3.55%，cap +3.68% —— 与 REPORT §3.2/§4 一致；`spans_w0_run2.json` 重读：mask_build p50=1.166ms、step_wall p50≈598ms 一致。STOP 判定依据成立。
 - D3：BASE 已确认（含 flex 主 kernel pin、LRU 语义）；profiling 结论决定 wave 2 是否给 kernel 预算（门槛：attention+mask ≥20% 整步）。
 - 2026-10-15 00:05 — D4 d4-001 复跑（C0 独立，本机 dflare venv；no-write 模式）：`tests/test_cache_budget.py` **13/13 通过**；`tests/test_online_mode.py -k adaptive` **4/4 通过**；`git apply --check`（4 文件 +693/−9）在 `research/rsi-c0` **干净可应用**。全量 489/6/0 引用 D4 日志 `evidence/w2_cpu/pytest_full_w2_20261014.log`（未逐条独立复核，子集已独立复跑）。
-- 2026-10-15 00:15 — d4-001 集成复跑（C0，集成后树 `1f8963e`）：`tests/test_cache_budget.py` 13/13、`tests/test_online_mode.py -k adaptive` 4/4 再次通过；在线套件其余部分依赖服务器环境，留待集成验证清单（不阻塞集成）。
+- 2026-10-15 00:04 — d4-001 集成复跑（C0，集成后树 `1f8963e`）：`tests/test_cache_budget.py` 13/13、`tests/test_online_mode.py -k adaptive` 4/4 再次通过；在线套件其余部分依赖服务器环境，留待集成验证清单（不阻塞集成）。
+- 2026-10-15 00:05 — D2 新 pin 系列（≥3 交替重复 A/B 的候选）：`pin_base1/2` 与 `pin_dedup1` 已完成、`pin_dedup2` 运行中（GPU2，8 步 probe）——用于复现/厘清 fwd -5.5% 与 phase 配对差异；收到后按"≥3 交替"配对口径复核。
