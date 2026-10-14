@@ -11,7 +11,9 @@
 > comparison does not. The unified boundary (prepare + forward timed on both
 > paths, CUDA-synchronised) is implemented and CPU-tested (R2,
 > `docs/plan/REVIEW_REMEDIATION.md`); the paired GPU re-measurement is a
-> GPU_PENDING item. Raw logs are kept unchanged.
+> GPU_PENDING item. **Update: the paired re-measurement landed as
+> `R-20261014-21` - see "Paired re-measurement" below.** Raw logs are kept
+> unchanged.
 
 Run: `R-20261014-12` (2026-10-14, GPU0 of `a6000xuyang`, plan owner
 C-01a13621). Design: `docs/plan/WP4_DESIGN.md`. Code:
@@ -113,3 +115,30 @@ the per-sample and batched paths (`tests/test_online_mode.py`).
 0.21 GPU-h charged (R-20261014-12): A 3m13s + B 2m41s + two profiling passes
 (~3.0 min and ~3.5 min wall, both dominated by the 2.5 min target load).
 First-round budget after this row: 3.00 / 8.00 GPU-h used.
+
+## Paired re-measurement under the unified boundary (R-20261014-21, GPU_PENDING #2)
+
+Same fixed rows, same seed (42), same config, 32 steps each; both legs at
+`runs/wp4/{ab1_v2,ab4_v2}`, cu-synced counters from `train_summary.json`
+(warmup excluded by the boundary):
+
+| Counter | A: batch 1 | B: group 4 | Delta |
+| --- | ---: | ---: | --- |
+| `extraction_prepare_seconds_total` | 6.355 | 5.811 | -8.6% |
+| `extraction_forward_seconds_total` | 18.212 | 17.079 | -6.2% |
+| `extraction_wall_seconds_total` | 24.567 | 22.890 | **-6.8%** |
+| `target_forwards_total` | 128 | 32 | 4.0x fewer calls |
+| `target_samples_total` | 128 | 128 | 0 |
+| train-phase target device peak | 13.672 GB | 13.674 GB | +0.001 GB |
+| train `wall_seconds` (incl. 32 steps) | 197.0 | 141.8 | -28% (extraction + step time on this host) |
+
+The 4x per-call reduction replicates; the unified-boundary wall saving is
+**-6.8%** on this smoke slice (the superseded -18.8% is retired for good).
+
+**Step losses are NOT bit-identical over 32 steps** (an earlier claim made
+from a 4-step window): losses agree for steps 1-4 (first epoch), `grad_norm`
+already separates at step 1 (121.5499 vs 121.5188), the first loss
+divergence is step 5 (6.15625 vs 6.09375), final 3.59375 vs 3.609375. The
+R-12 4-step bit-equality statement holds only for its first-epoch window;
+within-epoch reproducibility did not extend to the full 32-step run
+(batch composition changes bf16 reduction order once epochs interleave).

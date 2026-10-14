@@ -1,7 +1,9 @@
 # WP6 report - first non-Qwen VLM family (SmolVLM2-2.2B-Instruct)
 
-Status: **ENGINEERING DONE (single-image smoke validated), gaps registered**
-Run: `R-20261014-17` (0.53 GPU-h incl. probes/diagnostics; 1 GPU, A6000 48 GB)
+Status: **ENGINEERING DONE (single-image smoke + export closure validated), gaps registered**
+Runs: `R-20261014-17` (0.53 GPU-h incl. probes/diagnostics) and
+`R-20261014-22` (export -> fresh-process reload -> same-condition eval;
+0.06 GPU-h). 1 GPU, A6000 48 GB.
 Code: family adapter + hooks (`ef07b41`, `0f45fa1`, plus fixes `c2aacbb`,
 `8d4cc93`, `64ba517`, `be0be8c`, `13cb205`); 14 new CPU tests in
 `tests/test_smolvlm_adapter.py` (10 in the adapter commit + 4 with the fixes),
@@ -62,6 +64,34 @@ Command chain: `vlm_dflash train --config configs/smoke_smolvlm.yaml` then
   kernel compilation (1.41 s/sample vs 0.05 s for the init checkpoint's same
   architecture); speedup numbers in `eval_result.json` are diagnostic only.
 
+## R-20261014-22 result (PASS): export closure (GPU_PENDING #3)
+
+Chain: `export runs/e6/smoke_smolvlm --out-dir /tmp/e6_export` (CPU) ->
+fresh-process `demo --drafter /tmp/e6_export` -> same-condition `eval
+runs/e6/smoke_smolvlm --config configs/smoke_smolvlm.yaml`.
+
+- Export: 7 files, `model.safetensors` 427 MB, `code_commit 79d42d0`; the
+  metadata carries the SmolVLM contract (`adapter: smolvlm`, identity
+  fingerprint, `mask_token_id 49278`, `spatial_rope {sections: null, enabled:
+  false}`, `capture_layer_ids [1,11,21]`).
+- **First reload attempt failed** at contract resolution: the demo built its
+  fresh config from Qwen family defaults (`mask_token_id 151669` against the
+  49280-row SmolVLM embedding; spatial rope on for a 1-D family). Fix
+  `6619476`: `align_config_with_drafter` now adopts the drafter-recorded
+  drafting geometry (`drafter_recorded_settings`: mask token, block size,
+  layer count, spatial-rope enabled/mode/sections) from an export
+  `config.json` or a checkpoint `draft_config`, with a regression test that
+  fails the contract gate with Qwen defaults and passes after alignment.
+- Rerun: reload demo **token-exact 4/4** vs target-only greedy
+  (`mask_token=49278` in the identity line; adopted config
+  `block_size 4 / spatial_rope off / capture [1,11,21]`). Demo AL 1.012 /
+  acceptance 0.41% on the synthetic 4-prompt sample - not comparable to the
+  val-split eval (different sample + image geometry; first-call flex kernel
+  compile, no speed claim).
+- Same-condition eval reproduces the pre-export numbers exactly: AL
+  **1.182 / 1.083**, token-exact 4/4 for `ckpt_final` + `ckpt_init`; the diff
+  against the pre-export backup is timing-only fields.
+
 ## Registered gaps / limits
 
 1. **Schema-v2 (multi-turn) rows**: the multi-turn regen's full-render check
@@ -88,6 +118,8 @@ VLM_DFLASH_SMOLVLM_TARGET=<snapshot> VLM_DFLASH_E6_SOURCE=.../source.jsonl \
   VLM_DFLASH_E6_IMAGES=.../images python -m vlm_dflash.cli train \
   --config configs/smoke_smolvlm.yaml --run-dir runs/e6/smoke_smolvlm
 python -m vlm_dflash.cli eval runs/e6/smoke_smolvlm --config configs/smoke_smolvlm.yaml
+python -m vlm_dflash.cli export runs/e6/smoke_smolvlm --out-dir /tmp/e6_export
+python -m vlm_dflash.cli demo --drafter /tmp/e6_export --target <snapshot> --num-prompts 4
 ```
 
 Evidence archive: `a6000xuyang:~/recipe-smoke-config/e6_evidence.tar.gz`

@@ -338,8 +338,10 @@ speculative decoding must reproduce the target's own greedy tokens exactly
 - **Serving:** no production runtime integration claim. A first bridge to
   vLLM 0.22.1's native `dflash` method exists (`scripts/export_vllm_draft.py`;
   status + findings on the [serving bridge](docs/serving-bridge.md) page): it
-  loads and serves the export, but the token-exact gate is **not** passed and
-  no speed number is claimed - see the
+  loads and serves the export, but engine token-for-token parity is not
+  reproducible even across same-engine reruns (bf16 tie flips + engine
+  nondeterminism), the acceptance-length gap is the open blocker, and no
+  speed number is claimed - see the
   [WP5 report](docs/plan/WP5_REPORT.md).
 - **Reproducibility:** data and generation protocols are reproducible; bf16
   training is not bitwise deterministic. Acceptance numbers stay in the

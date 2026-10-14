@@ -41,8 +41,11 @@ Status: **DONE (CPU/docs only - no GPU charge; budget stays 4.10/8.00 GPU-h).**
   protocol- or single-seed scale; the SmolVLM2 family is an engineering
   smoke with no quality claim.
 - **BLOCKED / GPU_PENDING:** the vLLM runtime bridge is
-  BLOCKED-with-gap (loads and runs; token-exact gate not passed, small-margin
-  observations with unresolved root cause in `WP5_REPORT.md`). Nothing in this round is "production
+  BLOCKED-with-gap (loads and runs; small-margin observations at the traced
+  flips; `R-20261014-24/25` showed the engine is not token-reproducible even
+  against itself - same-engine 12/32, 0/467 genuine inconsistencies - so
+  token-exactness is retired as a criterion; the acceptance-length gap (-17%)
+  is the registered blocker in `WP5_REPORT.md`). Nothing in this round is "production
   ready"; the 24 GB preset remains unvalidated on real hardware.
 - **Engineering vs paper evidence:** engineering is done for WP0-WP4 and
   WP6 (WP5 partial per the blocking rule); paper evidence currently

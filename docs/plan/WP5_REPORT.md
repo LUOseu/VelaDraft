@@ -1,11 +1,12 @@
-# WP5 report - vLLM 0.22.1 native DFlash bridge: load path verified, token-exact gate not passed
+# WP5 report - vLLM 0.22.1 native DFlash bridge: load path verified; the 5/32 token-exact reading diagnosed as bf16 ties + engine nondeterminism (no bridge defect observed); AL gap open
 
 Runs: `R-20261014-14` (vLLM bridge check), `R-20261014-15` (in-repo
 serving-convention arms), `R-20261014-16` (divergence margin probe; diagnostic
 added during execution, not pre-registered; v1 probe design, v2 replay probe
-implemented under the R5 review remediation - see the R-16 section). Plan
-owner C-01a13621. GPU0
-(R-14), GPU2 (R-15), 1 GPU (R-16). Code: `vlm_dflash/export/vllm_bridge.py`,
+implemented under the R5 review remediation - see the R-16 section),
+`R-20261014-24` (baseline rerun) and `R-20261014-25` (in-engine diagnosis,
+GPU_PENDING #4). Plan owner C-01a13621. GPU0
+(R-14), GPU2 (R-15, R-25), 1 GPU (R-16, R-24). Code: `vlm_dflash/export/vllm_bridge.py`,
 `scripts/{export_vllm_draft,vllm_bridge_check,probe_divergence_margin}.py`,
 CPU coverage in `tests/test_export_vllm_bridge.py` (5 tests) +
 `tests/test_probe_divergence_margin.py` (7 tests).
@@ -137,18 +138,50 @@ Replacement diagnostic (implemented + CPU-tested):
   prefix enters the forward; off-trajectory / prompt-length-mismatch /
   non-deterministic cases excluded; missing-evidence marks; case selection).
 
+### R-24/R-25: in-engine diagnosis (GPU_PENDING #4) - no bridge defect observed
+
+Constraint: the vLLM 0.22.1 dflash path exposes no sequential-parity verify
+mode, so token-exactness cannot be guaranteed on that path by construction.
+The remaining question was whether *our* bridge/acceptance plumbing adds
+divergences on top of engine nondeterminism. Env `c1vllm` (vLLM 0.22.1 /
+torch 2.11), same 32 prompts and converted draft as R-14.
+
+- **R-24 (baseline rerun)**: the R-14 reading reproduces exactly -
+  token-exact 5/32, AL 1.40534, acceptance 0.0579, per-position
+  `[0.283, 0.084, 0.028, 0.009, 0.002, 0, 0]` (wall dflash 18.0 s vs target
+  13.1 s; warmup-dominated, not a speed measurement).
+- **R-25 Phase A (determinism matrix)**: rerunning the *same engine twice* on
+  the same prompts is not token-exact either - `T1a-T1b` **12/32**,
+  `T1a-T2a` 12/32, `T1a-D1a` 9/32, `T1a-D2a` 9/32, `T2a-D1a` 2/32,
+  `D1a-D2a` 8/32. In-engine run-to-run noise is the same magnitude as every
+  cross-config pair: token-exactness is not a property this engine has.
+- **R-25 Phase B (instrumented dump)**: an env-gated rejection-sampler patch
+  (inert by default; pristine + patched + install/revert shipped) dumped 469
+  spec steps / 638 emitted tokens over 5 prompts (batch 1, prompts
+  0/1/2/4/10). Emissions reconstruct the transcripts exactly (5/5
+  prefix-exact); the v2 analyzer classifies 467 steps as **453 consistent +
+  14 exact bf16 tie-branch, 0 genuine inconsistencies**; first cross-engine
+  divergence per prompt sits at margins 0.0 (p0/p2/p4), 0.125 (p1), and none
+  within 128 tokens (p10).
+
+Conclusion (registered): no acceptance-logic or bridge defect was observed in
+the instrumented path; the 5/32 reading is a statistic of bf16 tie flips plus
+engine-level nondeterminism. **The token-exact gate is not a usable
+correctness criterion for this stack as-is**; quality signals remain AL and
+acceptance metrics (vLLM AL is still not quotable - see the AL gap below).
+
 ## Attribution and registered gaps
 
 Ruled out as the driver: the RoPE convention (R-15, ~0.3%) and the mask-slot
-input convention (code-verified identical). Observed at the traced
-divergences: small top1-top2 margins (<=0.125) on 4 cases (HF-assisted
-diagnostic, R-16). The **root cause of the 27/32 token flips and of the AL
-gap remains unresolved**; the small margins are consistent with bf16
-near-ties on vLLM's block/parallel verify path but do not establish it. The
-repo's token-exact mode works by reusing `generate()`-backend logits in
-sequential verification, and vLLM 0.22.1 exposes no equivalent
-sequential-parity verify mode; a strict token-exact claim under vLLM's dflash
-path cannot be made today (R5: attribution narrowed accordingly).
+input convention (code-verified identical). Resolved by R-24/R-25: the 27/32
+token flips are **not a bridge/acceptance defect** - no genuine inconsistency
+appeared in 467 instrumented spec steps, every cross-engine divergence first
+appears at a bf16 tie or near-tie (margins 0.0/0.125), and same-engine
+reruns themselves agree only 12/32. Attribution: bf16 tie flips + engine-level
+run-to-run nondeterminism. The repo's token-exact mode works by reusing
+`generate()`-backend logits in sequential verification, and vLLM 0.22.1
+exposes no equivalent sequential-parity verify mode; a strict token-exact
+claim under vLLM's dflash path cannot be made today (R5 + R-25 attribution).
 
 Open gap (the real remaining work): **AL 1.4059 (vLLM) vs 1.6866/1.6924
 (in-repo) on identical weights and prompts (-17%)**. Candidate causes for a
@@ -163,22 +196,24 @@ repo-runtime-only.
 
 - Builder: implemented, CPU-tested, load-verified end-to-end; conversion is
   layout-exact.
-- Gate: NOT passed -> no "vLLM/SGLang support" claim, no speed claim; the
-  README/docs say "bridge exists, token-exact gate not passed". R5 remediation
-  (review `950b394`): the divergence is documented as observations with an
-  unresolved root cause; the v2 replay probe + causal gate are in place, and
-  same-engine diagnosis inside vLLM is a GPU_PENDING item
-  (`docs/plan/REVIEW_REMEDIATION.md`).
-- Status per plan rule (blocked by runtime incompatibility: deliver the
-  independently implementable part, register the gap, do not mark done, do
-  not re-run the same failing job): WP5 = BLOCKED, and execution moves on to
-  WP6. See `TASK_LEDGER.md`.
+- Gate: closed as **not a usable criterion for this stack** (R-25): the
+  in-engine diagnosis found no bridge/acceptance defect, and two runs of the
+  same engine differ at the same rate as any cross-engine pair (12/32). No
+  "vLLM/SGLang support" or speed claim is made; README/docs say "bridge
+  exists; the vLLM path is not token-exact by construction and its AL gap is
+  unresolved".
+- Status per plan rule (deliver the independently implementable part,
+  register the gap, do not mark done): WP5 = BLOCKED, now **on the
+  unexplained AL gap (-17%)** alone; the token-exact reading is retired as a
+  criterion (R5 + R-25). See `TASK_LEDGER.md`.
 
 ## Cost
 
-0.55 GPU-h: R-14 0.11 (GPU0: smoke ~4.1 min + full ~2.6 min) + R-15 0.36
+0.85 GPU-h: R-14 0.11 (GPU0: smoke ~4.1 min + full ~2.6 min) + R-15 0.36
 (GPU2: two eval processes, ~21 min combined device wall) + R-16 0.08
-(~4.6 min). First-round budget after WP5: **3.57 / 8.00 GPU-h used**.
+(~4.6 min) + R-24 0.08 (baseline rerun, ~4.5 min) + R-25 0.22 (determinism
+matrix ~10.7 min + single probe ~2.3 min + CPU patch/analysis). Running
+total: `RESOURCE_LEDGER.md`.
 
 ## Artifacts
 
@@ -186,5 +221,11 @@ repo-runtime-only.
   `2e2687d9...`): `bridge_check.json`, `bridge_smoke.json`,
   `divergence_margins.json`, both eval result JSONs + sample files +
   config/contract, derived-1D-checkpoint sha256, and all four job logs.
+- `a6000xuyang:~/recipe-smoke-config/wp5_gpu4_evidence.tar.gz` (sha256
+  `25fba026...`, 17 files, `EVIDENCE_README.txt` inside):
+  `determinism_matrix.json`/`.log`, `bridge_check_rerun.json`/`bridge_rerun.log`,
+  `probe_b1/{single_probe.json,steps.jsonl,verify_path_analysis_v2.json}`,
+  `tools/analyze_dump_v2.py`, `wp5_{determinism_check,single_probe}.py`,
+  `rejection_sampler.{patched,pristine}.py`, `install/revert_wp5_patch.sh`.
 - Live (tmp, renewable): `/tmp/wp5/{vllm_draft,run_1d}`; source run
   `runs/qwen25vl3b_2k` untouched.

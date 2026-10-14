@@ -125,9 +125,14 @@ mode the checkpoint set is identical; the store does not exist.
    finalisation split): the profiler's `--length-buckets` per-row mode now
    provides the per-bucket attribution (CPU-tested, 2026-10-14); the runs at
    2-3 pinned lengths on the real target are GPU_PENDING #6 in
-   `REVIEW_REMEDIATION.md`.
+   `REVIEW_REMEDIATION.md`. **Landed as `R-20261014-20`** (one bucket
+   populated on the smoke slice: 512-1024, 16 rows, median 606 tokens incl.
+   512 image tokens -> render 51.4 ms/row, forward 137.6 ms/row; batch groups
+   138.3 -> 127.5 ms/sample at group 4). Multi-bucket coverage at 2K scale
+   and the vision-vs-text split remain unmeasured.
 2. **Paired online/offline extraction re-timing under the unified R2
-   boundary**: registered as GPU_PENDING #2 in `REVIEW_REMEDIATION.md`.
+   boundary**: landed as `R-20261014-21` (extraction wall 24.57 -> 22.89 s,
+   -6.8%; 128 -> 32 target forwards; 32-step traces not bit-identical).
 3. **Checkpoint write wall** (not just bytes): no write timing was recorded;
    the checkpoint bytes are [M] but the write share is unknown.
 4. **2K-scale online extraction share**: the current 20% is a projection from

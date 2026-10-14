@@ -107,11 +107,11 @@ several):
 | --- | --- |
 | WP0 | implemented / CPU-verified; pending: alignment against the original WP definitions (missing input files) |
 | WP1 | implemented / CPU-verified; GPU evidence recorded (canonical E4 `R-20261014-11`) |
-| WP2 | R1/R3/R4 fixes CPU-verified; recorded GPU-smoke (E2); pending: group/leakage-aware split, post-R3/R4 GPU recheck (GPU_PENDING #1) |
+| WP2 | R1/R3/R4 fixes CPU-verified; post-R3/R4 GPU recheck recorded (`R-20261014-19`, GPU_PENDING #1); pending: group/leakage-aware split |
 | WP3 | GPU-smoke recorded (pinned DocVQA/ChartQA, E3); pending: fixed caption set, public multi-image/multi-turn workload, full cost ledger |
-| WP4 | implemented / CPU-verified; GPU-smoke recorded (timing superseded by R2 -> pending paired re-measurement, GPU_PENDING #2); pending: bucketing + bounded OOM retry |
-| WP5 | blocked (token-exact gate 5/32; root cause unresolved; same-engine diagnosis = GPU_PENDING #4) |
-| WP6 | GPU-smoke recorded (single-image, `R-20261014-17`); pending: export closure (GPU_PENDING #3), second algorithm, multi-image/online boundaries |
+| WP4 | implemented / CPU-verified; paired online re-timing recorded under the unified boundary (`R-20261014-21`, GPU_PENDING #2: extraction wall -6.8%, 128 -> 32 target forwards); pending: bucketing + bounded OOM retry |
+| WP5 | blocked on the unexplained AL gap (-17%); token-exact gate retired as a criterion (`R-20261014-24/25`, GPU_PENDING #4: bf16 ties + engine nondeterminism, no bridge defect observed) |
+| WP6 | GPU-smoke + export closure recorded (single-image, `R-20261014-17` + `R-20261014-22`); pending: a second algorithm on the family, multi-image/online boundaries |
 | WP7 | implemented / CPU-verified (docs/releases/matrix); pending: original E0-E4 alignment (missing inputs), public evidence bundle |
 
 | Work package | Branch state | Review verdict | This round | Still open |
@@ -120,9 +120,9 @@ several):
 | WP1 | DFly two-stage recipe (objectives, stage switch, teacher alignment, resume constraints, export metadata) | Strongest delivered core; real GPU records are report evidence | R6 fixes the stale "no canonical GPU run" text: E4 `R-20261014-11` is now in metadata, matrix and `docs/algorithms/dfly.md`; DFly training maturity -> validated | broader multi-seed recipe evidence (out of scope this round) |
 | WP2 | Schema v2 multi-image/multi-turn + DFlash E2 smoke (`R-20261014-08`) | Partial - not acceptable as a whole | R1/R3/R4 implemented with tests (see above); E2 evidence entry annotated as pre-remediation protocol | group/leakage-aware train/val split (review section 4 note) - **not implemented**; kept in the ledger below |
 | WP3 | DocVQA/ChartQA pinned prompts + reports (`R-20261014-10`) | Partial | no code change; claims trace to `benchmarks/` + RUN_LOG | caption fixed public prompt set; public multi-image/multi-turn workload; complete cost ledger - kept open |
-| WP4 | Batched online capture + order/resume tests + small GPU A/B (`R-20261014-12`) | Implementation valid; the performance conclusion must be re-measured | R2 unified timing boundary + superseded banners (docs + run log) | paired GPU re-timing (GPU_PENDING #2); length/visual-token bucketing and bounded OOM retry remain unimplemented |
-| WP5 | Converter + vLLM harness; failure documented | Correctly BLOCKED | R5 probe v2 + attribution narrowed to observations; gate stays 5/32 BLOCKED | same-engine first-divergence diagnosis inside vLLM (GPU_PENDING #4); AL gap (-17%) unexplained |
-| WP6 | SmolVLM2 single-image smoke (`R-20261014-17`) | First family milestone; not the full acceptance | status represented as `gpu_smoke` in metadata (R6); no overclaims | export -> fresh-process reload -> eval (GPU_PENDING #3); a second algorithm on the family; multi-image/online boundaries for it |
+| WP4 | Batched online capture + order/resume tests + small GPU A/B (`R-20261014-12`) | Implementation valid; performance re-measured (R-21) | R2 unified timing boundary + superseded banners (docs + run log); paired re-timing recorded `R-20261014-21` (extraction wall 24.57 -> 22.89 s, 128 -> 32 target forwards; step losses NOT bit-identical over 32 steps - first-epoch window only) | length/visual-token bucketing and bounded OOM retry remain unimplemented |
+| WP5 | Converter + vLLM harness; failure documented | Correctly BLOCKED | R5 probe v2 + R-24/R-25 in-engine diagnosis: no bridge/acceptance defect, token-exactness retired as a criterion (bf16 ties + engine nondeterminism; same-engine reruns 12/32) | AL gap (-17%) unexplained - the remaining blocker |
+| WP6 | SmolVLM2 single-image smoke (`R-20261014-17`) | First family milestone; not the full acceptance | export closure recorded `R-20261014-22` (reload demo token-exact 4/4; same-condition eval reproduces AL 1.182/1.083; demo-config adoption fix `6619476` + regression tests) | a second algorithm on the family; multi-image/online boundaries for it |
 | WP7 | Model cards, releases (`zoo-v0.3.1`/`v0.3.2`), paper outline | Docs/releases progressed; the original experiment matrix is not closed | R6 rebuilt the support matrix around capability vs evidence; E0-E4 caveat recorded here | alignment with the original E0-E4 definitions needs the missing input files; a compact public evidence bundle for *this* remediation is listed below |
 
 ### Unfinished items kept visible (not silently dropped)
@@ -166,12 +166,34 @@ this remediation and must not be launched without an explicit resource
 decision. Order follows the review:
 
 Scheduling status (2026-10-14, `cvpr-route` session): items #1-#3 and #5-#7
-are staged as a stop-on-first-failure, restart-idempotent host queue (run IDs
+were staged as a stop-on-first-failure, restart-idempotent host queue (run IDs
 R-18..R-23, `~/recipe-smoke-config/cvpr_queue.sh` on the GPU host) that
 starts only when a GPU is idle and hard-stops at 3.3 h cumulative job wall,
 inside the remaining 3.90 GPU-h of the first-round cap. #4 stays out of the
 queue by design (interactive vLLM session). Results are folded back into
 this package when they land; do not re-schedule these items elsewhere.
+
+Execution results (2026-10-14 17:00-19:00; the queue stopped once at the
+R-22 demo contract failure - fixed in `6619476` - then was restarted and
+completed; details + budgets in `RUN_LOG.md`):
+
+- #1 -> `R-20261014-19` **PASS** (post-R3/R4 E2 recheck; token-exact 4/4;
+  flex-kernel guard proves fix `79d42d0` on the pin).
+- #2 -> `R-20261014-21` **measured** (extraction wall 24.57 -> 22.89 s,
+  128 -> 32 target forwards; step losses NOT bit-identical over 32 steps -
+  first-epoch window only).
+- #3 -> `R-20261014-22` **PASS** (export; reload demo token-exact 4/4;
+  same-condition eval reproduces AL 1.182/1.083).
+- #4 -> `R-20261014-24/25` **diagnosis delivered**: no bridge/acceptance
+  defect; token-exactness retired as a criterion (bf16 ties + engine
+  run-to-run nondeterminism); the AL gap stays the WP5 blocker.
+- #5 -> `R-20261014-18` **PASS** (`upstream_dspark` smoke, `confidence_bce`
+  0.2042, `nan_seen=false`).
+- #6 -> `R-20261014-20` **measured** (length-bucketed render/forward
+  attribution; ran on the R-19 run dir `runs/e2/smoke_multiturn_postfix`
+  instead of the R-08 dir).
+- #7 -> `R-20261014-23` second recipe seed (`train.seed=43`); folded into
+  `RUN_LOG.md` when it lands.
 
 All commands assume the `review-remediation` checkout on the GPU host and
 the env conventions of the target configs (`VLM_DFLASH_TARGET`, plus
