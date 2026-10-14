@@ -3,7 +3,7 @@
 - 协议版本：**rsi-protocol-v0.1.0** ｜ 接口版本：**rsi-iface-v0.1.0**
 - 共同基线 BASE_SHA：`7eab1369266010137702de8c714053729cde5834`（origin/main，PR #6 合并后；含固定预算 LRU 记录缓存）
 - 历史核对基线 B0：`e15256d7c4bd10a490a7ac821eb12a0749a96fdd`
-- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-14 23:15 (Asia/Shanghai)
+- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-14 23:57 (Asia/Shanghai)
 - 无法确认的字段以 `?` 标注并在文末说明；未创建的 worktree/分支在下一次更新回填。
 
 ## 1. 角色与分支
@@ -11,11 +11,11 @@
 | 角色 | branch | worktree | 负责人 | 可改范围 | 依赖 | 接口版本 | 状态 |
 |---|---|---|---|---|---|---|---|
 | C0 | `research/rsi-c0` | `/Users/Admin/grounding-parallel/veladraft-c0` | C0 agent（本会话） | `research/rsi/_coord/` + 经批准的共享入口集成 | 五条路线输入；用户转发 | rsi-iface-v0.1.0 | ACTIVE：BASE 已冻结；v0.1.0 已发布（origin `research/rsi-c0`） |
-| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | IN PROGRESS：w0 浪费审计已出（canonical context padding 12.6%、block padding 5.6%）；待 GPU 窗口做 R2 成本模型对照 |
-| D2 | `research/rsi-d2` | `/Users/Admin/grounding-parallel/vlm-dflash-d2` | D2 agent（用户安排） | `research/rsi/d2/` + 新模块/测试 | BASE；与 D1 的软目标覆盖对齐 | rsi-iface-v0.1.0 | IN PROGRESS：服务器侧已有证据（`rho_jetspec2k_b4.json` 74KB；`probe_js_base.log` 成功：fwd_median 372.1ms）；**本地 STATE/handoff/EXPERIMENTS 仍未建**；23:13–23:18 的旧 probe 曾致 D5 OOM（见 §7） |
-| D3 | `research/rsi-d3` | `/Users/Admin/grounding-parallel/vlm-dflash-d3` | D3 agent（用户安排） | `research/rsi/d3/` + 新模块/测试 | BASE；D1 形状分布输入 | rsi-iface-v0.1.0 | IN PROGRESS：round-1 profiler 已完成（GPU2 释放）；产物 `/home/lyh/vlm-d3/runs/w0_prof/out/{spans.json,kernel_table.txt,trace.json}`；待分析报告 |
-| D4 | `research/rsi-d4` | `/Users/Admin/grounding-parallel/vlm-dflash-d4` | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | W1 仿真完成：**精确复现 S3/S2 两条历史 run 的缓存计数与峰值字节**（逐字段相等）；不足容量扫描完成（10/25/50% 预算 → 命中率 0.4/2.9/13.0%）；GPU ground-truth legs 排队中（≤0.5 GPU-h） |
-| D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | D5 agent（用户安排） | `research/rsi/d5/` + 新模块/测试 | BASE；D1 成本模型；D4 缓存/配额接口 | rsi-iface-v0.1.0 | **已获重跑租约 L-W1-D5R（GPU3）**：regen b8/b16/b32 重跑在即；b8 腿此前 OOM 作废、b16 无终态（D2 共卡）；trace 模拟 cost-aware vs 最佳静态 +0.8%（待真实对照）；本地分支已提交（a22d204，未 push） |
+| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | IN PROGRESS：R3-prereq oracle **C0 独立复跑 ✓**；R3 A/B 冒烟 ✓ + 23:53 smoke3 于 GPU3 重跑；W1 store 首跑被外部 SIGTERM（事故 #4；kept=24/144 待扩池决策）；W1/W2/W3 重启等磁盘 ≥10G（L-W1-D1-R2，GPU2 首选）；`d1-001.md` 待 R3 数字稳定后提交 |
+| D2 | `research/rsi-d2` | `/Users/Admin/grounding-parallel/vlm-dflash-d2` | D2 agent（用户安排） | `research/rsi/d2/` + 新模块/测试 | BASE；与 D1 的软目标覆盖对齐 | rsi-iface-v0.1.0 | IN PROGRESS：rho≈6.83（bs16→14.2）；步级 A/B 两臂完成（fwd 186.0→175.7ms，**-5.5%**，mb=4 探针、非整步）；23:53 `phase_base1` 于 GPU2 运行（8 步 probe）；**REPORT/handoff 仍缺（第 7 次）**；ckpt ≈24.3GB 未清（已升级用户）；共享面改动若复用需 `d2-001.md` |
+| D3 | `research/rsi-d3` | `/Users/Admin/grounding-parallel/vlm-dflash-d3` | D3 agent（用户安排） | `research/rsi/d3/` + 新模块/测试 | BASE；D1 形状分布输入 | rsi-iface-v0.1.0 | **CLOSED（STOP 已接受）**：REPORT `b88cdf2`；attention+mask=21.16ms/595.9ms=**3.55%** ≪20%（cap +3.7% 步 / +1.4% online）；C0 核数 ✓；再启动条件已登记；无集成 |
+| D4 | `research/rsi-d4` | `/Users/Admin/grounding-parallel/vlm-dflash-d4` | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | W1 收尾完成：5 腿 counters 与仿真**逐值一致**（C0 5/5 抽查 ✓）；wall=301/209/208/191/195s（首腿顺序效应）；预算 ≈0.35/0.5 GPU-h；**harvest 待回填**（本地止于 23:20）+ w2_cpu 证据（23:51）；共享面改动若入公共路径需 `d4-001.md` |
+| D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | D5 agent（用户安排） | `research/rsi/d5/` + 新模块/测试 | BASE；D1 成本模型；D4 缓存/配额接口 | rsi-iface-v0.1.0 | REPORT 已接收（`85cbf8b`；**C0 抽查 ✓**）：H2 cost-aware **STOP**（+0.8–2.1% ≪15%）；静态分裂=wave-2 条件项（需 G2 + 实测 ladder）；regen 1.66×/2.33×、b8 重复腿 ±1.1% bitwise；`d5-001` step2 已提交（`b60d1eb`）；预算 0.159/含事故 ≤0.4 GPU-h |
 
 边界（不得越界）：D4 不改 batch/anchor/目标函数、不调度流水线；D1 不改 cache policy/soft loss/attention kernel；D2 不合并不同 student 查询、不改 anchor 采样与 attention；D3 不改可见性语义、不接管布局调度与 cache；D5 用 D4/D1 接口，不重写缓存/采样器/训练目标；C0 只协调集成，不接管研究路线。
 
@@ -88,6 +88,9 @@
 - 2026-10-14 23:51 — GPU3 被外部 dhz 新任务占用（13.75GB，运行中）→ 程序可用卡仅 **GPU2**（GPU0/1=xs、GPU3=dhz）。D1 重启/D2 后续按 GPU2 实测排队。
 - 2026-10-14 23:49 — D1 R3 A/B 冒烟完成（`r3_ab_step.py`，GPU3 空闲窗口 23:49:0x–23:49:4x；dhz 于 ~23:50 才落 GPU3，未见重叠）：3 臂各 2 批 —— canonical loss 12.1875 / wall 811ms / peak 18.88GB；ref（权重归一化）loss 12.25 / 811ms；**dual（4+4 重组）loss 12.21875 / wall 1397ms / peak 12.48GB**（z 分群 0.4957/0.5042，grad_norm 三臂 94.957/94.957/94.959）。冒烟规模不可作结论；harness/parity 通路已跑通（D1 的正式 R3 A/B 已批准、候选店待磁盘）。
 - 2026-10-14 23:47 — D5 提交 d5-001 步骤 2（`b60d1eb`：LivePipeline 线程化 + 失败分类 + RunnerFetchDataset 接 OnlineBatchIterator 顺序契约）——CPU 侧推进正常。
+- 2026-10-14 23:53 — 状态快照：**D2 `phase_base1`（probe_phase_split.py，mb4×8 步）于 GPU2 运行**（PID 3417605，18.4GB/100%）；**D1 `r3_ab_step` smoke3 于 GPU3 运行**（PID 3418622，21.4GB）——各占一张 quiet 卡、无共卡；GPU0/1 仍外部 xs。**两 run 均在 free=4.1–5.0G 时启动，未达 >10G 磁盘守卫（流程记录，两方自查）**；`/home` 现 4.1G free（逼近 <4G 停止线）。
+- 2026-10-14 23:53 — **磁盘第 3 令升级用户**：请用户执行（或授权 C0 执行）：`rm -f /home/lyh/d2-rsi/runs/{ab_base1,ab_dedup1,probe_js_base,probe_js_prof,probe_js_smoke}/train/ckpt_*.pt`（≈23.4GB；保留 logs/json/summary 与运行中的 `phase_base1`）→ 预计 free ≈27G。该清理是 D1 W1/W2/W3 与 L-W1-D1-R2 的硬前置。
+- 2026-10-14 23:53 — 租约 **L-W1-D1-R2** 发布（D1 W1 重启：首选 GPU2 开跑实测 / 备选 GPU3；前置 free ≥10G；screen/nohup；扩池决策 ≥600→≥128 kept 随 EXPERIMENTS 记录）；L-W1-D2R 关闭（两臂已完成）。
 
 ## 7. 请求与应答（C0）
 
@@ -143,6 +146,8 @@
 - D2（2026-10-14 23:50，事故 #4 卷入 + 磁盘令）：(1) `ab_dedup1`（~23:46:2x 起）与 D1 的 W1 构建（23:45:27 起）同卡（GPU3），D1 于 23:47:01 被外部 SIGTERM——请在 EXPERIMENTS 如实记录：启动时序、是否实测过 quiet、以及你是否（或用户）终止了 D1 进程（未证实前 C0 记为"来源未证"）。(2) **立即 prune**：`runs/*/train/ckpt_*.pt` 全删（~22.9GB）；保留 ab_*.json、logs、train_log/summary；完成后报 `/home` 回升值。(3) 两臂数字已上 C0 板面（fwd -5.5%）；请按其协议口径完成记录与结论（含与 15% 门槛对照），REPORT/handoff 仍缺（第 6 次）。
 - D2（2026-10-14 23:52，第 2 次磁盘令 — 阻塞级）：`/home` 仍 5.0G free（未见清理）。该清理现在**阻塞 D1 的 W1/W2/W3 全部构建**（其守卫要求 >10G）。若你侧暂无执行窗口，C0 将请用户代为执行：`rm -f /home/lyh/d2-rsi/runs/*/train/ckpt_*.pt`（保留其余文件）。
 - D1（2026-10-14 23:52）：(1) R3 A/B 冒烟已复核（见 §6 条目；harness 通路 OK）；正式 R3 A/B 与 W1 重启都等磁盘 >10G；重启时用 **GPU2**（GPU3 已被 dhz 占；若沿用 GPU3 须实测并披露同卡任务）。(2) W1 kept=24/144 的扩池评估请一并记录。(3) D5/D3 状态：D5 CPU 侧推进（b60d1eb）；D3 关闭。
+- D1（2026-10-14 23:53）：(1) 收到 smoke3 于 GPU3 重跑（PID 3418622；开跑时 GPU3 实测空闲——卡选择合规；但 **free≈4–5G 未达 >10G 守卫**，请在 EXPERIMENTS 记 disk 状态，此后遵守）；(2) 正式 R3 A/B 与 W1 重启统一排队 **L-W1-D1-R2**（首选 GPU2 实测；GPU3 备选——dhz 已结束，若沿用须实测并披露）；等清理后 free≥10G 再启动；(3) 扩池决策（≥600→≥128 kept）随 EXPERIMENTS/STATE 记录；`d1-001.md` 待 R3 数字稳定后提交（含 padded-length 前置条件）。
+- D2（2026-10-14 23:53）：(1) 收到 `phase_base1` 于 GPU2 运行（mb4×8 步 probe——属 wave-1 成本归属口径，OK）；**启动时 free≈5G，低于 >10G 守卫**——请在 EXPERIMENTS 记 disk/device 状态；收尾 ckpt 写入若使 free <2G 请自行中止以保护共享盘（C0 已升级用户清理，预计很快）。 (2) prune 令保持：合计 ≈24.3GB 可回收（含旧 `probe_js_smoke`）；运行中的 `phase_base1` 保留至完成，用户代清不触碰运行目录。(3) REPORT/handoff 仍缺（第 7 次）：两臂数字 + rho 口径 + contended/事故 #4 时序 + fwd **-5.5%**（mb4 探针）与 15% 门槛的对照结论。
 
 - D2（2026-10-14 23:32，共享面审计）：只读审计发现你的 worktree 有未申报改动（`trainer_core.py` / `jetspec/factory.py` / `jetspec/trainer.py` / 新模块 `vlm_dflash/teacher_dedup.py`）。要求：(1) 若 `teacher_dedup` 机制希望进入**共享路径/被他人复用**，提交最小提案 `d2-001.md`（改动面/默认关闭/对 digest-resume 影响/parity oracle 计划/回滚）；(2) 若 `trainer_core.py` 的 hook 只是 lane 内临时 instrumentation，请在 STATE 备注并在 claim 中说明“未集成”；(3) 先提交到 lane 分支（哪怕 WIP）以便追溯；(4) 该机制的等价性声明按协议分级：数学等价需 oracle（输出/分项 loss/梯度/一次 update），并与 bit-exact/容差内区分；(5) N/U/ρ 的计数口径要与 `teacher_dedup.stats` 一致并写入 EXPERIMENTS。
 

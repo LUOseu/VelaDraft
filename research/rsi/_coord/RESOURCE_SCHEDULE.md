@@ -52,7 +52,8 @@
 | L-W1-open | D1/D2/D3/D4 | 任一实测空闲卡（D1≥D2≥D3/D4 优先顺序由任务到达决定；同卡不并发重负载） | 同上 | 各角色 wave 1 上限见上表 |
 | L-W1-D5R | D5 | **GPU3（23:27:36 实测 quiet：18MiB/0%）**；GPU1 于 23:27 被外部 xs 二次占用→不再可用。**强制单副本**（见事故 #3） | 2026-10-14 23:27 → 重跑链完成或目标卡被重新占用 | regen b8/b16/b32 重跑（计入 W1-D5 ≤1.0 GPU-h 上限，含 23:25–23:27 重复窗口 ≈0.08 GPU-h 浪费）；**23:37 链完成（8/16/32/8r 全 exit=0）→ 租约关闭** |
 | L-W1-D1 | D1 | **GPU3**（D1 自选；23:38 实测 quiet；若被外部占用改用 GPU2 并登记） | 2026-10-14 23:42 → R2 tensor probe + W1/W2/W3 stores 构建完成或卡被占 | 计入 W1-D1 ≤1.5 GPU-h；单卡串行、逐腿 quiet 自检；含 R3 步成本 A/B（5 臂×10–20 批 ≈2–5 GPU-min/组）；完成后让给 D3（可选 b16）/D2 排队 |
-| L-W1-D2R | D2 | **GPU2**（23:42 空闲；开跑前实测） | → 单次干净 step profile 完成（≤15 GPU-min） | 重做 23:24–25 的 contended run（本 run 须标 `contended=false`）；计入 W1-D2 ≤1.0 GPU-h；完成后 GPU2 让给 D3（可选 b16 补跑） |
+| L-W1-D2R | D2 | **GPU2**（23:42 空闲；开跑前实测） | → 单次干净 step profile 完成（≤15 GPU-min） | 重做 23:24–25 的 contended run（本 run 须标 `contended=false`）；计入 W1-D2 ≤1.0 GPU-h；**23:48 步级两臂完成（fwd -5.5%）→ 关闭** |
+| L-W1-D1-R2 | D1 | **GPU2**（首选；开跑实测 quiet）｜GPU3 备选（dhz 已结束，若沿用须实测披露） | → W1 重启（含扩池）+ 正式 R3 A/B 完成或卡被占 | 前置 **free ≥10G**（当前 4.1G 阻塞）；screen/nohup 启动；计入 W1-D1 ≤1.5 GPU-h；重启自事故 #4 首跑（23:47 SIGTERM）之后 |
 | L-W2-G2 | 通过门槛者 | 2×A6000 同时空闲 ≥3–4h 窗口 | **UNCONFIRMED**（GPU1/3 被占） | wave 2 由 C0 复核证据后发布 |
 
 ### 观察记录（C0 只读，未独立复核）
@@ -77,6 +78,8 @@
 - 2026-10-14 23:49 — **磁盘危机：free=5.0G**（D2 五目录 ckpt ~22.9GB 为可回收主体；D1 W2/W3 与重启全部被堵）。待 D2 prune 或用户清理后恢复放行；GPU2/3 空闲待命。
 - 2026-10-14 23:51 — **GPU3 被外部 dhz 占用**（新任务 `reproduction...racer_asymmetric_readout12`，13.75GB/运行中）→ 程序可用卡仅 **GPU2**；GPU0/1 仍为外部 xs。磁盘 5.0G（未变）。D1 重启与 D2 后续一律以 GPU2 为准（开跑前实测）。
 - 2026-10-14 23:52 — D1 的 R3 A/B 冒烟在 GPU3 空闲窗口完成（23:49:0x–23:49:4x，冒烟级；dhz ~23:50 起占用 GPU3）。磁盘仍 5.0G（D2 prune 第 2 次要求；若 D2 无窗口→请用户代删 `runs/*/train/ckpt_*.pt`）。程序 GPU 排队：GPU2 空闲待 D1 W1 重启（等磁盘）。
+- 2026-10-14 23:53 — GPU3 外部 dhz 任务结束（23:52:10 实测 18MiB/0%）→ 可用卡 **GPU2+GPU3**。随即 **D2 `phase_base1`→GPU2**（18.4GB/100%）、**D1 smoke3→GPU3**（21.4GB）——各占一卡、无共卡；两 run 均在 free 4.1–5.0G 启动，**未达 >10G 守卫**；`/home` 4.1G free。
+- 2026-10-14 23:53 — 磁盘第 3 令升级用户：`rm -f /home/lyh/d2-rsi/runs/{ab_base1,ab_dedup1,probe_js_base,probe_js_prof,probe_js_smoke}/train/ckpt_*.pt`（≈23.4GB；保留 json/log/summary 与运行中 `phase_base1`）→ 预计 free ≈27G；为 L-W1-D1-R2 硬前置。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 

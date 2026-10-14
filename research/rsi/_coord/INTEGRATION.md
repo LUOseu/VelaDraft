@@ -58,17 +58,17 @@
 
 优先给 D1/D2 研究资源，D4 提供实用 backend；按真实证据调整排序。
 
-### 4.1 Wave-1 台账（滚动；更新 2026-10-14 23:46）
+### 4.1 Wave-1 台账（滚动；更新 2026-10-14 23:57）
 
 | 路线 | wave-1 证据 | 门槛核验 | 当前判定 |
 |---|---|---|---|
-| D1 | 浪费审计（ctx pad 12.6%、block pad 6.0%）；R3-prereq oracle/流水线（**C0 独立复跑 ✓**：dloss 4.9e-7、grad_rel 1.7e-7）；R3 A/B harness 冒烟 ✓（3 臂跑通；dual peak 降至 12.5GB vs 18.9GB）；W1 store 首跑被外部 SIGTERM（事故 #4），重启待磁盘 | 整步收益待测 | HOLD（等 W1/W2/W3 + 正式 R3 A/B + d1-001） |
-| D2 | rho=6.83 真实切片（N≈7750/U≈1135；bs16→14.2）；13 项 CPU 正确性测试；步级两臂完成（fwd 186.0→175.7ms，-5.5%；mb=4 探针） | ρ≥2 ✓；步级占比 ~5–7%（待 D2 定论） | HOLD（磁盘/记录清理；与 15% 门槛对照后定 wave-2） |
+| D1 | 浪费审计（ctx pad 12.6%、block pad 6.0%）；R3-prereq oracle/流水线（**C0 独立复跑 ✓**：dloss 4.9e-7、grad_rel 1.7e-7）；R3 A/B harness 冒烟 ✓（3 臂跑通；dual peak 降至 12.5GB vs 18.9GB）；W1 store 首跑被外部 SIGTERM（事故 #4），重启待磁盘 | 整步收益待测 | HOLD（等磁盘解阻 → W1/W2/W3 + 正式 R3 A/B + d1-001） |
+| D2 | rho=6.83 真实切片（N≈7750/U≈1135；bs16→14.2）；13 项 CPU 正确性测试；步级两臂完成（fwd 186.0→175.7ms，-5.5%；mb=4 探针）；23:53 `phase_base1` 8 步 probe（GPU2） | ρ≥2 ✓；步级占比 ~5–7%（待 D2 定论） | HOLD（步级 -5.5% ≪15%（mb4 探针）；记录/清理缺口；wave-2 判定待 D2 结论） |
 | D3 | trace + Amdahl：attention+mask=21.16ms/595.9ms=**3.55%**（cap +3.7% 步 / +1.4% online），**C0 核数 ✓** | ≥20% ✗（远未达） | **STOP**（kernel 轨；re-open 条件已登记） |
-| D4 | W1 五腿实测 counters 与仿真逐值一致（**C0 5/5 抽查 ✓**）；容量→命中曲线（off/10%/25%/50%/8MiB） | 相对 LRU/mmap 强基线的额外收益待评 | HOLD（等 harvest + d4-001） |
+| D4 | W1 五腿实测 counters 与仿真逐值一致（**C0 5/5 抽查 ✓**）；容量→命中曲线（off/10%/25%/50%/8MiB） | 相对 LRU/mmap 强基线的额外收益待评 | HOLD（harvest 待回填；d4-001 前置） |
 | D5 | trace 分解 + sim v3；regen 真测 1.66×/2.33×（±1.1%，step-1 bitwise 复现）；静态分裂 sim 1.70×（未实测）；cost-aware sim +0.8–2.1% | cost-aware ✗（≪15%）；静态 split 待真实 ladder | HOLD（cost-aware=STOP；split=wave-2 条件项） |
 
-未决：D1 GPU 跑（GPU3）、D2 干净 profile（进行中）、D4 harvest、d1-001/d4-001 提案；预算实耗：D3 0.22/0.5、D4 ≈0.35/0.5、D5 ≤0.4/1.0（GPU-h）。
+未决：磁盘解阻（用户/D2 清理 → free ≥10G）→ D1 W1 重启（L-W1-D1-R2，GPU2 首选）+ 正式 R3 A/B；D2 REPORT/handoff + EXPERIMENTS 口径（步级 -5.5% vs 15% 门槛）；D4 harvest + d4-001；d1-001；预算实耗：D3 0.22/0.5、D4 ≈0.35/0.5、D5 ≤0.4/1.0、D2 ?/1.0（待自报）。
 
 ## 5. 组合与复核（只做相关组合）
 
