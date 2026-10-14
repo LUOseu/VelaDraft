@@ -45,6 +45,7 @@ from torch.utils.data import Dataset
 from ..data.sharegpt import load_sharegpt, row_image_paths
 from ..provenance import identity_from_contract
 from ..utils import read_json, sha256_file, sha256_json
+from .cache_budget import CacheBudgetController
 from .load import load_target
 from .sample_capture import (
     extract_target_head,
@@ -419,6 +420,24 @@ class OnlineFeatureSource:
             "skipped_too_large": 0,
             "peak_bytes": 0,
         }
+        # Optional adaptive budget on top of the fixed cap
+        # (``train.online_feature_cache_adaptive``): when enabled, the
+        # controller senses the job's memory headroom and the payload is
+        # trimmed to ``min(cap, headroom - reserve)`` under pressure, growing
+        # back stepwise when headroom returns. Default off; with it off the
+        # cache behaves exactly as before (the LRU store keeps its semantics -
+        # only the byte budget it runs against becomes dynamic).
+        adaptive = (cfg.get("train") or {}).get("online_feature_cache_adaptive", False)
+        if not isinstance(adaptive, bool):
+            raise ValueError(
+                "train.online_feature_cache_adaptive must be a bool "
+                f"(true enables the adaptive budget), got {adaptive!r}."
+            )
+        self._cache_budget_controller = (
+            CacheBudgetController(self.cache_capacity_bytes)
+            if adaptive and self.cache_capacity_bytes
+            else None
+        )
         target_cfg = cfg.get("target", {}) or {}
         self.target_dtype = str(target_cfg.get("dtype", "bfloat16"))
         self.attn_implementation = str(target_cfg.get("attn_implementation", "sdpa"))
@@ -571,9 +590,14 @@ class OnlineFeatureSource:
         """Return the retained record for ``index`` (LRU touch) or None.
 
         The record is shared, not copied: callers must treat it as read-only.
+        With the adaptive budget enabled the store is trimmed to the current
+        budget first, so memory-pressure shrinks take effect on the next read.
         """
         if not self.cache_capacity_bytes:
             return None
+        budget = self.cache_budget_bytes()
+        if budget < self._record_cache_bytes:
+            self._trim_record_cache(budget)
         record = self._record_cache.get(int(index))
         if record is None:
             self.cache_stats["misses"] += 1
@@ -583,17 +607,18 @@ class OnlineFeatureSource:
         return record
 
     def cache_store(self, index: int, record: dict) -> None:
-        """Retain a normalized record under the byte cap (LRU eviction).
+        """Retain a normalized record under the byte budget (LRU eviction).
 
-        Records larger than the whole capacity are not stored (they would
-        evict every other entry for a single hit); placeholders must never be
-        passed here.
+        Records larger than the whole budget are not stored (they would evict
+        every other entry for a single hit); placeholders must never be passed
+        here. With the adaptive budget enabled the budget is refreshed first.
         """
         if not self.cache_capacity_bytes:
             return
+        budget = self.cache_budget_bytes()
         index = int(index)
         size = _record_nbytes(record)
-        if size > self.cache_capacity_bytes:
+        if size > budget:
             self.cache_stats["skipped_too_large"] += 1
             return
         previous = self._record_cache.pop(index, None)
@@ -602,15 +627,29 @@ class OnlineFeatureSource:
         self._record_cache[index] = record
         self._record_cache_bytes += size
         self.cache_stats["stores"] += 1
-        while self._record_cache_bytes > self.cache_capacity_bytes and self._record_cache:
-            _evicted_index, evicted = self._record_cache.popitem(last=False)
-            self._record_cache_bytes -= _record_nbytes(evicted)
-            self.cache_stats["evictions"] += 1
+        self._trim_record_cache(budget)
         if self._record_cache_bytes > self.cache_stats["peak_bytes"]:
             self.cache_stats["peak_bytes"] = self._record_cache_bytes
 
     def cache_current_bytes(self) -> int:
         return self._record_cache_bytes
+
+    def cache_budget_bytes(self) -> int:
+        """Effective payload budget in bytes.
+
+        Without the adaptive controller this is the configured cap; with it,
+        the controller's current budget (``min(cap, job share, headroom -
+        reserve)``), refreshed at most once per controller interval.
+        """
+        if self._cache_budget_controller is None:
+            return self.cache_capacity_bytes
+        return self._cache_budget_controller.observe()
+
+    def _trim_record_cache(self, budget: int) -> None:
+        while self._record_cache_bytes > budget and self._record_cache:
+            _evicted_index, evicted = self._record_cache.popitem(last=False)
+            self._record_cache_bytes -= _record_nbytes(evicted)
+            self.cache_stats["evictions"] += 1
 
     # -- trainer-facing surface ----------------------------------------------
     def dataset(self) -> OnlineFeatureDataset:
@@ -677,6 +716,21 @@ class OnlineFeatureSource:
                     "(train.online_feature_cache_gb; 0 = disabled). A cache hit replaces the "
                     "target forward for that row; hits/misses are per lookup, evictions are "
                     "LRU byte-cap evictions, and the cache is runtime-only."
+                    + (
+                        " With train.online_feature_cache_adaptive the byte budget additionally "
+                        "tracks the job's memory headroom (see adaptive_budget); capacity_bytes "
+                        "stays the configured hard cap."
+                        if self._cache_budget_controller is not None
+                        else ""
+                    )
+                ),
+                **(
+                    {
+                        "budget_bytes": self.cache_budget_bytes(),
+                        "adaptive_budget": self._cache_budget_controller.stats(),
+                    }
+                    if self._cache_budget_controller is not None
+                    else {}
                 ),
             },
             "target_forwards_note": (

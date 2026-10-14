@@ -189,6 +189,17 @@ fits. In the lane's paired offline baseline (2026-10-14), training from the
 already-written store took 548.8 s vs this cache's 470.9 s train stage, with
 zero disk bytes.
 
+`train.online_feature_cache_adaptive: true` (default `false`) additionally
+bounds the retained payload by the job's own memory headroom (cgroup limit or
+`MemAvailable`, minus a reserve): the byte budget shrinks immediately under
+pressure (early LRU evictions; later reads re-extract as usual) and grows back
+stepwise when headroom returns. It never changes which rows are consumed,
+their order, or the grouping of any forward; with the flag off the cache
+behaves exactly as above. Enabled runs report the extra state under
+`feature_source.feature_cache.adaptive_budget` (cap / job share / current
+budget, reserve, shrink / grow counts, sensor snapshot); like the cache
+itself it is runtime-only and outside every digest.
+
 Caveat (measured on the lane's 129-row and 2K-row slices, 2026-10-14): the
 default shuffled loader draws a different row order every epoch, so the
 per-epoch grouping — and with it the batched teacher forward's padding
