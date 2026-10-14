@@ -51,6 +51,7 @@
 
 ## 6. BASE / 接口变更记录
 
+- 2026-10-15 00:20 — C0：**iface v0.2 候选登记**（PROTOCOL §12；未冻结）：D5 命名表受理——`sample_id`/`epoch_index`/`plan_position`/`regen_digest` 候选；`teacher_src_pos` 已确认（D2 handoff §1；待 d1-001 合并冻结）；`host_ram_budget_gb` 待 D4 确认。冻结前走 §11 流程；本轮不影响 v0.1.0 语义。
 - 2026-10-14 23:07 — C0：冻结 BASE_SHA `7eab136`（核查：六处 worktree 均 clean；review 四项问题核查结论见 INTEGRATION.md §1.1）。
 - 2026-10-14 23:11 — C0：发布 `research/rsi-c0` 至 origin（commit `a9dfc9f`..`35eba0b`；四个 coord 文档 + BASE 全测试证据；不涉及 main）。
 - 2026-10-14 23:15 — C0：确认 D4 启动（`vlm-dflash-d4` @`7eab136`）；D4 四项请求应答见 §7。
