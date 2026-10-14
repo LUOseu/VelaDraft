@@ -181,8 +181,9 @@ documented:
 
 See `docs/upstream/dfly.md`: objective = file-level port of the two-stage
 LK/D-PACE/e2e-TV math, selectable via `algorithm.train_recipe` (default: shared
-CE profile; no canonical GPU recipe run recorded yet); inference rule =
-documented adaptation; the correction is applied through the repo's pre-head
-trainer hook instead of the model wrapper; staged/online feature stores with
-explicit layer slicing replace the live target forward; the VL MRoPE/image
-plumbing is this repo's.
+CE profile; the canonical 2K recipe run is recorded in `R-20261014-11` and
+stamped `objective_profile=upstream_two_stage` in the checkpoint/export);
+inference rule = documented adaptation; the correction is applied through
+the repo's pre-head trainer hook instead of the model wrapper; staged/online
+feature stores with explicit layer slicing replace the live target forward;
+the VL MRoPE/image plumbing is this repo's.
