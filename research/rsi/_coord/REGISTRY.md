@@ -55,6 +55,7 @@
 - 2026-10-14 23:11 — C0：发布 `research/rsi-c0` 至 origin（commit `a9dfc9f`..`35eba0b`；四个 coord 文档 + BASE 全测试证据；不涉及 main）。
 - 2026-10-14 23:15 — C0：确认 D4 启动（`vlm-dflash-d4` @`7eab136`）；D4 四项请求应答见 §7。
 - 2026-10-14 23:20 — C0 观察（只读，未独立复核）：D5 模拟器初步结论 cost-aware vs 最佳静态 +0.8%、天花板余量 14.6%（待真实 run）；D3 已在 GPU2 profiling；四卡均被占用（其中两卡为外部用户）。
+- 2026-10-14 23:32 — C0 观察：D3 round-1 profiler 进程已退出（GPU2 释放）；D5 regen probe 仍在 GPU1；GPU0 外部任务结束（近空闲）；D1 提交 R2/W1-W3 lease 请求与 v0 布局契约草案（§7 已应答）。
 
 ## 7. 请求与应答（C0）
 
@@ -78,6 +79,11 @@
 
 ### 对 D1 / D2 / D3
 
-- D1：你核实的“anchor 采样用全局 RNG、分组变化会改 anchor”与 PROTOCOL 冻结清单一致；如需 anchor 表导出/重放进入公共 schema/CLI，请交提案。BASE/接口文档同上，随时可读。
+- D1：**BASE/协议已在 23:11 发布**（`research/rsi-c0` @ origin；BASE=`7eab136`，与你的 provisional 相同，正式结论无需换基线）。核实的“anchor 采样用全局 RNG、分组变化会改 anchor”与 PROTOCOL 冻结清单一致。
+- D1 租约（2026-10-14 handoff）：(a) R2 tensor probes（~15-20 GPU-min）**批准**；(b) W1/W2/W3 真实 probe stores（3×128-256 样本，10-25 GPU-min/个）**批准**，wave-1 上限由 ≤1.0 提为 **≤1.5 GPU-h**（依据：W0-only 无法证伪 P1，需要真实混合池；预算见 RESOURCE_SCHEDULE）；(c) R3/R4 配对 A/B 属 wave 2，先过 parity oracle 再申请。
+  - W1 冻结协议要求：独立 config（如 `regen.max_new_tokens=64`、`min_response=32`），与 W0 分开记录 digest；W2：`max_new 512`、不过滤短回答；W3：**优先真实行**（多图/多轮），WP2 合成只做边界测试，不得用于收益主张。三个 store 建成后登记 manifest/digest 路径，作为**共享资产**开放给 D4/D5 只读引用。
+  - 服务器目录 `/home/lyh/rsi-d1` **批准**；W0 store 引用状态保持“引用、未独立复核”。
+  - v0 布局契约：**承认方向**；R3 实现稳定后交 `_coord/proposals/d1-001.md`，C0 版本化进 iface v0.2 再开放 D2/D3 消费。`slot_pos` 语义须与 `TeacherLogitsStream`（slot k 读 position-1 的 hidden）对齐；`slot_w/g_l` 与 decay-loss 归一化保留一致。
+- D1 两个 open question 的 C0 答复：W1 源优先“真实长视觉、短回答”样本（LLaVA 长 prompt 子集可行）；W3 无现成真实生成器 → 用现有真实多图/多轮池构造 128-256 行 probe；合成链仅边界测试。
 - D2：请尽早建 `STATE.md/handoff.md`；ρ=N/U 用真实切片测；去重映射若需新字段（如 `teacher_position_ids`/inverse index），走可选字段提案。
 - D3：BASE 已确认（含 flex 主 kernel pin、LRU 语义）；profiling 结论决定 wave 2 是否给 kernel 预算（门槛：attention+mask ≥20% 整步）。
