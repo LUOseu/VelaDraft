@@ -121,6 +121,8 @@
 - 2026-10-15 03:22–03:25 — **D1 修复版 smoke 复核通过**：03:22（自校）与 03:24（trace 版，`research/rsi-d1@trace`）各 3 步 exit=0；clip trace call0 `my_clone 88.956` vs `clip_return 89.053`（0.11% = bf16 量化类）→ 恒等式健康。GPU3 释放；/home 17.7G、/tmp 23G。
 - 2026-10-15 03:30 — **裁定 `d4xd1-002-c0` 发布**（update 轴读法冻结 + 重启 GO；重启集 8 腿 = 唯一正式证据；预算 初跑 ≈0.26 + 重启 ≤1.2 ≤ 1.5 内）。重启链 **等待执行**（守卫双卷就绪：/tmp 21G+、/home 13G+；GPU3 空）。
 - 2026-10-15 03:45 — **C0：D5 三项请求复核与裁定（`d5-002-c0`）**：套件范围 pin `55e4e9c`（`55e4e9c..7db5d93` 仅文档 diff）→ 本地+服务器 88/88 复跑 ✓（服务器需 shim 绕 c1vllm site-packages 的 `tests` 遮蔽）；数字抽查 ✓（g2_collect walls、split parity、step 760/762/768 loss 行逐字节）；**批准 staged_b32**（L-W3-D5B）；**pinned_b8 = HOLD**。
+- 2026-10-15 03:38–03:53 — **D1 2×2 重启链（GPU3）**：W3 4 腿 rc=0（03:38:52→03:49:57；≈0.05 GPU-h/腿）；MIX ref（leg5）rc=0 03:53:24，legs 6–8 在跑。C0 直读：floor probe bitwise 0.0（缓存数值惰性 + 跨进程确定性）；bucket_on 两腿逐位一致；F1 冻结门下 bucket_on max loss_rel 1.248e-2@11（4/100 步超门）——初步归因损失路径差类（fp32 vs bf16 权重）+ 动力学；细节 `evidence/c0_d4xd1_interim_read_20261015.md`；不事后放宽，收口待 MIX。
+- 2026-10-15 03:47 — **磁盘腾挪（C0；用户先前确认候选）**：删除 `/home/lyh/zoo-publish-20261013`（4.0G）/`zoo-publish-20261014`（3.5G）/`fpt_tmp`（0.4G）→ `/home` avail 13G→**21G**（保 D1 在途链与 D5 staged_b32 余量）。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 

@@ -365,6 +365,14 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - **s3_b32 exit=0**（03:22:07；wall 1074s；alloc 0.59 GPU-h）；prune 03:22:12 释放 /home 6.2G→17.7G。`g2_collect.json`（11 行）出数：**s3_b8 1716s**（parity 全 ✓；vs sync_b8 2174.5s **−21%**、vs staged_b8 2297.3s **−25%**）；**s3_b32 1074s**（regen parity ✓、**store parity 待 staged_b32 复验**；vs sync_b32 1228.8s **−12.6%**；落在 sim 带 950–1100 内）。
 - batch 语义旋钮再确认（b8/b32 kept 集合不同；各自与自身对照）。**下一步**：staged_b32 store-parity 复验 + §10 汇总 + 三态 parity 收口 + GPU-h 时间戳重算；Tier C（pinned）暂缓照旧。
 
+### 对 D1（2026-10-15 03:55，D4×D1 2×2 — C0 中期实读：W3 cell 4/4 rc=0；F1 观察项）
+
+- **C0 直读（未依赖 harvest）**：W3 4 腿 rc=0（03:38:52 / 03:43:49 / 03:46:51 / 03:49:57）；floor probe（cache_on×bucket_off vs ref）**grads/updated/loss 全 bitwise 0.0**；两条 bucket_on 腿 parity 数值与 loss 序列**逐位一致**（与 cache 无关）。
+- **F1-as-registered**：bucket_on 两腿 **FAIL**（max loss_rel **1.248e-2 @step 11**；steps 11–14 共 4 步超门；中位 1.85e-3 / p90 4.29e-3）；bucket_off 两腿 PASS（0.0）。**按冻结读法如实记录，不会事后放宽。**
+- **归因（C0 初步）**：该比较先天含「regroup fp32 权重损失路径 vs 出厂 bf16 路径」的已知差类（`train.py:340` 默认 `fp32_weights=True`，注释 ~0.4% bias；wave-2 同 W3 行实测 canonical-vs-ref ≤5.96–6.60e-3），叠加动力学放大；与 cache/交互无关（bitwise 证据）。grads 逐张量 worst（b50 0.877 / b100 0.487）由小范数张量主导（ref 范数 5.45e-4 / 1.32e-3；绝对差 ~5–6.5e-4）。
+- 细节与证据路径：`evidence/c0_d4xd1_interim_read_20261015.md`。
+- **请求（非阻塞）**：①harvest 照跑（如实出 F1 FAIL + IDENTITY 门）；②深挖 step 11–14 时优先「同一步 loss 两条损失路径重算」；③MIX 收数后 C0 全量重算 → `d4xd1-003-c0` 收口（映射：F1 败 → 组合数值相容性声明按原注册不成立；按“另立项”给出事前注册的隔离对照提案）。
+
 ### 对 D5（2026-10-15 03:45，G2 三项请求应答 + C0 复核收据）— `d5-002-c0`
 
 1. **套件复核 ✓（范围已固定）**。D5 请求复核 HEAD `55e4e9c`（88/88）。C0 固定范围：`git diff --stat 55e4e9c..7db5d93` = 仅 4 个文档（EXPERIMENTS/REPORT/STATE/handoff；+134/−1）→ 代码树与套件范围一致。复跑：本地（py3.12 venv）**88 pass**；服务器（c1vllm，lane-local `pip --target /tmp/c0-d5-pytest` 装 pytest）**88 pass、exit 0**。环境坑（备查）：c1vllm site-packages 自带 `tests` 包遮蔽仓库 `tests/` 命名空间 → PYTHONPATH 前置 shim（`/tmp/c0-d5-shim/tests/__init__.py` 内 `__path__` 重定向到仓库 tests）后全绿；之后在服务器跑 lane 套件需带 shim 或换 venv。
