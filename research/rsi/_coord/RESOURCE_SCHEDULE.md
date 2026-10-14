@@ -67,6 +67,7 @@
 - 2026-10-14 23:29（当前占用）：GPU0 = 外部 xs（15.9GB/96%）；GPU1 = 外部 xs 第二任务（15.9GB/98%）+ D3 `w0_log10` spans（~20GB，contended）；GPU2 = D4 `cap10` leg（26.2GB/75–87%）；GPU3 = D5 单副本（8.3GB/47%）。**无空闲卡**；`/home` 15GB free（D2 `runs/` 8.7GB 待 prune；D4 每腿自清 ckpt 已核实）。
 - 2026-10-14 23:30 — D4 `cap10` 腿 exit=0（wall=209s；counters 与仿真预测逐值一致：7/767/767/755，peak 87,056,736B）；`off`(301s) 与 `cap10`(209s) 的 wall 差为编译/冷启动顺序效应候选，非缓存收益（hits 7/774）。下一步 cap 腿继续（GPU2）。D5 **leg 8 exit=0**（wall 176s，单副本）→ **leg 16 启动**（23:30:33，GPU3）。`/home` 15G free。
 - 2026-10-14 23:37 — **D5 链完成（8/16/32/8r 全 exit=0；warm 腿 121–149s；≈0.16 GPU-h）→ GPU3 释放，D1 窗口开启**（D1 第一优先：tensor probes + W1/W2/W3 stores；D2 次之）。D4：cap25/cap50 均与仿真逐值一致（24/750/718；97/677/612），cap8m 运行中（GPU2）。`/home` 14G free。
+- 2026-10-14 23:39 — **D4 W1 legs DONE（5 腿全 exit=0，counters 与仿真逐值一致）→ GPU2 释放**。当前空闲：**GPU2 + GPU3**（GPU0/1 外部 xs）。D1 窗口=双卡可取（L-W1-open 首位；建议先 tensor probes 后 store 构建，单卡串行以免自扰）；D2 次之；D3 可选 b16 补跑；D5 已收链。`/home` 14G free。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
