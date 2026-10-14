@@ -95,13 +95,13 @@
 7. 声明审计：抽查 2–3 个关键数字与原始日志/JSON 一致；限制与反证条件写明；负结果保留。
 8. 复现：EXPERIMENTS 字段齐全、依赖 SHA 固定、复现命令可执行；外部引用标明“引用、未独立复核”。
 
-## 8. Wave-1 收口（滚动草稿 · 更新 2026-10-15 02:22）
+## 8. Wave-1 收口（滚动草稿 · 更新 2026-10-15 02:30）
 
 > wave-1 尚未关闭（D1 wave-2 已完成并关闭租约；D5 chain2 Tier 0+A+B 已完成、S3 追赶链待跑；D4 已收口）。本节是 C0 的滚动台账：给每条**当前判定 / 证据路径 / 解除条件**；最终 GO/HOLD/STOP/BLOCKED 在关闭时冻结。平台工程价值与论文贡献潜力分列，不互相折算。
 
 | 路线 | 当前判定 | 关键证据 | 平台 / 论文 | 解除或关闭条件 |
 |---|---|---|---|---|
-| D1 | **GO（修订口径；`d1-002-c0`+`d1-003-c0`）— wave-2 全收，L-W2-D1 已关闭** | wave-2 配对（C0 重算）：grid W3 1.129/1.136/1.141、MIX 1.154/1.137/1.107（均值 13.5%/13.3%；win 580/600；peak −57%；parity b0/50/100 ✓）；**capacity demo ✓ C0 逐值重算**（W3 b16 43.59→14.32 GiB；b24 canonical OOM 5/5 → cost 14.41 GiB 5/5；MIX b16 27.74→9.83 GiB）；用量 ≈0.90/1.5 GPU-h；round-2 的 +19.0%/+24.7% 为 8 批 cell（不再作主数字） | 平台：布局重排引擎（跨 seed 稳定复现；容量杠杆=同卡逻辑 batch ×2–3）；论文：候选保持（+13–14% 步 + −57% 峰值），novelty 定位待辨 | **已完成**：L-W2-D1 关闭；集成落地 `4e1674e`（opt-in、默认 byte-identical、509/6 全绿）→ 下一 = **D4×D1 2×2 排程（已解锁）** + held-out 质量验证（欠） |
+| D1 | **GO（修订口径；`d1-002-c0`+`d1-003-c0`）— wave-2 全收，L-W2-D1 已关闭** | wave-2 配对（C0 重算）：grid W3 1.129/1.136/1.141、MIX 1.154/1.137/1.107（均值 13.5%/13.3%；win 580/600；peak −57%；parity b0/50/100 ✓）；**capacity demo ✓ C0 逐值重算**（W3 b16 43.59→14.32 GiB；b24 canonical OOM 5/5 → cost 14.41 GiB 5/5；MIX b16 27.74→9.83 GiB）；用量 ≈0.90/1.5 GPU-h；round-2 的 +19.0%/+24.7% 为 8 批 cell（不再作主数字） | 平台：布局重排引擎（跨 seed 稳定复现；容量杠杆=同卡逻辑 batch ×2–3）；论文：候选保持（+13–14% 步 + −57% 峰值），novelty 定位待辨 | **已完成**：L-W2-D1 关闭；集成落地 `4e1674e`（opt-in、默认 byte-identical、509/6 全绿）；R4 §12 评估已收（k4 残余 4.7–5.2%/6.1–6.4%）；cross-check `3e29244` = PASS（建议 a 已采纳 `192554a`）；**L-W3-D1R4 已批（≤0.2 GPU-h）**；**集成 e2e smoke PASS**（02:27–02:30 GPU0：产品路径 regroup 20 步 rc=0，peak 25.34→9.98 GB；`evidence/c0_e2e_regroup_smoke_20261015.md`）→ 下一 = **D4×D1 2×2 排程（已解锁）** + held-out 质量验证（欠） |
 | D2 | **STOP（自判+采纳；机制 DEFERRED；已全收口）** | `research/rsi/d2/` @ lane `bfb3635`（+`d6e3c9a` 记录提交；REPORT/EXPERIMENTS/handoff 全量含失败与归因段；“12/12”笔误已更正；预算 0.5/1.0 GPU-h 已记）；pin 2×2（−6.8%，loss bitwise）+ dfly recipe 2×2（−12.9/−19.5ms，12 步 loss 逐值相同） | 论文：否（−3.0%/−5.6% ≪15%；Amdahl 上限 ~5–6%）；平台：opt-in 旋钮（lane 存档，不集成） | **已关闭**；再开=REPORT §8 条件 |
 | D3 | STOP（已接受） | REPORT `b88cdf2`：attention+mask=3.55%（C0 核数 ✓）；/tmp 已清 | 论文：否 | 再开条件：W2 长答 ~15% 外推 / b16 / S≥2.5–4k |
 | D4 | **merge-ready（平台工程级；`d4-003-c0`；不动 main）** | W1 五腿 counter-exact（C0 5/5 ✓）；**d4-001 集成 `1f8963e`（sha1 核对 ✓；13+4+70/70 ✓）**；**W2-B 收口**（F1–F4 PASS；两腿 counters 相同、adjustments=0；lane `a8e762c`；0.062 GPU-h） | 平台：adaptive 安全阀（opt-in、默认关、静态 RAM 场景）；论文：低（无提速声称；压力响应未验证） | 无待办；推进 main 由消费方/用户决定（按 INTEGRATION §7 checklist，不自动 merge） |
