@@ -71,6 +71,7 @@
 - 2026-10-14 23:37 — **D5 链完成（8/16/32/8r 全 exit=0；warm 腿 121–149s；≈0.16 GPU-h）→ GPU3 释放，D1 窗口开启**（D1 第一优先：tensor probes + W1/W2/W3 stores；D2 次之）。D4：cap25/cap50 均与仿真逐值一致（24/750/718；97/677/612），cap8m 运行中（GPU2）。`/home` 14G free。
 - 2026-10-14 23:39 — **D4 W1 legs DONE（5 腿全 exit=0，counters 与仿真逐值一致）→ GPU2 释放**。当前空闲：**GPU2 + GPU3**（GPU0/1 外部 xs）。D1 窗口=双卡可取（L-W1-open 首位；建议先 tensor probes 后 store 构建，单卡串行以免自扰）；D2 次之；D3 可选 b16 补跑；D5 已收链。`/home` 14G free。
 - 2026-10-14 23:42 — GPU2/GPU3 仍空闲；发布 **L-W1-D1（GPU3）** 与 **L-W1-D2R（GPU2；D2 干净 step profile ≤15 GPU-min）**。D2 `probe_js_prof` ckpt 仍 4.6GB 未清（/home 14GB free；各腿开跑前须 >10GB）。D3 可选 b16 补跑排 GPU2 之后（非必需）。D5 链完成、卡已交还。
+- 2026-10-14 23:44 — D2 `ab_base1` 于 23:42 起在 **GPU3** 运行（probe 登记；核定卡为 GPU2）→ D1 开跑前须实测两卡；GPU2 空闲。D5 已提交 round-1 REPORT（H2 负结果；静态分裂=wave-2 条件项）；D3 收尾清理完成（footprint 4.5MB）。`/home` 15G free；D2 ckpt（4.6GB）仍未清——再次提醒。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
