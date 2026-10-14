@@ -13,10 +13,11 @@ target-native regen -> hidden-state capture -> tiny training -> eval -> export
 
 When ``--drafter`` points at a checkpoint trained with different target-side
 settings than the demo defaults (image pixel bounds, a larger feature-store
-capture layer list, or an explicit context subset), the demo adopts the
-drafter's recorded values so the provenance gate accepts the pair and the draft
-model rebuilds with its trained shapes, and uses a drafter-specific run
-directory (the frozen contract must not be overloaded).
+capture layer list, an explicit context subset, or a non-Qwen drafting
+geometry: mask token, block size, layer count, spatial-rope switch), the demo
+adopts the drafter's recorded values so the provenance gate accepts the pair
+and the draft model rebuilds with its trained shapes, and uses a
+drafter-specific run directory (the frozen contract must not be overloaded).
 """
 
 from __future__ import annotations
@@ -350,20 +351,87 @@ def drafter_recorded_layers(drafter_path: str | Path) -> dict:
     }
 
 
+def drafter_recorded_settings(drafter_path: str | Path) -> dict:
+    """Drafting geometry recorded by a drafter (run dir, export dir or .pt file).
+
+    Returns ``mask_token_id``, ``block_size``, ``num_hidden_layers``,
+    ``spatial_rope_enabled``, ``spatial_rope_mode`` and
+    ``spatial_rope_sections``; fields an artifact does not record come back as
+    ``None`` (legacy exports predate the spatial-rope block). The demo path
+    must rebuild a trained drafter's geometry instead of the algorithm
+    defaults: e.g. a SmolVLM-trained drafter carries its own mask token and
+    turns the spatial rope off.
+    """
+    import torch
+
+    from .utils import read_json
+
+    path = Path(drafter_path).expanduser().resolve()
+    if not path.exists():
+        raise SystemExit(f"--drafter {path} does not exist.")
+    if path.is_dir():
+        run_checkpoint = path / "train" / "ckpt_final.pt"
+        export_config = path / "config.json"
+        if run_checkpoint.exists():
+            meta = torch.load(run_checkpoint, map_location="cpu", weights_only=False)
+        elif export_config.exists() and (path / "model.safetensors").exists():
+            drafter = read_json(export_config).get("drafter") or {}
+            rope = drafter.get("spatial_rope") or {}
+            return {
+                "mask_token_id": drafter.get("mask_token_id"),
+                "block_size": drafter.get("block_size"),
+                "num_hidden_layers": drafter.get("num_hidden_layers"),
+                "spatial_rope_enabled": rope.get("enabled"),
+                "spatial_rope_mode": rope.get("mode"),
+                "spatial_rope_sections": rope.get("sections"),
+            }
+        else:
+            raise SystemExit(
+                f"--drafter {path} is a directory but has neither train/ckpt_final.pt "
+                "nor an exported config.json + model.safetensors."
+            )
+    elif path.suffix == ".pt":
+        meta = torch.load(path, map_location="cpu", weights_only=False)
+    else:
+        raise SystemExit(
+            "--drafter must be a run directory, a .pt checkpoint file or an exported zoo directory."
+        )
+    draft_config = meta.get("draft_config") or {}
+    if not isinstance(draft_config, dict):
+        draft_config = {}
+    dflash = draft_config.get("dflash_config") or {}
+    if not isinstance(dflash, dict):
+        dflash = {}
+    return {
+        "mask_token_id": meta.get("mask_token_id", dflash.get("mask_token_id")),
+        "block_size": meta.get("block_size", draft_config.get("block_size")),
+        "num_hidden_layers": draft_config.get("num_hidden_layers"),
+        "spatial_rope_enabled": dflash.get("spatial_rope_enabled"),
+        "spatial_rope_mode": dflash.get("spatial_rope_mode"),
+        "spatial_rope_sections": dflash.get("spatial_rope_sections"),
+    }
+
+
 def align_config_with_drafter(cfg: dict, algorithm_name: str, drafter_path: str | Path) -> None:
     """Adopt a drafter's recorded target-side settings into a fresh demo config.
 
     A fresh demo config follows algorithm defaults, which can disagree with a
     drafter trained on a feature store with a larger capture layer list (e.g.
-    the 5-layer 2K DFlare/DFly runs) or with an explicit context subset: the
-    target identity gate would refuse the pair, and the fusion algorithms would
-    rebuild their layer fusion with the wrong shape. Adopt the recorded values
-    verbatim — image pixel bounds, ``drafter.capture_layer_ids`` and, for the
-    fusion algorithms, ``algorithm.<name>.context_layer_ids`` — so the recorded
-    export runs through the normal demo path unchanged.
+    the 5-layer 2K DFlare/DFly runs), with an explicit context subset, or with a
+    non-Qwen target family whose contract rejects the family defaults (a
+    SmolVLM drafter records its own mask token and a disabled spatial rope):
+    the target identity gate would refuse the pair, the fusion algorithms would
+    rebuild their layer fusion with the wrong shape, and the contract would
+    fail on the family defaults. Adopt the recorded values verbatim — image
+    pixel bounds, the drafting geometry (``mask_token_id``, ``block_size``,
+    ``num_hidden_layers``, spatial-rope enabled/mode/sections),
+    ``drafter.capture_layer_ids`` and, for the fusion algorithms,
+    ``algorithm.<name>.context_layer_ids`` — so the recorded export runs
+    through the normal demo path unchanged.
     """
     identity = drafter_identity(drafter_path)
     recorded = drafter_recorded_layers(drafter_path)
+    settings = drafter_recorded_settings(drafter_path)
     for key in ("image_min_pixels", "image_max_pixels"):
         value = identity.get(key)
         if value is not None:
@@ -371,6 +439,27 @@ def align_config_with_drafter(cfg: dict, algorithm_name: str, drafter_path: str 
     capture = recorded.get("capture_layer_ids") or identity.get("capture_layer_ids")
     if capture:
         cfg["drafter"]["capture_layer_ids"] = [int(layer) for layer in capture]
+    adopted = []
+    drafter_cfg = cfg["drafter"]
+    for key in ("mask_token_id", "block_size", "num_hidden_layers"):
+        value = settings.get(key)
+        if value is not None:
+            drafter_cfg[key] = int(value)
+            adopted.append(f"{key}={int(value)}")
+    enabled = settings.get("spatial_rope_enabled")
+    if enabled is not None:
+        drafter_cfg["spatial_rope_enabled"] = bool(enabled)
+        adopted.append(f"spatial_rope_enabled={bool(enabled)}")
+    mode = settings.get("spatial_rope_mode")
+    if mode is not None:
+        drafter_cfg["spatial_rope_mode"] = str(mode)
+        adopted.append(f"spatial_rope_mode={mode}")
+    sections = settings.get("spatial_rope_sections")
+    if sections is not None:
+        drafter_cfg["spatial_rope_sections"] = [int(section) for section in sections]
+        adopted.append(f"spatial_rope_sections={drafter_cfg['spatial_rope_sections']}")
+    if adopted:
+        log("demo: adopting drafter-recorded drafting geometry: " + ", ".join(adopted))
     context = recorded.get("target_layer_ids")
     if context and algorithm_name in ("dflare", "dfly"):
         raw_algorithm = cfg.get("algorithm")

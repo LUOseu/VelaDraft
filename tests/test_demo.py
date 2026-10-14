@@ -17,6 +17,7 @@ from vlm_dflash.demo import (
     detect_drafter_algorithm,
     drafter_identity,
     drafter_recorded_layers,
+    drafter_recorded_settings,
     drafter_run_suffix,
     write_demo_source,
 )
@@ -233,6 +234,55 @@ def test_align_config_with_drafter_adopts_recorded_layers(tmp_path):
     assert dfly_cfg["algorithm"]["dfly"]["context_layer_ids"] == [0, 1]
 
 
+def test_drafter_recorded_settings_reads_export_run_and_pt(tmp_path):
+    export_dir = _tiny_export(tmp_path)
+    run_dir = tmp_path / "run"
+    assert drafter_recorded_settings(export_dir) == {
+        "mask_token_id": 255,
+        "block_size": 8,
+        "num_hidden_layers": 2,
+        "spatial_rope_enabled": False,
+        "spatial_rope_mode": "replace",
+        "spatial_rope_sections": [16, 24, 24],  # the run contract's MRoPE split
+    }
+    from_pt = drafter_recorded_settings(run_dir / "train" / "ckpt_final.pt")
+    assert from_pt["mask_token_id"] == 255
+    assert from_pt["block_size"] == 8
+    assert from_pt["num_hidden_layers"] == 2
+    assert from_pt["spatial_rope_enabled"] is False
+    assert drafter_recorded_settings(run_dir) == from_pt
+
+
+def test_align_config_with_drafter_adopts_recorded_drafting_geometry(tmp_path):
+    """A non-Qwen-family drafter must not be scored with Qwen family defaults.
+
+    Regression test for the SmolVLM export demo: the fresh demo config used the
+    Qwen mask token / spatial-rope switch, and ``ensure_contract`` rejected the
+    pair (``mask_token_id 151669 outside embedding range [0, 49280)``).
+    """
+    export_dir = _tiny_export(tmp_path)
+    cfg = _demo_cfg(tmp_path)
+    assert cfg["drafter"]["mask_token_id"] == 151669  # family default before adoption
+    assert cfg["drafter"]["spatial_rope_enabled"] is True
+    align_config_with_drafter(cfg, "dflash", export_dir)
+    assert cfg["drafter"]["mask_token_id"] == 255
+    assert cfg["drafter"]["block_size"] == 8
+    assert cfg["drafter"]["num_hidden_layers"] == 2
+    assert cfg["drafter"]["spatial_rope_enabled"] is False
+    assert cfg["drafter"]["spatial_rope_mode"] == "replace"
+    assert cfg["drafter"]["spatial_rope_sections"] == [16, 24, 24]
+
+    from_checkpoint = _demo_cfg(tmp_path, algorithm="dflash")
+    align_config_with_drafter(
+        from_checkpoint, "dflash", tmp_path / "run" / "train" / "ckpt_final.pt"
+    )
+    assert from_checkpoint["drafter"]["mask_token_id"] == 255
+    assert from_checkpoint["drafter"]["num_hidden_layers"] == 2
+    assert from_checkpoint["drafter"]["spatial_rope_enabled"] is False
+    # the raw checkpoint records no explicit MRoPE split; nothing adopted
+    assert "spatial_rope_sections" not in from_checkpoint["drafter"]
+
+
 def test_align_config_with_drafter_leaves_capture_free_exports_alone(tmp_path):
     export = tmp_path / "legacy"
     export.mkdir()
@@ -250,6 +300,9 @@ def test_align_config_with_drafter_leaves_capture_free_exports_alone(tmp_path):
     align_config_with_drafter(cfg, "dflash", export)
     assert "capture_layer_ids" not in cfg["drafter"]
     assert cfg["target"]["image_min_pixels"] == 100
+    # nothing recorded to adopt: the family defaults stay untouched
+    assert cfg["drafter"]["mask_token_id"] == 151669
+    assert cfg["drafter"]["spatial_rope_enabled"] is True
 
 
 def test_detect_drafter_algorithm_reads_export_and_run_metadata(tmp_path):

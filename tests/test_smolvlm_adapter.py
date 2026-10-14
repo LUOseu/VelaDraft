@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from vlm_dflash.adapters import adapter_for_model, get_adapter
 from vlm_dflash.adapters.smolvlm import SmolVLMAdapter
-from vlm_dflash.contract import ContractError, resolve_contract
+from vlm_dflash.contract import ContractError, ensure_contract, resolve_contract
 
 IMAGE_SEQ_LEN = 81
 RESERVED_ID = 12
@@ -141,6 +141,70 @@ def test_contract_rejects_real_tokenizer_token_as_mask(fake_target):
 def test_contract_rejects_mask_outside_embedding_range(fake_target):
     with pytest.raises(ContractError, match="outside embedding range"):
         resolve_contract(fake_target, {"mask_token_id": 999})
+
+
+def test_demo_alignment_lets_a_smolvlm_export_pass_the_contract(fake_target, tmp_path):
+    """R-22 regression: the demo must adopt the drafter's non-Qwen drafting geometry.
+
+    A fresh demo config carries Qwen family defaults (mask token 151669,
+    spatial rope enabled); ``ensure_contract`` rejects those against a SmolVLM
+    target. After ``align_config_with_drafter`` adopts the export's recorded
+    values (SmolVLM mask row, spatial rope off), the same call must clear the
+    gate.
+    """
+    from vlm_dflash.demo import align_config_with_drafter, build_demo_config
+
+    trained = resolve_contract(
+        fake_target, {"mask_token_id": RESERVED_ID, "draft_num_hidden_layers": 2, "block_size": 4}
+    )
+    export_dir = tmp_path / "export"
+    export_dir.mkdir()
+    (export_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "format": "vlm-dflash-export-v1",
+                "method": "dflash",
+                "identity": {
+                    "model_fingerprint": trained["target"]["model_fingerprint"],
+                    "image_min_pixels": trained["image"]["min_pixels"],
+                    "image_max_pixels": trained["image"]["max_pixels"],
+                },
+                "drafter": {
+                    "mask_token_id": RESERVED_ID,
+                    "block_size": 4,
+                    "num_hidden_layers": 2,
+                    "spatial_rope": {"enabled": False, "mode": "replace", "sections": None},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (export_dir / "model.safetensors").write_bytes(b"")
+
+    run_dir = tmp_path / "demo_run"
+    run_dir.mkdir()
+    cfg = build_demo_config(
+        target=str(fake_target),
+        algorithm="dflash",
+        run_dir=run_dir,
+        pool_path=tmp_path / "pool.jsonl",
+        images_dir=tmp_path / "images",
+        num_train=2,
+        num_val=2,
+        num_prompts=2,
+        max_new_tokens=16,
+        steps=0,
+        source_desc="unit",
+    )
+    with pytest.raises(ContractError, match="outside embedding range"):
+        ensure_contract(cfg, run_dir)
+
+    align_config_with_drafter(cfg, "dflash", export_dir)
+    contract = ensure_contract(cfg, run_dir)
+    assert contract["mask"]["token_id"] == RESERVED_ID
+    assert contract["rope"]["mode"] == "1d"
+    assert contract["layers"]["num_draft_layers"] == 2
+    assert contract["layers"]["block_size"] == 4
 
 
 def test_expected_image_token_counts_are_tiles_times_fixed_length():
