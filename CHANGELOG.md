@@ -44,6 +44,36 @@
   (`configs/smoke_multiturn.yaml`). Smoke-scale only; no quality or speed
   claim follows from it.
 
+### DSpark faithful objective (`train_recipe: upstream_dspark`)
+
+- New selectable recipe reproducing the speculators DSpark default objective
+  (`vllm-project/speculators @ 55ebbd5b`): a single stage of per-slot forward
+  `KL(p_target || p_draft)` over the full vocabulary (decay-weighted, no
+  top-k truncation) plus the confidence BCE against the analytic acceptance
+  rate `sum_v min(p_draft, p_target) = 1 - TV`.
+- The teacher distribution is **reconstructed on demand** from the stored
+  target final hidden states through the frozen output head
+  (`TeacherLogitsStream`, position `label - 1`, bounded fp32 chunks with
+  activation checkpointing). The KL term and the confidence target share one
+  teacher chunk stream per step; the confidence target is computed from the
+  live (Markov-corrected) drafter logits, detached, and never cached.
+- `algorithm.train_recipe` support is now a per-recipe supports-matrix
+  (`RECIPE_SUPPORT`): `upstream_dspark` is accepted only for `dspark`,
+  `upstream_two_stage` only for `dflash`/`dflare`/`dfly`; every pairing and
+  option key outside the matrix fails loud. Recipe options
+  (`cold_start_fraction`, `confidence_coef`) are validated per recipe.
+- The recipe enters the DSpark training-plan digest (byte-identical digests
+  for runs that do not select it), the checkpoint metadata, and the
+  config-validation gates: `capture.store_final_hidden=true` is required, the
+  confidence head must be enabled, and `algorithm.dspark.confidence_head_alpha`
+  must stay at the upstream default 1.0 (`train_recipe.confidence_coef` is the
+  tuning knob).
+- Plain DSpark runs are unchanged (decayed CE + greedy per-slot acceptance
+  indicator). Config: `configs/dspark/qwen2_5_vl_3b_2k_recipe.yaml`; CPU
+  evidence: objective vs direct full-vocab reference (loss + gradients),
+  chunk invariance, detached analytic target, trainer-level gradient coverage
+  and config gates in `tests/test_objectives.py` / `tests/test_dspark.py`.
+
 ### DocVQA / ChartQA benchmark adapters
 
 - `scripts/prepare_benchmark.py` gains `--workload docvqa` (`lmms-lab/DocVQA`

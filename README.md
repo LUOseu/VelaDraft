@@ -36,7 +36,11 @@ export.
 DFlare and DFly are integrated on main. DFly defaults to the shared block-CE
 training profile and can select the ported upstream two-stage recipe
 (`algorithm.train_recipe: upstream_two_stage`: LK / D-PACE cold start, then the
-end-to-end TV stage).
+end-to-end TV stage). DSpark defaults to the shared block-CE profile with the
+greedy-confidence adaptation and can select the faithful upstream objective
+(`algorithm.train_recipe: upstream_dspark`: verifier-distribution KL + analytic
+`1 - TV` confidence target, reconstructed on demand from stored final hidden
+states).
 
 - **One interface for every method.** All seven drafters share the same `train` /
   `eval` / `export` commands, checkpoint format and verification path, so method
@@ -125,7 +129,7 @@ All seven methods use the same train, eval and export commands.
 | Method | Mechanism | Training recipe in this repo |
 | --- | --- | --- |
 | [DFlash](docs/algorithms/dflash.md) | Shared FC context + block drafting | Reference block CE |
-| [DSpark](docs/algorithms/dspark.md) | Markov logit bias + confidence | CE + ported auxiliary objective (see method doc) |
+| [DSpark](docs/algorithms/dspark.md) | Markov logit bias + confidence | CE + greedy confidence (default), or faithful upstream objective (`train_recipe: upstream_dspark`) |
 | [Domino](docs/algorithms/domino.md) | Causal GRU correction | Ported curriculum recipe |
 | [JetSpec](docs/algorithms/jetspec.md) | Causal in-block mask + teacher distillation | Forward-KL |
 | [DFlash2](docs/algorithms/dflash2.md) | Local convolutions + candidate selector | Experimental reconstructed objective |
@@ -145,6 +149,15 @@ LK/D-PACE → end-to-end TV recipe, which requires a capture-v2 store
 parallel, while the hidden-states correction and the LM-head projection run per
 slot sequentially, conditioned on the previously proposed tokens — the
 documented local adaptation of upstream's train-time-only correction.
+
+DSpark notes: training defaults to the shared block-CE profile with the greedy
+per-slot acceptance indicator as the confidence target. Setting
+`algorithm.train_recipe: upstream_dspark` (also requires a capture-v2 store,
+`capture.store_final_hidden=true`) trains the faithful upstream objective —
+per-slot forward KL against the target's next-token distribution and the
+analytic acceptance rate `1 - TV` for the confidence head; both are computed
+on demand through the frozen output head from the stored final hidden states,
+never from stored verifier logits.
 
 DFlash2 uses an experimental reconstruction of the undisclosed upstream training
 objective, and JetSpec's production tree runtime is not ported. Per-target status

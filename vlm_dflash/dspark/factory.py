@@ -57,6 +57,7 @@ def build_draft_config(contract: dict, cfg: dict):
 
 def build_trainer_module(draft_config, contract: dict, cfg: dict, embed_weight, lm_head_weight=None):
     from ..dflash.factory import build_trainer_module as build_dflash_trainer_module
+    from ..objectives import resolve_recipe
     from .model import Qwen3DSparkDraftModel
     from .trainer import DSparkTrainerModule
 
@@ -76,6 +77,7 @@ def build_trainer_module(draft_config, contract: dict, cfg: dict, embed_weight, 
             "confidence_head_with_markov": bool(dspark["confidence_head_with_markov"]),
             "confidence_head_alpha": float(dspark["confidence_head_alpha"]),
             "sample_from_anchor": bool(dspark["sample_from_anchor"]),
+            "train_recipe": resolve_recipe(cfg, "dspark"),
         },
     )
 

@@ -98,6 +98,33 @@ class DSparkAlgorithm(DrafterAlgorithm):
         if alpha < 0:
             raise ValueError(f"algorithm.dspark.confidence_head_alpha must be >= 0, got {alpha}.")
 
+        from ..objectives import assert_recipe_capture, resolve_recipe
+
+        recipe = resolve_recipe(cfg, self.name)
+        assert_recipe_capture(recipe, cfg, algorithm_name=self.name)
+        if recipe is not None:
+            trains_confidence = any(float(stage.confidence_coef) > 0.0 for stage in recipe.stages)
+            if trains_confidence:
+                if not bool(dspark["enable_confidence_head"]):
+                    raise ValueError(
+                        f"algorithm=dspark train_recipe={recipe.name!r} trains the confidence head "
+                        "against the analytic acceptance target; enable_confidence_head must be "
+                        "true (or drop the recipe)."
+                    )
+                if float(dspark["confidence_head_alpha"]) != 1.0:
+                    raise ValueError(
+                        "algorithm.dspark.confidence_head_alpha must stay at the upstream default "
+                        f"1.0 under train_recipe={recipe.name!r}; set train_recipe.confidence_coef "
+                        "to change the confidence weight."
+                    )
+            elif bool(dspark["enable_confidence_head"]):
+                raise ValueError(
+                    f"algorithm=dspark train_recipe={recipe.name!r} has no confidence term "
+                    "(confidence_coef=0), so the enabled confidence head would never receive "
+                    "gradient; set algorithm.dspark.enable_confidence_head=false or "
+                    "train_recipe.confidence_coef > 0."
+                )
+
     # ------------------------------------------------------------------ #
     # training side
     # ------------------------------------------------------------------ #
@@ -127,10 +154,12 @@ class DSparkAlgorithm(DrafterAlgorithm):
         # (checkpoint metadata must record what was actually constructed).
         dflash_config = dict(getattr(draft_config, "dflash_config", {}) or {})
         from ..dspark.factory import DEFAULTS, resolve_dspark_config
+        from ..objectives import resolve_recipe
 
         resolved = resolve_dspark_config(cfg)
         dspark = {key: dflash_config.get(key, resolved[key]) for key in DEFAULTS}
         dspark["confidence_head_alpha"] = float(resolved["confidence_head_alpha"])
+        recipe = resolve_recipe(cfg, self.name)
         return {
             "draft_config": draft_config.to_dict(),
             "attention_backend": str(drafter.get("attention_backend", "flex_attention")),
@@ -139,6 +168,7 @@ class DSparkAlgorithm(DrafterAlgorithm):
             "num_anchors": int(drafter.get("num_anchors", 256)),
             "loss_decay_gamma": float(drafter.get("loss_decay_gamma", 7.0)),
             "target_layer_ids": [int(x) for x in contract["layers"]["draft_layer_ids"]],
+            "train_recipe": None if recipe is None else recipe.as_dict(),
             "dspark": {
                 "markov_rank": int(dspark["markov_rank"]),
                 "markov_head_type": str(dspark["markov_head_type"]),

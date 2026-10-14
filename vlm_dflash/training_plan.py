@@ -55,8 +55,14 @@ def _resolved_algorithm_knobs(cfg: dict, algorithm_name: str, contract: dict | N
     """Effective algorithm knobs with defaults filled in (or ``{}``)."""
     if algorithm_name == "dspark":
         from .dspark.factory import resolve_dspark_config
+        from .objectives import plan_recipe_knobs
 
-        return resolve_dspark_config(cfg)
+        knobs = resolve_dspark_config(cfg)
+        # The recipe block changes the training objective, so it belongs in the
+        # digest exactly like for the fusion algorithms ({} when unset, keeping
+        # the pre-recipe digests byte-identical).
+        knobs.update(plan_recipe_knobs(cfg, algorithm_name))
+        return knobs
     if algorithm_name == "domino":
         from .domino.factory import resolve_domino_config
 
