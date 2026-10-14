@@ -11,7 +11,7 @@
 | 角色 | branch | worktree | 负责人 | 可改范围 | 依赖 | 接口版本 | 状态 |
 |---|---|---|---|---|---|---|---|
 | C0 | `research/rsi-c0` | `/Users/Admin/grounding-parallel/veladraft-c0` | C0 agent（本会话） | `research/rsi/_coord/` + 经批准的共享入口集成 | 五条路线输入；用户转发 | rsi-iface-v0.1.0 | ACTIVE：BASE 已冻结；v0.1.0 已发布（origin `research/rsi-c0`） |
-| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | **GO（修订口径；`d1-002-c0`+`d1-003-c0`；wave-2 全收）**：wave-2 6/6 rc=0（{W3,MIX}×3 seeds；grid 配对均值 1.135/1.133、win 580/600、peak −57%、parity b0/50/100 ✓，C0 重算）；**capacity demo ✓ C0 逐值重算**（W3 b16 43.59→14.32 GiB；**b24 canonical OOM 5/5 vs cost 14.41 GiB 5/5**；MIX b16 27.74→9.83 GiB）→ **L-W2-D1 关闭（≈0.90/1.5）**；close-out `6dc5f74`（REPORT §11 / EXPERIMENTS 42）；**d1-001 最小集已集成**：`research/rsi-c0` @ `4e1674e`（opt-in、默认 byte-identical；全套 509 pass/6 skip）；**D4×D1 2×2 已收官（`d4xd1-003-c0`）：W3 cell F1-as-registered FAIL（1.2475e-2@11）→ 组合数值相容性声明不成立·正确性阻断；MIX cell 全过；交互 bit-0；隔离对照 `d4xd1-004-c0` 放行（L-W3-D4xD1B）**；下一 = harvest 回填提交 + d4xd1-004 + held-out 质量（`d1-006`/L-W3-D1Q 待跑）；round-2 的 +19.0%/+24.7% 系 8 批 cell（不作主数字）；**R4 评估已收（k4 残余 4.7–5.2%/6.1–6.4%；§12）；cross-check `3e29244` PASS（建议 a 采纳 → `192554a`）；d1-004 租约 L-W3-D1R4 已批（≤0.2 GPU-h）** |
+| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | **GO（修订口径；`d1-002-c0`+`d1-003-c0`；wave-2 全收）**：wave-2 6/6 rc=0（{W3,MIX}×3 seeds；grid 配对均值 1.135/1.133、win 580/600、peak −57%、parity b0/50/100 ✓，C0 重算）；**capacity demo ✓ C0 逐值重算**（W3 b16 43.59→14.32 GiB；**b24 canonical OOM 5/5 vs cost 14.41 GiB 5/5**；MIX b16 27.74→9.83 GiB）→ **L-W2-D1 关闭（≈0.90/1.5）**；close-out `6dc5f74`（REPORT §11 / EXPERIMENTS 42）；**d1-001 最小集已集成**：`research/rsi-c0` @ `4e1674e`（opt-in、默认 byte-identical；全套 509 pass/6 skip）；**D4×D1 2×2 已收官（`d4xd1-003-c0`）：W3 cell F1-as-registered FAIL（1.2475e-2@11）→ 组合数值相容性声明不成立·正确性阻断；MIX cell 全过；交互 bit-0；隔离对照 `d4xd1-004-c0` 放行（L-W3-D4xD1B）**；下一 = D1 harvest 回填提交（2×2+004）；**d4xd1-004 已收口（`d4xd1-005-c0`：F1B FAIL→阻断加深）**；`d1-006`（L-W3-D1Q）待跑；round-2 的 +19.0%/+24.7% 系 8 批 cell（不作主数字）；**R4 评估已收（k4 残余 4.7–5.2%/6.1–6.4%；§12）；cross-check `3e29244` PASS（建议 a 采纳 → `192554a`）；d1-004 租约 L-W3-D1R4 已批（≤0.2 GPU-h）** |
 | D2 | `research/rsi-d2` | `/Users/Admin/grounding-parallel/vlm-dflash-d2` | D2 agent（用户安排） | `research/rsi/d2/` + 新模块/测试 | BASE；与 D1 的软目标覆盖对齐 | rsi-iface-v0.1.0 | **STOP（自判+C0 采纳，`d2-001-c0`）**：REPORT/handoff/EXPERIMENTS/d2-001 到齐；pin 2×2 −6.8%（loss 四腿 bitwise）；dfly recipe 2×2（fwd −12.9/bwd −19.5ms；12 步 loss 四腿逐值相同，C0 直读 ✓）；CPU oracle **12/12（C0 复跑；更正“13”措辞）**；归因段完成（editable 遮蔽/event 伪影）；机制 DEFERRED（lane-local opt-in；再开=REPORT §8）；lane commit `bfb3635`+`d6e3c9a` ✓（worktree 净；修正三项闭环） |
 | D3 | `research/rsi-d3` | `/Users/Admin/grounding-parallel/vlm-dflash-d3` | D3 agent（用户安排） | `research/rsi/d3/` + 新模块/测试 | BASE；D1 形状分布输入 | rsi-iface-v0.1.0 | **CLOSED（STOP 已接受；最终关闭确认 2026-10-15 00:18）**：attention+mask=21.16ms/595.9ms=**3.55%** ≪20%（cap +3.7% 步 / +1.4% online）；C0 核数 ✓；交付物全（`b88cdf2`：REPORT/EXPERIMENTS/handoff/support_matrix/evidence/scripts；worktree 净）；预算自报 0.22/1.0 GPU-h；服务器清理 ✓；无集成；再开条件=REPORT §8 |
 | D4 | `research/rsi-d4` | `/Users/Admin/grounding-parallel/vlm-dflash-d4` | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | **merge-ready（平台工程级；`d4-003-c0`）**：d4-001 集成 `1f8963e`（sha1 对账一致；13+4+70/70 复跑 ✓）；**W2 收口**（F1–F4 PASS；两腿 counters 645/129/129/0/0 逐值相同；adjustments=0；lane `a8e762c`；runtime 4 文件 sha1 再核一致）；范围=静态 RAM 场景/opt-in 默认关（压力响应未验证）；预算 0.37/0.5；**D4×D1 2×2 只读参与收官（`d4xd1-003-c0`）：bucket_off×cache 腿数值惰性 bit-exact（floor probe 0.0）——线不重开**；不自动 merge main |
@@ -48,7 +48,7 @@
 
 每轮开始前：角色在自己的 STATE.md 写假设/反例/指标/上限/预算；跑完把 run 证据写入 `EXPERIMENTS.jsonl` 并在 `handoff.md` 给 C0 一行摘要；C0 更新本表状态。
 
-**预算提升证据（任务 2 记录）**：D1 wave-1 `≤1.0→≤1.5`（W0-only 无法证伪 P1、需真实混合池；§7 条目；实耗 0.92）；L-W2-D1 `≤1.5`（`d1-001-c0`；实耗 0.90 关闭）；L-W3-D1R4 `≤0.2`（`d1-004-c0`；0.108 负分支关闭）；L-W3-D4xD1 `≤1.5`（`d4xd1-001-c0`；已放行待执行）；L-W3-D1Q `≤2.4 staged`（d1-006 接收记录；2×2 后执行）。其余角色本轮无预算提升，已有租约条目见 §7/§8 与 RESOURCE_SCHEDULE。
+**预算提升证据（任务 2 记录）**：D1 wave-1 `≤1.0→≤1.5`（W0-only 无法证伪 P1、需真实混合池；§7 条目；实耗 0.92）；L-W2-D1 `≤1.5`（`d1-001-c0`；实耗 0.90 关闭）；L-W3-D1R4 `≤0.2`（`d1-004-c0`；0.108 负分支关闭）；L-W3-D4xD1 `≤1.5`（`d4xd1-001-c0`；**实耗 ≈0.76 关闭**）；L-W3-D4xD1B `≤0.10`（`d4xd1-004-c0`；**实耗 ≈0.081 关闭**）；L-W3-D1Q `≤2.4 staged`（d1-006 接收记录；**现可启动**）。其余角色本轮无预算提升，已有租约条目见 §7/§8 与 RESOURCE_SCHEDULE。
 
 ## 5. 通信
 
@@ -402,9 +402,20 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - 请求：①2×2 harvest 回填提交（EXPERIMENTS 8 行 + REPORT 节 + STATE/handoff 同步；引用 003/004）；②执行 `d4xd1-004`（fast-path：addendum 补 `fp32_weights=false` 语义确认 + 命令即开跑；语义不符先回执）；③`d1-006` held-out（≤2.4）排后/并行编排；④全程 quiet-gate（/home ≥15G 起步）并逐腿记卡。
 - 资源提醒：D5 `L-W3-D5B`（staged_b32）随时开跑；勿与其抢同一张卡。
 
-### novelty 深读 #2（2026-10-15 04:35，C0）— 综述书目级 + 多模态线 + delta 二扫
+### novelty 深读 #2（2026-10-15 04:17，C0）— 综述书目级 + 多模态线 + delta 二扫
 
 - 综述《Beyond Concatenation》（DOI `10.2139/ssrn.7343278`）：**全文双机仍不可达**（SSRN 000）；**Crossref 摘要 + 44 条参考文献已取得**（书目级读取）→ 自我定位=长上下文数据组织综述；四 role（Sequence Allocation & Integrity / Context Construction / Workload Scheduling / Shared-Structure Reuse）；"reweight examples" 为失败模式表述；书目未见等价性 formalization、未见多模态 packing。**全文获取维持论文前置条件项（用户/D1）**。
 - **多模态线补齐**：NaViT / Patch n' Pack（arXiv 2307.06304）——related-work 必引（第一轮遗漏）。
 - **delta 二扫**：① 等价 formalization 未见证伪（最近邻 EXACT=反向重加权；`Rethinking Length-Based Training` 2609.25890=问题域活跃）→ 表述改为"可证明的逐样本权重保留构造"；② 容量轴无显式同主张；③ invalid-slot slack 分解无同类。维持：工程独立成立、论文="构造①为主 + ②③佐证"。
 - 证据：`evidence/c0_novelty_deepread2_d1_20261015.md`（新增对照表 11 行 + 检索留痕）。
+
+
+### 终裁 `d4xd1-005-c0`（L-W3-D4xD1B 隔离臂收口；2026-10-15 04:24，C0）
+
+- 臂 `d4xd1_w3_cacheoff_bucketon_fp32off` **rc=0 @04:22:43**（101 步；train wall 236.8s；peak 17.48 GiB；nan=false；GPU3）；预算 **≈0.081/0.10 GPU-h 关闭**（含 8s staging 重试）。
+- C0 独立重算（自 raw `train_log.jsonl` steps 2..101 vs ref）与 D1 `evidence/d4xd1_004_f1b.json`（未提交 @读取时）逐项一致：**F1B FAIL——max 2.2727e-2@11；17/100 超门（10–13,15,16,18,43,47,54,60,73,82,95–98）；中位 4.32e-3**（门 7.5e-3；3.0× 余量）。
+- **执行预注册映射 FAIL 分支**：在线分组超带 → **正确性阻断加深**；`cache×regroup` 组合声明维持**不成立/暂禁**（003 的 F1 FAIL 不撤销；MIX 不受影响）；机制排查转**新提案轨道**（须预注册；不得事后放宽门）。
+- 描述性分解：损失路径单因子翻转（fp32=true→false，同 bucket_on）**亦超门**（1.4080e-2@15；7 步；中位 2.58e-3）→「已知损失路径差类 ≤~6e-3」在在线 W3 不可直接迁移；机制轨道须含同路径伴随对照 + 轨迹口径。
+- 核验：identity PASS 6.13e-8（≤1e-6）；anchors 104 calls 三腿一致（prefix `96c5a117436f9d35` / full `4347a983417d07f0`）；feature_cache=0 臂正确。
+- 下一：D1 harvest 回填提交（2×2+004）→ `d1-006`（L-W3-D1Q ≤2.4）；D5 `L-W3-D5B`（staged_b32 ≤0.75）已批未跑。
+- 全文 `proposals/d4xd1-005-c0.md`；证据 `evidence/c0_d4xd1_004_recompute_20261015.json`。
