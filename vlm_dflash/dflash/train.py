@@ -35,7 +35,9 @@ from ..training_plan import (
     training_plan_digest,
 )
 from ..utils import ensure_dir, log, read_json, set_seed, write_json
+from .decay_loss import DFlashDecayLoss
 from .features import FeatureDataset, collate_features, offline_feature_digest
+from .regroup import COST_ANCHOR_WEIGHT, SampleStat, plan_groups, row_weights, sample_z_rows
 
 
 def _make_optimizer_and_scheduler(parameters, train_cfg: dict, total_steps: int):
@@ -181,6 +183,125 @@ def _expected_recipe_stage(cfg: dict, algorithm_name: str, *, step: int, total_s
     return int(recipe.stage_index(int(step), int(total_steps)))
 
 
+def _regrouped_forward(module, batch, batch_lengths, regroup, *, accumulation, spatial, device):
+    """One logical batch executed as planned physical groups (``train.regroup``).
+
+    Mirrors the D1 wave-2 semantics: the frozen anchor table is sampled once per
+    logical batch (the same single sampler call the shipped forward would make),
+    the planner splits the batch into physical groups, and each group runs
+    ``module.forward(anchor_table=..., sample_weights=g_i)`` with the preserved
+    per-sample weights of the canonical (single reference batch) objective —
+    ``g_i = 1 / Z_batch`` for rows with ``Z_i > 0`` — against a raw weighted-sum
+    loss (``normalize="tokens"`` with ``num_tokens=None``). Backprop happens per
+    group (``loss / accumulation``, the same factor the shipped loop applies), so
+    the optimizer-step cadence and update order stay identical to the shipped
+    path. The returned metrics mirror a single shipped forward: additive counters
+    are summed and ratios recomputed (accuracy / accept_len must not be averaged
+    per group, batches have different valid-token counts).
+    """
+    from .trainer_core import DFlashStepMetrics
+
+    input_ids = batch["input_ids"]
+    hidden = batch["hidden"]
+    loss_mask = batch["loss_mask"]
+    image_mask = batch.get("image_mask")
+    position3 = batch.get("position3") if spatial else None
+    teacher_hidden = batch.get("final_hidden")
+    if batch_lengths is None:
+        raise ValueError("train.regroup requires the collated 'lengths' field; batch is missing it.")
+    bsz, seq_len = input_ids.shape
+    lengths = [int(value) for value in batch_lengths.view(-1).tolist()]
+
+    anchors, keep = module._sample_anchor_positions(seq_len, loss_mask, device)
+    anchors_cpu = anchors.detach().cpu()
+    keep_cpu = keep.detach().cpu()
+    z_rows = sample_z_rows(
+        loss_mask.detach().cpu(),
+        anchors_cpu,
+        keep_cpu,
+        module.block_size,
+        module.first_supervised_slot,
+        module.loss_decay_gamma,
+    )
+    stats = [
+        SampleStat(key=str(i), C=lengths[i], A=int(keep_cpu[i].sum().item()), Z=float(z_rows[i]), index=i)
+        for i in range(bsz)
+    ]
+    groups = plan_groups(stats, regroup["mode"], regroup["sub_batch"], regroup["cost_weight"])
+    # Reference split = one canonical microbatch (the whole logical batch), i.e.
+    # the shipped single-forward mean objective; see d1-002-c0 / d1-001 §1.
+    weights = row_weights([str(i) for i in range(bsz)], [list(range(bsz))], z_rows, accumulation=1)
+    max_anchor = [
+        int(anchors_cpu[i][keep_cpu[i]].max().item()) if bool(keep_cpu[i].any()) else -1 for i in range(bsz)
+    ]
+
+    total_loss = None
+    counters = {"loss_weight": None, "correct_tokens": None, "valid_tokens": None,
+                "accept_len_sum": None, "valid_blocks": None}
+    pos_correct = None
+    pos_count = None
+    for group in groups:
+        n_g = min(module.num_anchors, max(int(keep_cpu[i].sum().item()) for i in group))
+        if n_g <= 0:
+            # All-invalid group (zero-anchor rows): contributes nothing by
+            # construction (their weights are 0.0); skip the degenerate forward.
+            continue
+        s_g = max(lengths[i] for i in group)
+        group_max_anchor = max(max_anchor[i] for i in group)
+        if group_max_anchor >= 0:
+            s_g = max(s_g, group_max_anchor + module.block_size)
+        s_g = min(s_g, seq_len)
+        index = torch.tensor(group, dtype=torch.long, device=device)
+        group_weights = torch.tensor([weights[str(pos)] for pos in group], dtype=torch.float32, device=device)
+        group_kwargs = {}
+        if image_mask is not None:
+            group_kwargs["image_mask"] = image_mask[index][:, :s_g]
+        if position3 is not None:
+            group_kwargs["multimodal_position_ids"] = position3[:, index, :s_g]
+        if teacher_hidden is not None:
+            group_kwargs["teacher_hidden"] = teacher_hidden[index][:, :s_g]
+        metrics = module(
+            input_ids=input_ids[index][:, :s_g],
+            hidden_states=hidden[index][:, :s_g],
+            loss_mask=loss_mask[index][:, :s_g],
+            anchor_table=(anchors[index][:, :n_g], keep[index][:, :n_g]),
+            sample_weights=group_weights,
+            **group_kwargs,
+        )
+        if metrics.extra_metrics:
+            raise NotImplementedError("train.regroup does not support auxiliary/recipe losses yet")
+        if not torch.isfinite(metrics.loss):
+            raise RuntimeError(f"Non-finite training loss (train.regroup group {group}): {float(metrics.loss)}")
+        (metrics.loss / accumulation).backward()
+        group_loss = metrics.loss.detach()
+        total_loss = group_loss if total_loss is None else total_loss + group_loss
+        for key in counters:
+            value = getattr(metrics, key)
+            counters[key] = value if counters[key] is None else counters[key] + value
+        if metrics.pos_correct is not None:
+            pos_correct = metrics.pos_correct if pos_correct is None else pos_correct + metrics.pos_correct
+            pos_count = metrics.pos_count if pos_count is None else pos_count + metrics.pos_count
+    if total_loss is None:
+        raise RuntimeError("train.regroup produced no executable groups for this batch.")
+    valid_tokens = counters["valid_tokens"]
+    correct_tokens = counters["correct_tokens"]
+    accept_len_sum = counters["accept_len_sum"]
+    valid_blocks = counters["valid_blocks"]
+    return DFlashStepMetrics(
+        loss=total_loss,
+        loss_weight=counters["loss_weight"],
+        accuracy=correct_tokens / valid_tokens.clamp_min(1),
+        valid_tokens=valid_tokens,
+        correct_tokens=correct_tokens,
+        accept_len=accept_len_sum / valid_blocks.clamp_min(1),
+        accept_len_sum=accept_len_sum,
+        valid_blocks=valid_blocks,
+        pos_correct=pos_correct,
+        pos_count=pos_count,
+        extra_metrics=None,
+    )
+
+
 def run_training_loop(
     module,
     dataset,
@@ -200,6 +321,38 @@ def run_training_loop(
     accumulation = max(1, int(train_cfg.get("grad_accumulation_steps", 1)))
     log_every = int(train_cfg.get("log_every_steps", 10))
     max_grad_norm = float(train_cfg.get("max_grad_norm", 1.0))
+    regroup_cfg = train_cfg.get("regroup") or {}
+    regroup_mode = regroup_cfg.get("mode") if isinstance(regroup_cfg, dict) else None
+    regroup = None
+    if regroup_mode not in (None, "", "null", "none", "off"):
+        if getattr(module, "loss_type", None) != "dflash" or getattr(module, "sample_from_anchor", False):
+            raise ValueError(
+                "train.regroup supports the fixed-anchor dflash objective only "
+                f"(loss_type={getattr(module, 'loss_type', None)!r}, "
+                f"sample_from_anchor={getattr(module, 'sample_from_anchor', None)!r})."
+            )
+        sub_batch = int(regroup_cfg.get("sub_batch") or 0)
+        if sub_batch <= 0:
+            raise ValueError(
+                f"train.regroup.sub_batch must be a positive int, got {regroup_cfg.get('sub_batch')!r}."
+            )
+        cost_weight = float(regroup_cfg.get("cost_weight", COST_ANCHOR_WEIGHT))
+        fp32_weights = bool(regroup_cfg.get("fp32_weights", True))
+        regroup = {"mode": str(regroup_mode), "sub_batch": sub_batch, "cost_weight": cost_weight}
+        # Match the validated wave-2 configuration: the weighted path reduces in fp32
+        # (bf16 quantisation of the preserved per-sample weights biases the loss by
+        # ~0.4%; see the D1 precise-reduction arm). train.regroup.fp32_weights=false
+        # reproduces the quantisation for studies.
+        module.loss_fn = DFlashDecayLoss(
+            loss_gamma=module.loss_decay_gamma,
+            normalize="tokens",
+            first_slot=module.first_supervised_slot,
+            weight_dtype="fp32" if fp32_weights else "auto",
+        )
+        log(
+            f"train.regroup enabled: mode={regroup['mode']} sub_batch={sub_batch} "
+            f"cost_weight={cost_weight:.1f} fp32_weights={fp32_weights}"
+        )
     epochs = int(train_cfg.get("num_epochs", 6))
     image_token_id = int(contract["tokens"]["image_token_id"])
 
@@ -371,6 +524,7 @@ def run_training_loop(
         # accumulation window is progress, not a stall.
         valid_micro = 0
         for batch in iterator:
+            batch_lengths = batch.get("lengths")
             batch = {key: value for key, value in batch.items() if key != "lengths"}
             batch = {key: value.to(device) if torch.is_tensor(value) else value for key, value in batch.items()}
             # Algorithm progress hook: curricula (e.g. Domino's lambda_base)
@@ -380,17 +534,23 @@ def run_training_loop(
             if progress_hook is not None:
                 progress_hook(step, total_steps)
             try:
-                metrics = module(
-                    input_ids=batch["input_ids"],
-                    hidden_states=batch["hidden"],
-                    loss_mask=batch["loss_mask"],
-                    image_mask=batch["image_mask"],
-                    multimodal_position_ids=batch["position3"] if spatial else None,
-                    # Capture-v2 feature stores carry the target's final hidden
-                    # states for distillation objectives (JetSpec); older stores
-                    # do not have the key and pass None.
-                    teacher_hidden=batch.get("final_hidden"),
-                )
+                if regroup is None:
+                    metrics = module(
+                        input_ids=batch["input_ids"],
+                        hidden_states=batch["hidden"],
+                        loss_mask=batch["loss_mask"],
+                        image_mask=batch["image_mask"],
+                        multimodal_position_ids=batch["position3"] if spatial else None,
+                        # Capture-v2 feature stores carry the target's final hidden
+                        # states for distillation objectives (JetSpec); older stores
+                        # do not have the key and pass None.
+                        teacher_hidden=batch.get("final_hidden"),
+                    )
+                else:
+                    metrics = _regrouped_forward(
+                        module, batch, batch_lengths, regroup,
+                        accumulation=accumulation, spatial=spatial, device=device,
+                    )
             except skippable_errors:
                 skipped_batches += 1
                 continue
@@ -399,7 +559,12 @@ def run_training_loop(
             if not torch.isfinite(loss):
                 nan_seen = True
                 raise RuntimeError(f"Non-finite training loss at step {step}: {loss.item()}")
-            (loss / accumulation).backward()
+            if regroup is None:
+                # Regrouped forwards backprop per physical group inside
+                # ``_regrouped_forward`` — same total gradient (the weights encode
+                # the reference microbatch-mean objective) and the same
+                # optimizer-step cadence / update order as the shipped path.
+                (loss / accumulation).backward()
             micro_step += 1
             if micro_step % accumulation == 0:
                 if step == coverage_audit_step:

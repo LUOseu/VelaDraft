@@ -521,6 +521,7 @@ class DFlashTrainerModule(nn.Module):
         seq_lens: torch.Tensor | None = None,
         doc_remaining: torch.Tensor | None = None,
         causal: bool = False,
+        anchor_table: Optional[tuple[torch.Tensor, torch.Tensor]] = None,
     ) -> Tuple[
         torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, "torch.Tensor | BlockMask", Optional[torch.Tensor]
     ]:
@@ -530,6 +531,9 @@ class DFlashTrainerModule(nn.Module):
         (DFlash and its Domino / JetSpec subclasses): anchors are sampled so each
         block stays inside one document, the block's context prefix is restricted
         to its anchor's document, and the draft RoPE uses per-document positions.
+        ``anchor_table`` replays a frozen ``(anchors, keep)`` pair instead of
+        sampling (``train.regroup``; the caller pads each group to
+        ``max(anchor) + block_size`` so the replay stays in bounds).
 
         Under ``loss_type="variable_prefix"`` the block embedding shows a sampled
         real-token prefix (``_create_vp_noise_embed``) instead of the single anchor
@@ -563,9 +567,32 @@ class DFlashTrainerModule(nn.Module):
                 "got seq_lens without the other packing metadata."
             )
 
-        anchor_positions, block_keep_mask = self._sample_anchor_positions(
-            seq_len, loss_mask, device, doc_remaining=doc_remaining if packed else None
-        )
+        if anchor_table is None:
+            anchor_positions, block_keep_mask = self._sample_anchor_positions(
+                seq_len, loss_mask, device, doc_remaining=doc_remaining if packed else None
+            )
+        else:
+            anchor_positions, block_keep_mask = anchor_table
+            anchor_positions = anchor_positions.to(device=device, dtype=torch.long)
+            block_keep_mask = block_keep_mask.to(device=device, dtype=torch.bool)
+            if (
+                anchor_positions.dim() != 2
+                or anchor_positions.shape[0] != bsz
+                or block_keep_mask.shape != anchor_positions.shape
+            ):
+                raise ValueError(
+                    "anchor_table must be (anchor_positions [B, N], keep [B, N]) matching the "
+                    f"batch size; got {tuple(anchor_positions.shape)} / {tuple(block_keep_mask.shape)} "
+                    f"for B={bsz}."
+                )
+            kept = anchor_positions[block_keep_mask]
+            if kept.numel() and (
+                bool((kept < 0).any()) or bool((kept + self.block_size > seq_len).any())
+            ):
+                raise ValueError(
+                    "anchor_table contains kept anchors outside [0, seq_len - block_size]; "
+                    "pad the group to max(anchor) + block_size before replaying."
+                )
         if self.loss_type == "variable_prefix":
             prefix_lengths = self._sample_prefix_lengths(bsz, anchor_positions.shape[1], device)
             noise_embedding = self._create_vp_noise_embed(input_ids, anchor_positions, block_keep_mask, prefix_lengths)
@@ -682,6 +709,8 @@ class DFlashTrainerModule(nn.Module):
         image_mask: torch.Tensor | None = None,
         multimodal_position_ids: torch.Tensor | None = None,
         teacher_hidden: torch.Tensor | None = None,
+        anchor_table: Optional[tuple[torch.Tensor, torch.Tensor]] = None,
+        sample_weights: torch.Tensor | None = None,
     ) -> DFlashStepMetrics:
         """Parallel block-wise training forward pass.
 
@@ -708,11 +737,31 @@ class DFlashTrainerModule(nn.Module):
                 DFlash-family trainers any active ``train_recipe`` stage whose
                 LK / end-to-end TV terms need the teacher distribution. Other
                 algorithms ignore it.
+            anchor_table: Optional frozen ``(anchor_positions [B, N], keep [B, N])``
+                table replayed instead of sampling anchors; used by ``train.regroup``.
+                Requires the fixed-anchor dflash objective and non-packed inputs;
+                kept anchors must satisfy ``anchor + block_size <= seq_len``.
+            sample_weights: Optional per-sample weights ``[B]`` multiplied into the
+                block-mask rows before the loss (preserved weights for regrouped
+                physical batches); None (default) keeps the shipped path unchanged.
 
         Returns:
             Scalar loss and additive DFlash training metrics.
         """
         bsz, seq_len = input_ids.shape
+
+        if anchor_table is not None:
+            if self.loss_type == "variable_prefix":
+                raise ValueError("anchor_table replay is not supported for loss_type='variable_prefix'.")
+            if seq_lens is not None or doc_remaining is not None:
+                raise ValueError("anchor_table replay does not support packed inputs (seq_lens/doc_remaining).")
+        if sample_weights is not None:
+            if sample_weights.dim() != 1 or sample_weights.shape[0] != bsz:
+                raise ValueError(
+                    f"sample_weights must have shape [batch]=({bsz},), got {tuple(sample_weights.shape)}."
+                )
+            if not torch.isfinite(sample_weights).all():
+                raise ValueError("sample_weights contains non-finite entries.")
 
         if self.draft_model.visual_conditioning_enabled and image_mask is not None:
             if image_mask.shape != loss_mask.shape:
@@ -739,6 +788,7 @@ class DFlashTrainerModule(nn.Module):
                 seq_lens=seq_lens,
                 doc_remaining=doc_remaining,
                 causal=self.causal_in_block,
+                anchor_table=anchor_table,
             )
         )
 
@@ -778,6 +828,10 @@ class DFlashTrainerModule(nn.Module):
             seq_len,
             label_start=self.input_shift,
         )
+        if sample_weights is not None:
+            block_mask = block_mask * sample_weights.to(
+                device=block_mask.device, dtype=block_mask.dtype
+            ).view(-1, 1, 1)
 
         output_hidden = self.draft_model(
             position_ids=full_position_ids,

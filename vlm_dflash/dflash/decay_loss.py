@@ -384,6 +384,10 @@ class DFlashDecayLoss(nn.Module):
             that keeps the loss consistent across DP replicas and grad-accum.
             ``"mean"`` divides by the effective weight sum
             ``(w_k * block_mask).sum()`` for a per-call decay-weighted mean.
+        weight_dtype: ``"auto"`` (default) keeps the shipped reduction dtype;
+            ``"fp32"`` upcasts the NLL and mask to fp32 before the decay product,
+            so bf16 quantisation cannot bias preserved per-sample weights
+            (opt-in; used by the ``train.regroup`` weighted path).
         loss_gamma: Decay parameter γ. ``None`` disables decay (all predicted
             positions weighted equally).
     """
@@ -395,12 +399,15 @@ class DFlashDecayLoss(nn.Module):
         chunk_size: int = 1024,
         normalize: str = "tokens",
         first_slot: int = 1,
+        weight_dtype: str = "auto",
     ):
         super().__init__()
         if normalize not in ("tokens", "mean"):
             raise ValueError(f"normalize must be 'tokens' or 'mean', got {normalize!r}")
         if int(first_slot) < 0:
             raise ValueError(f"first_slot must be >= 0, got {first_slot!r}")
+        if weight_dtype not in ("auto", "fp32"):
+            raise ValueError(f"weight_dtype must be 'auto' or 'fp32', got {weight_dtype!r}")
         self.loss_gamma = None if loss_gamma is None else float(loss_gamma)
         self.use_fused_linear_ce = bool(use_fused_linear_ce)
         self.chunk_size = int(chunk_size)
@@ -409,6 +416,7 @@ class DFlashDecayLoss(nn.Module):
         # (slot 0 is the clean anchor copy); algorithms that draft the anchor
         # itself (DSpark sample_from_anchor=True) pass first_slot=0.
         self.first_slot = int(first_slot)
+        self.weight_dtype = str(weight_dtype)
 
     def _decay_weights(self, T: int, block_size: Optional[int], device, dtype) -> torch.Tensor:
         """Eq. 4 weights for ``T`` predicted positions, resetting per block.
@@ -434,6 +442,12 @@ class DFlashDecayLoss(nn.Module):
         draft_count_per_pos: Optional[torch.Tensor] = None,
     ) -> DLLMLossOutput:
         """Apply decay weights + block mask, sum, and normalise."""
+        if self.weight_dtype == "fp32":
+            # Precise-reduction mode: keep the (optionally per-sample scaled) mask
+            # and the NLL in fp32 so bf16 weight quantisation cannot bias the
+            # preserved per-sample weights g_i (D1 precise-reduction arm).
+            token_nll = token_nll.float()
+            block_mask = block_mask.float()
         _, T = token_nll.shape
         w = self._decay_weights(T, block_size, token_nll.device, token_nll.dtype)
         weights = w.unsqueeze(0) * block_mask.to(token_nll.dtype)  # [B, T]
