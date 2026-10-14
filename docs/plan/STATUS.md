@@ -66,7 +66,7 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   (`scripts/export_vllm_draft.py`; shared embed/lm_head, aux (2,18,34),
   n_spec 7) and runs, but the strict gate fails: **5/32 token-exact**, AL
   1.4059 vs in-repo 1.6924 (MRoPE) / 1.6866 (1-D arm, R-15 - rope convention
-  is not the driver), flips are bf16 ulp-scale near-ties (R-16 margin probe).
+  is not the driver), traced flips show small top1-top2 margins (R-16 HF-assisted probe; root cause unresolved per the R5 remediation).
   Registered as BLOCKED-with-gap per the plan rule; report
   `docs/plan/WP5_REPORT.md`, converter/harness code + 5 CPU tests in this
   branch. Lane split recap in COORDINATION.md.
@@ -75,7 +75,7 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   capture (image-token check **1377/1377**, `visual_path_check` passed) ->
   32-step train -> sequential eval **token-exact 4/4** on trained + init
   checkpoints (AL 1.182 / 1.083); parallel diagnostic 1/2 (0.0-margin flip,
-  the R-16 near-tie class). Family adapter + hooks + 14 CPU tests in this
+  small-margin flip class cf. R-16). Family adapter + hooks + 14 CPU tests in this
   branch (`ef07b41`, `0f45fa1` + fixes). Gaps registered (schema-v2
   multi-turn template drift, multi-image, online mode untested for the
   family; smoke scale - no quality claim): `docs/plan/WP6_REPORT.md`.
