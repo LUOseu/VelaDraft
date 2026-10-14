@@ -5,6 +5,14 @@
 - Repository renamed to `github.com/LUOseu/VelaDraft` (old `vlm-dflash` URLs
   redirect); the distribution name and CLI stay `vlm-dflash`.
 
+### CI / packaging fix: `num2words` dependency
+
+- `num2words` is now a declared runtime dependency (`pyproject.toml`): the
+  transformers SmolVLM processor requires it at construction time (so the
+  SmolVLM2 target path needs it), and the CPU-test CI environment - which
+  installs `.[tested,dev]` - was missing it, erroring all five
+  `tests/test_smolvlm_adapter.py` tests with `ImportError`.
+
 ### Schema v2: multi-image / multi-turn
 
 - Data schema v2: rows with `image_turns` (or the `vlm-dflash-data-v2`

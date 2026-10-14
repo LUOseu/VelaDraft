@@ -20,6 +20,7 @@ dependencies = [
     "numpy",
     "safetensors",
     "accelerate",
+    "num2words",
 ]
 
 [project.optional-dependencies]

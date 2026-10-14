@@ -79,6 +79,11 @@ starting a work package, re-read it before big steps.
   token-exact 4/4. README zoo table + `docs/zoo/qwen25vl-3b-dfly-recipe.md`
   + `RELEASE_VALIDATION` updated; `RUN_LOG` renumbered to keep the shared
   table contiguous (R-11 E4, R-12 WP4, R-13 zoo).
+- Note (C-01a13452): fixing the CI failures on the WP6 SmolVLM adapter tests
+  (`num2words` missing from the `.[tested,dev]` install) - declared it as a
+  runtime dependency in `pyproject.toml` + CHANGELOG note. No WP6/WP7 code,
+  tests or artifacts touched; CPU suite re-run green (361 passed / 6
+  skipped).
 - Any session may record small urgent fixes; note them here.
 
 If you (the other session) disagree with the split, edit this file first and
