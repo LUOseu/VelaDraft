@@ -179,6 +179,17 @@
 - D4（00:37 收口推进）：**lane commit `208f422` 对账完成 ✓**——4 文件 blob sha1 与集成树 `1f8963e` 逐一致（`3d48e108`/`fc019296`/`1c5c2a64`/`69071557`），reconcile 关闭。**W2 降级验证（B）两腿已跑**（GPU2，00:25:43–00:30:30；quiet 门控——off 腿后检测到 GPU2 被占自动等待；代码 sha 登记）：off/on fc counters **逐值相同**（hits 645 / misses 129 / stores 129 / evict 0 / peak 870MB @ cap 1GiB）、final_loss 均 7.25、wall 112/111s、`adaptive` 字段在腿上为 null。**收口要求**：REPORT/EXPERIMENTS 按 d4-002-c0 标 `cgroup_limit=unavailable`/`sensor=meminfo`，给出 `adaptive_budget` 计数口径（无压力=无调整的期望需显式落文），然后可给 merge-readiness 评估。
 - D5（00:37 Tier 0 结果）：chain2 按门运行——**smoke_canon ✓**（exit=0，final_loss 12.0625）；**smoke_s3 rc=1**：`split_pipeline.py` L66 `from runner.split_stage import SplitProducer` → `ModuleNotFoundError: No module named 'runner'`（服务器端缺 lane sys.path 引导）→ 按"parity 失败即停 S3 线"规则**停链**（无进一步支出；GPU 未用满窗口）。**待办**：修 import 路径 → 重跑 Tier 0→A（预授权仍有效，卡规则照旧）。另：00:33 报告中 `split_verify` tri-state +3 测试、lane 82/82 待 C0 复跑（等提交）。
 - D2（00:37 全收口）：lane commit `bfb3635`（代码+证据+[STOP]）+ `d6e3c9a`（记录）已到；worktree 干净；**“13/13”→ “12/12 笔误” 已在 REPORT §4.1 自更正**；预算 ≈0.5/1.0 GPU-h 已入 REPORT/STATE 明细。**无进一步请求**；机制存档为 lane-local opt-in（DEFERRED；再开=REPORT §8）。
+- D1（00:40 扫掠完成 + 回填已启动）：**R3 正式扫掠全部完成**（k2×5 store + k4×{mix,w3}；GPU3 释放）。**C0 全矩阵抽查（独立重算 3 个 run 均一致）**：
+
+  | store | k2 best | k4 best | 显存 k2 | 显存 k4 |
+  |---|---|---|---|---|
+  | w0 | 1.009× | —（未跑 k4） | −32.7% | — |
+  | w1 | 1.010× | —（未跑 k4） | −20.4% | — |
+  | w2 | 1.095× | —（未跑 k4） | −37.0% | — |
+  | mix_w1w2 | **1.242×** | **1.247×** | −30.0% | **−46.6%** |
+  | w3 | 1.107× | **1.190×** | −37.7% | **−57.5%** |
+
+  （k2=sub_batch 4；k4=sub_batch 2；w3_k4 独立重算：652.7→548.4ms=1.190×、peak 25.0→10.6GB、loss_rel 4.79e-3；mix_k4：315.4→253.0=1.247×、−46.6%。）**EXPERIMENTS 回填已核**：w0-k2 条目含物理卡（GPU1 独占；W3 并行在 GPU3、GPU0 外部）与修正后的 parity 口径——**regroup vs ref 漂移仅 2.7–5.4e-5；canonical-vs-ref 4.9e-3 系 canonical 自身 bf16 权重量化（cp 隔离至 1.5e-7）**；grad_rel ≤4.5e-3 / update_rel ≤6.2e-8。**剩余**：全 run 条目补齐（w1/mix/w3/k4）+ REPORT Round-2 + `d1-001.md` + 预算（r3 每 run ≈0.02 GPU-h 已入条目）+ summary `grad=0.0` 字段修正说明。
 
 ### 复核记录（C0 抽查，引用级）
 
@@ -207,3 +218,4 @@
 - 2026-10-15 00:34 — D1 R3 抽查（C0 独立重算，`r3_mix_w1w2_k2`）：median token 255.6 vs canonical 317.6 → **1.2424×**（与 summary 一致）；逐 logical_batch loss_rel max 4.15e-3（一致）；72 行=8 臂×9 批（1 warmup）。**发现**：summary `grad_rel_err_max/update_rel_err_max=0.0` 与 warmup 行 `grad_rel≈5e-3` 不符 → grad/update parity 未逐批记录，需 D1 说明/修正（对 wave-2 判读重要）。
 - 2026-10-15 00:36 — D1 R3 抽查（C0 独立重算，`r3_mix_w1w2_k4`，sub_batch=2）：canonical 315.4 → cost 254.4（**1.240×**）/ grid 253.0（1.247×）/ split 266.7（1.183×）；**peak 15.3→8.2GB（−46%）**——k4 与 k2 墙钟相近、显存更深（k2: −30%）。w3_k4 运行中（GPU3）。
 - 2026-10-15 00:37 — D4 W2 降级验证复核（引用级）：on 腿 config `online_feature_cache_adaptive=true`（off=false）确认；两腿 fc counters 与 final_loss 一致——与"无压力→无调整"预注册期望相符；`adaptive` 汇总字段为 null，待 D4 收口时给口径。
+- 2026-10-15 00:38 — D1 R3 抽查（C0 独立重算，`r3_w3_k4`）：652.7→cost 548.4（**1.190×**）/ grid 549.4；peak 25.0→**10.6GB（−57.5%）**；loss_rel max 4.79e-3（逐批重算一致）。**D1 修正口径已核（w0-k2 EXPERIMENTS 条目）**：regroup-vs-ref 漂移 2.7–5.4e-5、grad_rel≤4.5e-3、update_rel≤6.2e-8、cp 隔离 canonical 的 bf16 权重量化（4.9e-3→1.5e-7）——此前"summary grad=0.0"矛盾已按此解释修正（字段本身仍建议修）。
