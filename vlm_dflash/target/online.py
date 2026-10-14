@@ -126,19 +126,24 @@ def online_source_digest(cfg: dict, contract: dict, rows: list[dict], media_dir,
                 )
         regen = row["regen"]
         if "turns" in regen:
-            content.append(
-                {
-                    "turns": [
-                        {
-                            "prompt_ids": [int(token) for token in turn["prompt_ids"]],
-                            "answer_ids": [int(token) for token in turn["answer_ids"]],
-                        }
-                        for turn in regen["turns"]
-                    ],
-                    "full_ids": [int(token) for token in regen["full_ids"]],
-                    "image_sha256": image_hashes,
-                }
-            )
+            entry = {
+                "turns": [
+                    {
+                        "prompt_ids": [int(token) for token in turn["prompt_ids"]],
+                        "answer_ids": [int(token) for token in turn["answer_ids"]],
+                    }
+                    for turn in regen["turns"]
+                ],
+                "full_ids": [int(token) for token in regen["full_ids"]],
+                "image_sha256": image_hashes,
+            }
+            # Supervision protocol of multi-turn rows. Only rows that record a
+            # mode fold it in, so digests of legacy (mode-less, all-turn)
+            # artifacts stay byte-identical; a regenerated row under a different
+            # mode can never silently pass an exact-resume gate.
+            if regen.get("mode") is not None:
+                entry["multi_turn_mode"] = str(regen["mode"])
+            content.append(entry)
         else:
             content.append(
                 {

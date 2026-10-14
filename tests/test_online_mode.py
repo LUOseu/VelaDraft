@@ -979,6 +979,32 @@ def test_online_digest_records_online_batch_size(monkeypatch, tmp_path):
     assert batched.summary()["online_batch_size"] == 3
 
 
+def test_online_digest_covers_multi_turn_mode(monkeypatch, tmp_path):
+    """R3: switching the recorded multi-turn mode must change the data digest."""
+    _install_stub_extraction(monkeypatch, [])
+    run_dir = _write_online_run_dir(tmp_path)
+    payload = read_jsonl(run_dir / "regen" / "target_data.jsonl")
+    payload[1]["regen"] = {
+        "mode": "last_turn_only",
+        "assistant_indices": [3],
+        "turns": [{"prompt_ids": [11, 12, 13], "answer_ids": [21, 22]}],
+        "full_ids": [11, 12, 13, 21, 22],
+        "answer_spans": [[3, 5]],
+    }
+    write_jsonl(run_dir / "regen" / "target_data.jsonl", payload)
+    last_turn_only = _stub_source(monkeypatch, run_dir).digest()
+    payload[1]["regen"]["mode"] = "all_turns"
+    write_jsonl(run_dir / "regen" / "target_data.jsonl", payload)
+    all_turns = _stub_source(monkeypatch, run_dir).digest()
+    assert all_turns != last_turn_only
+    # Legacy records without a mode stay byte-identical to the pre-R3 scheme
+    # (dropping the field changes the digest again, it is not silently equal).
+    payload[1]["regen"].pop("mode")
+    write_jsonl(run_dir / "regen" / "target_data.jsonl", payload)
+    legacy = _stub_source(monkeypatch, run_dir).digest()
+    assert legacy != last_turn_only and legacy != all_turns
+
+
 def test_online_digest_v2_covers_token_values_and_image_bytes(monkeypatch, tmp_path):
     """Equal-length token edits and same-size image swaps must change the digest."""
     _install_stub_extraction(monkeypatch, [])
