@@ -85,6 +85,7 @@
 - 2026-10-14 23:47 — **事故 #4（D1×D2 同卡 + D1 被终止）**：D1 的 W1 store 构建（23:45:27 起，GPU3，quiet 自检通过）于 **23:47:01 被外部 SIGTERM**（exit=143；`w1_launch.log`="Terminated"；非 OOM）；D2 `ab_dedup1` 臂约 23:46:2x 启动于**同卡**（ckpt_init 23:47:07，23:47:38 完成）。**SIGTERM 来源未证**（两方均需在 EXPERIMENTS 记时序；C0 不做归属判定）。D1 部分产物：`d1_w1_probe/features` 780MB（capture 24 样本后、train 步中途被杀）。
 - 2026-10-14 23:48 — D2 A/B 步级两臂完成：`ab_base1` 23:44 / `ab_dedup1` 23:47；`fwd_median 186.0→175.7ms`（**-5.5%**）、`bwd_median 10.7→9.4ms`；losses 前 3 步一致、其后容差漂移（原始数字记录，解释与门槛对照归 D2；mb=4 探针，非整步）。
 - 2026-10-14 23:49 — **磁盘危机**：`/home` free=**5.0G**（低于所有守卫阈值）；可回收块 = D2 `runs/` 五目录 ckpt 合计 **~22.9GB**（base/dedup/smoke/base/prof 各 4.1–4.6GB）。D1 W2/W3 与任何重启被堵；已要求 D2 立即 prune（保留 log/summary/json/features，删 `train/ckpt_*.pt`）。
+- 2026-10-14 23:51 — GPU3 被外部 dhz 新任务占用（13.75GB，运行中）→ 程序可用卡仅 **GPU2**（GPU0/1=xs、GPU3=dhz）。D1 重启/D2 后续按 GPU2 实测排队。
 
 ## 7. 请求与应答（C0）
 

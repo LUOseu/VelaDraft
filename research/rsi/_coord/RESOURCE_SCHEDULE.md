@@ -75,6 +75,7 @@
 - 2026-10-14 23:50 — D2 基线臂完成（23:44），GPU3 释放。**`/home` 降至 11G free**：D2 `runs/` 14GB（新臂 ab_base1 4.6GB + probe_js_prof 4.6GB + 其他），已要求逐臂清理后再开下一臂；D1 store 构建（1.2–2GB/个）开跑前须确认 >10G。GPU2/GPU3 空闲；origin/main 复核 = `7eab136`（BASE 无漂移）。
 - 2026-10-14 23:47 — **事故 #4**：D1 W1 构建（23:45:27 GPU3）与 D2 `ab_dedup1`（~23:46:2x GPU3）同卡 → D1 于 23:47:01 被外部 SIGTERM（exit=143，来源未证）；D2 臂 23:47:38 完成。GPU3 随后空闲；GPU0/1 外部 xs。
 - 2026-10-14 23:49 — **磁盘危机：free=5.0G**（D2 五目录 ckpt ~22.9GB 为可回收主体；D1 W2/W3 与重启全部被堵）。待 D2 prune 或用户清理后恢复放行；GPU2/3 空闲待命。
+- 2026-10-14 23:51 — **GPU3 被外部 dhz 占用**（新任务 `reproduction...racer_asymmetric_readout12`，13.75GB/运行中）→ 程序可用卡仅 **GPU2**；GPU0/1 仍为外部 xs。磁盘 5.0G（未变）。D1 重启与 D2 后续一律以 GPU2 为准（开跑前实测）。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
