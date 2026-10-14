@@ -49,6 +49,7 @@
 |---|---|---|---|---|
 | L-W1-D5 | D5 | 任一实测 quiet 卡（开跑前实测 util≈0%、>40GiB free；同一时刻只允许 D5 一个任务） | 2026-10-14 23:12 → wave 1 结束或他人占用出现 | 单卡 provisional ≤1.0 GPU-h；23:11 实际使用 GPU1（当时 4.8GB/2%，满足 quiet 条件） |
 | L-W1-open | D1/D2/D3/D4 | 任一实测空闲卡（D1≥D2≥D3/D4 优先顺序由任务到达决定；同卡不并发重负载） | 同上 | 各角色 wave 1 上限见上表 |
+| L-W1-D5R | D5 | **GPU3（23:22 实测空闲 18MiB/0%）**；开跑前照常实测；单任务独占 | 2026-10-14 23:22 → 重跑链完成或 GPU3 被外部重新占用 | regen b8/b16/b32 重跑（计入 W1-D5 ≤1.0 GPU-h 上限）；**完成后 GPU3 优先让给 D1**（L-W1-D1） |
 | L-W2-G2 | 通过门槛者 | 2×A6000 同时空闲 ≥3–4h 窗口 | **UNCONFIRMED**（GPU1/3 被占） | wave 2 由 C0 复核证据后发布 |
 
 ### 观察记录（C0 只读，未独立复核）
@@ -58,6 +59,7 @@
 - 2026-10-14 23:18 — GPU1 = D5（10.4GB）+ **D2（27GB，并发，未登记租约）**；GPU0 = 外部 xs（14.9GB）+ D2（264MiB）；GPU2 空闲；GPU3 外部。重负载定义：alloc > 4GB 或 util > 50%；同卡禁止两个未声明的重负载任务。受影响的计时标 `contended`。
 - **23:19 事故（D5×D2 共卡）**：D5 的 regen 批量 probe（GPU1，CUDA_VISIBLE_DEVICES=1）b8 腿 **OOM 失败**（`torch.OutOfMemoryError ... Process 3313721 has 26.36 GiB in use`，即 D2 同卡）；b8 exit=1；b16 于 23:18:47 启动后进程无退出记录消失（日志止于权重加载）。**处理：b8 作废（contended/OOM）；b16 按未完成处理；整链需独占卡重跑；失败 run 计入 GPU-hours、不计入有效结果。**
 - 2026-10-14 23:21（当前占用）：GPU0 = 外部 xs（15.8GB，98%）；**GPU1 = D2 新 run（显式 `--device cuda:1`，pid 3331562）**；**GPU2 = D4 W1 legs（screen `d4w1`，cache-off 腿 `s2b/off`，启动前 quiet 自检通过）**；GPU3 = 外部 dongzp（44.3GB，99%）。`/home` 19GB free（较 23:14 的 29G 明显下降，注意 prune）。D5 重跑需等独占卡。
+- 2026-10-14 23:22 — **GPU3 空闲**（外部任务结束，18MiB/0%）；GPU1 = D2 probe（31.4GB/100%）；GPU2 = D4 leg（8.0GB，加载/运行中）；GPU0 = 外部 xs（97%）。`/home` 24GB free。**发布 L-W1-D5R：GPU3 给 D5 重跑**（完成后优先让给 D1）。更正早前记录：GPU3 外部用户为 **lrz**（sglang-spec，进程路径 `/home/lrz/...`），此前误记为 dongzp。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 

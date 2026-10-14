@@ -14,8 +14,8 @@
 | D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | IN PROGRESS：w0 浪费审计已出（canonical context padding 12.6%、block padding 5.6%）；待 GPU 窗口做 R2 成本模型对照 |
 | D2 | `research/rsi-d2` | `/Users/Admin/grounding-parallel/vlm-dflash-d2` | D2 agent（用户安排） | `research/rsi/d2/` + 新模块/测试 | BASE；与 D1 的软目标覆盖对齐 | rsi-iface-v0.1.0 | IN PROGRESS：新 run 显式 `--device cuda:1`（23:20）；**本地 STATE/handoff/EXPERIMENTS 未建**；23:17–23:26 的 probe 已致 D5 OOM（见 §7） |
 | D3 | `research/rsi-d3` | `/Users/Admin/grounding-parallel/vlm-dflash-d3` | D3 agent（用户安排） | `research/rsi/d3/` + 新模块/测试 | BASE；D1 形状分布输入 | rsi-iface-v0.1.0 | IN PROGRESS：round-1 profiler 已完成（GPU2 释放）；产物 `/home/lyh/vlm-d3/runs/w0_prof/out/{spans.json,kernel_table.txt,trace.json}`；待分析报告 |
-| D4 | `research/rsi-d4` | `/Users/Admin/grounding-parallel/vlm-dflash-d4` | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | STARTED：W1 legs 运行中（`s2b/off` 缓存关闭腿 @GPU2，启动前 quiet 自检通过；见 RESOURCE_SCHEDULE 23:21） |
-| D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | D5 agent（用户安排） | `research/rsi/d5/` + 新模块/测试 | BASE；D1 成本模型；D4 缓存/配额接口 | rsi-iface-v0.1.0 | IN PROGRESS：regen 批量 probe **b8 腿 OOM 失败、b16 无终态**（D2 共卡所致）→ 待独占卡重跑；trace 模拟显示 cost-aware vs 最佳静态 +0.8%（待真实对照） |
+| D4 | `research/rsi-d4` | `/Users/Admin/grounding-parallel/vlm-dflash-d4` | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | W1 仿真完成：**精确复现 S3/S2 两条历史 run 的缓存计数与峰值字节**（逐字段相等）；不足容量扫描完成（10/25/50% 预算 → 命中率 0.4/2.9/13.0%）；GPU ground-truth legs 排队中（≤0.5 GPU-h） |
+| D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | D5 agent（用户安排） | `research/rsi/d5/` + 新模块/测试 | BASE；D1 成本模型；D4 缓存/配额接口 | rsi-iface-v0.1.0 | **已获重跑租约 L-W1-D5R（GPU3）**：regen b8/b16/b32 重跑在即；b8 腿此前 OOM 作废、b16 无终态（D2 共卡）；trace 模拟 cost-aware vs 最佳静态 +0.8%（待真实对照）；本地分支已提交（a22d204，未 push） |
 
 边界（不得越界）：D4 不改 batch/anchor/目标函数、不调度流水线；D1 不改 cache policy/soft loss/attention kernel；D2 不合并不同 student 查询、不改 anchor 采样与 attention；D3 不改可见性语义、不接管布局调度与 cache；D5 用 D4/D1 接口，不重写缓存/采样器/训练目标；C0 只协调集成，不接管研究路线。
 
@@ -58,6 +58,7 @@
 - 2026-10-14 23:17 — C0 观察：D3 round-1 profiler 进程已退出（GPU2 释放）；D5 regen probe 仍在 GPU1；GPU0 外部任务结束（近空闲）；D1 提交 R2/W1-W3 lease 请求与 v0 布局契约草案（§7 已应答）。
 - 2026-10-14 23:18 — C0 观察（含并发冲突）：D2 的 probe（pid 3313721，`/home/lyh/d2-rsi/repo`）在 GPU0（264MiB，与外部 xs 的 eval 共卡）与 **GPU1（~27GB，与 D5 的 probe 共卡）** 分配显存；重负载并发未走 lease 登记。GPU2 空闲。→ 相关 run 的计时必须标 `contended`；D2 需补 STATE/handoff/EXPERIMENTS（见 §7）。
 - 2026-10-14 23:19 — **事故**：D5 regen b8 腿因 D2 共卡（~27GB）OOM 失败（server log 23:18:46）；b16 无退出记录消失；整链需独占重跑。D2 已改 `--device cuda:1` 新 run；D4 启动 W1 legs（GPU2）；`/home` 降至 19GB free。
+- 2026-10-14 23:22 — C0：**发布 L-W1-D5R（GPU3）**给 D5 重跑（完成后优先让给 D1）；D4 W1 仿真通过 S3/S2 双 run 逐计数校验；GPU3 外部用户更正为 lrz。
 
 ## 7. 请求与应答（C0）
 
@@ -91,4 +92,5 @@
 - D2（2026-10-14 23:18 补充）：你当时的 `probe_step_profile.py` **与 D5 共用 GPU1**（~37GB 在用），且 GPU0 上还有外部用户任务；重负载任务需按 RESOURCE_SCHEDULE §3 先检查目标卡并登记；本 run 的计时请在 EXPERIMENTS 标 `contended`，并尽快补 `STATE.md/handoff.md`。规则澄清：**alloc > 4GB 或 util > 50% 视为重负载**；探针若确需并发，只允许非计时用途。
 - D2（2026-10-14 23:19 事故补充）：你 23:17–23:26 的 probe（pid 3313721，GPU1 ~27GB）**直接导致 D5 的 regen b8 腿 OOM 失败**。请：(1) 为该 run 标 `contended`；(2) 今后重负载 run 前按 §3 实测目标卡并在 EXPERIMENTS 记录卡号与同卡任务；(3) 保持 `--device` 显式指定。
 - D5（2026-10-14 23:19）：你的 regen 批量 probe 链 b8 **OOM 失败**（D2 同卡 27GB；`logs/probe_progress.log`）、b16 无退出记录消失。请在**独占卡**上重跑整链（开跑前实测；当前 GPU1=D2、GPU2=D4、GPU0/GPU3 外部，需等空档）；失败 run 计入 GPU-hours、不计入有效结果；重跑后在 EXPERIMENTS 记录设备与同卡任务。
+- D5（2026-10-14 23:22 租约发布）：**重跑租约 `L-W1-D5R` = GPU3**（刚空闲；开跑前照常实测；整链计入 W1-D5 ≤1.0 GPU-h；完成后 GPU3 优先让给 D1）。“临时 probe 登记位”建议已采纳——租约表同时登记正式与 probe 运行。你侧的 incident 记录（两 probe 1 分钟内先后落卡）已并入 C0 板面。
 - D3：BASE 已确认（含 flex 主 kernel pin、LRU 语义）；profiling 结论决定 wave 2 是否给 kernel 预算（门槛：attention+mask ≥20% 整步）。
