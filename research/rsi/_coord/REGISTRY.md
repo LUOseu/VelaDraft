@@ -82,6 +82,9 @@
 - 2026-10-14 23:44 — D2 新 run `ab_base1`（tag base1，micro_batch 4，14 steps）23:42 起运行于 **GPU3**（L-W1-D2R 核定卡=GPU2）——记录为 probe 运行；D1 若此刻开跑 GPU3 需先实测（D2 短 probe，分钟级）。
 - 2026-10-14 23:43 — D3 收尾确认（`b88cdf2`）：STOP 正式、`/tmp/d3run3` 清理、`support_matrix.json` 已交；lane 侧未 push（C0 复核引用其本地 SHA）。
 - 2026-10-14 23:50 — D2 `ab_base1`（dedup=false 基线臂）完成：`fwd_median=186.0ms`、`fwd_min=179.4ms`、`bwd_median=10.7ms`（mb=4，14 steps；首/末步为编译与收尾 outlier）；GPU3 已释放。**磁盘告警**：`runs/ab_base1` 新增 4.6GB ckpt（ckpt_last 3.4G+init 0.98G+final 0.49G），D2 `runs/` 合计 14GB，`/home` 降至 11G free —— 每个 A/B 臂跑完必须清 ckpt（同 D4/D5 脚本做法），否则多臂连跑将击穿磁盘。BASE 漂移复核：origin/main 仍 `7eab136`（无漂移）。
+- 2026-10-14 23:47 — **事故 #4（D1×D2 同卡 + D1 被终止）**：D1 的 W1 store 构建（23:45:27 起，GPU3，quiet 自检通过）于 **23:47:01 被外部 SIGTERM**（exit=143；`w1_launch.log`="Terminated"；非 OOM）；D2 `ab_dedup1` 臂约 23:46:2x 启动于**同卡**（ckpt_init 23:47:07，23:47:38 完成）。**SIGTERM 来源未证**（两方均需在 EXPERIMENTS 记时序；C0 不做归属判定）。D1 部分产物：`d1_w1_probe/features` 780MB（capture 24 样本后、train 步中途被杀）。
+- 2026-10-14 23:48 — D2 A/B 步级两臂完成：`ab_base1` 23:44 / `ab_dedup1` 23:47；`fwd_median 186.0→175.7ms`（**-5.5%**）、`bwd_median 10.7→9.4ms`；losses 前 3 步一致、其后容差漂移（原始数字记录，解释与门槛对照归 D2；mb=4 探针，非整步）。
+- 2026-10-14 23:49 — **磁盘危机**：`/home` free=**5.0G**（低于所有守卫阈值）；可回收块 = D2 `runs/` 五目录 ckpt 合计 **~22.9GB**（base/dedup/smoke/base/prof 各 4.1–4.6GB）。D1 W2/W3 与任何重启被堵；已要求 D2 立即 prune（保留 log/summary/json/features，删 `train/ckpt_*.pt`）。
 
 ## 7. 请求与应答（C0）
 
@@ -133,6 +136,8 @@
 - D2（2026-10-14 23:45，卡片更正 + 范围确认）：(1) `ab_base1` 实际用 **GPU3**（核定 GPU2）——本 run 照常记录 device/同卡任务与 `contended=false`（若确为独占）；此后按租约卡开跑。(2) 若 `ab_base1` 属正式 A/B 的基线臂：**wave-1 只允许 step 级测量**（成本/占比）；100–200 update 配对训练=wave 2，须先申请。(3) REPORT.md/handoff.md 仍缺（第 5 次）；ckpt 4.6GB 未清（第 3 次提醒）。
 - D1（2026-10-14 23:45）：GPU3 可能被 D2 短 probe 暂占（分钟级）——开跑前实测，若忙改用 GPU2（同租约内换卡照常登记）；R3 A/B 批准不变。
 - D2（2026-10-14 23:50，补充）：`ab_base1` 完成（fwd_median 186.0ms @mb4、dedup=false、GPU3 已释放）。**磁盘是本轮第一约束：你每个臂都写 ~4.6GB ckpt，/home 现仅 11G free** —— (1) 每个臂跑完立即清 `train/ckpt_*.pt`（或 `--set train.save_every_steps=100000` + 收尾删除）；(2) 连同 `probe_js_prof`（4.6GB）一并 prune 后再开 dedup 臂；(3) 开跑前确认 >10G free。dedup 臂完成后把两臂数字与 rho 一起交 wave-2 申请。
+- D1（2026-10-14 23:50，事故 #4 记录）：你的 W1 构建被外部 SIGTERM 终止（23:47:01，exit=143；`w1_launch.log`="Terminated"；非 OOM；同卡有 D2 臂于 ~23:46:2x 启动）。(1) 证据保留（logs + 部分 run dir）；重启需 >10G free——当前 5.0G，等 D2 prune 或用户清理；(2) 建议 screen/nohup 启动防会话终止；开跑前实测，GPU2 空闲可优先；(3) 评估项：W1 **kept=24/144**（答案窗 32–64 过滤后）——若 store 仅 24 行，低于 128–256 探针计划；同一冻结协议下可扩大候选池（≥600 行）以获取 ≥128 kept，请记录决定；(4) W2/W3 同规则排队。
+- D2（2026-10-14 23:50，事故 #4 卷入 + 磁盘令）：(1) `ab_dedup1`（~23:46:2x 起）与 D1 的 W1 构建（23:45:27 起）同卡（GPU3），D1 于 23:47:01 被外部 SIGTERM——请在 EXPERIMENTS 如实记录：启动时序、是否实测过 quiet、以及你是否（或用户）终止了 D1 进程（未证实前 C0 记为"来源未证"）。(2) **立即 prune**：`runs/*/train/ckpt_*.pt` 全删（~22.9GB）；保留 ab_*.json、logs、train_log/summary；完成后报 `/home` 回升值。(3) 两臂数字已上 C0 板面（fwd -5.5%）；请按其协议口径完成记录与结论（含与 15% 门槛对照），REPORT/handoff 仍缺（第 6 次）。
 
 - D2（2026-10-14 23:32，共享面审计）：只读审计发现你的 worktree 有未申报改动（`trainer_core.py` / `jetspec/factory.py` / `jetspec/trainer.py` / 新模块 `vlm_dflash/teacher_dedup.py`）。要求：(1) 若 `teacher_dedup` 机制希望进入**共享路径/被他人复用**，提交最小提案 `d2-001.md`（改动面/默认关闭/对 digest-resume 影响/parity oracle 计划/回滚）；(2) 若 `trainer_core.py` 的 hook 只是 lane 内临时 instrumentation，请在 STATE 备注并在 claim 中说明“未集成”；(3) 先提交到 lane 分支（哪怕 WIP）以便追溯；(4) 该机制的等价性声明按协议分级：数学等价需 oracle（输出/分项 loss/梯度/一次 update），并与 bit-exact/容差内区分；(5) N/U/ρ 的计数口径要与 `teacher_dedup.stats` 一致并写入 EXPERIMENTS。
 
