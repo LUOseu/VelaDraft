@@ -249,9 +249,10 @@ the env conventions of the target configs (`VLM_DFLASH_TARGET`, plus
   `git log --oneline 950b394..HEAD` lists (oldest first) `7cc9e5b` (R1),
   `47b0075` (R4), `c2d98e5` (R3), `7038c56` (R2), `7a44301` (R5),
   `b3730d7` (R6), `d9a202c` (traceability + GPU_PENDING), `3beafcf`
-  (README), `5db73c7` (DFly docs), plus this status-label/command update
-  (the branch tip). Baseline `950b394` is untouched; `main` history was
-  never rewritten.
+  (README), `5db73c7` (DFly docs), `f904953` (status labels + GPU commands),
+  `7e89240` (hf-reader tests + ledger open items; `git log -1` on
+  `review-remediation` gives the exact tip). Baseline `950b394` is
+  untouched; `main` history was never rewritten.
 - CPU regression: `pytest -o addopts="" -q` on this branch =
   **413 passed, 6 skipped** (411 at first pass + the two final-audit hf-reader
   tests; skips: `tests/test_contract_integration.py`
