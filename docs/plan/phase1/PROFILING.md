@@ -122,8 +122,10 @@ mode the checkpoint set is identical; the store does not exist.
 ## 7. What this profiling does not cover (register, do not assume)
 
 1. **Length-bucketed teacher timing** (vision pixels vs text tokens vs
-   finalisation split): needs `scripts/profile_online_extraction.py` runs at
-   3-4 pinned lengths on the real target. GPU_PENDING (unbudgeted).
+   finalisation split): the profiler's `--length-buckets` per-row mode now
+   provides the per-bucket attribution (CPU-tested, 2026-10-14); the runs at
+   2-3 pinned lengths on the real target are GPU_PENDING #6 in
+   `REVIEW_REMEDIATION.md`.
 2. **Paired online/offline extraction re-timing under the unified R2
    boundary**: registered as GPU_PENDING #2 in `REVIEW_REMEDIATION.md`.
 3. **Checkpoint write wall** (not just bytes): no write timing was recorded;

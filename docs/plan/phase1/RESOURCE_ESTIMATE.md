@@ -30,10 +30,13 @@ and first-call kernel compile. "GPU-h" = allocation x wall.
 | 4 | Same-engine first-divergence diagnosis inside vLLM (#4) | 0.3-0.6 | R-14..16 checked 0.55 for the whole bridge program |
 | 5 | `train_recipe: upstream_dspark` GPU smoke (new, this phase) | 0.2-0.4 | one short recipe run on the reused store + export; mirrors R-01 scale |
 | 6 | Length-bucketed profiling (vision vs text vs finalisation split, `PROFILING.md` §7) | 0.15-0.25 | one profiling pass per length bucket on the smoke slice |
-| | **Total** | **1.3-2.35** | fits the 3.90 remaining with reserve |
+| 7 | Second training seed for the 2K recipe (`train.seed=43`; P4 "seed 波动" / G4) | 0.9-1.4 | E4 legs: main loop 25-44 min (sanity off) + eval ~31 min |
+| | **Total** | **2.2-3.75** | fits the 3.90 remaining; little reserve, and the ledger is shared with the concurrent session - re-read it before launching |
 
-Explicitly excluded from this table: any multi-seed quality matrix - that is
-phase-2 scope and requires the §6 gate (below).
+Explicitly excluded from this table: any multi-seed **quality matrix** (the
+§7 formal scope). Item 7 is the single small-seed repeat the pilot itself
+needs for its "seed 波动" deliverable and the §6.1 learning-effectiveness
+gate; it is not the formal matrix.
 
 ## Phase-2 estimate if the §6 gate is ever approved (NOT requested here)
 

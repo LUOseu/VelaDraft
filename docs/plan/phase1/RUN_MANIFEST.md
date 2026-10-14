@@ -31,7 +31,7 @@ is CPU tests and docs.
 | Per-method training-signal declarations | `TrainingSignals` on `AlgorithmMetadata` + generated doc + drift test | commit `64cef1d`; `docs/TRAINING_SIGNALS.md`, `scripts/render_training_signals.py` |
 | Multimodal supervision representation | design note + 9 new tests (mask/input invariance, loss/grad connection, late-image rejection, exact resume, export round-trip) | commit `b5691e5`; `tests/test_multimodal_supervision.py`, `docs/plan/WP2_DESIGN.md` |
 | Export records visual conditioning | `visual_conditioning` block + model-card line | commit `b5691e5`; `vlm_dflash/export/hf.py` |
-| Full CPU regression | 443 passed / 6 skipped (`pytest -o addopts="" -q`) | local run 2026-10-14, this worktree |
+| Full CPU regression | 453 passed / 6 skipped (`pytest -o addopts="" -q`; 443 at the `191da28` package commit, +10 length-bucket profiler tests) | local run 2026-10-14, this worktree |
 | Competitive audit | pinned findings for 5 upstream projects | `COMPETITIVE_AUDIT.md` |
 | Profiling + cache decision | cost shares and plan comparison on recorded numbers | `PROFILING.md`, `CACHE_DECISION.md` |
 

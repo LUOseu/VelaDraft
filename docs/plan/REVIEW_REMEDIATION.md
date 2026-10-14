@@ -268,6 +268,45 @@ the env conventions of the target configs (`VLM_DFLASH_TARGET`, plus
    metadata carries the recipe. Optional: 4-prompt `demo --drafter` reload
    token-exact. Estimate 0.2-0.4 GPU-h (`docs/plan/phase1/RESOURCE_ESTIMATE.md`).
 
+6. **Length-bucketed online profiling** (route-document §6 P2 gap;
+   `docs/plan/phase1/PROFILING.md` §7): per-row render/forward attribution
+   across pinned token-length buckets on the real target. The profiler's
+   `--length-buckets` mode (added 2026-10-14, CPU-tested) provides it; the
+   per-row mode is O(rows) single-sample passes, so pin a `--limit`.
+
+   ```bash
+   VLM_DFLASH_TARGET=<Qwen2.5-VL-3B dir> \
+     python scripts/profile_online_extraction.py \
+       --config configs/smoke_multiturn.yaml --run-dir runs/e2/smoke_multiturn \
+       --length-buckets 512,1024 --render-repeats 2 --forward-repeats 3
+   ```
+
+   Record: per-bucket median render/forward ms and forward-ms-per-token; the
+   batch-group numbers in the same report remain the trainer-facing view.
+   Estimate 0.15-0.25 GPU-h.
+
+7. **Second training seed for the 2K recipe** (route-document §6 P4 "seed
+   波动" / §6.1 learning-effectiveness gate): rerun the canonical E4 protocol
+   (`R-20261014-11`) with `train.seed=43` on the same store and data; train +
+   the standard 128-prompt eval including the init control. This is the small
+   seed repeat, not the §7 formal matrix. Mirror the recorded E4 invocation
+   chain (`~/recipe-smoke-config/e4_train.log` on the GPU host).
+
+   ```bash
+   VLM_DFLASH_TARGET=<Qwen2.5-VL-3B dir> \
+     python -m vlm_dflash.cli train \
+       --config configs/dfly/qwen2_5_vl_3b_2k_recipe_matched.yaml \
+       --features ~/vlm-dflash/runs/qwen25vl3b_jetspec_2k/features \
+       --set train.seed=43 --set train.overfit_sanity.enabled=false \
+       --run-dir runs/dfly/recipe_seed43
+   python -m vlm_dflash.cli eval runs/dfly/recipe_seed43 \
+     --config configs/dfly/qwen2_5_vl_3b_2k_recipe_matched.yaml
+   ```
+
+   Pass criteria: `nan_seen=false`; eval reports both checkpoints token-exact
+   and `ckpt_final` AL clearly above `ckpt_init` AL (seed 42: 1.839 vs
+   1.003). Estimate 0.9-1.4 GPU-h (E4 train minus sanity + eval legs).
+
 ## Delivery checklist (review section 6)
 
 - Per-R commits, change descriptions and test evidence: table above.

@@ -22,8 +22,9 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   note + invariants (`b5691e5`) - plus the self-contained package
   `docs/plan/phase1/` (report, claim ledger, run manifest, resource
   estimate, profiling, cache decision, competitive audit, GO_NO_GO). CPU
-  regression 443 passed / 6 skipped. Verdict there: **NO-GO for the formal
-  matrix / big-compute request**; the bounded pending list (1.3-2.35 GPU-h)
+  regression 453 passed / 6 skipped. Verdict there: **NO-GO for the formal
+  matrix / big-compute request**; the bounded pending list (2.2-3.75 GPU-h,
+  incl. the #7 second seed and the CPU-tested length-bucket profiler mode)
   is the recommended next spend. Start with
   `docs/plan/phase1/LOCAL_PILOT_REPORT.md`.
 - **Review remediation round (2026-10-14, branch `review-remediation` off

@@ -12,8 +12,8 @@ design note + invariants (`b5691e5`), and the self-contained deliverable
 package `docs/plan/phase1/` - LOCAL_PILOT_REPORT (start there), CLAIM_EVIDENCE
 (P1-P9), RUN_MANIFEST, RESOURCE_ESTIMATE, PROFILING, CACHE_DECISION,
 COMPETITIVE_AUDIT, GO_NO_GO. Its verdict: NO-GO for the formal training
-matrix / big-compute request; the bounded pending list (1.3-2.35 GPU-h,
-`REVIEW_REMEDIATION.md` GPU_PENDING) is the recommended next spend.
+matrix / big-compute request; the bounded pending list (2.2-3.75 GPU-h,
+`REVIEW_REMEDIATION.md` GPU_PENDING #1-#7) is the recommended next spend.
 
 ## Capability gap table (verified against the worktree on 2026-10-14)
 

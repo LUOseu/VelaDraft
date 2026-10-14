@@ -71,6 +71,11 @@
   COMPETITIVE_AUDIT and GO_NO_GO (verdict: NO-GO for the formal
   matrix / big-compute request; the bounded pending list is the
   recommended next spend).
+- The online-extraction profiler gains a `--length-buckets` per-row mode
+  (median render/forward per token-length bucket, plus
+  `forward_ms_per_token`), CPU-tested; the P2 length-distribution
+  measurement and the second-seed learning repeat are registered as
+  GPU_PENDING #6/#7 in `docs/plan/REVIEW_REMEDIATION.md`.
 
 ### DSpark faithful objective (`train_recipe: upstream_dspark`)
 

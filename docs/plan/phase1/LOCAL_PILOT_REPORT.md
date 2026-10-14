@@ -37,7 +37,8 @@ relative path.
 | 7 | LOCAL_PILOT_REPORT / CLAIM_EVIDENCE / RUN_MANIFEST / RESOURCE_ESTIMATE / GO_NO_GO, self-contained | This directory | `LOCAL_PILOT_REPORT.md`, `CLAIM_EVIDENCE.md`, `RUN_MANIFEST.md`, `RESOURCE_ESTIMATE.md`, `GO_NO_GO.md` |
 | (constraint) | Competitive audit of SpecForge / Speculators / AngelSpec / NeMo Automodel / TIDE | Delivered with pinned commits and file-level evidence | `COMPETITIVE_AUDIT.md` |
 
-CPU regression on this branch: **443 passed / 6 skipped** (baseline before
+CPU regression on this branch: **453 passed / 6 skipped** (443 at the
+`191da28` package commit, +10 length-bucket profiler tests; baseline before
 this phase: 434/6).
 
 ## The four-way classification (route §15 final-reporting rule)
@@ -68,8 +69,9 @@ this phase: 434/6).
 
 **待 GPU 验证 (registered, not run; commands in `../REVIEW_REMEDIATION.md`)**
 - Post-R3/R4 multi-image re-check (#1), paired online re-timing (#2),
-  SmolVLM export closure (#3), same-engine vLLM diagnosis (#4), and the new
-  `upstream_dspark` GPU smoke (#5). Estimated 1.3-2.35 GPU-h total
+  SmolVLM export closure (#3), same-engine vLLM diagnosis (#4), the new
+  `upstream_dspark` GPU smoke (#5), length-bucketed profiling (#6) and the
+  second recipe seed (#7). Estimated 2.2-3.75 GPU-h total
   (`RESOURCE_ESTIMATE.md`).
 
 **Technical hypotheses (stated, not evidenced)**
@@ -86,9 +88,10 @@ this phase: 434/6).
 
 ## What phase-2 should do first (if and when GO)
 
-1. Clear the five registered pending GPU items (bounded, 1.3-2.35 GPU-h) - in
-   particular #2 (paired timing) and #5 (DSpark smoke), because both feed the
-   §6.1 execution-benefit and faithfulness gates.
+1. Clear the registered pending GPU items (bounded, 2.2-3.75 GPU-h) - in
+   particular #2 (paired timing), #5 (DSpark smoke) and #7 (second seed),
+   because they feed the §6.1 execution-benefit, faithfulness and
+   learning-effectiveness gates.
 2. Re-run the competitive audit re-pins before writing any comparison table.
 3. Only then evaluate the §6.1 gate again (`GO_NO_GO.md`) before any
    multi-seed or multi-node request.
