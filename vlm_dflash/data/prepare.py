@@ -38,6 +38,8 @@ from ..utils import (
 
 
 def _iter_llava_instruct(cfg: dict) -> list[dict]:
+    from .schema import check_v1_question_layout
+
     dataset = cfg["dataset"]
     annotation = Path(dataset["annotation"])
     images_dir = Path(dataset["images_dir"])
@@ -52,6 +54,7 @@ def _iter_llava_instruct(cfg: dict) -> list[dict]:
         question, answer = conversations[0].get("value", ""), conversations[1].get("value", "")
         if "<image>" not in question:
             continue
+        check_v1_question_layout(question, context=f"llava_instruct row {row.get('id', src_index)!r}")
         image_name = row.get("image")
         if not isinstance(image_name, str) or not image_name:
             continue
@@ -165,10 +168,14 @@ def _iter_hf(cfg: dict) -> list[dict]:
 
     question_col = hf.get("question_col", "question")
     answer_col = hf.get("answer_col", "answer")
+    from .schema import check_v1_question_layout
+
     for src_index, row in enumerate(ds):
         question, answer = str(row[question_col]), str(row[answer_col])
         if "<image>" not in question:
             question = "<image>\n" + question
+        else:
+            check_v1_question_layout(question, context=f"hf row {src_index}")
         if len(answer) < min_chars:
             continue
         image = row[image_col]

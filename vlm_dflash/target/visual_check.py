@@ -78,8 +78,11 @@ def run_visual_path_check(
                 if str(turn.get("from", "")).lower() in ("gpt", "assistant", "model")
             ]
             overrides = {msg_index: turn["answer_text"] for msg_index, turn in zip(assistant_indices, turns)}
-            messages, _ = messages_from_row(row, assistant_overrides=overrides)
-            inputs = encode_conversation(processor, messages, list(images))
+            messages, image_indices = messages_from_row(row, assistant_overrides=overrides)
+            # ``images`` arrives in row order; the processor consumes them in
+            # the conversation's appearance order (R4: interleaved rows may
+            # place images in any order inside their turns).
+            inputs = encode_conversation(processor, messages, [images[position] for position in image_indices])
             full_ids = torch.tensor([int(token) for token in row["regen"]["full_ids"]], dtype=torch.long)
             return forward_and_capture(
                 model,
