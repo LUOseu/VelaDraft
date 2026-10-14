@@ -62,7 +62,7 @@
 
 | 路线 | wave-1 证据 | 门槛核验 | 当前判定 |
 |---|---|---|---|
-| D1 | 浪费审计（ctx pad 12.6%、block pad 6.0%）；R3-prereq oracle/流水线（**C0 独立复跑 ✓**：dloss 4.9e-7、grad_rel 1.7e-7）；W1 store 构建首跑被外部 SIGTERM（23:47，事故 #4）；重启待磁盘恢复 | 整步收益待测 | HOLD（等 W1/W2/W3 + R3 A/B + d1-001） |
+| D1 | 浪费审计（ctx pad 12.6%、block pad 6.0%）；R3-prereq oracle/流水线（**C0 独立复跑 ✓**：dloss 4.9e-7、grad_rel 1.7e-7）；R3 A/B harness 冒烟 ✓（3 臂跑通；dual peak 降至 12.5GB vs 18.9GB）；W1 store 首跑被外部 SIGTERM（事故 #4），重启待磁盘 | 整步收益待测 | HOLD（等 W1/W2/W3 + 正式 R3 A/B + d1-001） |
 | D2 | rho=6.83 真实切片（N≈7750/U≈1135；bs16→14.2）；13 项 CPU 正确性测试；步级两臂完成（fwd 186.0→175.7ms，-5.5%；mb=4 探针） | ρ≥2 ✓；步级占比 ~5–7%（待 D2 定论） | HOLD（磁盘/记录清理；与 15% 门槛对照后定 wave-2） |
 | D3 | trace + Amdahl：attention+mask=21.16ms/595.9ms=**3.55%**（cap +3.7% 步 / +1.4% online），**C0 核数 ✓** | ≥20% ✗（远未达） | **STOP**（kernel 轨；re-open 条件已登记） |
 | D4 | W1 五腿实测 counters 与仿真逐值一致（**C0 5/5 抽查 ✓**）；容量→命中曲线（off/10%/25%/50%/8MiB） | 相对 LRU/mmap 强基线的额外收益待评 | HOLD（等 harvest + d4-001） |
