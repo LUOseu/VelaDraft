@@ -3,19 +3,19 @@
 - 协议版本：**rsi-protocol-v0.1.0** ｜ 接口版本：**rsi-iface-v0.1.0**
 - 共同基线 BASE_SHA：`7eab1369266010137702de8c714053729cde5834`（origin/main，PR #6 合并后；含固定预算 LRU 记录缓存）
 - 历史核对基线 B0：`e15256d7c4bd10a490a7ac821eb12a0749a96fdd`
-- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-14 23:20 (Asia/Shanghai)
+- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-14 23:40 (Asia/Shanghai)
 - 无法确认的字段以 `?` 标注并在文末说明；未创建的 worktree/分支在下一次更新回填。
 
 ## 1. 角色与分支
 
-| 角色 | branch | worktree | 唯一主责 | 可改范围 | 状态 |
-|---|---|---|---|---|---|
-| C0 | `research/rsi-c0` | `/Users/Admin/grounding-parallel/veladraft-c0` | 协议、资源、共享接口、集成、复核 | `research/rsi/_coord/` + 经批准的共享入口集成 | ACTIVE：基线已冻结，v0.1.0 已发布 |
-| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | context/anchor 双轴组织、批内重排、ragged 布局 | `research/rsi/d1/` + 新模块/测试 | STARTED（worktree 已建 23:03，`research/rsi/` 未跟踪目录出现，内容未复核） |
-| D2 | `research/rsi-d2` | `/Users/Admin/grounding-parallel/vlm-dflash-d2` | 重叠监督 teacher 去重、对应流式 loss | `research/rsi/d2/` + 新模块/测试 | STARTED（23:03，工作树 clean） |
-| D3 | `research/rsi-d3` | `/Users/Admin/grounding-parallel/vlm-dflash-d3` | attention/mask profiling、元数据、必要的专用 kernel | `research/rsi/d3/` + 新模块/测试 | STARTED（23:04） |
-| D4 | `research/rsi-d4` | 建议 `/Users/Admin/grounding-parallel/vlm-dflash-d4`（?未建） | 冻结 raw feature 保留、固定 LRU、adaptive budget、消费侧 I/O | `research/rsi/d4/` + 新模块/测试 | PENDING（worktree 未建；固定 LRU 已在 BASE） |
-| D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | 固定总预算下生产者-消费者与成本调度 | `research/rsi/d5/` + 新模块/测试 | STARTED（23:05） |
+| 角色 | branch | worktree | 负责人 | 可改范围 | 依赖 | 接口版本 | 状态 |
+|---|---|---|---|---|---|---|---|
+| C0 | `research/rsi-c0` | `/Users/Admin/grounding-parallel/veladraft-c0` | C0 agent（本会话） | `research/rsi/_coord/` + 经批准的共享入口集成 | 五条路线输入；用户转发 | rsi-iface-v0.1.0 | ACTIVE：BASE 已冻结；v0.1.0 已发布（origin `research/rsi-c0`） |
+| D1 | `research/rsi-d1` | `/Users/Admin/grounding-parallel/vlm-dflash-d1` | D1 agent（用户安排） | `research/rsi/d1/` + 新模块/测试 | BASE；D4 feature/byte 接口（读取） | rsi-iface-v0.1.0 | IN PROGRESS：w0 浪费审计、anchor 回放测试、STATE 有内容（只读观察 23:35） |
+| D2 | `research/rsi-d2` | `/Users/Admin/grounding-parallel/vlm-dflash-d2` | D2 agent（用户安排） | `research/rsi/d2/` + 新模块/测试 | BASE；与 D1 的软目标覆盖对齐 | rsi-iface-v0.1.0 | IN PROGRESS：probe_rho.py 已出现（只读观察 23:35） |
+| D3 | `research/rsi-d3` | `/Users/Admin/grounding-parallel/vlm-dflash-d3` | D3 agent（用户安排） | `research/rsi/d3/` + 新模块/测试 | BASE；D1 形状分布输入 | rsi-iface-v0.1.0 | IN PROGRESS：mask/attention 审计与 profile 脚本已出现 |
+| D4 | `research/rsi-d4` | 建议 `/Users/Admin/grounding-parallel/vlm-dflash-d4`（?未建） | D4 agent（用户安排） | `research/rsi/d4/` + 新模块/测试 | BASE；D5 消费者需求的接口反馈 | rsi-iface-v0.1.0 | PENDING（worktree 未建；固定 LRU 已在 BASE）；D5 已留只读接口请求待 D4 应答 |
+| D5 | `research/rsi-d5` | `/Users/Admin/grounding-parallel/vlm-dflash-d5` | D5 agent（用户安排） | `research/rsi/d5/` + 新模块/测试 | BASE；D1 成本模型；D4 缓存/配额接口 | rsi-iface-v0.1.0 | IN PROGRESS：STATE/REPORT/EXPERIMENTS/handoff 已建；已向 C0 提 4 项请求（见 §7） |
 
 边界（不得越界）：D4 不改 batch/anchor/目标函数、不调度流水线；D1 不改 cache policy/soft loss/attention kernel；D2 不合并不同 student 查询、不改 anchor 采样与 attention；D3 不改可见性语义、不接管布局调度与 cache；D5 用 D4/D1 接口，不重写缓存/采样器/训练目标；C0 只协调集成，不接管研究路线。
 
@@ -52,3 +52,23 @@
 ## 6. BASE / 接口变更记录
 
 - 2026-10-14 23:20 — C0：冻结 BASE_SHA `7eab136`（科研前核查：六处 worktree 均 clean；review 四项问题核查结论见 INTEGRATION.md §1.1）。
+- 2026-10-14 23:25 — C0：发布 `research/rsi-c0` 至 origin（四个 coord 文档 + BASE 全测试证据；不涉及 main）。
+
+## 7. 请求与应答（C0）
+
+角色以 `handoff.md` 提问；C0 在此应答并同步到 RESOURCE_SCHEDULE/INTEGRATION。D 角色请定期 `git fetch origin research/rsi-c0` 或只读本目录。
+
+### 对 D5（2026-10-14 23:15 handoff）
+
+1. **BASE/协议/资源已发布**：BASE_SHA=`7eab136`（与你的 provisional 相同，正式结论无需换基线）；`rsi-protocol-v0.1.0`；`rsi-iface-v0.1.0`；资源表见 RESOURCE_SCHEDULE。
+2. **单卡 provisional 租约：批准**，上限由 0.5 提为 **≤1.0 GPU-h 单卡**（依据：你的 regen 批量 scaling probe 明确目的；正式四组×≥3 交替属 wave 2）。**2 卡隔离租约：UNCONFIRMED**——GPU1/3 当前被他人占用，需出现 2 卡同时空闲 ≥3–4h 的窗口才由 C0 发布；那之前 D5 只做单卡 trace/模拟，不得写成已验证的多 GPU 结论。
+3. **多进程 producer：原则同意，属 wave 2**；先交提案 `research/rsi/_coord/proposals/d5-001.md`（进程角色/设备、IPC 路径与字节、失败恢复、磁盘守卫、日志/产物归位），C0 接收后才实现。wave 1 不需要多进程；全部实现须落在 `research/rsi/d5/` 新模块 + 最小 CLI 包装，不改公共入口语义。
+4. **GPU-hours 口径：一致**——分配 GPU × wall（含等待），并单独报 total wall 与峰值。
+
+对 D4 的接口请求（miss/recompute 计数、占用/命中率读取、消费后可删判定钩子、`host_ram_budget_gb` 总配额）已登记；**D4 未启动**，C0 将其转达。在 D4 答复前，D5 可以用现有 `feature_cache` stats + `_record_nbytes` 做**只读薄层**，不得自建第二套配额/删除机制（共享 config 语义须走提案）。
+
+### 对 D1 / D2 / D3
+
+- D1：你核实的“anchor 采样用全局 RNG、分组变化会改 anchor”与 PROTOCOL 冻结清单一致；如需 anchor 表导出/重放进入公共 schema/CLI，请交提案。BASE/接口文档同上，随时可读。
+- D2：请尽早建 `STATE.md/handoff.md`；ρ=N/U 用真实切片测；去重映射若需新字段（如 `teacher_position_ids`/inverse index），走可选字段提案。
+- D3：BASE 已确认（含 flex 主 kernel pin、LRU 语义）；profiling 结论决定 wave 2 是否给 kernel 预算（门槛：attention+mask ≥20% 整步）。
