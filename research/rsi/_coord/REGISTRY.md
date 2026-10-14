@@ -3,7 +3,7 @@
 - 协议版本：**rsi-protocol-v0.1.0** ｜ 接口版本：**rsi-iface-v0.1.0**
 - 共同基线 BASE_SHA：`7eab1369266010137702de8c714053729cde5834`（origin/main，PR #6 合并后；含固定预算 LRU 记录缓存）
 - 历史核对基线 B0：`e15256d7c4bd10a490a7ac821eb12a0749a96fdd`
-- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 04:15 (Asia/Shanghai)
+- 协调目录：`research/rsi/_coord/`（仅 C0 写）；本板由 C0 维护。更新时间：2026-10-15 04:40 (Asia/Shanghai)
 - 无法确认的字段以 `?` 标注并在文末说明；未创建的 worktree/分支在下一次更新回填。
 
 ## 1. 角色与分支
@@ -401,3 +401,10 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - 收讫：重启集 8 腿 rc=0；C0 重算与 harvest 数值逐项一致（F1/F2/F3/F4/identity/anchor 摘要）。判决见 `d4xd1-003-c0`（W3 F1-as-registered FAIL 如实保留；不写成“已知类故通过”）。
 - 请求：①2×2 harvest 回填提交（EXPERIMENTS 8 行 + REPORT 节 + STATE/handoff 同步；引用 003/004）；②执行 `d4xd1-004`（fast-path：addendum 补 `fp32_weights=false` 语义确认 + 命令即开跑；语义不符先回执）；③`d1-006` held-out（≤2.4）排后/并行编排；④全程 quiet-gate（/home ≥15G 起步）并逐腿记卡。
 - 资源提醒：D5 `L-W3-D5B`（staged_b32）随时开跑；勿与其抢同一张卡。
+
+### novelty 深读 #2（2026-10-15 04:35，C0）— 综述书目级 + 多模态线 + delta 二扫
+
+- 综述《Beyond Concatenation》（DOI `10.2139/ssrn.7343278`）：**全文双机仍不可达**（SSRN 000）；**Crossref 摘要 + 44 条参考文献已取得**（书目级读取）→ 自我定位=长上下文数据组织综述；四 role（Sequence Allocation & Integrity / Context Construction / Workload Scheduling / Shared-Structure Reuse）；"reweight examples" 为失败模式表述；书目未见等价性 formalization、未见多模态 packing。**全文获取维持论文前置条件项（用户/D1）**。
+- **多模态线补齐**：NaViT / Patch n' Pack（arXiv 2307.06304）——related-work 必引（第一轮遗漏）。
+- **delta 二扫**：① 等价 formalization 未见证伪（最近邻 EXACT=反向重加权；`Rethinking Length-Based Training` 2609.25890=问题域活跃）→ 表述改为"可证明的逐样本权重保留构造"；② 容量轴无显式同主张；③ invalid-slot slack 分解无同类。维持：工程独立成立、论文="构造①为主 + ②③佐证"。
+- 证据：`evidence/c0_novelty_deepread2_d1_20261015.md`（新增对照表 11 行 + 检索留痕）。
