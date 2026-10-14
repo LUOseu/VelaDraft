@@ -55,7 +55,7 @@
 | L-W1-D2R | D2 | **GPU2**（23:42 空闲；开跑前实测） | → 单次干净 step profile 完成（≤15 GPU-min） | 重做 23:24–25 的 contended run（本 run 须标 `contended=false`）；计入 W1-D2 ≤1.0 GPU-h；**23:48 步级两臂完成（fwd -5.5%）→ 关闭** |
 | L-W1-D1-R2 | D1 | **GPU2**（首选；开跑实测 quiet）｜GPU3 备选（dhz 已结束，若沿用须实测披露） | → W2/W3 store + 正式 R3 A/B 完成或卡被占 | **W1 已建成（23:59:42，kept 191/192）**；剩余 W2/W3 store 与 R3 A/B 同租约；前置 free≥10G（当前 22G）；逐腿 quiet 自检、**跑后清 train ckpt（~4.6G/腿）**；计入 W1-D1 ≤1.5 GPU-h |
 | L-W2-D4 | D4 | 任一实测 quiet 单卡（util≤5%、mem_free≥40GiB、磁盘≥10G；非他人有效租约卡） | → capped-process real-sensor A/B 完成或卡被占 | **条件批准 ≤1.5 GPU-h**（d4-001 条件照旧：MemoryMax/ulimit 隔离、预注册压力轨迹+证伪条件、只报 wall/内存/命中率、自清 ckpt）；**00:20 起预授权窗口**：预计 ≥1.5h 即可开跑，D4 自记卡号+quiet 证据；单卡窗口优先 D4、双卡优先 D5-G2；平台工程验证定位，非论文增量 |
-| L-W2-G2 | **D5 步 3–4（静态 ladder）优先**；D4×D5 producer 重测次之 | 2 张实测 quiet 卡（同上 quiet 口径；非有效租约卡） | → 预登记 leg 集完成或卡被占 | **00:20 起预授权档位**：最小可裁剪集 `staged_b8+sync_b8` ≈2.2 GPU-h（双卡 quiet 即开）；最小有价值集 `+pinned_b8+sync_b32` ≈4.0 GPU-h（预计窗口 ≥3.5h）；全矩阵 4.6–5.2 GPU-h 需 C0 窗口时确认。D5 自记卡号+quiet 证据入 EXPERIMENTS；冲突时 C0 回收。 |
+| L-W2-G2 | **D5 步 3–4（静态 ladder）优先**；D4×D5 producer 重测次之 | 2 张实测 quiet 卡（同上 quiet 口径；非有效租约卡） | → 预登记 leg 集完成或卡被占 | **00:25 版档位（取代 00:20 值）**：Tier 0 smoke ≈0.2 GPU-h（窗内第一门；parity 失败即停 S3 线）/ Tier A `staged_b8+sync_b8+s3_b8` ≈3.0–3.2 / Tier B `+sync_b32+s3_b32` ≈4.2–4.4 / Tier C 全矩阵 ≈6.6–7.2。**预授权：双卡 quiet 即开 Tier 0→A**；A 后两卡仍静且预计 ≥2.5h → 可续 B；**C 需 C0 确认**。D5 自记卡号+quiet 证据入 EXPERIMENTS；冲突时 C0 回收。 |
 
 ### 观察记录（C0 只读，未独立复核）
 

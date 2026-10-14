@@ -66,7 +66,7 @@
 | D2 | rho=6.83；**12 项 CPU 测试（C0 复跑 12/12 ✓）**；pin 2×2 fwd -6.8%（loss 四腿 bitwise）；**dfly recipe 2×2 完成：fwd −12.9ms、bwd −19.5ms（12 步 loss 四腿逐值相同，C0 直读 ✓）**；phase dedup4 归因完成（editable install 遮蔽=空对照；未钉卡 event 伪影已修） | ρ≥2 ✓；**收益 −3.0%（Jetspec）/ −5.6%（DFly recipe）≪15%；显存无降** | **STOP（D2 自判，C0 采纳；d2-001-c0）**→DEFERRED（lane-local opt-in；再开条件=REPORT §8） |
 | D3 | trace + Amdahl：attention+mask=21.16ms/595.9ms=**3.55%**（cap +3.7% 步 / +1.4% online），**C0 核数 ✓** | ≥20% ✗（远未达） | **STOP**（kernel 轨；re-open 条件已登记） |
 | D4 | W1 五腿 counters 逐值一致（**C0 5/5 ✓**）+ harvest 回填（REPORT §W1/§W2）；W2 CPU 压力轨迹（证伪→修复；零越界） | 无提速声称（安全阀）；d4-001 已集成（`1f8963e`）；lane commit 对账 + real-sensor A/B（L-W2-D4）待完成 | HOLD→集成路径明确（ACCEPTED 条件；L-W2-D4 ≤1.5 GPU-h，00:20 起预授权窗口）；平台工程候选，非收益项 |
-| D5 | trace 分解 + sim v3/v4；regen 真测 1.66×/2.33×；静态分裂 sim 1.70×（未实测）；cost-aware sim +0.8–2.1%；**d5-001 步 2（cf74790；含 duplicate guard，C0 43/43 复跑 ✓）** | cost-aware ✗（≪15%）；静态 split 待真实 ladder | HOLD（cost-aware=STOP；split=wave-2 条件项；CPU 步 2 已收；G2 档位预授权等窗口） |
+| D5 | trace 分解 + sim v3/v4；regen 真测 1.66×/2.33×；静态分裂 sim 1.70×；cost-aware sim +0.8–2.1%；**d5-001 步 2 + 两卡 split 接线（lane 79/79 C0 独立复跑 ✓，含 36 parity 项；Tier 0 smoke 批准）** | cost-aware ✗（≪15%）；静态 split 待真实 ladder | HOLD（split=wave-2 条件项；G2 分档预授权等窗口） |
 
 未决：D2 **lane commit（零提交）**+“13→12”措辞更正（其余收讫，STOP 已采纳）；D1 W3 运行中（W2 ✓ 144/144，摘要 `5980f77b…`）→ 正式 R3 A/B + d1-001 + 预算自报；D4 lane commit 对账 + L-W2-D4 降级验证 B（d4-002-c0 已批，等窗口）；D5 步 3–4 等 G2 窗口（档位预授权）；iface v0.2 候选已录入 PROTOCOL §12（`teacher_src_pos` 已确认、`host_ram_budget_gb` 待 D4）；预算实耗：D3 0.22/0.5、D4 0.31/0.5（+≤0.3 降级项）、D5 ≤0.4/1.0、D1 待自报、D2 ≤1.0 待盘点确认。
 
@@ -105,7 +105,7 @@
 | D2 | **STOP（自判+采纳；机制 DEFERRED）** | `research/rsi/d2/{REPORT.md,EXPERIMENTS.jsonl,handoff.md}`（全量与失败，含归因段 §6）；pin 2×2（−6.8%，loss bitwise）；dfly recipe 2×2（fwd −12.9/bwd −19.5ms；12 步 loss 逐值相同，C0 直读 ✓）；`d2-001` + `d2-001-c0` | 论文：否（−3.0%/−5.6% ≪15%）；平台：opt-in 旋钮（不集成） | 已按 STOP 收口；再开=REPORT §8 条件；欠 lane commit |
 | D3 | STOP（已接受） | REPORT `b88cdf2`：attention+mask=3.55%（C0 核数 ✓）；/tmp 已清 | 论文：否 | 再开条件：W2 长答 ~15% 外推 / b16 / S≥2.5–4k |
 | D4 | HOLD → 已集成（merge 待验证） | W1 五腿 counter-exact（C0 5/5 ✓）；REPORT §W1/§W2；**d4-001 集成 `1f8963e`（sha1 对账一致；复跑 13+4 ✓）** | 平台：adaptive 安全阀（opt-in）；论文：低（无提速声称） | D4 lane commit 对账；L-W2-D4 ≤1.5 GPU-h real-sensor A/B → 然后可评 merge-ready |
-| D5 | HOLD（条件项；CPU 步 2 已收） | REPORT `85cbf8b` + sim v4 `23875e8` + **d5-001 步 2 `cf74790`（lane 43/43 C0 独立复跑 ✓；已驱动真 train_dflash）**；regen 真测 1.66×/2.33× | 平台：runner 语义级可驱动真 trainer；论文：低（H2 负） | 步 3–4 等 G2 窗口（档位预授权，min set ≈2.2 GPU-h）；静态分裂=wave-2 条件项 |
+| D5 | HOLD（条件项；CPU 步 2 已收） | REPORT `85cbf8b` + sim v4 `23875e8` + **d5-001 步 2 + 两卡 split 接线（lane 79/79 C0 独立复跑 ✓；含真 trainer 驱动与 merge/verify parity）**；regen 真测 1.66×/2.33× | 平台：runner 语义级可驱动真 trainer；论文：低（H2 负） | 步 3–4=G2 窗内 Tier 0→A（预授权 ≈3.2–3.4 GPU-h）；B 条件续、C 需 C0 |
 
 跨路线观察：D5 v4 的 keep-oracle 变体需要“生成前已知 keep”的预测器——若 D1 双轴组织能提供此类信号，仅作为 **D1×D5 条件组合的讨论项**（未批准；须双方有共同监督位置才立项）。
 
