@@ -60,6 +60,7 @@
 | L-W3-D1R4 | D1 R4 sub1 边界 A/B（`d1-004`） | **GPU3 优先**；或任一实测 quiet 单卡（同 quiet 口径）；与 D5 的 1+2 不共卡 | → 2 cells 完成或卡被占 | **批准 ≤0.2 GPU-h**（02:25；`d1-004-c0`）：`--sub-batch 1`、W3+MIX seed 42、arms canonical,cost、parity 0/50/100、100 timed 批；预注册判决 ≥1.135 → R4 正分支 / 否则边界关闭；≈0.10 GPU-h 预估；与 C0 2×2（计划 GPU0）冲突时本短实验优先。**02:33 完成 rc=0（实测 0.108 GPU-h）→ 负分支关闭（`d1-005-c0`：W3 1.1296 / MIX 1.0199 < 1.135）** |
 | L-W3-D4xD1 | D1（执行全部 8 腿；另半 = D4 机制产品路径集成运行，D4 线不重开） | **GPU3 优先；8 legs 同卡**；不共 D5 的 1+2；D5 新腿需要 3 时让行 | 即刻 → 8 legs 完成或卡被占 | **批准 ≤1.5 GPU-h**（02:38；`d4xd1-001-c0`）：{cache_off, cache_on=16GiB} × {bucket_off, grid/sub2}、online、W3+MIX seed 42、1 warmup + 100 updates；F1–F4 判决冻结；**02:45 fast-path 放行**：addendum 三条（命令/parity 捕获法/anchor 机制）落 handoff 即开跑 |
 | L-W3-D1Q | D1 held-out 质量（`d1-006`） | GPU3（2×2 之后同卡顺序）；quiet-gate 同 L-W2-D1 | → 4 训练腿 + eval（staged）完成或卡被占 | **接收 ≤2.4 GPU-h**（02:45；条件化）：Stage-1 canonical×{42,43} 建带（≤1.2）→ Stage-2 regroup×{42,43} 比较（≤1.2）；先带后比；`eval_dflash.py` 64 prompts / 固定 val；<200 步不收敛 → 不判定 |
+| L-W3-D5B | D5 staged_b32（补离线静态基线 + store-parity 复验） | 任一实测 quiet 单卡（避开 D1 2×2 所在 GPU3；quiet 口径同 L-W2-D1） | 2026-10-15 03:45 → staged_b32 完成 + `verify_against` 收据或卡被占 | **批准 ≤0.75 GPU-h**（03:45；`d5-002-c0`）：offline 单卡；目的=关闭 s3_b32 store parity 盲区（对 `g2_s3_b32_1015_0304` 复验）+ 补 b32 离线基线行；**建议 avail ≥15G 起步**（s3 腿峰值 10–12G 教训）、跑后 prune、结果回填 EXPERIMENTS/REPORT §10 |
 
 ### 观察记录（C0 只读，未独立复核）
 
@@ -119,6 +120,7 @@
 - 2026-10-15 03:22 — **D5 `s3_b32` exit=0**（wall 1074s、alloc 0.59 GPU-h）；03:22:12 prune 释放 `/home` 6.2G→17.7G。D5 `g2_collect.json`（11 行）出数：s3_b8 1716s（parity 全 ✓；vs sync_b8 −21%、vs staged_b8 −25%）；s3_b32 1074s（regen ✓、store 待 staged_b32 复验；vs sync_b32 −12.6%）。
 - 2026-10-15 03:22–03:25 — **D1 修复版 smoke 复核通过**：03:22（自校）与 03:24（trace 版，`research/rsi-d1@trace`）各 3 步 exit=0；clip trace call0 `my_clone 88.956` vs `clip_return 89.053`（0.11% = bf16 量化类）→ 恒等式健康。GPU3 释放；/home 17.7G、/tmp 23G。
 - 2026-10-15 03:30 — **裁定 `d4xd1-002-c0` 发布**（update 轴读法冻结 + 重启 GO；重启集 8 腿 = 唯一正式证据；预算 初跑 ≈0.26 + 重启 ≤1.2 ≤ 1.5 内）。重启链 **等待执行**（守卫双卷就绪：/tmp 21G+、/home 13G+；GPU3 空）。
+- 2026-10-15 03:45 — **C0：D5 三项请求复核与裁定（`d5-002-c0`）**：套件范围 pin `55e4e9c`（`55e4e9c..7db5d93` 仅文档 diff）→ 本地+服务器 88/88 复跑 ✓（服务器需 shim 绕 c1vllm site-packages 的 `tests` 遮蔽）；数字抽查 ✓（g2_collect walls、split parity、step 760/762/768 loss 行逐字节）；**批准 staged_b32**（L-W3-D5B）；**pinned_b8 = HOLD**。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
