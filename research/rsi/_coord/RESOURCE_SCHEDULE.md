@@ -85,6 +85,7 @@
 - 2026-10-14 23:59 — **D1 W1 store 建成（exit=0）**：192→kept 191、features 1.8G（manifest+6 shards；已登记共享资产）、run-dir 6.4G（train ckpt 4.6G 建议跑后清）；wall≈179s。磁盘 22G free。
 - 2026-10-15 00:00 — **D2 phase 配对首批**（base4 vs dedup4，mb4：fwd 188.3→189.3 未见 -5.5% 复现；loss 三腿 bitwise 同值；ckpt KB 级自清生效）；**GPU2/GPU3 空闲**（GPU0/1 外部 xs）。**D4 d4-001 ACCEPTED（条件）** + **L-W2-D4 ≤1.5 GPU-h 条件批准**（等窗口）；D1 W2/W3+R3 同租约排队。
 - 2026-10-15 00:05 — **GPU0 空闲**（外部 xs 完成）→ 门开给 L-W2-D4 与 D1 W2/W3（按实测 quiet）；GPU2 = D2 pin 系列（运行中）；GPU3 = 外部 dhz racer repro 回归（~14.3GB）。D1 清 W1 train ckpt 生效（free 27G）。
+- 2026-10-15 00:06 — D2 pin 2×2 完成（fwd -6.8% 复现、loss bitwise；GPU2 已释放）；**D1 W2 build 于 GPU3 运行**（00:05:45 起；guard 27G / gpu_idle=0% ✓）；D5 lane 41/41 C0 复跑 ✓（CPU）。当前：GPU0 空闲 / GPU1 xs / GPU2 空闲 / GPU3 D1；磁盘 27G。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
