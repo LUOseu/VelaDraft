@@ -14,3 +14,4 @@ C0 处理状态记录在本目录同名补充或 REGISTRY §7：RECEIVED / ACCEP
 
 历史：D1 的“anchor 表重放 hook”与“重排权重 API 对接点”（REPORT §6 / HANDOFF 2026-10-14）等待正式提案编号。
 2026-10-14 23:30：**d5-001 已收**（producer/consumer 分片调度 runner）→ RECEIVED（部分/条件批准），答复见 `d5-001-c0.md`。
+2026-10-14 23:56：**d4-001 已收**（adaptive byte-budget 旋钮 `train.online_feature_cache_adaptive`）→ 评审通过 **ACCEPTED（条件）**：D4 将冻结实现（内容 sha1 登记于 REGISTRY §7）提交 lane 分支后，C0 在 `research/rsi-c0` 集成（含 `docs/online-training.md` 文档行 + 测试复跑）；W2 租约 L-W2-D4 条件批准 ≤1.5 GPU-h（real-sensor capped-process A/B，平台工程定位）。
