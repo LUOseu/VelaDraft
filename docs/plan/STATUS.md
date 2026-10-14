@@ -27,6 +27,9 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   incl. the #7 second seed and the CPU-tested length-bucket profiler mode)
   is the recommended next spend. Start with
   `docs/plan/phase1/LOCAL_PILOT_REPORT.md`.
+  The bounded pending list is now staged as an idempotent host queue
+  (`~/recipe-smoke-config/cvpr_queue.sh`, runs R-18..R-23) that waits for an
+  idle GPU; #4 (vLLM divergence) stays interactive-only.
 - **Review remediation round (2026-10-14, branch `review-remediation` off
   `950b394`): R1-R6 implemented.** R1 collision-safe media + audit script
   (`7cc9e5b`), R4 ordered segments + explicit unsupported-media rejection

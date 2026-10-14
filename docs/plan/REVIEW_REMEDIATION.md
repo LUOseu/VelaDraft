@@ -165,6 +165,14 @@ Budget note: 4.10 / 8.00 GPU-h used; these items are **not authorised** by
 this remediation and must not be launched without an explicit resource
 decision. Order follows the review:
 
+Scheduling status (2026-10-14, `cvpr-route` session): items #1-#3 and #5-#7
+are staged as a stop-on-first-failure, restart-idempotent host queue (run IDs
+R-18..R-23, `~/recipe-smoke-config/cvpr_queue.sh` on the GPU host) that
+starts only when a GPU is idle and hard-stops at 3.3 h cumulative job wall,
+inside the remaining 3.90 GPU-h of the first-round cap. #4 stays out of the
+queue by design (interactive vLLM session). Results are folded back into
+this package when they land; do not re-schedule these items elsewhere.
+
 All commands assume the `review-remediation` checkout on the GPU host and
 the env conventions of the target configs (`VLM_DFLASH_TARGET`, plus
 `VLM_DFLASH_E2_SOURCE` / `VLM_DFLASH_E2_IMAGES` for E2 data).
