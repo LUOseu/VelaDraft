@@ -100,6 +100,7 @@
 - 2026-10-15 00:44 — D5 staged_b8 运行中（GPU1，regen 600/2000 @00:45，kept 154；GPU2 空备用）；GPU0 = 外部 xs（pid 3548763，15.9GB/97%）；GPU3 00:45 短暂被外部占用后已释放（18MiB/0%）；磁盘 17G。**D1 round-2 收讫**（`56b6563`；REPORT/EXPERIMENTS/`d1-001`/预算 0.70 全量），**wave-2 放行**（`d1-001-c0`）。
 - 2026-10-15 00:47 — **发布 L-W2-D1**（见上表）。**事故 #6 登记**（D1 W0-k2 首跑 ~00:20：quiet 自检后启动瞬间被外部进程抢 GPU1 → OOM；等待后重试成功；无他人进程被杀；教训=自检↔launch 间隔最小化 + 启动后 10s 复核；详见 REGISTRY 复核记录）。
 - 2026-10-15 00:46 — **D4 W2 收口**（`d4-003`）：方案 B 两腿 F1–F4 PASS（0.062 GPU-h）；lane `a8e762c`；runtime 4 文件 sha1 与集成版一致；C0 核验 ✓ → **merge-ready（平台工程级）**（`d4-003-c0`）；**L-W2-D4 关闭**（未追加）。
+- 2026-10-15 00:49 — D1 自启 round-2.1 重复跑（`--parity 3` 多批位）：mix k4 p3 完成（cost 1.170 / grid 1.163，**低于首跑 1.240/1.247**——跨 run 波动，待 ≥3 重复聚合）；w3 k4 p3 运行中（**GPU2**，quiet-guard util≤10%/free≥40GiB ✓，脚本 `run_p3_one.sh`）；其余 cells 排队。**卡位**：chain2 的 sync 腿需卡 1+2——D1 短跑可继续（launch 自检照旧），**wave-2 长跑优先 GPU3 / chain2 结束后再用 2；D5 腿等 pair 时 D1 让行**（L-W2-D1 冲突条款）。
 
 Wave 2（仅通过证据门槛的 1–2 项）：配对 100–200 更新实验 ≤4 GPU-h/方向；3 seeds canonical 合计 ≤6 GPU-h；参考量级：2K 切片两腿 ≈0.91 GPU-h。均须 C0 批准并在 REGISTRY 记录依据。
 
