@@ -72,6 +72,8 @@
 - 2026-10-14 23:32 — C0 只读审计（D2 本地 worktree）：存在**未申报的共享面改动**——`vlm_dflash/dflash/trainer_core.py`（+54）、`vlm_dflash/jetspec/factory.py`（+7）、`vlm_dflash/jetspec/trainer.py`（+80）、新模块 `vlm_dflash/teacher_dedup.py`（exact teacher-projection dedup，按 hidden-row id 去重、按 query gather 复用）。这些改动**未走提案、未提交**；不进入共同基线、不作为已复核结论。要求见 §7 D2 条目 (5)。
 - 2026-10-14 23:33 — D5 重跑链：**leg 16 exit=0**（23:30:33→23:32:34，wall≈121s；此前“消失行”单副本重测通过）；**leg 32 于 23:32:36 启动**（GPU3，开跑 free=15G）。注意 leg wall：b8=176s > b16=121s——首腿含编译/冷启动，harvest 时须按“首次加载/编译与 warm 分开”口径处理，不得直接当 scaling 结论。
 - 2026-10-14 23:33 — D4 `cap25` 腿 exit=0（wall=208s；hits/misses/stores/evictions=24/750/750/718、peak=217,654,164B、capacity=217,663,573B≈25%），与仿真 exact-capacity 预测 24/750/718 **逐值一致**（连续第二档精确匹配）；cap10(209s)≈cap25(208s) → 先前 off(301s)>cap10 的差确认为首腿编译/冷启动顺序效应，非缓存收益。
+- 2026-10-14 23:37 — **D5 重跑链完成（全绿）**：8=176s / 16=121s / 32=127s / 8r=149s，均 exit=0（23:27:36–23:37:13，单副本 GPU3，开跑实测 quiet）；`probe R1b done`。链时长 ≈0.16 GPU-h。**warm 腿对照**：8r(149s) vs 16(121s) vs 32(127s) → batch 16+ 相对 batch 8 增益 ~19%，32 未优于 16；首腿 8(176s) 含编译冷启动（勿作 scaling 分母）。GPU3 释放 → **D1 窗口开启（L-W1-open 首位）**。
+- 2026-10-14 23:36 — D4 `cap50` 腿 exit=0（wall=191s；hits/misses/stores/evictions=97/677/677/612、peak=435,308,328B、capacity=435,327,147B≈50%），与仿真预测 97/677/612 **逐值一致**（连续第三档精确匹配）；末腿 8MiB 运行中。
 
 ## 7. 请求与应答（C0）
 
@@ -123,4 +125,5 @@
 
 - 2026-10-14 23:24 — D4 W1 仿真：s3_sim_sweep.jsonl 全容量行与 s3 b_on 记录逐字段一致（命中/存储/峰值字节）；不足容量命中率序列合理（10/25/50% → 0.4/2.9/13.0%）。结论：LRU/字节模型对这组访问序列**成立**；未独立重跑仿真。
 - 2026-10-14 23:33 — D4 `cap25` 实测 vs 仿真（**抽查通过，数值级**）：hits/misses/evictions=24/750/718 逐值一致；连续两档（10%/25%）精确匹配 → 仿真的逐计数预测能力在实测腿上成立；剩余 50%/8MiB 档待跑。
+- 2026-10-14 23:36 — D4 `cap50` 实测 vs 仿真（**抽查通过，数值级**）：hits/misses/evictions=97/677/612 逐值一致（第三档）；wall=191s（无异常）。剩余 8MiB 档。
 - D3：BASE 已确认（含 flex 主 kernel pin、LRU 语义）；profiling 结论决定 wave 2 是否给 kernel 预算（门槛：attention+mask ≥20% 整步）。
