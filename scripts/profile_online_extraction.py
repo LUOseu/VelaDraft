@@ -101,8 +101,9 @@ def summarise_length_buckets(per_row: list[dict], edges: list[int]) -> list[dict
 
     Empty buckets are skipped; ``length_max`` is ``None`` for the unbounded
     top bucket. ``forward_ms_per_token`` divides the bucket's median forward
-    by its median token length, so vision-heavy short rows can be told apart
-    from text-heavy long rows.
+    (milliseconds) by its median token length, so vision-heavy short rows can
+    be told apart from text-heavy long rows; the result is milliseconds per
+    token.
     """
     grouped: dict[int, list[dict]] = {}
     for record in per_row:
@@ -123,7 +124,7 @@ def summarise_length_buckets(per_row: list[dict], edges: list[int]) -> list[dict
                 "median_image_tokens": statistics.median([int(r["image_tokens"]) for r in rows]),
                 "render_ms_per_row": round(render_ms, 2),
                 "forward_ms_per_row": round(forward_ms, 2),
-                "forward_ms_per_token": round(1000.0 * forward_ms / max(1.0, float(median_length)), 3),
+                "forward_ms_per_token": round(forward_ms / max(1.0, float(median_length)), 4),
             }
         )
     return summary

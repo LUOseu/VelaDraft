@@ -69,13 +69,14 @@ def test_summarise_length_buckets_medians_and_empty_buckets_skipped():
     assert first["median_image_tokens"] == 160  # median of [64, 256]
     assert first["render_ms_per_row"] == 15.0
     assert first["forward_ms_per_row"] == 150.0
-    assert first["forward_ms_per_token"] == pytest.approx(1000.0 * 150.0 / 150.0)
+    # ms per token: median forward (ms) / median token length
+    assert first["forward_ms_per_token"] == pytest.approx(150.0 / 150.0)
 
     second = summary[1]
     assert second["rows"] == 1
     assert second["length_min"] == 512
     assert second["length_max"] == 1024
-    assert second["forward_ms_per_token"] == pytest.approx(1000.0 * 300.0 / 900.0)
+    assert second["forward_ms_per_token"] == pytest.approx(300.0 / 900.0, abs=1e-4)
 
 
 def test_summarise_length_buckets_skips_nothing_when_only_top_bucket_used():

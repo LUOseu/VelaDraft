@@ -150,6 +150,11 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
         # (DFly: the objective profile -- "controlled_ce" or the selected
         # algorithm.train_recipe name). None for methods that predate the field.
         "objective_profile": checkpoint.get("objective_profile"),
+        # Resolved ``algorithm.train_recipe`` as recorded in the checkpoint
+        # metadata (the DFlash family writes it when a recipe is selected;
+        # None otherwise). Kept in full so a consumer can tell which training
+        # objective produced the weights without the run directory.
+        "train_recipe": checkpoint.get("train_recipe"),
         # Visual conditioning the draft was trained with (None for text-only
         # drafts): serving must build the same cached visual context from the
         # image-token span and hand it to every draft layer.
@@ -287,6 +292,9 @@ def render_model_card(export_config: dict) -> str:
         )
     if export_config.get("objective_profile"):
         lines.append(f"| objective profile | {export_config['objective_profile']} |")
+    recipe = export_config.get("train_recipe")
+    if recipe:
+        lines.append(f"| train recipe | {recipe.get('name')} ({recipe.get('scheme')}) |")
     if data:
         lines += [
             f"| training data | {data.get('num_train')} train / {data.get('num_val')} val from `{data.get('source')}` |",
@@ -381,6 +389,7 @@ def export_run(run_dir: str | Path, *, checkpoint: str = "ckpt_final.pt", out_di
             "checkpoint": checkpoint,
             "code_commit": export_config.get("code_commit"),
             "algorithm": export_config["method"],
+            "train_recipe": export_config.get("train_recipe"),
             "target": export_config["target"],
             "data": export_config["data"],
             "training": export_config["training"],
