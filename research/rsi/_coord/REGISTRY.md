@@ -352,7 +352,7 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - **捕获缺陷（D1 自检发现；全披露于 addendum §5.5）**：首版 sitecustomize grads hook 写成 `p.detach()`（参数本体而非 `.grad`）——首个 parity diff 即自检矛盾（b0 全 0.0 + ‖captured‖≈338≈参数范数 ≠ train_log grad_norm 89.05）→ D1 03:17 果断停链；**4 个 W3 腿目录 + 全部 tensor 目录已删**（证据无效，正当）。
 - 修复与复核：grads 捕获移至 `clip_grad_norm_` 入口（clip 前、R4 同语义）；smoke（03:22/03:24）通过——clip trace call0：my_clone 88.956 vs clip_return 89.053 = **0.11% bf16 量化类 ✓**；链路自校 ok。
 - **初跑一切数字以 void 对待**（含 −47% 峰值、~3× 步时、任何 parity）——只作仪器调通参考；**重启集（8 腿全集）= 唯一正式证据**。
-- 重启授权 + update 轴读法：**裁定 `d4xd1-002-c0`**（3.4x 发布；本裁定在重启数据前冻结）。预算：初跑 ≈0.26 GPU-h 入账；重启 ≤1.2；合计 ≤1.5（越界披露）。guard 双卷现状：/tmp 23G、/home 17.7G（s3_b32 exit=0 + prune 后）。
+- 重启授权 + update 轴读法：**裁定 `d4xd1-002-c0`**（03:30 发布；本裁定在重启数据前冻结）。预算：初跑 ≈0.26 GPU-h 入账；重启 ≤1.2；合计 ≤1.5（越界披露）。guard 双卷现状：/tmp 23G、/home 17.7G（s3_b32 exit=0 + prune 后）。
 
 ### 裁定 d4xd1-002-c0（update 轴读法 + 重启 GO；数据前冻结）
 
