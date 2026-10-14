@@ -36,9 +36,10 @@ config-selectable recipe** (`algorithm.train_recipe: upstream_two_stage` — see
 "Objective" and `docs/upstream/dfly.md`). Every number above was produced with
 the default shared DFlash decayed block CE (`objective_profile:
 controlled_ce`), which stays the default; the recipe objective is unit-tested
-and exercised end to end on the tiny fixture, but no canonical GPU recipe run
-is recorded here yet, so any reported number must state which profile produced
-it.
+and exercised end to end on the tiny fixture; the canonical 2K recipe run is
+recorded (`R-20261014-11`: AL 1.839 vs controlled_ce 1.682, 128/128
+token-exact; `configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml`). Any reported number
+must still state which profile produced it.
 
 ## Objective (read before citing numbers)
 

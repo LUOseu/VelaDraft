@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, DrafterAlgorithm
+from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord
 from .registry import register
 
 
@@ -26,9 +26,10 @@ class DFlyAlgorithm(DrafterAlgorithm):
             "architecture": "validated",
             # Upstream's two-stage objective (LK/D-PACE -> e2e TV) is ported as
             # the config-selectable ``algorithm.train_recipe`` (objectives.py,
-            # CPU-tested end to end); no canonical GPU recipe run is recorded
-            # yet, so training stays experimental (mirrors dflash2).
-            "training": "experimental",
+            # CPU-tested end to end) and its canonical 2K run is recorded
+            # (R-20261014-11: AL 1.839 vs controlled_ce 1.682, 128/128 exact),
+            # so training is validated like the other recorded runs.
+            "training": "validated",
             "multimodal": "validated",
             "runtime": "experimental",
         },
@@ -43,6 +44,26 @@ class DFlyAlgorithm(DrafterAlgorithm):
         },
         capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
+        evidence=(
+            EvidenceRecord(
+                family="qwen25_vl",
+                layout="single_image",
+                feature_mode="offline",
+                state="canonical_validated",
+                evidence=(
+                    "R-20261014-11 E4 canonical 2K upstream_two_stage recipe (AL 1.839 vs controlled_ce 1.682, 128/128 exact; configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml); zoo-v0.3.2 archive + demo reload"
+                ),
+            ),
+            EvidenceRecord(
+                family="qwen3_vl",
+                layout="single_image",
+                feature_mode="offline",
+                state="reduced_validation",
+                evidence=(
+                    "docs/algorithms/dfly.md Qwen3-VL-8B reduced validation (configs/dfly/qwen3_vl_8b_reduced.yaml)"
+                ),
+            ),
+        ),
     )
 
     def validate_config(self, cfg: dict) -> None:

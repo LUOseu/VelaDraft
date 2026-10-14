@@ -7,7 +7,7 @@ Baseline `9137de0`. Every "done" line points at code/tests/runs, not prose.
 
 | Capability | Verified baseline state | This plan |
 | --- | --- | --- |
-| 7 algorithms unified train/eval/export | `SUPPORT_MATRIX.md` generated from `AlgorithmMetadata`; all 7 through Export (DFly/DFlash2 training marked experimental) | keep interfaces |
+| 7 algorithms unified train/eval/export | `SUPPORT_MATRIX.md` generated from `AlgorithmMetadata` (capability vs evidence separated, review R6); all 7 through Export (DFlash2 training marked experimental; DFly recipe validated with the R-20261014-11 canonical run) | keep interfaces |
 | Offline features + online live target capture | `vlm_dflash/target/{capture,online}.py`, `docs/online-training.md` | WP4 batch online capture |
 | DFlare/DFly review fixes | merged (`ff406bb` via PR #2 = baseline) | read-only |
 | DFly upstream two-stage recipe | ported on `dfly-upstream-recipe` (WP1, not yet on main) | WP1 |
