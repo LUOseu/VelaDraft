@@ -162,7 +162,9 @@ never from stored verifier logits.
 DFlash2 uses an experimental reconstruction of the undisclosed upstream training
 objective, and JetSpec's production tree runtime is not ported. Per-target status
 and capability details are in the [support matrix](SUPPORT_MATRIX.md), the
-[algorithm matrix](ALGORITHM_MATRIX.md) and the [upstream audits](UPSTREAM_AUDIT.md).
+[algorithm matrix](ALGORITHM_MATRIX.md), the per-method
+[training-signal declarations](docs/TRAINING_SIGNALS.md) and the
+[upstream audits](UPSTREAM_AUDIT.md).
 
 ## Model Zoo
 

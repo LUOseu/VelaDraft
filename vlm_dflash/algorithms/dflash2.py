@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord
+from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord, TrainingSignals
 from .registry import register
 
 
@@ -41,6 +41,27 @@ class DFlash2Algorithm(DrafterAlgorithm):
         },
         capabilities={"image": True, "multi_image": True, "video": False, "parallel_tree_runtime": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
+        training_signals=TrainingSignals(
+            hard_label=(
+                "Selector term: hard K-way CE over the unary top-K candidates (the target id is "
+                "forced in when absent). The unary term is a distribution objective, not "
+                "hard-label CE."
+            ),
+            context_layers="Contract capture layers (shared DFlash backbone).",
+            teacher_final_hidden=(
+                "Required (capture.store_final_hidden=true): the unary term distils the target's "
+                "next-token distribution reconstructed through the frozen output head."
+            ),
+            distribution_objective=(
+                "Yes - forward KL(target || draft) on the unary logits with the fixed exponential "
+                "decay (gamma 4.0); an experimental reconstruction - upstream does not publish "
+                "the training objective."
+            ),
+            confidence_objective="None (the selector reranks candidates; it is not an acceptance head).",
+            stage="Single stage.",
+            block_convention="DFlash slot convention (slot 0 anchor clean, unsupervised).",
+            notes="Objective is a reconstruction, not a reproduction; full vocabulary required.",
+        ),
         evidence=(
             EvidenceRecord(
                 family="qwen25_vl",

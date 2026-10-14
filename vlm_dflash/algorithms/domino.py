@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, EvidenceRecord
+from .base import AlgorithmMetadata, EvidenceRecord, TrainingSignals
 from .dflash import DFlashAlgorithm
 from .registry import register
 
@@ -41,6 +41,25 @@ class DominoAlgorithm(DFlashAlgorithm):
         },
         capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
+        training_signals=TrainingSignals(
+            hard_label=(
+                "Yes - decayed block CE on regenerated targets; the base-anchor curriculum mixes "
+                "CE on the corrected logits with CE on the backbone-only logits (lambda_base "
+                "decays linearly to 0)."
+            ),
+            context_layers="Contract capture layers (shared DFlash context).",
+            teacher_final_hidden="Not used (the curriculum trains on hard regenerated targets).",
+            distribution_objective="None (the port source defines the curriculum CE only).",
+            confidence_objective="None.",
+            stage=(
+                "Single stage; the curriculum is a config schedule (lambda_base_start / "
+                "lambda_base_decay_ratio)."
+            ),
+            block_convention=(
+                "shift_label=true (default): anchor included, all slots supervised (slot k "
+                "predicts anchor+k+1); false: DFlash convention (slots 1..S-1)."
+            ),
+        ),
         evidence=(
             EvidenceRecord(
                 family="qwen25_vl",

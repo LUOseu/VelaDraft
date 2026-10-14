@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord
+from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord, TrainingSignals
 from .registry import register
 
 
@@ -37,6 +37,33 @@ class DSparkAlgorithm(DrafterAlgorithm):
         },
         capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
+        training_signals=TrainingSignals(
+            hard_label=(
+                "Default: decayed block CE on regenerated targets, every supervised slot. "
+                "sample_from_anchor=true (upstream default) supervises all S slots; false keeps "
+                "the DFlash convention (slots 1..S-1)."
+            ),
+            context_layers="Contract capture layers (same fused context as DFlash).",
+            teacher_final_hidden=(
+                "Recipe only - train_recipe: upstream_dspark streams the target's final hidden "
+                "states through the frozen output head to reconstruct the teacher distribution."
+            ),
+            distribution_objective=(
+                "None by default; under the recipe, per-slot forward KL(p_target || p_draft) over "
+                "the full vocabulary, decay-weighted (the speculators default loss_fn=kl_div)."
+            ),
+            confidence_objective=(
+                "Greedy per-slot acceptance indicator by default (the temperature-0 verification "
+                "event); under the recipe, the analytic acceptance rate "
+                "sum_v min(p_draft, p_target) = 1 - TV, computed from the live drafter "
+                "distribution each step (detached) - never cached."
+            ),
+            stage="Single stage.",
+            block_convention=(
+                "sample_from_anchor=true: slot k predicts anchor+k+1, all slots supervised, S "
+                "proposals per round (round window S+1); false: DFlash convention, S-1 proposals."
+            ),
+        ),
         evidence=(
             EvidenceRecord(
                 family="qwen25_vl",

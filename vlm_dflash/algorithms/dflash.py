@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord
+from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord, TrainingSignals
 from .registry import register
 
 
@@ -37,6 +37,31 @@ class DFlashAlgorithm(DrafterAlgorithm):
         },
         capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "validated"},
+        training_signals=TrainingSignals(
+            hard_label=(
+                "Yes - decayed block CE on regenerated targets; slots 1..block_size-1 "
+                "(slot 0 is the clean anchor, unsupervised)."
+            ),
+            context_layers=(
+                "Contract capture layers (drafter.capture_layer_ids; fused [T*H] context "
+                "projection shared by every draft layer)."
+            ),
+            teacher_final_hidden=(
+                "Not used by the default objective; required by train_recipe: upstream_two_stage."
+            ),
+            distribution_objective=(
+                "None by default; LK (hybrid KL/TV) + end-to-end multi-step TV under the recipe."
+            ),
+            confidence_objective="None.",
+            stage=(
+                "Single stage by default; the recipe switches LK cold start -> e2e TV at "
+                "cold_start_fraction."
+            ),
+            block_convention=(
+                "DFlash convention: slot 0 = clean anchor (unsupervised), slots 1..S-1 "
+                "supervised; S-1 proposals per round."
+            ),
+        ),
         evidence=(
             EvidenceRecord(
                 family="qwen25_vl",

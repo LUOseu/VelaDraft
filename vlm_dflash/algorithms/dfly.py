@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord
+from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord, TrainingSignals
 from .registry import register
 
 
@@ -44,6 +44,32 @@ class DFlyAlgorithm(DrafterAlgorithm):
         },
         capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
+        training_signals=TrainingSignals(
+            hard_label=(
+                "Yes - decayed block CE by default; under the recipe, D-PACE-weighted block CE "
+                "in stage 2 (stage 1 is LK-only, no CE)."
+            ),
+            context_layers=(
+                "context_layer_ids with per-layer fusion + the hidden-states correction "
+                "(upstream recipe: [1,9,17,25,33]; matched 3-layer variant: [1,17,33])."
+            ),
+            teacher_final_hidden=(
+                "Recipe only - train_recipe: upstream_two_stage consumes the target's final "
+                "hidden states in both stages (LK and e2e TV)."
+            ),
+            distribution_objective=(
+                "Under the recipe: LK hybrid (KL/TV blend) cold start, then the end-to-end "
+                "multi-step TV term."
+            ),
+            confidence_objective=(
+                "None as a trained head; D-PACE confidences are detached position weights "
+                "derived from the CE."
+            ),
+            stage="Single stage by default; the recipe switches cold_start_lk_dpace -> e2e_tv.",
+            block_convention=(
+                "Forced DFlash convention (sample_from_anchor=false regardless of the YAML value)."
+            ),
+        ),
         evidence=(
             EvidenceRecord(
                 family="qwen25_vl",
