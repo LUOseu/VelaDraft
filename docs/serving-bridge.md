@@ -29,8 +29,15 @@ divergence analysis and registered gaps in
 - **Not achieved:** token-exact greedy output. On 32 pinned prompts,
   vLLM-dflash matched its own target-only output on 5/32; AL 1.4059 vs
   in-repo sequential 1.6866/1.6924 on identical weights (the margin probe
-  observed small top1-top2 margins at the 4 traced flips - an HF-assisted
-  observation; the root cause stays unresolved). The remaining AL gap (-17%)
+  observed small top1-top2 margins at the 4 traced flips; the later
+  same-engine diagnosis `R-20261014-24/25` showed the engine is not
+  token-reproducible even against itself - same-engine reruns agree 12/32,
+  and an instrumented rejection-sampler dump found 0 genuine inconsistencies
+  within the sampled range (5 prompts / 467 spec steps; 14 exact bf16
+  tie-branch) - so token-exactness is retired as a criterion for this stack
+  and no bridge/acceptance logic error was observed there; a complete
+  serving correctness verification remains outstanding). The remaining AL
+  gap (-17%)
   is registered as the open blocker; until it is closed, no vLLM number is
   quotable.
 
@@ -80,8 +87,11 @@ Pick **one** target, **one** drafter, **one** runtime and build a thin adapter:
 
 What the WP5 build actually used: vLLM 0.22.1's native `dflash` method on
 Qwen2.5-VL-3B-Instruct (steps 1-3 done via the converter + harness); the
-step-4 gate failed (5/32 token-exact) and the residual AL gap is the
-registered blocker (`plan/WP5_REPORT.md`).
+step-4 gate failed (5/32 token-exact; `R-20261014-24/25` later diagnosed it
+as bf16 tie flips + engine run-to-run nondeterminism - same-engine 12/32,
+0/467 genuine inconsistencies - and retired token-exactness as a criterion)
+and the residual AL gap (-17%) is the registered blocker
+(`plan/WP5_REPORT.md`).
 
 ## What must not be claimed until it is real
 

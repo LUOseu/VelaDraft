@@ -127,3 +127,34 @@ unchanged; the drag test in E2 checks drafter-side consumption
 
 E2 (GPU): synthetic 2-image / 2-turn JSONL -> prepare -> regen -> capture ->
 train (tiny) -> eval token-exact; record cost report.
+
+## Supervision representation (phase-1 design note)
+
+This section is the field-by-field contract required by the route document
+(§4.1): which artifact carries each piece of supervision, which stage produces
+it and which stage consumes it. Names in `code` are real artifact keys; the
+consumer-side invariants are pinned in `tests/test_multimodal_supervision.py`
+and the data-side parsing/rendering invariants in
+`tests/test_wp2_multiturn.py`.
+
+| §4.1 requirement | Artifact / key | Producer -> consumer |
+| --- | --- | --- |
+| target / tokenizer / processor / image preprocessing / template identity | `contract.json`: `target.model_fingerprint` (sha256 of config/generation/index + weight shard sizes), `target.processor_fingerprint` (processor files, chat template included), `image.min_pixels` / `image.max_pixels` plus the recorded processor defaults, `tokens.*` (tokenizer values cross-checked against the target config) | `contract.build_contract` -> all stages; stage digests (`cli.stage_digest_payload`) pin the identity subset per stage, and `provenance.assert_identity` re-checks it when a checkpoint is consumed (eval load, resume) |
+| ordered image-text segments, media content hash, image turn | schema-v2 row: `conversations[].segments` (typed text/image segments in appearance order), `images` + `image_turns` (flat, same order; v1 rows normalize to `image_turns=[0]`); `data/manifest.json` rows keep `image_sha256` / `image_sha256_list` and the dataset `rows_sha256` | `data/schema.normalize_row` + `data/prepare.py` -> renderer -> regen/capture |
+| full token sequence, visual token span, native positions | capture record: `input_ids` (full sequence after incremental regen concat), `image_spans` (contiguous runs in appearance order; `image_span` keeps the first run for v1 consumers), `n_image_tokens` checked against the processor's `image_grid_thw` counts, `position3` (replay of the target's own 3-axis positions for the full multi-image sequence) | `target/sample_capture.py` -> feature store -> `dflash/features.collate_features` (pads the batch, derives `image_mask = input_ids == contract.tokens.image_token_id`) |
+| visible-context boundary, assistant supervision spans, block anchors, stop positions | `loss_mask` (float, union of generated assistant spans; `meta.answer_spans` / `meta.turn_spans` keep per-turn provenance, `meta.truncated` marks a clipped tail); anchors are sampled inside the trainer from `loss_mask > 0` positions only; the regenerated `answer_ids` end in the target stop token (`regen.turns[].stop_token_id`, `forced_stop`) | `target/regen.py` (greedy, stops at the target EOS) -> capture -> `DFlashTrainerModule` |
+| method-requested target layers | `contract.layers.capture_layer_ids` (ordered list the store holds) + the store's `hidden` width; the per-method consumed subset is declared machine-readably in `docs/TRAINING_SIGNALS.md` (`context_layers`) | contract -> capture -> trainer |
+| teacher final hidden states | capture-v2 `final_hidden` (stored only when a recipe/objective needs it: `capture.store_final_hidden`); teacher logits are reconstructed on demand from the frozen head | capture -> trainer (`teacher_hidden`) |
+| loss normalization and stage | per-algorithm loss terms and the active `algorithm.train_recipe` stage; both enter the training-plan digest (`training_plan.py`) and the checkpoint (`recipe_stage`), and the recipe's teacher-signal requirement is validated against the capture layout before training starts | algorithms -> trainer |
+
+### Multi-window data units (deferred, documented)
+
+One schema-v2 row currently produces exactly one training unit: the full
+history plus the single supervised last answer
+(`regen.multi_turn_mode=last_turn_only`, the default). Because one pool sample
+is one conversation, the "one conversation lives in one split" rule holds
+trivially at the `data/prepare.py` split site today. If a conversation is
+later cut into several last-turn windows, each window is an explicit data
+unit and all windows of a conversation must be assigned to one split at that
+same site. `regen.multi_turn_mode=all_turns` is the separate opt-in mode and
+must not be mixed with last-turn windows in one run.

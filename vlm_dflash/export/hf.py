@@ -50,6 +50,27 @@ def _capture_layer_ids(checkpoint: dict, contract: dict) -> list:
     )
 
 
+def _visual_conditioning_block(checkpoint: dict) -> dict | None:
+    """Visual-conditioning config of the draft, or None for text-only drafts.
+
+    The serving contract that matters is the *structure*: how many cached
+    visual vectors per layer the checkpoint expects, and through which adapter
+    they enter the block tokens. ``draft_config.dflash_config`` keeps the raw
+    keys for the loader; this block makes the contract readable without
+    knowing the internal config layout.
+    """
+    draft_config = checkpoint.get("draft_config") or {}
+    dflash_config = draft_config.get("dflash_config") or {}
+    num_query_tokens = int(dflash_config.get("visual_num_query_tokens", 0) or 0)
+    if num_query_tokens <= 0:
+        return None
+    return {
+        "num_query_tokens": num_query_tokens,
+        "adapter_type": str(dflash_config.get("visual_adapter_type", "cross_attention")),
+        "adapter_dim": int(dflash_config.get("visual_adapter_dim", 256)),
+    }
+
+
 def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -> dict:
     from ..algorithms import get_algorithm
 
@@ -129,6 +150,15 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
         # (DFly: the objective profile -- "controlled_ce" or the selected
         # algorithm.train_recipe name). None for methods that predate the field.
         "objective_profile": checkpoint.get("objective_profile"),
+        # Resolved ``algorithm.train_recipe`` as recorded in the checkpoint
+        # metadata (the DFlash family writes it when a recipe is selected;
+        # None otherwise). Kept in full so a consumer can tell which training
+        # objective produced the weights without the run directory.
+        "train_recipe": checkpoint.get("train_recipe"),
+        # Visual conditioning the draft was trained with (None for text-only
+        # drafts): serving must build the same cached visual context from the
+        # image-token span and hand it to every draft layer.
+        "visual_conditioning": _visual_conditioning_block(checkpoint),
         "checkpoint": checkpoint_name,
         # Which target-feature source trained these weights: "offline" (staged
         # capture) or "online" (live extraction during training). Serving is
@@ -254,8 +284,17 @@ def render_model_card(export_config: dict) -> str:
         f"| MRoPE sections | {drafter['spatial_rope']['sections']} ({drafter['spatial_rope']['mode']}) |",
         f"| code commit | `{export_config.get('code_commit') or 'n/a'}` |",
     ]
+    visual = export_config.get("visual_conditioning")
+    if visual:
+        lines.append(
+            f"| visual conditioning | {visual['num_query_tokens']} cached visual vector(s) per draft layer "
+            f"({visual['adapter_type']}, dim {visual['adapter_dim']}) |"
+        )
     if export_config.get("objective_profile"):
         lines.append(f"| objective profile | {export_config['objective_profile']} |")
+    recipe = export_config.get("train_recipe")
+    if recipe:
+        lines.append(f"| train recipe | {recipe.get('name')} ({recipe.get('scheme')}) |")
     if data:
         lines += [
             f"| training data | {data.get('num_train')} train / {data.get('num_val')} val from `{data.get('source')}` |",
@@ -350,6 +389,7 @@ def export_run(run_dir: str | Path, *, checkpoint: str = "ckpt_final.pt", out_di
             "checkpoint": checkpoint,
             "code_commit": export_config.get("code_commit"),
             "algorithm": export_config["method"],
+            "train_recipe": export_config.get("train_recipe"),
             "target": export_config["target"],
             "data": export_config["data"],
             "training": export_config["training"],

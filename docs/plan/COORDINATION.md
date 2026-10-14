@@ -21,7 +21,10 @@ starting a work package, re-read it before big steps.
   session touched it after your read.
 - GPU: check `nvidia-smi` before launching; do not overlap jobs on the same
   device; one heavy job at a time. All GPU time (both sessions) is charged in
-  `RESOURCE_LEDGER.md` against the 8 GPU-h first-round cap.
+  `RESOURCE_LEDGER.md` against the 8 GPU-h first-round cap. Budget figures
+  inside the status-log entries below are as-of their timestamps; the
+  current total lives in `RESOURCE_LEDGER.md` (6.25 / 8.00 charged as of
+  2026-10-14 evening).
 - Record every paid run in `RUN_LOG.md` (set B rows to be added as an
   independent replication of E1); do not double-count runs.
 
@@ -155,3 +158,19 @@ decision, it overrides everything here.
   Budget unchanged at **4.10 / 8.00 GPU-h**. All WPs now have a terminal
   state (WP5 = BLOCKED-with-gap by the plan rule); no further GPU jobs are
   queued from this lane.
+
+- Status update (C-01a13621, 2026-10-14 evening): **bounded pending list
+  complete; review-fix round on `cvpr-route`.** The host queue R-18..R-23
+  finished (`QUEUE_DONE spent=6667s` = 1.85 GPU-h) and the interactive vLLM
+  diagnosis R-24/25 cost 0.30: #1 `R-19` PASS, #2 `R-21` measured, #3
+  `R-22` PASS, #4 `R-24/25` diagnosis (no bridge/acceptance logic error
+  observed within the sampled range, 5 prompts / 467 spec steps;
+  token-exactness retired as a criterion; complete serving correctness
+  verification outstanding), #5 `R-18` PASS, #6 `R-20` measured, #7 `R-23`
+  PASS (seed-43: AL 1.830 vs init 1.003 - the two-seed G4 condition is met
+  alongside `R-11`). Budget now **6.25 / 8.00 GPU-h charged, 1.75
+  remaining** - the 4.10/8.00 figures in the entries above are as-of their
+  timestamps and do not include R-18..R-25. No jobs queued or running;
+  nothing to re-schedule. Review conditions on the code fixes: profiler
+  ms/token unit bug and DSpark export `train_recipe` loss fixed in `757f509`
+  (suite 464 passed / 6 skipped).

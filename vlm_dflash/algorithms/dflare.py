@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord
+from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord, TrainingSignals
 from .registry import register
 
 
@@ -38,6 +38,20 @@ class DFlareAlgorithm(DrafterAlgorithm):
         },
         capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
+        training_signals=TrainingSignals(
+            hard_label="Yes - decayed block CE on regenerated targets (the shared DFlash objective).",
+            context_layers=(
+                "Per-draft-layer fusion over the captured target layers (context_layer_ids; null "
+                "= every captured layer) plus dedicated target-context K/V projections."
+            ),
+            teacher_final_hidden=(
+                "Not used by the default objective; required by train_recipe: upstream_two_stage."
+            ),
+            distribution_objective="None by default; LK + end-to-end TV under the recipe.",
+            confidence_objective="None.",
+            stage="Single stage by default; two-stage recipe as for DFlash.",
+            block_convention="DFlash slot convention (slot 0 anchor clean, unsupervised; S-1 proposals).",
+        ),
         evidence=(
             EvidenceRecord(
                 family="qwen25_vl",

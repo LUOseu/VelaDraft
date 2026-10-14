@@ -53,7 +53,7 @@ from .mask import (
 )
 from .decay_loss import DFlashDecayLoss
 from .draft_model import Qwen3DFlashDraftModel
-from ..objectives import TeacherLogitsStream, recipe_loss
+from ..objectives import CONFIDENCE_LOGITS_AUX_KEY, TeacherLogitsStream, recipe_loss
 
 
 def _context_doc_ids(seq_lens: torch.Tensor, seq_len: int, device: torch.device) -> torch.Tensor:
@@ -912,7 +912,7 @@ class DFlashTrainerModule(nn.Module):
         if recipe is not None and recipe.name != "controlled_ce":
             stage = recipe.stages[self._recipe_stage_index or 0]
             teacher_chunk_fn = None
-            if stage.lk_coef > 0.0 or stage.e2e_tv_coef > 0.0:
+            if stage.lk_coef > 0.0 or stage.e2e_tv_coef > 0.0 or stage.confidence_coef > 0.0:
                 if teacher_hidden is None or label_indices is None:
                     raise ValueError(
                         f"recipe stage {stage.name!r} needs the target's final hidden states (the "
@@ -925,6 +925,13 @@ class DFlashTrainerModule(nn.Module):
                 teacher_chunk_fn = TeacherLogitsStream(
                     self.lm_head, teacher_hidden, label_indices, first_slot=first
                 ).logits
+            # A confidence-head stage receives its per-slot logits from the
+            # algorithm seam (DSpark's ``_apply_algorithm_terms``); the analytic
+            # target is then computed against the same teacher chunks here, so
+            # the teacher projection runs once per step.
+            confidence_logits = None
+            if stage.confidence_coef > 0.0 and isinstance(aux_metrics, dict):
+                confidence_logits = aux_metrics.get(CONFIDENCE_LOGITS_AUX_KEY)
             recipe_total, recipe_metrics = recipe_loss(
                 stage,
                 student_logits=pred_logits.view(bsz, n, slots, -1),
@@ -933,6 +940,7 @@ class DFlashTrainerModule(nn.Module):
                 teacher_logits=None,
                 teacher_chunk_fn=teacher_chunk_fn,
                 loss_decay_gamma=self.loss_decay_gamma,
+                confidence_logits=confidence_logits,
             )
             recipe_metrics["recipe_stage"] = float(self._recipe_stage_index or 0)
             total_loss = recipe_total.to(loss_out.total_loss.dtype)
@@ -1029,6 +1037,13 @@ class DFlashTrainerModule(nn.Module):
     def recipe_stage_index(self) -> int | None:
         """Current recipe stage (``None`` when no recipe is active)."""
         return self._recipe_stage_index
+
+    def current_recipe_stage(self):
+        """The recipe stage the upcoming step trains (``None`` without a recipe)."""
+        if self.train_recipe is None:
+            return None
+        stages = self.train_recipe.stages
+        return stages[min(int(self._recipe_stage_index or 0), len(stages) - 1)]
 
     def set_training_progress(self, step: int, total_steps: int) -> None:
         """Training-loop progress hook (also used by Domino's curriculum).

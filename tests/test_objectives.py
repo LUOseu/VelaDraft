@@ -15,6 +15,7 @@ block-CE trainer core. These tests pin the contract:
 
 from __future__ import annotations
 
+import dataclasses
 import sys
 from pathlib import Path
 
@@ -209,13 +210,17 @@ def _ref_lk(student: torch.Tensor, teacher: torch.Tensor, weights: torch.Tensor,
     if loss_type == "hybrid":
         lam = torch.exp(-eta * (1.0 - tv))
         ell = lam * kl + (1.0 - lam) * tv
+    elif loss_type == "kl":
+        ell = kl
+    elif loss_type == "tv":
+        ell = tv
     else:
         ell = -torch.log((1.0 - tv).clamp_min(1e-10))
     w = weights.double()
     return float((ell * w).sum() / w.sum().clamp_min(1e-6))
 
 
-@pytest.mark.parametrize("loss_type", ["hybrid", "alpha"])
+@pytest.mark.parametrize("loss_type", ["hybrid", "alpha", "kl", "tv"])
 def test_lk_term_matches_direct_reference(loss_type):
     torch.manual_seed(1)
     rows, vocab = 37, 11
@@ -229,7 +234,7 @@ def test_lk_term_matches_direct_reference(loss_type):
 
 def test_lk_term_rejects_unknown_loss_type():
     with pytest.raises(ValueError, match="unknown lk_loss_type"):
-        lk_term(torch.randn(3, 5), torch.randn(3, 5), torch.ones(3), loss_type="kl", eta=3.0)
+        lk_term(torch.randn(3, 5), torch.randn(3, 5), torch.ones(3), loss_type="nope", eta=3.0)
 
 
 def test_lk_hybrid_eta_zero_is_pure_tv():
@@ -239,6 +244,221 @@ def test_lk_hybrid_eta_zero_is_pure_tv():
     got = float(lk_term(student, teacher, weights, loss_type="hybrid", eta=0.0))
     ref = _ref_lk(student, teacher, weights, loss_type="hybrid", eta=0.0)
     assert got == pytest.approx(ref, rel=1e-4)
+
+
+def test_lk_kl_and_tv_types_and_the_accept_collector():
+    torch.manual_seed(3)
+    rows, vocab = 23, 9
+    student = torch.randn(rows, vocab)
+    teacher = torch.randn(rows, vocab)
+    weights = torch.ones(rows)
+    p = torch.softmax(teacher.double(), dim=-1)
+    q = torch.softmax(student.double(), dim=-1)
+    accept_ref = torch.minimum(p, q).sum(dim=-1)
+
+    kl = float(lk_term(student, teacher, weights, loss_type="kl", eta=3.0))
+    tv = float(lk_term(student, teacher, weights, loss_type="tv", eta=3.0))
+    assert kl == pytest.approx(_ref_lk(student, teacher, weights, "kl", 3.0), rel=1e-4)
+    assert tv == pytest.approx(_ref_lk(student, teacher, weights, "tv", 3.0), rel=1e-4)
+    # The NeMo DSpark probability term is the L1 geometry: |p - q|_1 == 2 * TV,
+    # so no separate branch is needed to reproduce it from the same chunks.
+    l1_ref = float((p - q).abs().sum(dim=-1).mean())
+    assert 2.0 * tv == pytest.approx(l1_ref, rel=1e-4)
+
+    collected: dict = {}
+    total = float(
+        lk_term(student, teacher, weights, loss_type="kl", eta=3.0, accept_out=collected)
+    )
+    assert total == pytest.approx(kl, rel=1e-6, abs=1e-7)
+    accept = torch.cat([collected[start] for start in sorted(collected)], dim=0)
+    assert accept.shape == (rows,)
+    assert not accept.requires_grad
+    assert torch.allclose(accept.double(), accept_ref, atol=1e-6)
+
+
+# --------------------------------------------------------------------------- #
+# upstream_dspark recipe (DSpark faithful objective)
+# --------------------------------------------------------------------------- #
+
+
+def test_upstream_dspark_recipe_resolves_for_dspark_only():
+    recipe = resolve_recipe({"algorithm": {"train_recipe": "upstream_dspark"}}, "dspark")
+    assert recipe is not None
+    stage = recipe.stages[0]
+    assert recipe.needs_teacher
+    assert (stage.ce_coef, stage.lk_coef, stage.e2e_tv_coef) == (0.0, 1.0, 0.0)
+    assert stage.lk_loss_type == "kl"
+    assert stage.weighting == "decay"
+    assert stage.confidence_coef == 1.0
+
+    tuned = resolve_recipe(
+        {"algorithm": {"train_recipe": {"name": "upstream_dspark", "confidence_coef": 0.25}}},
+        "dspark",
+    )
+    assert tuned is not None
+    assert tuned.stages[0].confidence_coef == 0.25
+
+    with pytest.raises(ValueError, match="not supported for algorithm"):
+        resolve_recipe({"algorithm": {"train_recipe": "upstream_dspark"}}, "dflash")
+    with pytest.raises(ValueError, match="unsupported keys"):
+        resolve_recipe(
+            {"algorithm": {"train_recipe": {"name": "upstream_dspark", "cold_start_fraction": 0.5}}},
+            "dspark",
+        )
+    with pytest.raises(ValueError, match="confidence_coef must be >= 0"):
+        resolve_recipe(
+            {"algorithm": {"train_recipe": {"name": "upstream_dspark", "confidence_coef": -0.1}}},
+            "dspark",
+        )
+
+    assert_recipe_capture(
+        recipe, {"capture": {"store_final_hidden": True}}, algorithm_name="dspark"
+    )
+    with pytest.raises(ValueError, match="store_final_hidden=true"):
+        assert_recipe_capture(recipe, {"capture": {}}, algorithm_name="dspark")
+
+    # The confidence coefficient enters the plan digest. Recipes that never
+    # select it keep byte-identical stage dicts (their checkpoints stay
+    # exactly resumable).
+    knobs = plan_recipe_knobs({"algorithm": {"train_recipe": "upstream_dspark"}}, "dspark")
+    assert knobs["train_recipe"]["stages"][0]["confidence_coef"] == 1.0
+    dfly = plan_recipe_knobs({"algorithm": {"train_recipe": "upstream_two_stage"}}, "dfly")
+    assert "confidence_coef" not in dfly["train_recipe"]["stages"][0]
+
+
+def test_plan_digest_records_the_dspark_recipe():
+    base = training_plan_digest(_plan_cfg(), "dspark")
+    by_name = training_plan_digest(_plan_cfg("upstream_dspark"), "dspark")
+    tuned = training_plan_digest(
+        _plan_cfg({"name": "upstream_dspark", "confidence_coef": 0.5}), "dspark"
+    )
+    assert by_name != base
+    assert tuned != by_name
+    knobs = plan_recipe_knobs(_plan_cfg("upstream_dspark"), "dspark")
+    assert knobs["train_recipe"]["stages"][0]["confidence_coef"] == 1.0
+
+
+def _dspark_recipe_fixture():
+    recipe = resolve_recipe({"algorithm": {"train_recipe": "upstream_dspark"}}, "dspark")
+    assert recipe is not None
+    torch.manual_seed(21)
+    student = torch.randn(2, 3, 5, 13, requires_grad=True)
+    teacher = torch.randn(2, 3, 5, 13)
+    targets = torch.randint(0, 13, (2, 3, 5))
+    mask = torch.ones(2, 3, 5)
+    mask[0, 1, 3:] = 0
+    conf = torch.randn(2, 3, 5, requires_grad=True)
+    return recipe, student, teacher, targets, mask, conf
+
+
+def test_upstream_dspark_loss_matches_direct_full_vocab_reference():
+    recipe, student, teacher, targets, mask, conf = _dspark_recipe_fixture()
+    total, components = recipe_loss(
+        recipe.stages[0],
+        student_logits=student,
+        target_ids=targets,
+        block_mask=mask,
+        teacher_logits=teacher,
+        loss_decay_gamma=7.0,
+        confidence_logits=conf,
+    )
+    # Direct double-precision reference over the full vocab (no truncation).
+    p = torch.softmax(teacher.double(), dim=-1)
+    log_q = torch.log_softmax(student.detach().double(), dim=-1)
+    q = log_q.exp()
+    kl = (p * (p.clamp_min(1e-9).log() - log_q)).sum(dim=-1)  # [B, n, S]
+    accept = torch.minimum(p, q).sum(dim=-1)
+    depth = torch.exp(-torch.arange(5).double() / 7.0).view(1, 1, 5)
+    w = mask.double() * depth
+    kl_ref = float((kl * w).sum() / w.sum().clamp_min(1e-6))
+    prob = torch.sigmoid(conf.detach().double())
+    bce = -(accept * torch.log(prob) + (1 - accept) * torch.log(1 - prob))
+    bce_ref = float((bce * w).sum() / w.sum().clamp_min(1e-6))
+
+    assert components["lk_loss"] == pytest.approx(kl_ref, rel=1e-4, abs=1e-5)
+    assert components["confidence_bce"] == pytest.approx(bce_ref, rel=1e-4, abs=1e-5)
+    assert components["confidence_target_mean"] == pytest.approx(
+        float((accept * mask.double()).sum() / mask.double().sum()), rel=1e-5, abs=1e-6
+    )
+    assert float(total.detach()) == pytest.approx(kl_ref + bce_ref, rel=1e-4, abs=1e-5)
+
+    # The analytic target is detached: the BCE trains only the confidence head,
+    # so the student logits receive exactly the KL gradient;
+    # the confidence logits receive their own BCE gradient.
+    student_ref = student.detach().clone().requires_grad_(True)
+    kl_only, _ = recipe_loss(
+        dataclasses.replace(recipe.stages[0], confidence_coef=0.0),
+        student_logits=student_ref,
+        target_ids=targets,
+        block_mask=mask,
+        teacher_logits=teacher,
+        loss_decay_gamma=7.0,
+    )
+    kl_only.backward()
+    total.backward()
+    assert student.grad is not None
+    assert torch.allclose(student.grad, student_ref.grad, atol=1e-6)
+    assert conf.grad is not None
+    assert float(conf.grad.abs().sum()) > 0.0
+
+
+def test_upstream_dspark_confidence_requires_logits_and_distribution_term():
+    recipe, student, teacher, targets, mask, conf = _dspark_recipe_fixture()
+    with pytest.raises(ValueError, match="confidence_logits"):
+        recipe_loss(
+            recipe.stages[0],
+            student_logits=student,
+            target_ids=targets,
+            block_mask=mask,
+            teacher_logits=teacher,
+            loss_decay_gamma=7.0,
+        )
+    with pytest.raises(ValueError, match=r"same \[B, n, S\] shape"):
+        recipe_loss(
+            recipe.stages[0],
+            student_logits=student,
+            target_ids=targets,
+            block_mask=mask,
+            teacher_logits=teacher,
+            loss_decay_gamma=7.0,
+            confidence_logits=conf[:, :, :2],
+        )
+    with pytest.raises(ValueError, match="no distribution term"):
+        recipe_loss(
+            dataclasses.replace(recipe.stages[0], lk_coef=0.0),
+            student_logits=student,
+            target_ids=targets,
+            block_mask=mask,
+            teacher_logits=teacher,
+            loss_decay_gamma=7.0,
+            confidence_logits=conf,
+        )
+
+
+def test_upstream_dspark_loss_is_chunk_invariant(monkeypatch):
+    recipe, student, teacher, targets, mask, conf = _dspark_recipe_fixture()
+    full_total, full = recipe_loss(
+        recipe.stages[0],
+        student_logits=student,
+        target_ids=targets,
+        block_mask=mask,
+        teacher_logits=teacher,
+        loss_decay_gamma=7.0,
+        confidence_logits=conf,
+    )
+    monkeypatch.setattr(obj, "LK_CHUNK_ROWS", 4)
+    chunk_total, chunk = recipe_loss(
+        recipe.stages[0],
+        student_logits=student,
+        target_ids=targets,
+        block_mask=mask,
+        teacher_logits=teacher,
+        loss_decay_gamma=7.0,
+        confidence_logits=conf,
+    )
+    assert torch.allclose(full_total, chunk_total, atol=1e-6)
+    for key in ("lk_loss", "confidence_bce", "confidence_target_mean", "confidence_pred_mean"):
+        assert chunk[key] == pytest.approx(full[key], rel=1e-5, abs=1e-6)
 
 
 def _ref_e2e(student: torch.Tensor, teacher: torch.Tensor, mask: torch.Tensor):

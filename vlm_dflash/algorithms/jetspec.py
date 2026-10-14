@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, EvidenceRecord
+from .base import AlgorithmMetadata, EvidenceRecord, TrainingSignals
 from .dflash import DFlashAlgorithm
 from .registry import register
 
@@ -50,6 +50,28 @@ class JetSpecAlgorithm(DFlashAlgorithm):
             "export": True,
         },
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
+        training_signals=TrainingSignals(
+            hard_label=(
+                "No hard-label CE - the trainer replaces it with the teacher-distribution KL "
+                "(it never degenerates to CE)."
+            ),
+            context_layers="Contract capture layers (unmodified DFlash backbone; no new parameters).",
+            teacher_final_hidden=(
+                "Required (capture.store_final_hidden=true): teacher logits are the frozen "
+                "output-head projection of the stored final hidden states at the gathered "
+                "positions (bit-exact reproduction of the target's own logits)."
+            ),
+            distribution_objective=(
+                "Yes - temperature-scaled forward KL(P_target || Q_draft), T^2 scaling, uniform "
+                "weighting over slots 1..S-1 (no depth decay)."
+            ),
+            confidence_objective="None.",
+            stage="Single stage.",
+            block_convention=(
+                "DFlash slot convention (slot 0 anchor clean, unsupervised; S-1 proposals) with "
+                "the block-causal in-block attention mask."
+            ),
+        ),
         evidence=(
             EvidenceRecord(
                 family="qwen25_vl",

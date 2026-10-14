@@ -55,8 +55,10 @@ import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
 
 __all__ = [
+    "CONFIDENCE_LOGITS_AUX_KEY",
     "RECIPE_ALGORITHMS",
     "RECIPE_SCHEME_VERSION",
+    "RECIPE_SUPPORT",
     "RecipeStage",
     "ResolvedRecipe",
     "TeacherLogitsStream",
@@ -74,9 +76,27 @@ __all__ = [
 #: Version tag for the recipe block inside the training-plan digest.
 RECIPE_SCHEME_VERSION = "vlm-dflash-recipe-v1"
 
-#: Algorithms whose trainer module is the shared block-CE core and therefore
-#: accepts ``algorithm.train_recipe``. Other algorithms reject the key.
-RECIPE_ALGORITHMS = ("dflash", "dflare", "dfly")
+#: Recipe name -> the algorithms whose trainer supports it. This is the single
+#: supports-matrix: selecting a recipe outside its list fails loud in
+#: :func:`resolve_recipe` instead of being silently ignored. Extend it only
+#: together with trainer-side support and tests.
+RECIPE_SUPPORT: dict[str, tuple[str, ...]] = {
+    "controlled_ce": ("dflash", "dflare", "dfly"),
+    "upstream_two_stage": ("dflash", "dflare", "dfly"),
+    "upstream_dspark": ("dspark",),
+}
+
+#: Every algorithm that accepts at least one recipe (derived view of
+#: :data:`RECIPE_SUPPORT`, for messages and compatibility checks).
+RECIPE_ALGORITHMS = tuple(
+    sorted({algorithm for algorithms in RECIPE_SUPPORT.values() for algorithm in algorithms})
+)
+
+#: Algorithm-internal aux-metrics key (underscore prefix: stripped before
+#: logging) through which a trainer passes the supervised-slot confidence
+#: logits into the shared recipe loss, which trains the confidence head against
+#: the analytic acceptance target computed from the same teacher chunk stream.
+CONFIDENCE_LOGITS_AUX_KEY = "_confidence_logits"
 
 # Chunk sizes for the fp32 loss arithmetic (rows of positions / blocks per
 # chunk). Bounds the transient fp32 memory at full vocab (~152k) without
@@ -97,9 +117,12 @@ class RecipeStage:
     lk_loss_type: str = "hybrid"
     lk_eta: float = 3.0
     dpace_alpha: float = 0.5
+    #: Weight of the confidence BCE term trained against the analytic
+    #: acceptance rate (0 disables it).
+    confidence_coef: float = 0.0
 
     def as_dict(self) -> dict:
-        return {
+        record = {
             "name": self.name,
             "weighting": self.weighting,
             "ce_coef": float(self.ce_coef),
@@ -109,6 +132,12 @@ class RecipeStage:
             "lk_eta": float(self.lk_eta),
             "dpace_alpha": float(self.dpace_alpha),
         }
+        # Emitted only when selected, so plans of runs that never use the
+        # confidence objective keep their recorded digests byte-identical
+        # (their checkpoints stay exactly resumable).
+        if self.confidence_coef:
+            record["confidence_coef"] = float(self.confidence_coef)
+        return record
 
 
 @dataclass(frozen=True)
@@ -189,23 +218,66 @@ def _upstream_two_stage(cold_start_fraction: float) -> ResolvedRecipe:
     )
 
 
+def _upstream_dspark(confidence_coef: float) -> ResolvedRecipe:
+    """The upstream speculators DSpark default objective (single stage).
+
+    Distils the block logits against the target's next-token distribution with
+    the plain forward KL (``kl_div`` weight 1.0 in speculators
+    ``TrainConfig._resolve_derived_defaults``) and trains the confidence head
+    against the analytic acceptance rate ``sum_v min(p, q) = 1 - TV`` (their
+    ``compute_metrics``), both position-decayed. The teacher distribution is
+    reconstructed on demand from the target's final hidden states through the
+    frozen output head (``TeacherLogitsStream``); the drafter's live
+    probabilities enter the confidence target at every step, so it is computed
+    dynamically and never cached as a fixed feature.
+    """
+    if confidence_coef < 0.0:
+        raise ValueError(
+            "algorithm.train_recipe.confidence_coef must be >= 0, got "
+            f"{confidence_coef!r}."
+        )
+    return ResolvedRecipe(
+        name="upstream_dspark",
+        stages=(
+            RecipeStage(
+                name="verifier_kl_confidence",
+                weighting="decay",
+                ce_coef=0.0,
+                lk_coef=1.0,
+                e2e_tv_coef=0.0,
+                lk_loss_type="kl",
+                confidence_coef=float(confidence_coef),
+            ),
+        ),
+        cold_start_fraction=1.0,
+        needs_teacher=True,
+    )
+
+
 _RECIPE_BUILDERS = {
     "controlled_ce": lambda options: _controlled_ce(),
     "upstream_two_stage": lambda options: _upstream_two_stage(
         float(options.get("cold_start_fraction", 0.5))
     ),
+    "upstream_dspark": lambda options: _upstream_dspark(
+        float(options.get("confidence_coef", 1.0))
+    ),
 }
 
-#: Option keys a recipe mapping may carry besides ``name``.
-_RECIPE_OPTIONS = ("cold_start_fraction",)
+#: Option keys each recipe mapping may carry besides ``name``.
+_RECIPE_ALLOWED_OPTIONS: dict[str, tuple[str, ...]] = {
+    "controlled_ce": (),
+    "upstream_two_stage": ("cold_start_fraction",),
+    "upstream_dspark": ("confidence_coef",),
+}
 
 
 def resolve_recipe(cfg: dict, algorithm_name: str) -> ResolvedRecipe | None:
     """Resolve ``algorithm.train_recipe`` for ``algorithm_name`` (or ``None``).
 
-    Bounded schema: unknown recipe names, unknown option keys and recipes on
-    algorithms outside :data:`RECIPE_ALGORITHMS` all fail loud, so a config can
-    never ask for an objective the run would silently not train.
+    Bounded schema: unknown recipe names, unknown option keys and recipe /
+    algorithm pairs outside :data:`RECIPE_SUPPORT` all fail loud, so a config
+    can never ask for an objective the run would silently not train.
     """
     algorithm_cfg = cfg.get("algorithm") if isinstance(cfg, dict) else None
     if not isinstance(algorithm_cfg, dict):
@@ -213,12 +285,6 @@ def resolve_recipe(cfg: dict, algorithm_name: str) -> ResolvedRecipe | None:
     block = algorithm_cfg.get("train_recipe")
     if block is None:
         return None
-    if algorithm_name not in RECIPE_ALGORITHMS:
-        raise ValueError(
-            f"algorithm.train_recipe is not supported for algorithm={algorithm_name!r}. "
-            f"Supported algorithms: {list(RECIPE_ALGORITHMS)} — their trainers share the block-CE "
-            "core the recipe objectives attach to; other algorithms define their own objectives."
-        )
     if isinstance(block, str):
         name, options = block, {}
     elif isinstance(block, dict):
@@ -234,11 +300,22 @@ def resolve_recipe(cfg: dict, algorithm_name: str) -> ResolvedRecipe | None:
             f"algorithm.train_recipe has unknown recipe name {name!r}; supported: "
             f"{sorted(_RECIPE_BUILDERS)}."
         )
-    unknown = sorted(set(options) - set(_RECIPE_OPTIONS))
+    supported_here = sorted(
+        recipe for recipe, algorithms in RECIPE_SUPPORT.items() if algorithm_name in algorithms
+    )
+    if name not in supported_here:
+        raise ValueError(
+            f"algorithm.train_recipe {name!r} is not supported for algorithm={algorithm_name!r}; "
+            f"that algorithm supports: {supported_here or 'no recipes'}. The supports-matrix is "
+            "RECIPE_SUPPORT in vlm_dflash/objectives.py — a pairing is only added together with "
+            "trainer-side support and tests."
+        )
+    allowed = _RECIPE_ALLOWED_OPTIONS[name]
+    unknown = sorted(set(options) - set(allowed))
     if unknown:
         raise ValueError(
             f"algorithm.train_recipe for {name!r} has unsupported keys {unknown}; supported: "
-            f"{sorted(_RECIPE_OPTIONS)}."
+            f"{sorted(allowed)}."
         )
     return _RECIPE_BUILDERS[name](options)
 
@@ -314,10 +391,26 @@ def lk_per_position(
     *,
     loss_type: str,
     eta: float,
-) -> torch.Tensor:
-    """Per-position LK loss ``[rows]`` (chunked; fp32 arithmetic)."""
+    return_accept: bool = False,
+):
+    """Per-position acceptance-family loss ``[rows]`` (chunked; fp32 arithmetic).
+
+    ``loss_type`` selects the per-position objective:
+
+    - ``"alpha"`` / ``"hybrid"``: the DFly upstream LK losses;
+    - ``"kl"``: pure forward ``KL(p_teacher || p_student)`` — the speculators
+      DSpark default loss (``kl_div_loss`` in ``speculators/losses/eager.py``,
+      full-vocab semantics, no top-k truncation);
+    - ``"tv"``: pure total variation ``0.5 * |p - q|_1``.
+
+    With ``return_accept=True`` the chunk also yields the per-position
+    distributional acceptance rate ``sum_v min(p, q) = 1 - TV`` (fp32,
+    detached — the analytic confidence target of the upstream DSpark
+    objective).
+    """
     rows = student_logits.shape[0]
     out = []
+    accepts = [] if return_accept else None
     for start in range(0, rows, LK_CHUNK_ROWS):
         stop = min(rows, start + LK_CHUNK_ROWS)
         tv, kl = _tv_kl(student_logits[start:stop], teacher_logits[start:stop])
@@ -326,10 +419,22 @@ def lk_per_position(
         elif loss_type == "hybrid":
             lam = torch.exp(-eta * (1.0 - tv).detach().clamp(0.0, 1.0))
             ell = lam * kl + (1.0 - lam) * tv
+        elif loss_type == "kl":
+            ell = kl
+        elif loss_type == "tv":
+            ell = tv
         else:
-            raise ValueError(f"unknown lk_loss_type {loss_type!r}; expected 'alpha' or 'hybrid'.")
+            raise ValueError(
+                f"unknown lk_loss_type {loss_type!r}; expected 'alpha', 'hybrid', 'kl' or 'tv'."
+            )
         out.append(ell)
-    return torch.cat(out, dim=0) if len(out) > 1 else out[0]
+        if accepts is not None:
+            accepts.append((1.0 - tv).detach())
+    ell_all = torch.cat(out, dim=0) if len(out) > 1 else out[0]
+    if accepts is None:
+        return ell_all
+    accept_all = torch.cat(accepts, dim=0) if len(accepts) > 1 else accepts[0]
+    return ell_all, accept_all
 
 
 def lk_term(
@@ -340,6 +445,7 @@ def lk_term(
     loss_type: str,
     eta: float,
     teacher_chunk_fn=None,
+    accept_out: dict | None = None,
 ) -> torch.Tensor:
     """Weighted-mean LK term over the flat supervised slots.
 
@@ -354,6 +460,12 @@ def lk_term(
     backward instead of being retained: without it the autocast fp32 copies of
     the full-vocab rows accumulate across all chunks (~35 GB at the canonical
     16-sample sanity batch) and OOM a 48 GB card.
+
+    With ``accept_out`` (a dict) the per-chunk analytic acceptance rate is also
+    collected under its chunk-start row index. The key-based write is
+    idempotent under the activation-checkpoint recompute in the backward (the
+    recomputed chunk overwrites its own key with identical values), and rows
+    come out in ascending flat-slot order via ``sorted(accept_out)``.
     """
     if (teacher_logits is None) == (teacher_chunk_fn is None):
         raise ValueError("pass exactly one of teacher_logits / teacher_chunk_fn.")
@@ -369,7 +481,13 @@ def lk_term(
                 if teacher_chunk_fn is not None
                 else teacher_logits[start:stop]
             )
-            ell = lk_per_position(student_chunk, teacher_chunk, loss_type=loss_type, eta=eta)
+            if accept_out is None:
+                ell = lk_per_position(student_chunk, teacher_chunk, loss_type=loss_type, eta=eta)
+            else:
+                ell, accept = lk_per_position(
+                    student_chunk, teacher_chunk, loss_type=loss_type, eta=eta, return_accept=True
+                )
+                accept_out[start] = accept
             return (ell * weight_chunk).sum()
 
         student_chunk = student_logits[start:stop]
@@ -480,6 +598,7 @@ def recipe_loss(
     teacher_logits: torch.Tensor | None,
     teacher_chunk_fn=None,
     loss_decay_gamma: float | None,
+    confidence_logits: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, dict]:
     """Loss for one recipe stage + logging components.
 
@@ -490,12 +609,42 @@ def recipe_loss(
     rows (lazy; the trainer's :class:`TeacherLogitsStream`). Any stage whose
     ``lk_coef`` or ``e2e_tv_coef`` is non-zero requires the teacher; pass
     exactly one of the two forms.
+
+    ``confidence_coef > 0`` additionally trains a confidence head: pass its
+    per-slot logits as ``confidence_logits`` ``[B, n, S]``. The BCE target is
+    the analytic acceptance rate ``sum_v min(p_student, p_teacher)`` computed
+    from the very same teacher chunks and the *current* student logits
+    (detached) — exactly the upstream DSpark confidence objective, which is why
+    it must be computed here, per step, next to the distribution term, and
+    never cached as a fixed feature.
     """
-    if stage.ce_coef <= 0.0 and stage.lk_coef <= 0.0 and stage.e2e_tv_coef <= 0.0:
+    if (
+        stage.ce_coef <= 0.0
+        and stage.lk_coef <= 0.0
+        and stage.e2e_tv_coef <= 0.0
+        and stage.confidence_coef <= 0.0
+    ):
         raise ValueError(f"recipe stage {stage.name!r} has no active loss term.")
     mask = block_mask.to(torch.float32)
+    if stage.confidence_coef > 0.0:
+        if stage.lk_coef <= 0.0:
+            raise ValueError(
+                f"recipe stage {stage.name!r} trains the confidence head but has no distribution "
+                "term: the analytic acceptance target is computed from the same teacher chunk "
+                "stream as the KL/TV term, so at least one of them must be active in this stage."
+            )
+        if confidence_logits is None:
+            raise ValueError(
+                f"recipe stage {stage.name!r} trains a confidence head (confidence_coef="
+                f"{stage.confidence_coef}); pass the per-slot logits as confidence_logits."
+            )
+        if tuple(confidence_logits.shape) != tuple(block_mask.shape):
+            raise ValueError(
+                "confidence_logits must have the same [B, n, S] shape as block_mask; got "
+                f"{tuple(confidence_logits.shape)} vs {tuple(block_mask.shape)}."
+            )
 
-    needs_teacher = stage.lk_coef > 0.0 or stage.e2e_tv_coef > 0.0
+    needs_teacher = stage.lk_coef > 0.0 or stage.e2e_tv_coef > 0.0 or stage.confidence_coef > 0.0
     if needs_teacher and teacher_logits is None and teacher_chunk_fn is None:
         raise ValueError(
             f"recipe stage {stage.name!r} needs the target's final hidden states as the teacher "
@@ -530,6 +679,7 @@ def recipe_loss(
         components["ce_loss"] = float(ce_term.detach())
 
     if stage.lk_coef > 0.0:
+        accept_out: dict | None = {} if stage.confidence_coef > 0.0 else None
         lk = lk_term(
             student_logits.reshape(-1, student_logits.size(-1)),
             None if teacher_chunk_fn is not None else teacher_logits.reshape(-1, teacher_logits.size(-1)),
@@ -537,9 +687,36 @@ def recipe_loss(
             loss_type=stage.lk_loss_type,
             eta=stage.lk_eta,
             teacher_chunk_fn=teacher_chunk_fn,
+            accept_out=accept_out,
         )
         total = total + float(stage.lk_coef) * lk
         components["lk_loss"] = float(lk.detach())
+    else:
+        accept_out = None
+
+    if stage.confidence_coef > 0.0:
+        accept_rows = torch.cat(
+            [accept_out[start] for start in sorted(accept_out)], dim=0
+        ).to(torch.float32)
+        if accept_rows.numel() != mask.numel():
+            raise RuntimeError(
+                "internal: the collected acceptance rows do not cover every supervised slot "
+                f"({accept_rows.numel()} vs {mask.numel()}); this is a bug in the chunk collector."
+            )
+        conf_flat = confidence_logits.reshape(-1).to(torch.float32)
+        bce = F.binary_cross_entropy_with_logits(conf_flat, accept_rows, reduction="none")
+        conf_term = (bce * weights.reshape(-1)).sum() / denom
+        total = total + float(stage.confidence_coef) * conf_term
+        with torch.no_grad():
+            mask_flat = mask.reshape(-1)
+            mask_total = mask_flat.sum().clamp_min(1e-6)
+            probs = conf_flat.detach().sigmoid()
+            components["confidence_bce"] = float(conf_term.detach())
+            components["confidence_target_mean"] = float((accept_rows * mask_flat).sum() / mask_total)
+            components["confidence_pred_mean"] = float((probs * mask_flat).sum() / mask_total)
+            components["confidence_abs_error"] = float(
+                ((probs - accept_rows).abs() * mask_flat).sum() / mask_total
+            )
 
     if stage.e2e_tv_coef > 0.0:
         e2e, accept_len = e2e_tv_term(

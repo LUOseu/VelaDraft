@@ -162,6 +162,50 @@ def test_support_matrix_renders_from_algorithm_metadata():
     assert (root / "SUPPORT_MATRIX.md").read_text(encoding="utf-8") == rendered
 
 
+def test_training_signals_doc_renders_from_algorithm_metadata():
+    """docs/TRAINING_SIGNALS.md must not drift from the declarations."""
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location(
+        "render_training_signals", root / "scripts" / "render_training_signals.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    rendered = module.render()
+    assert (root / "docs" / "TRAINING_SIGNALS.md").read_text(encoding="utf-8") == rendered
+
+
+@pytest.mark.parametrize("name", available_algorithms())
+def test_training_signals_declarations_are_complete(name):
+    """Every algorithm declares every training-signal field (item 2, phase 1)."""
+    signals = get_algorithm(name).metadata.training_signals
+    assert signals is not None, f"{name} must declare training_signals"
+    record = signals.as_dict()
+    for key in (
+        "hard_label",
+        "context_layers",
+        "teacher_final_hidden",
+        "distribution_objective",
+        "confidence_objective",
+        "stage",
+        "block_convention",
+    ):
+        assert record[key].strip(), f"{name}.training_signals[{key!r}] is empty"
+    # Declarations and the recipe machinery must tell the same story: an
+    # algorithm with a teacher-consuming recipe names it in the declaration.
+    from vlm_dflash.objectives import RECIPE_SUPPORT, resolve_recipe
+
+    for recipe in sorted(r for r, algorithms in RECIPE_SUPPORT.items() if name in algorithms):
+        resolved = resolve_recipe({"algorithm": {"train_recipe": recipe}}, name)
+        assert resolved is not None
+        if resolved.needs_teacher:
+            assert recipe in record["teacher_final_hidden"], (
+                f"{name} accepts teacher-consuming recipe {recipe!r} but its "
+                "teacher_final_hidden declaration does not name it"
+            )
+
+
 @pytest.mark.parametrize("name", available_algorithms())
 def test_verify_backend_switch_reaches_shared_inference_engine(name):
     """The evaluator's verify_sdpa_backend setting must bind every algorithm.

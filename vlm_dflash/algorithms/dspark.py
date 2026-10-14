@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord
+from .base import AlgorithmMetadata, DrafterAlgorithm, EvidenceRecord, TrainingSignals
 from .registry import register
 
 
@@ -37,6 +37,33 @@ class DSparkAlgorithm(DrafterAlgorithm):
         },
         capabilities={"image": True, "multi_image": True, "video": False, "eval": True, "export": True},
         targets={"qwen25_vl": "validated", "qwen3_vl": "reduced_validation"},
+        training_signals=TrainingSignals(
+            hard_label=(
+                "Default: decayed block CE on regenerated targets, every supervised slot. "
+                "sample_from_anchor=true (upstream default) supervises all S slots; false keeps "
+                "the DFlash convention (slots 1..S-1)."
+            ),
+            context_layers="Contract capture layers (same fused context as DFlash).",
+            teacher_final_hidden=(
+                "Recipe only - train_recipe: upstream_dspark streams the target's final hidden "
+                "states through the frozen output head to reconstruct the teacher distribution."
+            ),
+            distribution_objective=(
+                "None by default; under the recipe, per-slot forward KL(p_target || p_draft) over "
+                "the full vocabulary, decay-weighted (the speculators default loss_fn=kl_div)."
+            ),
+            confidence_objective=(
+                "Greedy per-slot acceptance indicator by default (the temperature-0 verification "
+                "event); under the recipe, the analytic acceptance rate "
+                "sum_v min(p_draft, p_target) = 1 - TV, computed from the live drafter "
+                "distribution each step (detached) - never cached."
+            ),
+            stage="Single stage.",
+            block_convention=(
+                "sample_from_anchor=true: slot k predicts anchor+k+1, all slots supervised, S "
+                "proposals per round (round window S+1); false: DFlash convention, S-1 proposals."
+            ),
+        ),
         evidence=(
             EvidenceRecord(
                 family="qwen25_vl",
@@ -98,6 +125,33 @@ class DSparkAlgorithm(DrafterAlgorithm):
         if alpha < 0:
             raise ValueError(f"algorithm.dspark.confidence_head_alpha must be >= 0, got {alpha}.")
 
+        from ..objectives import assert_recipe_capture, resolve_recipe
+
+        recipe = resolve_recipe(cfg, self.name)
+        assert_recipe_capture(recipe, cfg, algorithm_name=self.name)
+        if recipe is not None:
+            trains_confidence = any(float(stage.confidence_coef) > 0.0 for stage in recipe.stages)
+            if trains_confidence:
+                if not bool(dspark["enable_confidence_head"]):
+                    raise ValueError(
+                        f"algorithm=dspark train_recipe={recipe.name!r} trains the confidence head "
+                        "against the analytic acceptance target; enable_confidence_head must be "
+                        "true (or drop the recipe)."
+                    )
+                if float(dspark["confidence_head_alpha"]) != 1.0:
+                    raise ValueError(
+                        "algorithm.dspark.confidence_head_alpha must stay at the upstream default "
+                        f"1.0 under train_recipe={recipe.name!r}; set train_recipe.confidence_coef "
+                        "to change the confidence weight."
+                    )
+            elif bool(dspark["enable_confidence_head"]):
+                raise ValueError(
+                    f"algorithm=dspark train_recipe={recipe.name!r} has no confidence term "
+                    "(confidence_coef=0), so the enabled confidence head would never receive "
+                    "gradient; set algorithm.dspark.enable_confidence_head=false or "
+                    "train_recipe.confidence_coef > 0."
+                )
+
     # ------------------------------------------------------------------ #
     # training side
     # ------------------------------------------------------------------ #
@@ -127,10 +181,12 @@ class DSparkAlgorithm(DrafterAlgorithm):
         # (checkpoint metadata must record what was actually constructed).
         dflash_config = dict(getattr(draft_config, "dflash_config", {}) or {})
         from ..dspark.factory import DEFAULTS, resolve_dspark_config
+        from ..objectives import resolve_recipe
 
         resolved = resolve_dspark_config(cfg)
         dspark = {key: dflash_config.get(key, resolved[key]) for key in DEFAULTS}
         dspark["confidence_head_alpha"] = float(resolved["confidence_head_alpha"])
+        recipe = resolve_recipe(cfg, self.name)
         return {
             "draft_config": draft_config.to_dict(),
             "attention_backend": str(drafter.get("attention_backend", "flex_attention")),
@@ -139,6 +195,7 @@ class DSparkAlgorithm(DrafterAlgorithm):
             "num_anchors": int(drafter.get("num_anchors", 256)),
             "loss_decay_gamma": float(drafter.get("loss_decay_gamma", 7.0)),
             "target_layer_ids": [int(x) for x in contract["layers"]["draft_layer_ids"]],
+            "train_recipe": None if recipe is None else recipe.as_dict(),
             "dspark": {
                 "markov_rank": int(dspark["markov_rank"]),
                 "markov_head_type": str(dspark["markov_head_type"]),

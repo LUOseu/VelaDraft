@@ -67,19 +67,36 @@ Checkpoint format:         speculators HF-style speculator configs (speculators_
 
 ## What we change (and why)
 
-- **Confidence target (documented adaptation).** Upstream trains the confidence
-  head against the analytical acceptance rate `1 - TV(p_draft, p_target)` from
-  verifier logits (online distillation). Our pipeline is staged and offline: the
-  feature shards store target *hidden states* only, not verifier distributions
-  (full-vocab logits per position are not storable). The confidence target here
-  is the **greedy per-slot acceptance indicator** (draft argmax == target token)
-  — the exact event our temperature-0 verification gate measures, and the signal
-  a dynamic-draft-length policy would consume. This is the one deliberate
-  objective deviation; everything else (heads, bias, chaining, slot alignment)
-  follows upstream.
-- **Distribution term dropped.** The KL/L1 term against verifier logits is not
-  computable from staged features; our base loss stays the frozen decayed block
-  CE on hard regen targets. Consequences are tracked as a parity gap, not hidden.
+- **Verifier-distribution objective (recipe `upstream_dspark`).** The upstream
+  default loss is `loss_fn="kl_div"` — per position forward
+  `KL(p_verifier || p_draft)` against the verifier logits, decay-weighted, with
+  the confidence BCE against `accept_rate = 1 - TV(p_draft, p_target)` — see
+  speculators `models/dspark/metrics.py::compute_metrics`,
+  `losses/utils.py::compound_loss/loss_function`, `losses/eager.py::kl_div_loss`
+  and `tv_loss`, default resolved in `train/config/schema.py`
+  (`_DEFAULT_LOSS_FN` falls back to `"kl_div"`; `dflash_decay_gamma=4.0`).
+  We reproduce this objective without storing verifier logits: the stored
+  target **final hidden states** are projected through the frozen output head
+  on demand (`TeacherLogitsStream`, position `label - 1`, bounded fp32 chunks,
+  activation-checkpointed). The KL term and the analytic confidence target
+  share one chunk stream per forward; the target is computed from the live
+  drafter distribution each step (detached), never cached. Keyed by
+  `algorithm.train_recipe: upstream_dspark`
+  (`configs/dspark/qwen2_5_vl_3b_2k_recipe.yaml`); requires
+  `capture.store_final_hidden=true` and a store with `stores_final_hidden`.
+- **Plain runs (documented adaptation).** Without the recipe, the loss stays
+  the frozen decayed block CE on hard regen targets and the confidence target
+  is the **greedy per-slot acceptance indicator** (draft argmax == target
+  token) — the exact event our temperature-0 verification gate measures. This
+  is the original port behavior, kept as the default so recorded runs and
+  their plan digests stay byte-identical.
+- **Normalization convention.** Our decay-weighted terms divide by
+  `sum(mask * decay)` (the repo-wide `DFlashDecayLoss` convention); the
+  speculators `loss_function` divides by the plain mask count. Gradient
+  direction is identical; the effective scale differs by the batch's mean
+  decay factor. Also: our recipe uses the run's `loss_decay_gamma` (dev configs
+  use 7.0; set 4.0 to match the upstream default) and trains over the full
+  target vocabulary (upstream's example pipeline can map to a 32k draft vocab).
 - **Verification extension.** `sample_from_anchor=True` needs a round window of
   `block_size + 1` positions (anchor + `block_size` proposals) in
   `spec_generate`; the draft's own input block stays `block_size`.
@@ -98,9 +115,14 @@ Checkpoint format:         speculators HF-style speculator configs (speculators_
 
 **Maintainer-implementation-informed reconstruction** — architecture, head
 semantics, sampling chain and slot alignment are ported from the two upstream
-implementations at the commits above; the training objective deviates in the
-two documented points (confidence target, dropped verifier-distribution term),
-because the staged offline pipeline cannot reproduce online logit distillation.
-Parity evidence to be recorded after the canonical benchmark: confidence
-signal non-constant + calibrated (AUROC/ECE), and acceptance comparison vs
-DFlash on identical features.
+implementations at the commits above. The training objective is selectable:
+`train_recipe: upstream_dspark` reproduces the speculators default objective
+(KL distillation + analytic confidence target) from stored final hidden states,
+with the three documented convention differences above (normalization divisor,
+decay-gamma default, draft vocab); plain runs keep the original
+decayed-CE + greedy-confidence port. Objective-level parity evidence (loss and
+gradients vs a direct full-vocab reference, chunk invariance, detached analytic
+target, gradient coverage of both heads) is recorded in the CPU tests
+(`tests/test_objectives.py`, `tests/test_dspark.py`); a real-target GPU
+comparison is pending (see the GPU_PENDING list in
+`docs/plan/REVIEW_REMEDIATION.md`).

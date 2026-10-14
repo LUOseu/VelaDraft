@@ -133,14 +133,21 @@ def _reject_assistant_image_markers(segments: list[dict], *, context: str) -> No
         )
 
 
-def check_v1_question_layout(question: str, *, context: str) -> None:
+def check_v1_question_layout(question: str, *, context: str, allow_trailing: bool = False) -> None:
     """v1 rows render the image first: the ``<image>`` placeholder may only lead.
 
     The historical single-image renderer strips the placeholder and places the
-    image at the start of the prompt, so a mid-text placeholder cannot be
+    image at the start of the prompt, so an interleaved placeholder cannot be
     converted faithfully. Such rows are rejected here (converted to schema
     ``vlm-dflash-data-v2`` they render in order) instead of being silently
     reordered.
+
+    ``allow_trailing`` additionally accepts the LLaVA-Instruct historical form
+    where a single placeholder is the last non-whitespace token
+    (``"...question...\\n<image>"``, about half of that dataset's rows): the v1
+    renderer strips the placeholder and renders the image first, which is
+    exactly how every recorded 2K llava run and capture store was built. Text
+    *after* the placeholder stays rejected.
     """
     markers = str(question).count("<image>")
     if markers > 1:
@@ -149,8 +156,8 @@ def check_v1_question_layout(question: str, *, context: str) -> None:
             "convert the row to schema 'vlm-dflash-data-v2' for multi-image content."
         )
     if markers == 1:
-        before = str(question).split("<image>", 1)[0]
-        if before.strip():
+        before, after = str(question).split("<image>", 1)
+        if before.strip() and not (allow_trailing and not after.strip()):
             raise ValueError(
                 f"{context}: the <image> placeholder must be at the start of the question for v1 rows "
                 f"(found {before!r} before it); convert the row to schema 'vlm-dflash-data-v2' to keep "

@@ -25,7 +25,12 @@ from vlm_dflash.utils import gradient_coverage_report
 
 
 def _tiny_dspark_module(
-    seed: int = 0, *, sample_from_anchor: bool = True, markov_rank: int = 32
+    seed: int = 0,
+    *,
+    sample_from_anchor: bool = True,
+    markov_rank: int = 32,
+    train_recipe=None,
+    confidence_head_alpha: float = 1.0,
 ) -> DSparkTrainerModule:
     torch.manual_seed(seed)
     from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
@@ -69,7 +74,9 @@ def _tiny_dspark_module(
         loss_decay_gamma=7.0,
         markov_rank=markov_rank,
         markov_head_type="vanilla",
+        confidence_head_alpha=confidence_head_alpha,
         sample_from_anchor=sample_from_anchor,
+        train_recipe=train_recipe,
     )
 
 
@@ -443,6 +450,157 @@ def test_calibration_report_handles_varying_anchor_counts():
     assert len(report["per_slot_pred_mean"]) == 8
     assert len(report["per_slot_accept_rate"]) == 8
     assert all(0.0 <= value <= 1.0 for value in report["per_slot_pred_mean"])
+
+
+# --------------------------------------------------------------------------- #
+# faithful objective: train_recipe upstream_dspark (KL + analytic confidence)
+# --------------------------------------------------------------------------- #
+
+
+def _dspark_recipe():
+    from vlm_dflash.objectives import resolve_recipe
+
+    recipe = resolve_recipe({"algorithm": {"train_recipe": "upstream_dspark"}}, "dspark")
+    assert recipe is not None
+    return recipe
+
+
+def _teacher_hidden(input_ids: torch.Tensor, seed: int = 5) -> torch.Tensor:
+    torch.manual_seed(seed)
+    return torch.randn(input_ids.shape[0], input_ids.shape[1], 64)
+
+
+def test_dspark_faithful_recipe_trains_confidence_on_the_analytic_target():
+    input_ids, loss_mask, hidden = _tiny_batch()
+    module = _tiny_dspark_module(train_recipe=_dspark_recipe())
+    metrics = module(
+        input_ids=input_ids,
+        hidden_states=hidden,
+        loss_mask=loss_mask,
+        teacher_hidden=_teacher_hidden(input_ids),
+    )
+    extra = metrics.extra_metrics or {}
+    assert extra.get("recipe_stage") == 0.0
+    assert {"lk_loss", "confidence_bce", "confidence_target_mean", "confidence_pred_mean"} <= set(extra)
+    # The stashed logits are algorithm-internal (never logged).
+    assert "_confidence_logits" not in extra
+    assert 0.0 <= float(extra["confidence_target_mean"]) <= 1.0
+    assert torch.isfinite(metrics.loss)
+    # Exactly KL + confidence BCE: the greedy adaptation must not also train
+    # the head in this mode (a double BCE would break this identity).
+    assert float(metrics.loss.detach()) == pytest.approx(
+        float(extra["lk_loss"]) + float(extra["confidence_bce"]), rel=1e-4, abs=1e-5
+    )
+
+    metrics.loss.backward()
+    conf_grad = module.confidence_head.proj.weight.grad
+    assert conf_grad is not None and float(conf_grad.abs().sum()) > 0
+    markov_grad = module.markov_head.markov_w2.weight.grad
+    assert markov_grad is not None and float(markov_grad.abs().sum()) > 0
+    assert any(p.grad is not None for p in module.draft_model.parameters())
+
+
+def test_dspark_faithful_recipe_requires_the_teacher_signal():
+    input_ids, loss_mask, hidden = _tiny_batch()
+    module = _tiny_dspark_module(train_recipe=_dspark_recipe())
+    with pytest.raises(ValueError, match="final hidden states"):
+        module(input_ids=input_ids, hidden_states=hidden, loss_mask=loss_mask)
+
+
+def test_calibration_report_upstream_recipe_passes_the_teacher_signal():
+    """The calibration pass must feed ``final_hidden`` like the training forward.
+
+    R-18 (2026-10-14) trained 16 GPU steps, then crashed in
+    ``calibration_report``: it ran the module forward without
+    ``teacher_hidden`` while ``train_recipe: upstream_dspark`` needs the
+    target's final hidden states. The training loop already passes
+    ``batch["final_hidden"]`` (``dflash/train.py``); the calibration loader
+    builds its batches with the same collate, so the same key is available.
+    """
+    input_ids, loss_mask, hidden = _tiny_batch(batch_size=4, seq_len=48)
+    module = _tiny_dspark_module(train_recipe=_dspark_recipe())
+    batch = {
+        "input_ids": input_ids,
+        "loss_mask": loss_mask,
+        "hidden": hidden,
+        "image_mask": torch.zeros_like(loss_mask, dtype=torch.bool),
+        "position3": torch.zeros(3, input_ids.shape[0], input_ids.shape[1], dtype=torch.long),
+        "final_hidden": _teacher_hidden(input_ids),
+    }
+    report = module.calibration_report([batch], torch.device("cpu"))
+    assert report is not None
+    assert report["supervised_slots"] == 8
+    assert len(report["per_slot_pred_mean"]) == 8
+
+
+def test_calibration_report_upstream_recipe_requires_the_teacher_signal():
+    input_ids, loss_mask, hidden = _tiny_batch(batch_size=4, seq_len=48)
+    module = _tiny_dspark_module(train_recipe=_dspark_recipe())
+    batch = {
+        "input_ids": input_ids,
+        "loss_mask": loss_mask,
+        "hidden": hidden,
+        "image_mask": torch.zeros_like(loss_mask, dtype=torch.bool),
+        "position3": torch.zeros(3, input_ids.shape[0], input_ids.shape[1], dtype=torch.long),
+    }
+    with pytest.raises(ValueError, match="final hidden states"):
+        module.calibration_report([batch], torch.device("cpu"))
+
+
+def test_dspark_faithful_recipe_keeps_the_upstream_confidence_weight():
+    input_ids, loss_mask, hidden = _tiny_batch()
+    module = _tiny_dspark_module(train_recipe=_dspark_recipe(), confidence_head_alpha=2.0)
+    with pytest.raises(ValueError, match="upstream default"):
+        module(
+            input_ids=input_ids,
+            hidden_states=hidden,
+            loss_mask=loss_mask,
+            teacher_hidden=_teacher_hidden(input_ids),
+        )
+
+
+def test_dspark_validate_config_enforces_recipe_objective_consistency():
+    algorithm = get_algorithm("dspark")
+    base_algorithm = {"name": "dspark", "train_recipe": "upstream_dspark"}
+    base = {"drafter": {"mask_token_id": 255, "block_size": 8}, "algorithm": base_algorithm}
+    with pytest.raises(ValueError, match="store_final_hidden=true"):
+        algorithm.validate_config({**base, "capture": {}})
+    ok = {**base, "capture": {"store_final_hidden": True}}
+    algorithm.validate_config(ok)
+    with pytest.raises(ValueError, match="enable_confidence_head"):
+        algorithm.validate_config(
+            {**ok, "algorithm": {**base_algorithm, "dspark": {"enable_confidence_head": False}}}
+        )
+    with pytest.raises(ValueError, match="upstream default"):
+        algorithm.validate_config(
+            {**ok, "algorithm": {**base_algorithm, "dspark": {"confidence_head_alpha": 0.5}}}
+        )
+    no_conf = {
+        **ok,
+        "algorithm": {
+            "name": "dspark",
+            "train_recipe": {"name": "upstream_dspark", "confidence_coef": 0.0},
+        },
+    }
+    with pytest.raises(ValueError, match="never receive gradient"):
+        algorithm.validate_config(no_conf)
+    algorithm.validate_config(
+        {**no_conf, "algorithm": {**no_conf["algorithm"], "dspark": {"enable_confidence_head": False}}}
+    )
+
+
+def test_dspark_checkpoint_metadata_records_the_recipe():
+    algorithm = get_algorithm("dspark")
+    module = _tiny_dspark_module()
+    contract = {"layers": {"draft_layer_ids": [0, 1]}}
+    cfg = {
+        "drafter": {"mask_token_id": 255, "block_size": 8},
+        "algorithm": {"name": "dspark", "train_recipe": "upstream_dspark"},
+    }
+    meta = algorithm.checkpoint_metadata(contract, cfg, module.draft_model.config)
+    assert meta["train_recipe"]["name"] == "upstream_dspark"
+    assert meta["train_recipe"]["stages"][0]["confidence_coef"] == 1.0
+    assert meta["train_recipe"]["needs_teacher"] is True
 
 
 # --------------------------------------------------------------------------- #

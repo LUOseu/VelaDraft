@@ -15,6 +15,16 @@
 
 ### Schema v2: multi-image / multi-turn
 
+- Data fix (2026-10-14): `llava_instruct` prepare accepts the dataset's
+  historical trailing-placeholder form (`"...question...\\n<image>"`, about
+  half of LLaVA-150k) again - the R4 layout check ran before the length/media
+  filters and raised on the first such row, making the whole source
+  unusable. The check now runs with `allow_trailing=True` for this source
+  (the v1 renderer strips the placeholder and renders the image first, as
+  every recorded 2K llava run and capture store was built); interleaved
+  (`text <image> text`) and multi-placeholder rows stay rejected
+  (`data/schema.py`, `data/prepare.py`, `tests/test_multiturn_layout.py`).
+
 - Data schema v2: rows with `image_turns` (or the `vlm-dflash-data-v2`
   marker) keep the full conversation and a flat `images` list; every image is
   rendered at the start of the turn it is attached to. v1 rows and every v1
@@ -43,6 +53,69 @@
   token-exact 4/4 for both `ckpt_final` and `ckpt_init`
   (`configs/smoke_multiturn.yaml`). Smoke-scale only; no quality or speed
   claim follows from it.
+
+### Phase-1 audit deliverables: training signals + multimodal supervision
+
+- Every algorithm now declares its training-signal requirements
+  (`TrainingSignals` on `AlgorithmMetadata`: hard label, context layers,
+  teacher final hidden states, distribution / confidence objective, stage,
+  block convention), rendered to `docs/TRAINING_SIGNALS.md` by
+  `scripts/render_training_signals.py` with a drift test so the declaration
+  cannot silently diverge from the metadata.
+- The multimodal supervision representation gains its phase-1 design note
+  (`docs/plan/WP2_DESIGN.md`: the field-by-field producer/consumer contract,
+  including the deferred multi-window data-unit rule) and
+  `tests/test_multimodal_supervision.py`: supervision never lands on
+  `loss_mask == 0` positions, seeded forwards are deterministic, fully
+  unsupervised padding rows are inert, image tokens drive the loss and the
+  visual gradients while text-only batches leave the visual branch an exact
+  no-op, image spans that would leak future turns are rejected, and
+  visual-conditioned runs resume exactly (a changed visual branch is
+  refused) and export/reload with the visual branch intact.
+- The export config and model card record the draft's visual conditioning
+  (`visual_conditioning`: cached vectors per layer + adapter type), so a
+  serving stack can see that the checkpoint expects image-token spans.
+- The route-document §15 audit package lands self-contained in
+  `docs/plan/phase1/`: LOCAL_PILOT_REPORT, CLAIM_EVIDENCE (P1-P9),
+  RUN_MANIFEST, RESOURCE_ESTIMATE, PROFILING, CACHE_DECISION,
+  COMPETITIVE_AUDIT and GO_NO_GO (verdict: NO-GO for the formal
+  matrix / big-compute request; the bounded pending list is the
+  recommended next spend).
+- The online-extraction profiler gains a `--length-buckets` per-row mode
+  (median render/forward per token-length bucket, plus
+  `forward_ms_per_token`), CPU-tested; the P2 length-distribution
+  measurement and the second-seed learning repeat are registered as
+  GPU_PENDING #6/#7 in `docs/plan/REVIEW_REMEDIATION.md`.
+
+### DSpark faithful objective (`train_recipe: upstream_dspark`)
+
+- New selectable recipe reproducing the speculators DSpark default objective
+  (`vllm-project/speculators @ 55ebbd5b`): a single stage of per-slot forward
+  `KL(p_target || p_draft)` over the full vocabulary (decay-weighted, no
+  top-k truncation) plus the confidence BCE against the analytic acceptance
+  rate `sum_v min(p_draft, p_target) = 1 - TV`.
+- The teacher distribution is **reconstructed on demand** from the stored
+  target final hidden states through the frozen output head
+  (`TeacherLogitsStream`, position `label - 1`, bounded fp32 chunks with
+  activation checkpointing). The KL term and the confidence target share one
+  teacher chunk stream per step; the confidence target is computed from the
+  live (Markov-corrected) drafter logits, detached, and never cached.
+- `algorithm.train_recipe` support is now a per-recipe supports-matrix
+  (`RECIPE_SUPPORT`): `upstream_dspark` is accepted only for `dspark`,
+  `upstream_two_stage` only for `dflash`/`dflare`/`dfly`; every pairing and
+  option key outside the matrix fails loud. Recipe options
+  (`cold_start_fraction`, `confidence_coef`) are validated per recipe.
+- The recipe enters the DSpark training-plan digest (byte-identical digests
+  for runs that do not select it), the checkpoint metadata, and the
+  config-validation gates: `capture.store_final_hidden=true` is required, the
+  confidence head must be enabled, and `algorithm.dspark.confidence_head_alpha`
+  must stay at the upstream default 1.0 (`train_recipe.confidence_coef` is the
+  tuning knob).
+- Plain DSpark runs are unchanged (decayed CE + greedy per-slot acceptance
+  indicator). Config: `configs/dspark/qwen2_5_vl_3b_2k_recipe.yaml`; CPU
+  evidence: objective vs direct full-vocab reference (loss + gradients),
+  chunk invariance, detached analytic target, trainer-level gradient coverage
+  and config gates in `tests/test_objectives.py` / `tests/test_dspark.py`.
 
 ### DocVQA / ChartQA benchmark adapters
 

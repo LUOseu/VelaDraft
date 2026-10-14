@@ -6,9 +6,13 @@ algorithm seam (``_apply_algorithm_terms``) to add the two DSpark terms:
 - the low-rank Markov logit bias, teacher-forced with the ground-truth previous
   token of each supervised slot (slot k predicts ``anchor + input_shift + k``,
   and its bias conditions on the token immediately before that position), and
-- the confidence head BCE, whose target is the per-slot greedy acceptance
-  indicator (draft argmax == target token); see ``heads.py`` for why the staged
-  pipeline uses this adaptation of the upstream ``1 - TV`` target.
+- the confidence head BCE. Its default target is the per-slot greedy acceptance
+  indicator (draft argmax == target token). Under
+  ``train_recipe: upstream_dspark`` it is instead the upstream analytic
+  acceptance rate ``sum_v min(p_draft, p_teacher) = 1 - TV``, computed per step
+  from the live drafter distribution in the shared recipe loss (which streams
+  the teacher distribution from the target's final hidden states — the same
+  chunks the KL term consumes).
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ import torch
 import torch.nn.functional as F
 
 from ..dflash.trainer_core import DFlashTrainerModule
+from ..objectives import CONFIDENCE_LOGITS_AUX_KEY
 
 __all__ = ["DSparkTrainerModule"]
 
@@ -118,6 +123,17 @@ class DSparkTrainerModule(DFlashTrainerModule):
         self.markov_head = draft_model.markov_head
         self.confidence_head = draft_model.confidence_head
 
+    def _analytic_confidence_target(self) -> bool:
+        """Whether the active recipe trains the confidence head against ``1 - TV``.
+
+        ``train_recipe: upstream_dspark`` computes the confidence target from
+        the live drafter distribution inside the shared recipe loss (the same
+        teacher chunks the KL term consumes); plain runs keep the greedy
+        per-slot acceptance indicator.
+        """
+        stage = self.current_recipe_stage()
+        return stage is not None and float(stage.confidence_coef) > 0.0
+
     def _apply_algorithm_terms(
         self,
         *,
@@ -164,29 +180,24 @@ class DSparkTrainerModule(DFlashTrainerModule):
             confidence_logits = self.confidence_head(conf_features)  # [B, N, bs]
 
             first = self.first_supervised_slot
-            with torch.no_grad():
-                accepted = (
-                    block_logits.detach().argmax(dim=-1)[:, :, first:] == target_ids[:, :, first:]
-                ).to(confidence_logits.dtype)
             conf_sup = confidence_logits[:, :, first:]
             mask_sup = block_mask[:, :, first:].to(conf_sup.dtype)
-            weights = mask_sup
-            if self.loss_decay_gamma is not None:
-                depth = torch.exp(
-                    -torch.arange(bs - first, device=conf_sup.device, dtype=conf_sup.dtype)
-                    / self.loss_decay_gamma
-                )
-                weights = weights * depth
-            bce = F.binary_cross_entropy_with_logits(conf_sup, accepted, reduction="none")
-            conf_loss = (bce * weights).sum() / weights.sum().clamp_min(1e-6)
-            aux_loss = self.confidence_head_alpha * conf_loss
+            analytic = self._analytic_confidence_target()
             with torch.no_grad():
+                # The greedy per-slot acceptance indicator is the deployed
+                # (temperature-0) verification event. It drives the calibration
+                # report in both modes; only plain runs train the head on it.
+                accepted = (
+                    block_logits.detach().argmax(dim=-1)[:, :, first:] == target_ids[:, :, first:]
+                ).to(conf_sup.dtype)
                 probs = conf_sup.detach().sigmoid()
                 denom = mask_sup.sum().clamp_min(1.0)
-                metrics["confidence_bce"] = float(conf_loss.detach())
                 metrics["confidence_pred_mean"] = float((probs * mask_sup).sum() / denom)
-                metrics["confidence_target_mean"] = float((accepted * mask_sup).sum() / denom)
-                metrics["confidence_abs_error"] = float(((probs - accepted).abs() * mask_sup).sum() / denom)
+                if not analytic:
+                    metrics["confidence_target_mean"] = float((accepted * mask_sup).sum() / denom)
+                    metrics["confidence_abs_error"] = float(
+                        ((probs - accepted).abs() * mask_sup).sum() / denom
+                    )
                 if self.calibration_sink is not None:
                     # Flatten the block axis: the number of sampled anchors varies
                     # per batch, so concatenating [B, N_i, slots] tensors along
@@ -198,6 +209,41 @@ class DSparkTrainerModule(DFlashTrainerModule):
                             mask_sup.reshape(-1, mask_sup.shape[-1]).detach().float().cpu(),
                         )
                     )
+            if analytic:
+                # Upstream DSpark confidence objective: BCE against the analytic
+                # acceptance rate 1 - TV, computed per step from the *live*
+                # drafter distribution inside the shared recipe loss (the same
+                # teacher projection the KL term streams — never a cached
+                # target). ``aux_metrics`` carries the head logits there; the
+                # greedy BCE below must not also run, or the head would train
+                # on two different targets at once.
+                if self.confidence_head_alpha != 1.0:
+                    raise ValueError(
+                        "algorithm.dspark.confidence_head_alpha must stay at the upstream default "
+                        "1.0 under train_recipe=upstream_dspark; set train_recipe.confidence_coef "
+                        "to change the confidence weight."
+                    )
+                if teacher_hidden is None:
+                    raise ValueError(
+                        "train_recipe=upstream_dspark trains the confidence head against the "
+                        "analytic acceptance rate, which needs the target's final hidden states "
+                        "(capture.store_final_hidden=true / a feature store with "
+                        "stores_final_hidden=true)."
+                    )
+                metrics[CONFIDENCE_LOGITS_AUX_KEY] = conf_sup
+            else:
+                weights = mask_sup
+                if self.loss_decay_gamma is not None:
+                    depth = torch.exp(
+                        -torch.arange(bs - first, device=conf_sup.device, dtype=conf_sup.dtype)
+                        / self.loss_decay_gamma
+                    )
+                    weights = weights * depth
+                bce = F.binary_cross_entropy_with_logits(conf_sup, accepted, reduction="none")
+                conf_loss = (bce * weights).sum() / weights.sum().clamp_min(1e-6)
+                aux_loss = self.confidence_head_alpha * conf_loss
+                with torch.no_grad():
+                    metrics["confidence_bce"] = float(conf_loss.detach())
         return block_logits.view(bsz, n * bs, -1), aux_loss, metrics or None
 
     @torch.no_grad()
@@ -226,6 +272,12 @@ class DSparkTrainerModule(DFlashTrainerModule):
                     loss_mask=batch["loss_mask"],
                     image_mask=batch["image_mask"],
                     multimodal_position_ids=batch["position3"],
+                    # Capture-v2 stores carry the target's final hidden states;
+                    # the analytic (upstream_dspark) confidence objective needs
+                    # them here exactly as the training forward does (R-18 ran
+                    # the calibration pass without them and crashed after
+                    # training had already finished).
+                    teacher_hidden=batch.get("final_hidden"),
                 )
             collected = self.calibration_sink
         finally:

@@ -93,9 +93,10 @@ class AlgorithmMetadata:
     capabilities: dict[str, bool]
     targets: dict[str, str]
     evidence: tuple[EvidenceRecord, ...] = ()
+    training_signals: "TrainingSignals | None" = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        record = {
             "name": self.name,
             "description": self.description,
             "maturity": dict(self.maturity),
@@ -103,6 +104,46 @@ class AlgorithmMetadata:
             "capabilities": dict(self.capabilities),
             "targets": dict(self.targets),
             "evidence": [record.as_dict() for record in self.evidence],
+        }
+        if self.training_signals is not None:
+            record["training_signals"] = self.training_signals.as_dict()
+        return record
+
+
+@dataclass(frozen=True)
+class TrainingSignals:
+    """What a method's training objective consumes (CVPR-route phase-1 item 2).
+
+    A per-method declaration of the training signals: which positions carry
+    hard-label supervision, which target layers feed the drafter context,
+    whether the target's final hidden states are required (and under which
+    selectable objective), which distribution / confidence terms exist, the
+    stage structure and the block supervision convention. Rendered into
+    ``docs/TRAINING_SIGNALS.md`` from this registry; a drift test keeps the two
+    equal, so a claim in the doc always traces to code. Recipes accepted per
+    algorithm are derived from ``vlm_dflash.objectives.RECIPE_SUPPORT`` (single
+    source of truth) by the renderer, not repeated here.
+    """
+
+    hard_label: str
+    context_layers: str
+    teacher_final_hidden: str
+    distribution_objective: str
+    confidence_objective: str
+    stage: str
+    block_convention: str
+    notes: str = ""
+
+    def as_dict(self) -> dict[str, str]:
+        return {
+            "hard_label": self.hard_label,
+            "context_layers": self.context_layers,
+            "teacher_final_hidden": self.teacher_final_hidden,
+            "distribution_objective": self.distribution_objective,
+            "confidence_objective": self.confidence_objective,
+            "stage": self.stage,
+            "block_convention": self.block_convention,
+            "notes": self.notes,
         }
 
 

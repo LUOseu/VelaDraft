@@ -385,6 +385,18 @@ class Qwen3DFlashAttention(nn.Module):
         attn_fn: Callable = eager_attention_forward
         if self.config._attn_implementation != "eager":
             attn_fn = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
+        attn_kwargs = dict(kwargs)
+        if self.config._attn_implementation == "flex_attention":
+            # Torch >= 2.10 can route this block attention to the flex
+            # *decoding* kernel (q_len < 128 plus a power-of-two GQA ratio).
+            # Its BLOCK_M = next_pow2(q_len * gqa_ratio) heuristic -- 80 * 8
+            # -> 1024 for a ten-anchor smoke block -- makes the kernel exceed
+            # the sm_86 shared-memory budget at Triton compile time (272 KiB
+            # needed vs 99 KiB available) and on torch 2.11 every decoding
+            # candidate is filtered out (NoValidChoicesError). The main flex
+            # kernel handles the same block-sparse mask, so pin it here;
+            # explicit caller-provided kernel options still win.
+            attn_kwargs.setdefault("kernel_options", {"FORCE_USE_FLEX_ATTENTION": True})
         backend_context = nullcontext()
         if not self.training and q.device.type == "cuda" and self.config._attn_implementation == "sdpa":
             # DFlash changes the cached context length after nearly every block.
@@ -402,7 +414,7 @@ class Qwen3DFlashAttention(nn.Module):
                 dropout=0.0 if not self.training else self.attention_dropout,
                 scaling=self.scaling,
                 sliding_window=self.sliding_window,
-                **kwargs,
+                **attn_kwargs,
             )
         attn_output = attn_output.reshape(bsz, q_len, -1)
         return self.o_proj(attn_output), attn_weights

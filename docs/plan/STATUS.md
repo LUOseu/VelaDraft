@@ -15,6 +15,35 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
 
 ## Now
 
+- **CVPR-route phase-1 round (2026-10-14, branch `cvpr-route`, CPU only - 0
+  new GPU-h; budget then 4.10/8.00):** route-document §15 items 1-7 delivered -
+  `upstream_dspark` faithful objective (`a80f564`), per-method
+  training-signal declarations (`64cef1d`), multimodal-supervision design
+  note + invariants (`b5691e5`) - plus the self-contained package
+  `docs/plan/phase1/` (report, claim ledger, run manifest, resource
+  estimate, profiling, cache decision, competitive audit, GO_NO_GO). CPU
+  regression 453 passed / 6 skipped at the package commit (464 / 6 on the
+  current branch head, `757f509`). Verdict there: **NO-GO for the formal
+  matrix / big-compute request**; the bounded pending list (2.2-3.75 GPU-h,
+  incl. the #7 second seed and the CPU-tested length-bucket profiler mode)
+  was the recommended next spend. Start with
+  `docs/plan/phase1/LOCAL_PILOT_REPORT.md`.
+  The bounded pending list ran as an idempotent host queue
+  (`~/recipe-smoke-config/cvpr_queue.sh`, run IDs R-18..R-23): #1 `R-19`
+  PASS (post-R3/R4 E2 recheck + flex-kernel guard), #2 `R-21` measured
+  (extraction wall -6.8% under the unified boundary, 128 -> 32 target
+  forwards), #3 `R-22` PASS (export closure: fresh-process reload demo
+  token-exact 4/4, same-condition eval reproduces AL 1.182/1.083; demo-config
+  adoption fix `6619476` + regression tests), #5 `R-18` PASS
+  (`upstream_dspark` smoke, `confidence_bce` 0.2042), #6 `R-20` measured
+  (length-bucket render/forward attribution), #7 `R-23` PASS (seed-43
+  recipe run: AL 1.830 vs init 1.003, token-exact 128/128 - the two-seed
+  G4 condition is now met alongside `R-11`).
+  #4 (vLLM divergence) stayed interactive-only as `R-24/R-25`: no
+  bridge/acceptance logic error observed within the sampled range (5 prompts
+  / 467 spec steps); token-exactness retired as a criterion (bf16 ties +
+  engine nondeterminism); WP5 blocked on the -17% AL gap, with a complete
+  serving correctness verification outstanding.
 - **Review remediation round (2026-10-14, branch `review-remediation` off
   `950b394`): R1-R6 implemented.** R1 collision-safe media + audit script
   (`7cc9e5b`), R4 ordered segments + explicit unsupported-media rejection
@@ -22,10 +51,12 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   (`c2d98e5`), R2 unified online timing boundary + WP4 supersession
   (`7038c56`), R5 frozen-prefix probe v2 + narrowed vLLM attribution
   (`7a44301`), R6 support matrix capability vs evidence (`b3730d7`).
-  Full CPU regression 411 passed / 6 skipped; no new GPU jobs (budget
+  Full CPU regression 411 passed / 6 skipped; no new GPU jobs (budget then
   4.10/8.00 GPU-h) - GPU re-checks listed in
   `docs/plan/REVIEW_REMEDIATION.md` (GPU_PENDING section). WP5 stays BLOCKED
-  at 5/32 token-exact with the root cause unresolved.
+  (5/32 token-exact at that time, root cause then unresolved; the later
+  `R-20261014-24/25` diagnosis retired token-exactness as a criterion and
+  narrowed the blocker to the AL gap - see the `cvpr-route` bullet above).
 
 - WP0 done: capability gap table + ledgers below; CPU baseline suite green
   (321 tests collected, all pass; `pytest tests/ -q`).
@@ -82,6 +113,12 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
   Registered as BLOCKED-with-gap per the plan rule; report
   `docs/plan/WP5_REPORT.md`, converter/harness code + 5 CPU tests in this
   branch. Lane split recap in COORDINATION.md.
+  Diagnosis `R-20261014-24/25` (0.30 GPU-h): no bridge/acceptance logic
+  error observed within the sampled range (5 prompts / 467 spec steps;
+  same-engine reruns agree only 12/32; 0 genuine inconsistencies, 14 exact
+  bf16 ties); the token-exact gate is retired as a criterion. WP5 remains
+  BLOCKED on the unexplained AL gap, and a complete serving correctness
+  verification remains outstanding.
 - WP6 done, engineering gate PASS (`R-20261014-17`, 0.53 GPU-h): first
   non-Qwen family SmolVLM2-2.2B-Instruct through prepare -> regen (16/16) ->
   capture (image-token check **1377/1377**, `visual_path_check` passed) ->
@@ -103,9 +140,11 @@ shared server; `/home` is ~100% full, see RESOURCE_LEDGER).
 
 ## Budget
 
-8 GPU-h first-round cap; **4.10 GPU-h charged** (E1 0.59 incl. the duplicate
+8 GPU-h first-round cap; **6.25 GPU-h charged** (E1 0.59 incl. the duplicate
 concurrent set, zoo re-download validation 0.04, E2 0.55, E3 0.15, E4 1.45,
-WP4 measurement 0.21, WP5 0.55, WP6 0.53); allocation in RESOURCE_LEDGER.md.
+WP4 measurement 0.21, WP5 0.55, WP6 0.53, cvpr-route queue R-18..R-23 1.85,
+WP5 in-engine diagnosis R-24/25 0.30); **1.75 GPU-h remaining**; allocation
+in RESOURCE_LEDGER.md.
 
 ## Blockers / risks
 
@@ -134,11 +173,14 @@ WP4 measurement 0.21, WP5 0.55, WP6 0.53); allocation in RESOURCE_LEDGER.md.
   01:30 -> 61 GB at 02:20 after pruning E2's renewable `ckpt_last`; a
   host-wide writeback stall slowed the E2 eval ~5 min). Keep net-new
   artifacts small; prune this plan's own renewable temp files after each job.
-- WP5 blocker (runtime numeric parity): vLLM 0.22.1's dflash path is not
-  token-exact vs its own target-only greedy (5/32) and its AL (1.4059) is
-  -17% vs the in-repo sequential numbers on identical weights; MRoPE-vs-1D
-  excluded (R-15), mask-input convention verified equal. Not re-run; gap and
-  candidate causes registered in `docs/plan/WP5_REPORT.md`.
+- WP5 blocker (runtime numeric parity): the vLLM 0.22.1 dflash path is not
+  token-exact vs its own target-only greedy (5/32) - `R-20261014-24/25`
+  showed this is bf16 ties + engine run-to-run nondeterminism (same-engine
+  reruns 12/32; instrumented dump 0 genuine inconsistencies in 467 steps),
+  not a bridge defect - so token-exactness is retired as a criterion. The
+  remaining blocker is the **AL gap: 1.4059 vs in-repo 1.6866/1.6924
+  (-17%)**. MRoPE-vs-1D excluded (R-15); mask-input convention verified
+  equal. Registry + candidate causes: `docs/plan/WP5_REPORT.md`.
 - Recipe training at micro-batch 8 peaked at 46.5 GB on a 48 GB card (~3%
   margin). Do not raise the micro-batch for recipe runs.
 - Companion plan documents absent (see note above).
