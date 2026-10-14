@@ -2,7 +2,7 @@
 
 ## 1. 冻结基线（已核实 2026-10-14 23:00–23:20）
 
-- **BASE_SHA = `7eab1369266010137702de8c714053729cde5834`**（origin/main，= `research/online-systems` 7ada005 + PR #6 merge）。D1/D2/D3/D5 本地 worktree 均已在此 SHA 建立（只读核实）；D4 worktree ?未建。
+- **BASE_SHA = `7eab1369266010137702de8c714053729cde5834`**（origin/main，= `research/online-systems` 7ada005 + PR #6 merge）。D1/D2/D3/D5 本地 worktree 均已在此 SHA 建立（只读核实）；D4 worktree 亦已建立（`vlm-dflash-d4` @`7eab136`，23:12 起用，C0 23:15 确认；23:41 快照复核）。
 - B0（历史核对基线）= `e15256d7c4bd10a490a7ac821eb12a0749a96fdd`（PR #4；docs/plan 等引用它，仅为线索，不代表当前 HEAD）。
 - 现有未提交工作：逐一核查六处 worktree（vlm-dflash、veladraft-systems、vlm-dflash-recipe、vlm-dflash-reviewfix、vlm-dflash-dflare、/private/tmp/vlm-dflash-prev）——全部 clean；无需要保护的未提交改动。
 - 本地 CPU 验证：`tests/test_online_mode.py` **66/66 passed**；全套 CPU suite **478 collected → 472 passed / 6 skipped / 0 failed**（exit 0，7.2s；torch 2.10 CPU，py3.12 venv，在 veladraft-c0 以 cwd 导入；日志 `research/rsi/_coord/evidence/pytest_full_20261014.log`）。
