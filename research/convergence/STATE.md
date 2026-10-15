@@ -1,6 +1,6 @@
 # STATE — D1 convergence (single-agent round)
 
-Last update: 2026-10-15 ~12:52 CST. Branch `research/rsi-d1-conv` (base `origin/main` @ 6d99f04).
+Last update: 2026-10-15 ~13:20 CST. Branch `research/rsi-d1-conv` (base `origin/main` @ 6d99f04).
 
 ## 发现—证据—决定—下一步 log
 
@@ -80,6 +80,24 @@ Last update: 2026-10-15 ~12:52 CST. Branch `research/rsi-d1-conv` (base `origin/
   package updated with the concrete block. The applicability statement for the paper: D1's physical
   regrouping is currently a dflash-family-only optimization (boundary documented, negative result for
   the others recorded, not papered over).
+
+
+### F10. Stability curve / L* rule: settled(400)=False, settled(800)=False; extension leg running
+- 发现 (canonical seed 42, held-out AL, frozen W3 store): 200=1.2017, 400=1.2105, 600=1.1632, 800=1.1370
+  (all token_exact=True; levels consistent with the historical d1q baseline AL~1.165/acc~2.4% at 200 steps).
+  settled(400)=0.73%>0.5%; settled(800)=|1.1370-1.2105|/1.2105=6.07%>0.5% -> the rule requires the fresh
+  1600-step extension leg (`conv_stab1600`, running on GPU1 since 13:06) and the same rule on {800,1600}.
+  The canonical curve peaks near step 400 and then declines: on this 192-row store the drafter overfits
+  (train loss 0.026, slot0 acc ~0.999 while held-out AL falls). A plateau is unlikely; the prereg's
+  "not settled" disclosure path (L*=1600) is the likely outcome, computed mechanically when the leg lands.
+- 证据: `evidence/legs/conv_stab_canon_s42/` (first eval wave fetched 12:52, all three ckpts);
+  `evidence/settle_decision.json` (updated with AL(800)); server log lines 12:49:08 + 13:14:57.
+- 注意 (gotcha): each `eval_dflash.py` run OVERWRITES `run/eval/eval_result.json`; the 3-ckpt curve result
+  was overwritten by the single-ckpt (ckpt_final) run. The full 3-ckpt result is preserved locally; the
+  server now holds only the ckpt_final one. Stability-leg heavy ckpts cleaned (ckpt_eval_* + ckpt_final
+  kept) to free ~12G; /home at 53G free.
+- 下一步: stab1600 done (~13:40) -> AL(800 fresh), AL(1600) -> L* verdict -> launch the confirm wave at
+  L* on all free GPUs (`vconv_confirm_driver.sh <L*> <gpus> pilot`, with `VCONV_EVAL_CKPTS=ckpt_final.pt`).
 
 ### F5. Stability leg: full 800 steps trained; crashed only at final checkpoint write (disk full)
 - 发现: `conv_stab_canon_s42` trained steps 1..800 (train_log.jsonl complete, loss 12.875 -> 0.026, gn
