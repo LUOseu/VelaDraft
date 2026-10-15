@@ -206,6 +206,21 @@ def now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def repo_sha(repo: str) -> str | None:
+    """Code SHA for the state log: D1_GIT_SHA if set, else the repo checkout's HEAD."""
+    sha = os.environ.get("D1_GIT_SHA")
+    if sha:
+        return sha
+    try:
+        out = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"],
+                             capture_output=True, text=True, timeout=10)
+        if out.returncode == 0:
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
 def record(statef, lock, entry: dict, stage: str, status: str, started, gpu: int) -> None:
     row = {"ts": now(), "entry": entry["id"], "stage": stage, "status": status,
            "started": started, "gpu": gpu, "git_sha": os.environ.get("D1_GIT_SHA")}
@@ -400,6 +415,7 @@ def main() -> int:
     env.setdefault("VELADRAFT_PYTHON", sys.executable)
     env.setdefault("VELADRAFT_RUNS_ROOT", str(Path(env["VELADRAFT_REPO"]) / "runs" / "a100"))
     matrix = load_matrix(Path(args.matrix), env)
+    os.environ.setdefault("D1_GIT_SHA", repo_sha(matrix["repo"]) or "")
     if args.command == "dry-run":
         return cmd_dry_run(matrix, args)
     if args.command == "run":

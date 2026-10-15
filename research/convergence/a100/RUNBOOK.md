@@ -51,6 +51,16 @@ $VELADRAFT_PYTHON scripts/prepare_benchmark.py --workload chartqa --source <dl> 
 `caption_general` reads the run's own val split (`run_val` manifest), which
 keeps the fourth workload inside the held-out boundary.
 
+Test-tier coverage note: the repo currently ships four benchmark manifests
+(`01_general_caption` run_val, `02_textvqa` OCR, `03_docvqa` documents,
+`04_chartqa` charts). A **multi-image / multi-turn test-tier workload is not in
+the repo** — multi-turn/multi-image data exists on the *training* side (the W3
+store) and in `caption_general` only via the run's val split. To add the tier,
+drop a new manifest + pinned prompt file following `02_textvqa.json`'s pattern;
+until then the runner treats it as unsupported and skips with a reason (no
+silent substitution). Per-run state rows record `git_sha` automatically from
+the repo checkout (`D1_GIT_SHA` overrides).
+
 ## 3. Tracks
 
 - **controlled** — every drafter trains with the identical config
