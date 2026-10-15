@@ -15,6 +15,30 @@ vlm-dflash train --mode online --config configs/qwen2_5_vl_3b.yaml \
 are CLI aliases for `train.feature_mode`; the two modes are mutually exclusive
 with `--features`.
 
+## Configuration at a glance
+
+All knobs live under `train.`. In every setup below the target does **frozen
+forward passes only**; the drafter is what updates its parameters. And "no
+feature store on disk" does not mean "no disk": a run still writes data,
+regen, checkpoints, logs and eval output - online only removes the multi-GiB
+`features/` store.
+
+| Setup | Config | Default | What it does | Extra resources | Recorded evidence |
+| --- | --- | --- | --- | --- | --- |
+| Online, per-sample | `--mode online` | offline (presets pin it) | extracts live features instead of reading a store | frozen target resident on GPU for the whole run | GPU smokes: train -> token-exact eval -> export (3B, 8B untied, split devices) |
+| Batched capture | `train.online_batch_size: N` | `1` (per-sample) | one padded target forward per N rows | may move the teacher batch composition (bf16 ulp scale) | 3-row smoke + a 16-row slice: 16 -> 4 forward calls, step losses bit-identical; extraction-wall re-measured under a unified boundary (pending, see below) |
+| RAM record cache | `train.online_feature_cache_gb: <GiB>` | `0` (off) | serves repeat epochs from a byte-bounded host-RAM store | up to the configured GiB of host RAM; never persisted | 129 rows / 6 epochs: 645 hits / 129 misses / 129 stores / 0 evictions, peak 830 MiB; trajectory caveat below |
+| Adaptive budget | `train.online_feature_cache_adaptive: true` | `false` | shrinks/grows the cache payload with the job's memory headroom | requires the RAM cache; eviction becomes dynamic | measured on the lane's slices; state under `feature_source.feature_cache.adaptive_budget` |
+
+Enabling them is one flag each, e.g.
+`--set train.online_batch_size=4` or
+`--set train.online_feature_cache_gb=8` (see the commands below). Runtime
+counters land in `train_summary.json` under `feature_source`:
+`target_forwards_total` / `target_samples_total` for extraction, and
+`feature_source.feature_cache` (capacity, hits, misses, stores, evictions,
+retained/peak bytes) for the cache. The sections below document each setup,
+its constraints and its numerical caveats.
+
 ## Offline vs online
 
 | | offline (default) | online |
@@ -377,7 +401,28 @@ startup visual-path check runs a fixed 3 capture forwards **outside** these
 counters; a resumed run does not re-extract fast-forwarded items and reuses
 the recorded visual-path check.
 
-## Validation status
+## Current validation status
+
+Short version, for users:
+
+- **CPU (dev venv): full suite green (222 tests).** The online-mode
+  correctness contracts - content digest v2, the training-plan gate, resume
+  write-order and log-reconciliation regressions, dtype/head factory checks -
+  run without a GPU (`CUDA_VISIBLE_DEVICES="" python -m pytest tests/ -q`).
+- **GPU (recorded on the reference host, single RTX A6000 48 GB):** the
+  smokes in the ledger below cover per-sample extraction on Qwen2.5-VL-3B and
+  Qwen3-VL-8B (untied head), all five algorithms, split devices (target on
+  one card, drafter on another) and interrupted-resume reconciliation; every
+  run went train -> token-exact eval -> export. They validate **plumbing**
+  (token-exactness, provenance, counters) - their AL is 1.000 after 4 steps
+  and is **not** a quality result.
+- **Numbers elsewhere:** the recorded benchmarks in `BENCHMARKS.md` and the
+  Model Zoo are **offline-path** numbers and must not be relabelled as
+  online. The batched-capture extraction-wall gain awaits its paired
+  re-measurement (see *Batched capture*).
+
+<details>
+<summary>Development validation ledger (smokes 1-7, historical; click to expand)</summary>
 
 - CPU (dev venv): full suite green (214 tests) including the online review
   fixes: content-digest v2 (token-value edits, image swaps, path-stability,
@@ -471,10 +516,7 @@ the recorded visual-path check.
   consults only the `data` stage → negative case still refuses) rather than
   a GPU rerun.
 
-These smokes validate plumbing (token-exactness, provenance, counters). Their
-AL is 1.000 after 4 steps and is **not** a quality result. The recorded
-benchmarks in `BENCHMARKS.md` / the Model Zoo are offline-path numbers and
-must not be relabelled as online.
+</details>
 
 ## Scope of the first version (v0.3.2)
 
