@@ -150,7 +150,7 @@ group-aware auxiliary accounting, with the smoke gates in
   concurrent legs + tenant flicker); paired per-step numbers come from the
   harness (`evidence/systems_table.md`). Pooled wave train wall: canonical
   1798 s mean vs grid2 1728 s (−3.9%); peak 25.3 → 10.0 GiB (−60.5%).
-- PR: <placeholder link> (no merge to main; regroup default-off everywhere).
+- PR: https://github.com/LUOseu/VelaDraft/pull/9 (open, HOLD; no merge to main; regroup default-off everywhere).
 - A100: `a100/RUNBOOK.md` + `a100/run_matrix.py` (dry-run validated: 32 entries,
   37.3 GPU-h est., 0 errors; controlled + native tracks; train/val/test
   isolation; regroup gates + adaptation smoke).
