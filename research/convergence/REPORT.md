@@ -14,26 +14,34 @@ confirm wave completes.**
 | Per-prompt acceptance accounting in `eval_samples.jsonl` | done | commit `5750c23` |
 | Train-state → eval checkpoint converter (stability curves without re-training) | done, tested | commit `bc87e8f`; `tests/test_convert_train_state_ckpt.py` |
 
-## 2. Systems closure (A6000 48GB, W3 store, harness, 3 reps × 100 batches)
+## 2. Systems closure (A6000 48GB, harness, 3 reps × 100 batches)
 
-Figures from `evidence/systems_table.md` (paired per-logical-batch medians vs canonical):
+Final numbers from `evidence/systems_table.md` (paired per-logical-batch medians vs
+canonical, 3 reps; raw rows `evidence/harness/`). Speedup vs canonical:
 
-| layout (sub-batch) | wall speedup | peak alloc | context padding waste | loss rel (med) |
+| arm | W3 k4 | W3 k2 | MIX k4 | W1 k4 |
 | --- | --- | --- | --- | --- |
-| canonical | 1.000 | 25.05 GiB | 11.8% | — |
-| split (plain equal-k split, unsorted) | 1.056 | 10.64 GiB | 5.5% | 0.22% |
-| token (C-only sorted) | 1.108 | 10.65 GiB | 2.7% | 0.22% |
-| dual (C + A) | 1.103 | 10.64 GiB | 2.7% | 0.22% |
-| cost (fitted C + w·A) | 1.131 | 10.65 GiB | 3.6% | 0.22% |
-| grid (2D quantiles) | 1.131 | 10.65 GiB | 3.6% | 0.22% |
-| cp / ref (sanity) | 0.999 / 1.000 | 25.05 GiB | — | 0.22% |
+| canonical | 1.000 | 1.000 | 1.000 | 1.000 |
+| split (plain equal split) | 1.061 | 1.026 | 1.082 | 0.867 |
+| token (C-only sort) | 1.111 | 1.067 | 1.128 | 0.867 |
+| dual (C + A sort) | 1.110 | 1.069 | 1.123 | 0.865 |
+| cost (C + w·A) | 1.133 | 1.097 | 1.157 | 0.872 |
+| grid (2D quantiles) | 1.131 | 1.097 | 1.156 | 0.873 |
+| cp / ref (identity controls) | 1.000 / 0.999 | 0.999 / 1.000 | 0.995 / 0.994 | 0.976 / 0.979 |
 
-<placeholder: final 3-rep aggregated numbers incl. w3_k2, mix_k4, w1_k4>
+Peak alloc 25.05 → 10.64 GiB (−57%) at W3 k4; 24.0 → 10.36 GiB on MIX;
+25.05 → 15.60 GiB (−38%) at W3 k2. Context padding waste on W3 k4:
+11.8% → 2.7% (`token`/`dual`) / 3.6% (`cost`/`grid`); MIX: 20.1% → 4.1% / 6.0%.
+One-batch loss parity vs canonical (bf16 vs fp32-preserved reduction): med
+≈ 0.21%, grad-norm max ≈ 0.8% — the machinery identity path costs ≈ 0%
+(cp/ref ≈ 1.000, loss-identical).
 
-Decomposition: splitting alone ≈ +5.6%; sorting by C ≈ +5.2pp more; the anchor
-axis adds ≈ +2.3pp on top of C (`token` → `dual/grid/cost`). At k=2 the gains
-shrink (<placeholder>) — the value is concentrated where rows are highly
-heterogeneous.
+Decomposition: plain sub-batching +2.6–8.2%; sorting by C adds +2.6–4.6pp
+(MIX k4: 1.082 → 1.128); the A/cost axis adds **+2.2–3.0pp on heterogeneous
+stores** (W3 k4 1.111 → 1.131; k2 1.067 → 1.097; MIX 1.128 → 1.156) but ≈ 0 on
+low-memory-pressure W1. **No-gain boundary:** on W1 (short sequences, 10 GiB
+canonical peak) every regroup arm is *slower* (0.865–0.873) — sub-batching
+overhead is not repaid when padding/memory pressure is low.
 
 ## 3. Capacity (logical batch 16, single-step)
 
