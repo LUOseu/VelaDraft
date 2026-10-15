@@ -343,6 +343,13 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
         )
     train_rows = materialise(train_idx, "data.jsonl")
     val_rows = materialise(val_idx, "val.jsonl")
+    if val_size > 0 and not val_rows:
+        log(
+            "prepare_data: warning: the val split is empty - the pool has "
+            f"{len(pool)} row(s) and the training slice/limit ({train_size}) already "
+            "consumes all of them. Eval reads val.jsonl, so add rows or lower the "
+            "training slice (train + val_size rows are needed)."
+        )
     write_jsonl(data_dir / "data.jsonl", train_rows)
     write_jsonl(data_dir / "val.jsonl", val_rows)
     write_json(data_dir / "meta.json", {"media_dir": "images", "source": source})
