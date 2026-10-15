@@ -85,7 +85,12 @@ def main() -> int:
     parser.add_argument("--jsonl", required=True, help="image-text pool (JSONL)")
     parser.add_argument("--images-dir", required=True, help="image root for the JSONL")
     parser.add_argument("--run-dir", default="runs/example_from_jsonl")
-    parser.add_argument("--limit", type=int, default=32, help="rows to use (train + val)")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=32,
+        help="number of training rows to use; the validation split (val_size=4 here) is drawn on top, so the pool needs at least limit + 4 valid rows",
+    )
     parser.add_argument("--steps", type=int, default=60)
     args = parser.parse_args()
 

@@ -1,4 +1,4 @@
-> Copy of the released export's generated `model_card.md` (the downloaded archive keeps it verbatim, including the authoring host's local target path). Target-support states inside the archive predate the v0.3.1 `reduced_validation` retag; current machine-readable states: [`SUPPORT_MATRIX.md`](../SUPPORT_MATRIX.md).
+> Copy of the released export's generated `model_card.md` (the downloaded archive keeps it verbatim, including the authoring host's local target path). Target-support states inside the archive predate the v0.3.1 `reduced_validation` retag; current machine-readable states: [`SUPPORT_MATRIX.md`](../../SUPPORT_MATRIX.md).
 
 # vlm-dflash drafter — Qwen2.5-VL-3B-Instruct
 

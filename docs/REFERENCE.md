@@ -4,7 +4,8 @@ This repo ports the DFlash block-drafter core from a read-only reference so the
 training/eval semantics stay identical (and comparable) to the original work:
 
 - Reference: `jacky566/Automodel_lao` @ `d21fb5aa` ("feat(speculative): improve
-  Qwen2.5-VL visual drafting"), Apache-2.0. Runbook at commit `85f5dd9c` (`AGENT.md`).
+  Qwen2.5-VL visual drafting"), Apache-2.0. Runbook at upstream commit `85f5dd9c`
+  (`AGENT.md` in that read-only reference repo).
 - We only read that repository; this repo never imports it at runtime and never
   depends on its (unpushed) work-in-progress files.
 
@@ -17,10 +18,10 @@ training/eval semantics stay identical (and comparable) to the original work:
 | `vlm_dflash/dflash/mask.py` | `nemo_automodel/components/attention/dflash_mask.py` | import paths only |
 | `vlm_dflash/dflash/decay_loss.py` | `nemo_automodel/components/loss/dllm_loss.py` | import paths only |
 
-Success reference configuration (interpreted for our contract):
-`examples/speculative/dflash/qwen2_5_vl_dflash_hard_mrope_full.yaml`
-(spatial-rope `replace` with sections `[16,24,24]`, mask token 151669,
-block size 8, 256 anchors, loss gamma 7, lr 6e-4, warmup 0.04).
+Success reference configuration (interpreted for our contract; upstream path
+`examples/speculative/dflash/qwen2_5_vl_dflash_hard_mrope_full.yaml`):
+spatial-rope `replace` with sections `[16,24,24]`, mask token 151669,
+block size 8, 256 anchors, loss gamma 7, lr 6e-4, warmup 0.04.
 
 ## Training semantics (kept identical)
 

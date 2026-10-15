@@ -26,7 +26,7 @@ with `--features`.
 | `capture` stage | runs | skipped (config still parsed + validated) |
 | `train.num_workers` | any | must be 0 |
 | Share a capture across algorithms | yes (`--features`) | no |
-| Multi-run / multi-node reuse | store is portable | one target, one process |
+| Reuse across runs | store is portable and reusable | one target, one process; no multi-node launch path |
 | Visual-path check | on captured features (`features/visual_path_check.json`) | on the live model (`online/visual_path_check.json`) |
 
 Use **online** when you want a single-command train without managing a feature
@@ -34,7 +34,25 @@ store, when disk or IO for a multi-GiB store is the bottleneck, or when the
 target should provably be the model the trainer holds. Use **offline** when
 several algorithms share one capture, when the target is expensive relative to
 the drafter (the cost is paid once, not per epoch), or when you need DataLoader
-workers, multi-node training or a portable artifact.
+workers or a portable feature store. Neither mode ships a distributed
+(DDP/multi-node) launch path: a store can be copied to another host, but
+multi-node training is not a supported configuration of this repo today.
+
+## Devices: what is supported today
+
+| Layout | Status | Notes |
+| --- | --- | --- |
+| One process, target + drafter on the same GPU | validated path | The canonical protocol and all quality numbers train this way (offline); online smokes use the same layout. |
+| One process, target / drafter on two GPUs | recorded smoke | `--set target.device=cuda:1 --set train.device=cuda:0` (GPU smoke 6 in *Validation status*). This is co-location, not DDP or tensor parallel: there is no gradient sync and no automatic producer/consumer overlap between the two devices — both live in the training loop's forward path. |
+| Distributed (DDP / tensor parallel / multi-node) | not supported | No launcher or sync path exists in the trainer. Do not plan a multi-node job around this CLI. |
+
+Device indices are logical: they refer to the process's visible devices after
+`CUDA_VISIBLE_DEVICES`. With `CUDA_VISIBLE_DEVICES=2,3`, `cuda:0` in the config
+is physical GPU 2 and `cuda:1` is physical GPU 3; without the mask, `cuda:1` is
+physical GPU 1. Memory requirements depend on target, recipe, micro-batch,
+sequence length and whether the overfit sanity runs: the 24 GB preset stays a
+*suggested* configuration (no recorded run on a real 24 GB card), and the
+DFlash demo peak is not a lower bound for every algorithm.
 
 Measured smoke costs on one A6000 (3-row demo slice, 4 steps, batch 1 —
 plumbing checks, not benchmarks):

@@ -8,16 +8,22 @@ reference. Do not mix experimental parallel-runtime numbers into these tables.
 
 | Target | Corpus | Train rows | Prompts | AL (trained) | AL (random init) | Token-exact | Per-slot acceptance (trained) |
 | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
-| Qwen2.5-VL-3B | 512 | 278 kept | 64 | 1.198 | 1.003 | 64/64 | see eval_result.json |
+| Qwen2.5-VL-3B | 512 | 278 kept† | 64 | 1.198 | 1.003 | 64/64 | see eval_result.json |
 | Qwen2.5-VL-3B | 2K | 1050 kept | 128 | 1.630 | 1.003 | 128/128 | .413, .149, .048, .015, .004, .001, 0 |
 | Qwen2.5-VL-3B (dspark) | 2K | 1050 kept | 128 | 1.735 | 1.003 | 128/128 | .432, .173, .075, .034, .015, .007, .003 |
 | Qwen2.5-VL-3B (domino) | 2K | 1050 kept | 128 | 1.764 | 1.003 | 128/128 | .443, .180, .078, .036, .016, .009, .005 |
-| Qwen3-VL-8B | 512 | 274 kept | 32 | 1.322 | 1.003 | 32/32 | see eval_result.json |
+| Qwen3-VL-8B | 512 | 274 kept† | 32† | 1.322 | 1.003 | 32/32 | see eval_result.json |
 | Qwen3-VL-8B | 2K | 1996 kept | 32 | 1.665 | 1.000 | 32/32 | .413, .160, .063, .027, .010, .002, .0004 |
 | Qwen2.5-VL-3B | 5K | 2629 kept | 128 | 1.817 | 1.003 | 128/128 | .482, .210, .080, .030, .011, .005, .001 |
 | Qwen2.5-VL-3B (dflash2, experimental) | 2K | 1050 kept | 128 | 1.954 | 1.003 | 128/128 | .495, .243, .118, .060, .027, .013, .006 |
 
 Notes
+- † **Number-trace pending (2026-10-15).** The kept/prompt cells of the two
+  512 rows disagree with the stage records in `docs/measured-runs.md`
+  (3B/512: 274 kept / 64-prompt eval; 8B/512: 512/512 kept / 64 prompts).
+  The underlying run artifacts live on the reference host, so both records
+  stay visible until they are re-checked; the marked cells must not be used
+  for capacity planning. AL / token-exact are quoted the same in both records.
 - The 512-corpus 3B row is the 2026-10-11 rerun (original v0.1: AL 1.220);
   bf16 runs reproduce the protocol, not the bits (< ~2% AL noise).
 - Slot-0/1 acceptance dominates; 2K is the first point with stable non-zero

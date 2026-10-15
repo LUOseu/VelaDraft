@@ -133,18 +133,20 @@ DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpe
 
 ## 模型下载
 
-已发布的 drafter 参考 checkpoint：
+已发布的 drafter 参考 checkpoint（完整索引、recipe 区别与校验命令见
+[docs/model-zoo.md](docs/model-zoo.md)；下表中大小为 release 资产值）：
 
 | Drafter | Target | 下载 | Model card |
 | --- | --- | --- | --- |
 | **DFlash** · 冻结块草稿参考实现 | Qwen2.5-VL-3B | [387 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash.md) |
 | **Domino** · GRU 修正 | Qwen2.5-VL-3B | [464 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-domino.tar.gz) | [详情](docs/zoo/qwen25vl-3b-domino.md) |
-| **DSpark** · Markov + confidence head | Qwen2.5-VL-3B | [487 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dspark.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dspark.md) |
-| **JetSpec** · forward-KL 蒸馏 | Qwen2.5-VL-3B | [370 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-jetspec.tar.gz) | [详情](docs/zoo/qwen25vl-3b-jetspec.md) |
-| **DFlash2** · 实验性训练目标 | Qwen2.5-VL-3B | [498 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflash2-exp.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash2-exp.md) |
-| **DFlare** · 可学习融合 + 专属 context K/V | Qwen2.5-VL-3B | [356 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflare.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflare.md) |
-| **DFly** · 共享 KV + hidden 修正 | Qwen2.5-VL-3B | [401 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dfly.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dfly.md) |
-| **DFlash** · 8B 规模 | Qwen3-VL-8B | [955 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen3vl-8b-dflash.tar.gz) | [详情](docs/zoo/qwen3vl-8b-dflash.md) |
+| **DSpark** · Markov + confidence head | Qwen2.5-VL-3B | [511 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dspark.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dspark.md) |
+| **JetSpec** · forward-KL 蒸馏 | Qwen2.5-VL-3B | [388 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-jetspec.tar.gz) | [详情](docs/zoo/qwen25vl-3b-jetspec.md) |
+| **DFlash2** · 实验性训练目标 | Qwen2.5-VL-3B | [522 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflash2-exp.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflash2-exp.md) |
+| **DFlare** · 可学习融合 + 专属 context K/V | Qwen2.5-VL-3B | [373 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dflare.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dflare.md) |
+| **DFly** · 共享 KV + hidden 修正（共享 block CE） | Qwen2.5-VL-3B | [420 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen25vl-3b-dfly.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dfly.md) |
+| **DFly** · 上游两阶段配方（`upstream_two_stage`，AL 1.839） | Qwen2.5-VL-3B | [420 MB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.2/qwen25vl-3b-dfly-recipe.tar.gz) | [详情](docs/zoo/qwen25vl-3b-dfly-recipe.md) |
+| **DFlash** · 8B 规模 | Qwen3-VL-8B | [1.00 GB](https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.1/qwen3vl-8b-dflash.tar.gz) | [详情](docs/zoo/qwen3vl-8b-dflash.md) |
 
 这些权重是**流水线验证用的参考产物**：按已记录的开发协议训练，用于跑通
 `训练 → 评测 → 导出`、集成工作和输出一致性检查，并非面向生产调优的 drafter；
@@ -165,15 +167,24 @@ DFlash2 的上游训练目标未公开，本项目使用实验性重建；JetSpe
 ```
 
 多图 / 多轮行通过 schema v2 启用：扁平的 `images` 列表加 `image_turns`
-（每张图片所属的 conversation 下标，顺序与 `images` 一致）；整段对话会被保留，
-每个 assistant 轮次按 teacher-forced 历史逐轮贪心重生成：
+（每张图片所属的 conversation 下标，顺序与 `images` 一致）。多轮监督的默认协议是
+`regen.multi_turn_mode: last_turn_only`：数据中较早的 assistant 轮次按原样保留，
+仅作为 teacher-forced 上下文；**只有最后一个 assistant 回答会被目标模型重新生成
+并参与训练**（评测渲染同一段原始历史，训练与评测协议一致）。`all_turns` 是显式
+开启的实验模式：每个 assistant 轮次都基于已生成的前文重新生成并监督，与默认协议
+的样本不可直接比较。
+
+训练监督来自目标模型重生成的回答（其 token id 被记录，capture 阶段据此做逐位
+一致性校验），**不是**数据行里手写的 `answer` 文本；`answer`/历史轮次只影响
+prompt 与上下文。下面示例中，第一轮 gpt 回答只作上下文，第二轮 gpt 回答是被监督
+（重新生成）的目标：
 
 ```json
 {"id":"sample-002","images":["a.jpg","b.jpg"],"image_turns":[0,2],
  "conversations":[{"from":"human","value":"<image>\n第一张图里是什么？"},
-                  {"from":"gpt","value":"..."},
+                  {"from":"gpt","value":"……（上下文，不参与 loss）"},
                   {"from":"human","value":"<image>\n第二张呢？"},
-                  {"from":"gpt","value":"..."}],
+                  {"from":"gpt","value":"……（仅此处被重新生成并监督）"}],
  "schema":"vlm-dflash-data-v2"}
 ```
 
@@ -270,9 +281,12 @@ README 有意不展示小规模训练数字和算法排名：已记录的运行�
 - **输入：** 图片（一张或多张）+ 文本，单轮或多轮，贪心解码。schema v2（每行
   多张图片、图片可挂到任意 user 轮次）已在记录的 E2 smoke 上为 DFlash
   端到端验证；其余算法共用同一数据路径——见[支持矩阵](SUPPORT_MATRIX.md)脚注。
-- **Target：** 上述两种 Qwen-VL 模型；其他家族需要 adapter 和验证。
+- **Target：** 主要验证对象为 Qwen2.5-VL-3B 与 Qwen3-VL-8B；SmolVLM2 目前有
+  DFlash 单图 smoke（工程验证，无质量结论）；其他家族需要 adapter 和验证。
 - **硬件：** 实测参考为单张 48 GB GPU；24 GB preset 是建议配置，尚未在实际 24 GB 卡上验证。
-- **Serving：** 生产 vLLM/SGLang 集成仍为后续工作；[serving bridge](docs/serving-bridge.md)描述拟议交接方式。
+- **Serving：** 生产 vLLM/SGLang 集成仍为后续工作；[serving bridge](docs/serving-bridge.md)
+  是已实现的实验性导出/加载工具（converter + load 验证），正确性与性能验收
+  未完成，暂无 vLLM/SGLang 支持声明。
 - **复现：** 数据与生成协议可复现，bf16 训练不保证 bitwise deterministic；
   接受指标以测量记录（见[基准结果](#基准结果)）为准。
 

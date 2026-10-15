@@ -2,7 +2,8 @@
 
 Direction: one training stack for multimodal parallel drafters — but only
 "support" claims backed by measured evidence. DFlash is frozen as the
-reference algorithm; the other four plug in through the registry.
+reference algorithm; the other six (DSpark, Domino, JetSpec, DFlash2, DFlare,
+DFly) plug in through the registry.
 
 ## Algorithm zoo (v0.3, this release)
 - [x] DFlash frozen + machine-readable reference
@@ -14,17 +15,22 @@ reference algorithm; the other four plug in through the registry.
 - [x] DFlash2 ported + measured (AL 1.954, token-exact) — **Experimental**:
       upstream publishes the architecture but not the training objective; the
       conv/selector decomposition is bounded by an ablation.
-- [x] Benchmark harness (manifests + runner + report) + first public workload
-      validated: TextVQA (128-prompt seeded subset, pinned prompt manifest,
-      token-exact; see `RELEASE_VALIDATION.md`). DocVQA / ChartQA stay pinned
-      protocols without adapters.
+- [x] Benchmark harness (manifests + runner + report) + public workloads
+      validated on pinned prompt subsets: TextVQA, then DocVQA and ChartQA
+      (`BENCHMARKS.md` E3 tables, 128-prompt seeded subsets, token-exact; see
+      `RELEASE_VALIDATION.md` and `docs/benchmark.md`).
 - [x] Qwen3-VL reduced-scale validation for DSpark / Domino / JetSpec / DFlash2
       (v0.3.0-rc1; results in `RELEASE_VALIDATION.md`).
 
-## Release (next)
-- Public checkpoints (3B zoo first, 8B DFlash), model cards (export already
-  emits `model_card.md`), HF collection, PyPI, 5-minute demo, README front
-  page polish.
+## Release status
+- [x] Public checkpoints: `zoo-v0.3.0` (DFlash, Domino), `zoo-v0.3.1`
+      (DSpark, JetSpec, DFlash2-exp, DFlare, DFly, 8B DFlash), `zoo-v0.3.2`
+      (DFly upstream recipe) — index in `docs/model-zoo.md`; model cards are
+      emitted by `export` and mirrored under `docs/zoo/`.
+- [x] 5-minute demo recorded (`RELEASE_VALIDATION.md`).
+- [ ] Hugging Face Hub collection, PyPI publishing (the code is public on
+      GitHub; do not follow distribution instructions that assume PyPI).
+- [ ] README front-page polish tracked via the docs review (2026-10-15).
 - Release audit before any push; version/tag hygiene.
 
 ## v0.3.2 (in development)
@@ -33,7 +39,8 @@ reference algorithm; the other four plug in through the registry.
       plumbing smokes (all five algorithms on 3B) in
       `docs/online-training.md`. Offline stays the default.
 - [ ] Online-vs-offline wall-clock/disk curve on a real corpus (only when a
-      canonical online run is scheduled).
+      canonical online run is scheduled; the paired single-vs-batched
+      extraction re-timing `R-20261014-21` is a partial record, not the curve).
 
 ## DFlare / DFly (AngelSpec ports)
 - [x] DFlare: separate-context-KV attention + per-draft-layer softmax fusion
@@ -58,8 +65,9 @@ reference algorithm; the other four plug in through the registry.
       upstream_two_stage` (exact loss math in `vlm_dflash/objectives.py`;
       CPU-tested for formula parity, stage switching and resume gating, and
       exercised end to end on the tiny fixture). Runs without `train_recipe`
-      keep the shared decayed block CE; a canonical GPU recipe run and its AL
-      comparison are the next record to land.
+      keep the shared decayed block CE. Canonical GPU recipe run recorded
+      (`R-20261014-11`: AL 1.839 vs 1.682 for the CE run on the same store and
+      seed, 128/128 token-exact) and published as `zoo-v0.3.2`.
 - [x] Schema v2 (multi-image / multi-turn): rows with `image_turns` keep the
       full conversation; per-turn greedy regen with incremental `full_ids`
       (asserted against one full-conversation render), multi-span capture
@@ -71,8 +79,10 @@ reference algorithm; the other four plug in through the registry.
 ## Later (not on the critical path)
 - DFlash2 objective isolation (`unary_loss: ce` control) if the number is
   quoted as a method claim; JetSpec production parallel-tree runtime.
-- Video, vLLM/SGLang interop, latency breakdowns, hardware presets validated
-  by measurement; multi-image batched online capture (WP4).
+- Video, vLLM/SGLang interop (current state and gates in
+  `docs/serving-bridge.md`), latency breakdowns, hardware presets validated
+  by measurement; multi-image batched online capture beyond the recorded
+  WP4 measurements.
 
 Rules
 - No support checkbox without a run: implemented / tested / validated /
