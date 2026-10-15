@@ -194,7 +194,14 @@ Last update: 2026-10-15 ~13:20 CST. Branch `research/rsi-d1-conv` (base `origin/
 - `eval_samples.jsonl` lacked per-prompt verify_steps/accepted/draft counts; added (commit `5750c23`),
   eval tests pass; server repo pulled so the stability leg's eval writes the new fields.
 
-## Running now (13:56 CST)
+## Closed (16:45 CST) — confirm wave done, verdicts recorded
+- Confirm wave at L*=1600 (driver 13:55:54 -> "all legs done" 16:43:05): 12/12 legs rc=0
+  (canonical x4 + grid2 x4 confirmatory; token2/split2 x2 pilots), all token_exact=True.
+  Frozen gates: grid2 FAIL (relAL -0.775%, lo -2.000%; acc pass); pilots exploratory (token2 -0.03%,
+  split2 +0.15%). Cost table (14 legs) + artifacts committed; REPORT status = closed/HOLD.
+  GPU-hours this round (wave): ~7.2 GPU-h train + ~1.5 GPU-h eval.
+- Server state: all our processes exited; GPU0/1/2 free; GPU3 external tenant only.
+- Earlier lines kept below for the record:
 - GPU0/1/2: confirm wave at L*=1600 (driver pid 600986, launched 13:55:54): canonical x4 + grid2 x4 (gates)
   + pilots token2/split2 x2. Queue per GPU: gpu0 canon_s42, grid2_s43, canon_s45, split2_s42; gpu1
   grid2_s42, canon_s44, grid2_s45, token2_s43; gpu2 canon_s43, grid2_s44, token2_s42, split2_s43.

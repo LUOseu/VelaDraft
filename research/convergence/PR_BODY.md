@@ -58,8 +58,21 @@ default-off; nothing here changes shipped training semantics unless
   scoped to the matched budget. AL declines at longer budgets (1.20@400 →
   1.155@800 → 1.119@1600) — small-store overfit; the arm comparison is a
   matched-budget test.
-- Confirmatory quality legs (canonical ×4, grid2 ×4 at L*=1600; token2/split2
-  pilots): <pending — verdict per `PREREGISTRATION.md` gates>
+- Confirmatory quality legs (canonical ×4, grid2 ×4 at L*=1600, val64, paired;
+  frozen gates in `PREREGISTRATION.md` §5, hierarchical bootstrap B=10,000):
+  per-seed relΔAL = +0.015% / +0.430% / −3.042% / −0.501%; mean −0.775%,
+  one-sided 95% lower bound **−2.000%** → **AL gate FAIL** (margin −1%);
+  Δacc = −0.00113 (lo −0.00352) → acc gate passes; verdict **FAIL** (both must
+  hold). Attribution: step-1 seams 4.4e-4–2.8e-3 (same supervision/anchors);
+  seed-level endpoint chaos in the *not settled* regime (curve moves ~3%/800
+  steps) — a certification failure, not an established systematic regression
+  (t≈−1.0 across seeds). All 16 confirmatory+pilot legs token_exact=True.
+  Artifacts: `evidence/quality_data.json`, `evidence/quality_verdict.json`,
+  per-leg raw under `evidence/legs/`.
+- Pilots (token2 C-only, split2 plain split ×2 seeds; exploratory, non-gating):
+  −0.032% (lo −1.06%) and +0.147% (lo −0.35%).
+- Full cost table (14 legs): `evidence/costs_table.md` — train wall/GPU-h, peak
+  (25.3 → 10.0 GiB for sub2 layouts, −60.5%), eval per-sample breakdown.
 - Second-drafter applicability: dflare **bypass bitwise PASS**; regroup
   machinery refused (aux metrics) — code boundary: dspark/domino
   (`sample_from_anchor`), dflash2/jetspec (aux loss), dflare (aux metrics),
@@ -91,3 +104,13 @@ bash research/convergence/scripts/finalize_systems.sh
 ```
 
 No merge to main; unverified features stay default-off.
+
+## Outcome
+
+**HOLD for the optimization claim; systems/capacity/applicability results stand.**
+The pre-registered non-inferiority gate fails at the affordable local budget
+(L*=1600, explicit "not settled" disclosure from the frozen settle rule). The
+regrouping machinery stays default-off; the benchmark base, the identity-bypass
+fix, the eval accounting, the applicability boundary map and the A100 matrix
+are ready for the full round. Historical verdicts (d1-006/d1-007/d4xd1) are
+preserved unchanged in `research/convergence/HISTORY.md`.
