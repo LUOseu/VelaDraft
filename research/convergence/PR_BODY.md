@@ -46,24 +46,48 @@ default-off; nothing here changes shipped training semantics unless
   micro-8 fits at 24.21 GiB peak / 12.6% padding; split sub2 9.37 GiB / 4.9%;
   grid sub2 9.37 GiB / 3.3% with wall −18.8% vs canonical micro-8
   (`research/convergence/evidence/capacity/`).
-- Systems A/B series (3 reps × arms canonical/split/token/cost/grid on W3 +
-  MIX + W1): <pending — final numbers>
-- Confirmatory quality legs (canonical ×4, grid2 ×4 at L*; token2/split2 pilots):
-  <pending — verdict per `PREREGISTRATION.md`>
-- Second-drafter applicability: dflare smoke <pending>; code-level boundary:
-  dspark/domino refused (`sample_from_anchor`), dflash2/jetspec refused
-  (auxiliary metrics gate), dflare under test.
+- Systems A/B series (3 reps × arms, `evidence/systems_table.md`): speedup vs
+  canonical on W3 k4 = split 1.061 / token 1.111 / dual 1.110 / cost 1.133 /
+  grid 1.131, peak 25.05 → 10.64 GiB (−57%), padding 11.8% → 2.7–3.6%; MIX k4
+  grid 1.156 (pad 20.1% → 6.0%); k2 gains shrink (grid 1.097); **W1 k4 all
+  regroup arms slower (0.865–0.873) — low-memory-pressure no-gain boundary**.
+  Identity controls cp/ref ≈ 1.000 (loss-identical; machinery overhead ≈ 0).
+- Stability/L* (frozen prereg §3, canonical-only): settled(400)=False (0.73%),
+  settled(800)=False (6.04%); fresh 1600-step extension settled(1600)=False
+  (3.07%) → **L* = 1600 with the explicit "not settled" disclosure**; claim
+  scoped to the matched budget. AL declines at longer budgets (1.20@400 →
+  1.155@800 → 1.119@1600) — small-store overfit; the arm comparison is a
+  matched-budget test.
+- Confirmatory quality legs (canonical ×4, grid2 ×4 at L*=1600; token2/split2
+  pilots): <pending — verdict per `PREREGISTRATION.md` gates>
+- Second-drafter applicability: dflare **bypass bitwise PASS**; regroup
+  machinery refused (aux metrics) — code boundary: dspark/domino
+  (`sample_from_anchor`), dflash2/jetspec (aux loss), dflare (aux metrics),
+  dfly untested (`evidence/second_drafter/`, STATE F9).
+- A100 matrix dry-run re-validated (32 entries, 37.3 GPU-h est, 0 errors;
+  `evidence/a100_dryrun.txt`).
 
 ## Reproduce
 
 ```bash
 # local tests
 PYTHONPATH=. python -m pytest tests/test_regroup.py tests/test_convert_train_state_ckpt.py -q
-# server (4×A6000): stability curve -> L*, confirm legs, systems series, capacity
+# server (4×A6000): stability curve -> L* (frozen rule)
 bash research/convergence/scripts/vconv_stability_leg.sh conv_stab_canon_s42 1 800 200 42
-bash research/convergence/scripts/vconv_confirm_series.sh <L*> 1,2,3 pilot
+python research/convergence/analyze_settle.py --leg evidence/legs/conv_stab_canon_s42 \
+  --extra-result evidence/legs/conv_stab_canon_s42/eval/eval_result_stab_curve.json
+# extension leg (1600) + extension verdict ({800,1600} clause)
+bash research/convergence/scripts/vconv_stability_leg.sh conv_stab1600 1 1600 400 42
+python research/convergence/analyze_settle.py --leg evidence/legs/conv_stab1600 --extension
+# confirm wave at L* (canonical x4 + grid2 x4 + pilots; retry driver)
+VCONV_EVAL_CKPTS=ckpt_final.pt VCONV_KEEP_CKPT_FINAL=1 \
+  bash research/convergence/scripts/vconv_confirm_driver.sh 1600 0,1,2 pilot 8
+# systems series + capacity probe
 bash research/convergence/scripts/vconv_harness_series.sh series1
 bash research/convergence/scripts/vconv_capacity_probe.sh
+# finalizers (fetch + frozen gates / systems table)
+bash research/convergence/scripts/finalize_quality.sh
+bash research/convergence/scripts/finalize_systems.sh
 ```
 
 No merge to main; unverified features stay default-off.
