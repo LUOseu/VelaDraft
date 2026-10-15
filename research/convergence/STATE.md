@@ -149,6 +149,25 @@ Last update: 2026-10-15 ~13:20 CST. Branch `research/rsi-d1-conv` (base `origin/
 - 配对成本: train wall 1805.2s vs 1690.4s (-6.4%); peak 25.34 vs 9.99 GiB (-61%).
 - 证据: `evidence/legs/conv_canon_s42/` vs `evidence/legs/conv_grid2_s42/` (+local log diff).
 
+### F14. CONFIRMATORY VERDICT (frozen prereg): **FAIL** — grid/sub2 not non-inferior at L*=1600
+- 结果 (canonical x4 vs grid2 x4, val64, paired): seed rel-AL = +0.015% / +0.430% / **-3.042%** /
+  -0.501%; mean relAL **-0.775%**, hierarchical-bootstrap one-sided 95% lower bound **-2.000%**
+  (gate: >-1.0%) -> **AL gate FAIL**. dacc mean -0.00113, lower bound -0.00352 (gate >-0.005)
+  -> acc gate PASS. Prereg §5: both must hold -> **verdict FAIL**. All 8 legs token_exact=True.
+- 归因 (RSI checks): step-1 loss seams of the pairs = 4.4e-4 / 2.8e-3 / 1.9e-3 (same order for every
+  seed -> same supervision/anchors; the seam is the fp32-vs-bf16 reduction). s44: grid2's TRAIN loss is
+  slightly BETTER (last10 1.92e-3 vs 1.98e-3) while held-out AL is 3% worse -> endpoint divergence in
+  the chaos-divergent, still-fast-moving (not settled) held-out regime, not a semantic change and not a
+  bug (bitwise controls F2/F12 hold; harness parity holds). The L* extension curve moves ~3%/800 steps;
+  a ±1% non-inferiority claim at 1600 steps is below the regime's trajectory sensitivity.
+- 决定: keep verdict FAIL as-is (no post-hoc loosening; k=2 candidate is not swapped for another layout
+  post-hoc per prereg §4); record as the round's negative result. Systems/capacity gains stand
+  independently (F7/F13: peak -60%, wall -6..8.5%, padding 11.8%->3.6% at this budget).
+- 证据: `evidence/quality_data.json`, `evidence/quality_verdict.json` (mechanical, bootstrap seed
+  20261015); per-seed raw in `evidence/legs/conv_{canon,grid2}_s*`.
+- 下一步: pilots (token2/split2) land -> re-run `scripts/finalize_quality.sh` for the archived artifact
+  incl. pilots; full cost table; REPORT/PR/final message with HOLD for the optimization claim.
+
 ### F5. Stability leg: full 800 steps trained; crashed only at final checkpoint write (disk full)
 - 发现: `conv_stab_canon_s42` trained steps 1..800 (train_log.jsonl complete, loss 12.875 -> 0.026, gn
   sane, lr schedule complete) and died at 11:33:18 inside the final `ckpt_last.pt` write (`.tmp` 669MB

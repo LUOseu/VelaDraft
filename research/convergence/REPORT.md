@@ -2,8 +2,10 @@
 
 Single-agent convergence round for direction D1: physical training regrouping by
 visual context length C × valid anchor count A. Branch `research/rsi-d1-conv`
-(base `origin/main` @ `6d99f04`). Status: **in progress — numbers filled as the
-confirm wave completes.**
+(base `origin/main` @ `6d99f04`). Status: **closed.** Systems/capacity/applicability
+tables below are final; the frozen confirmatory quality gate is a **FAIL**
+(non-inferiority not established at the registered budget) — the negative result
+is the registered outcome and the optimization stays default-off.
 
 ## 1. What was fixed first (round prerequisites)
 
