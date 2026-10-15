@@ -1,6 +1,6 @@
 # STATE — D1 convergence (single-agent round)
 
-Last update: 2026-10-15 ~11:4x CST. Branch `research/rsi-d1-conv` (base `origin/main` @ 6d99f04).
+Last update: 2026-10-15 ~12:20 CST. Branch `research/rsi-d1-conv` (base `origin/main` @ 6d99f04).
 
 ## 发现—证据—决定—下一步 log
 
@@ -32,11 +32,46 @@ Last update: 2026-10-15 ~11:4x CST. Branch `research/rsi-d1-conv` (base `origin/
   > -1% relative AL and > -0.5pp acceptance rate; candidate grid/sub2 (systems-rule); 4 seeds confirmatory
   {42,43,44,45}; token/split at 2 seeds pilot. Length rule: settle test on canonical-only AL curve.
 
+### F3 addendum, commit-order disclosure
+- `PREREGISTRATION.md` authored 11:18:38 / `analyze_quality.py` 11:18:55 (mtime), first committed 12:16
+  (`6af79f1`) as part of the convergence working set. Between authorship and commit, the only runs were the
+  identity smoke legs (canonical/off, canonical/8 bypass, canonical/8 machinery, grid/2 3-step): no eval of
+  any arm had been executed and no gate statistic existed. No candidate (grid/sub2) *training* leg has been
+  launched or read. The frozen gates were fixed in text/sha before every arm result that will be fed to them.
+
+### F5. Stability leg: full 800 steps trained; crashed only at final checkpoint write (disk full)
+- 发现: `conv_stab_canon_s42` trained steps 1..800 (train_log.jsonl complete, loss 12.875 -> 0.026, gn
+  sane, lr schedule complete) and died at 11:33:18 inside the final `ckpt_last.pt` write (`.tmp` 669MB
+  partial; /home was at 100%, 365M free). `ckpt_200/400/600.pt` (exact steps 200/400/600; watcher copied at
+  log-steps 211/410/610) survived. `train_summary.json` was never written -> disclosed; leg validity flags
+  (loss_decreased, nan_seen) re-derivable from train_log.jsonl only.
+- 证据: `/home/lyh/veladraft-conv/runs/conv_stab_canon_s42/train/`, `logs/vconv_conv_stab_canon_s42_train.log`
+  ("write error: No space left on device" traceback), `df` history.
+- 决定: keep the 200/400/600 checkpoints (the settle rule needs exactly {200,400} and, only if unsettled,
+  {800} via a 200-step resume from the intact step-600 `ckpt_last.pt`); eval launched manually at 12:17 on
+  GPU1 with `--set eval.checkpoints=[ckpt_200.pt,ckpt_400.pt,ckpt_600.pt]`.
+
+### F6. Disk recovery (shared /home was the binding constraint, not GPUs)
+- 发现: /home (15T shared) sat at 100% all morning; GPU guard requires >=15G free, so runs could not start.
+  GPUs themselves flicker: 4 tenants can appear/disappear within minutes (GPU0 re-occupied at 12:17).
+- 决定: deleted only `*.pt` files (resumable ckpts) from 16 stopped-lane smoke run dirs
+  (`vlm-dflash/runs/fix*_smoke_*`, `fix3_resume_online`, `rc_traindemo_gpu3`, `demo_dflash*`,
+  `rsi-d1/runs/d4xd1_smoke`, `rsi-d1/runs/d1_mix_w1w2`); every config/contract/eval/log/json was left in
+  place, and LIVE stores (`d1_w3_probe`, `d1q_val64`, `d1_mix_w1w2/features`, `d1_w1_probe`) untouched.
+  Freed ~64G; /home at 65G free afterwards. No mainline benchmark runs (`qwen25vl3b_*`, `qwen3vl8b_reduced_*`)
+  were touched.
+
 ### F4. Eval per-prompt accounting added (prereq for the preregistered CI)
 - `eval_samples.jsonl` lacked per-prompt verify_steps/accepted/draft counts; added (commit `5750c23`),
   eval tests pass; server repo pulled so the stability leg's eval writes the new fields.
 
-## Running now
+## Running now (12:20 CST)
+- GPU1: stability eval of `conv_stab_canon_s42` over ckpt_200/400/600 (started 12:17) -> L* decision via
+  `analyze_settle.py`.
+- GPU2: harness series `series1` (restarted 12:17 after harness files were committed to the repo and pulled;
+  the 11:20 failure was only the missing `research/convergence/harness/` path).
+- GPUs 0/3: tenants (GPU0 91%/14.7G at 12:17; GPU3 external as usual). Launches go wherever a GPU is free;
+  `vconv_confirm_series.sh <L> <gpus> [pilot]` is staged and syntax-checked for the confirmatory matrix.
 - GPU0: `conv_stab_canon_s42` — canonical seed 42, 800 steps, mid ckpt copies @200/400/600, 4-checkpoint eval.
 - GPU1: harness series `series1` — W3 k4 x3, W3 k2 x3, MIX k4 x2, W1 k4 x1, seam run (arms
   canonical,cp,ref,split,token,dual,cost,grid; 100 batches/rep; parity 3).
