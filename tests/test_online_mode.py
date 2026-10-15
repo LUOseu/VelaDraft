@@ -3111,13 +3111,37 @@ def test_online_cache_real_tiny_model_second_epoch_is_free(monkeypatch, tmp_path
 # --------------------------------------------------------------------------- #
 
 class _AdaptiveSensorStub:
-    """Scriptable headroom reading for the adaptive-budget tests."""
+    """Headroom reading coupled to the cache's own occupancy (closed loop).
 
-    def __init__(self, available_bytes: int) -> None:
-        self.available_bytes = available_bytes
+    Models a job cgroup: ``available = limit - other - retained``, where
+    ``retained`` is the cache's current payload -- a real cgroup probe already
+    excludes it from the headroom (review finding: scripted, occupancy-
+    independent readings encoded the old double-charging semantics).
+    ``other_bytes`` scripts the rest of the job's usage; ``source`` is wired to
+    the cache under test after construction. ``rise_after_next_read`` applies a
+    new ``other_bytes`` once the current read returns, so a test can move the
+    pressure between a lookup and the store that follows it.
+    """
+
+    def __init__(self, limit_bytes: int, other_bytes: int = 0) -> None:
+        self.limit_bytes = limit_bytes
+        self.other_bytes = other_bytes
+        self.source = None
+        self._rise_after_next_read: int | None = None
+
+    def rise_after_next_read(self, other_bytes: int) -> None:
+        self._rise_after_next_read = other_bytes
 
     def __call__(self):
-        return cache_budget_module.MemorySample("stub", None, None, self.available_bytes)
+        retained = 0 if self.source is None else self.source.cache_current_bytes()
+        used = self.other_bytes + retained
+        sample = cache_budget_module.MemorySample(
+            "stub", self.limit_bytes, used, self.limit_bytes - used
+        )
+        if self._rise_after_next_read is not None:
+            self.other_bytes = self._rise_after_next_read
+            self._rise_after_next_read = None
+        return sample
 
 
 def _adaptive_params(**overrides) -> "cache_budget_module.BudgetParams":
@@ -3151,11 +3175,12 @@ def test_online_cache_adaptive_trims_under_pressure_and_grows_back(monkeypatch, 
     calls: list = []
     _install_batched_stub(monkeypatch, calls, context_hidden=4)
     run_dir = _write_online_run_dir(tmp_path, rows=6, answer_len=12)
-    sensor = _AdaptiveSensorStub(available_bytes=10_000)
+    sensor = _AdaptiveSensorStub(limit_bytes=10_000)
     _install_adaptive_controller(monkeypatch, sensor)
     cfg = _cache_cfg(4752 / (1 << 30))  # 6 records x 792 B
     cfg["train"]["online_feature_cache_adaptive"] = True
     source = _stub_source_with_cfg(monkeypatch, run_dir, cfg)
+    sensor.source = source  # the reading now tracks the cache's own bytes
     dataset = source.dataset()
 
     # Plenty of headroom: the full working set is retained, as with a fixed cap.
@@ -3166,8 +3191,10 @@ def test_online_cache_adaptive_trims_under_pressure_and_grows_back(monkeypatch, 
     assert source.cache_current_bytes() == 4752
     assert source.cache_budget_bytes() == 4752
 
-    # Pressure: room for two records only -> the LRU head is trimmed on the next read.
-    sensor.available_bytes = 1584
+    # Pressure: the job's non-cache usage rises until two records fit -> the
+    # LRU head is trimmed on the next read (the reading already excludes the
+    # retained 4752 bytes, like a real cgroup probe).
+    sensor.other_bytes = 10_000 - 1584
     dataset[4]
     assert source.cache_budget_bytes() == 1584
     assert source.cache_stats["evictions"] == 4
@@ -3181,7 +3208,7 @@ def test_online_cache_adaptive_trims_under_pressure_and_grows_back(monkeypatch, 
     assert source.cache_stats["evictions"] == 7
 
     # Recovery: above the high watermark the budget grows in steps, never by a jump.
-    sensor.available_bytes = 10_000
+    sensor.other_bytes = 0
     assert source.cache_budget_bytes() == 3168
     assert source.cache_budget_bytes() == 4752
     before_evictions = source.cache_stats["evictions"]
@@ -3198,16 +3225,49 @@ def test_online_cache_adaptive_trims_under_pressure_and_grows_back(monkeypatch, 
     assert adaptive["shrinks"] == 1 and adaptive["grows"] == 2 and adaptive["adjustments"] == 3
 
 
+def test_online_cache_adaptive_store_rejection_still_trims_old_entries(monkeypatch, tmp_path):
+    """Regression (review P2): pressure rising between lookup and store.
+
+    ``cache_store`` refreshes the budget and trims the existing store *before*
+    deciding whether the new record fits; it used to return early on an
+    over-budget record, leaving the stale payload resident until the next
+    lookup (repro: budget=0 while retained=120, evictions=0).
+    """
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    run_dir = _write_online_run_dir(tmp_path, rows=7, answer_len=12)
+    sensor = _AdaptiveSensorStub(limit_bytes=10_000)
+    _install_adaptive_controller(monkeypatch, sensor)
+    cfg = _cache_cfg(4752 / (1 << 30))  # 6 records x 792 B
+    cfg["train"]["online_feature_cache_adaptive"] = True
+    source = _stub_source_with_cfg(monkeypatch, run_dir, cfg)
+    sensor.source = source
+    dataset = source.dataset()
+    for index in range(6):
+        dataset[index]
+    assert source.cache_current_bytes() == 4752 and source.cache_stats["evictions"] == 0
+
+    # Row 6's lookup still sees free memory; the job's other usage rises while
+    # the teacher forward runs, so the store observes a zero budget.
+    sensor.rise_after_next_read(10_000)
+    dataset[6]
+    assert source.cache_stats["skipped_too_large"] == 1  # the new record was refused
+    assert source.cache_stats["stores"] == 6
+    assert source.cache_current_bytes() == 0  # ...but the stale payload was trimmed first
+    assert source.cache_stats["evictions"] == 6
+
+
 def test_online_cache_adaptive_zero_headroom_stores_nothing_until_relief(monkeypatch, tmp_path):
     """A zero budget is supported: reads re-extract until the headroom returns."""
     calls: list = []
     _install_batched_stub(monkeypatch, calls, context_hidden=4)
     run_dir = _write_online_run_dir(tmp_path, rows=2, answer_len=12)
-    sensor = _AdaptiveSensorStub(available_bytes=0)
+    sensor = _AdaptiveSensorStub(limit_bytes=10_000, other_bytes=10_000)  # no headroom left
     _install_adaptive_controller(monkeypatch, sensor)
     cfg = _cache_cfg(4752 / (1 << 30))
     cfg["train"]["online_feature_cache_adaptive"] = True
     source = _stub_source_with_cfg(monkeypatch, run_dir, cfg)
+    sensor.source = source
     dataset = source.dataset()
 
     first = dataset[0]
@@ -3219,7 +3279,7 @@ def test_online_cache_adaptive_zero_headroom_stores_nothing_until_relief(monkeyp
     assert source.cache_current_bytes() == 0
     _assert_same_record(first, second)
 
-    sensor.available_bytes = 10_000
+    sensor.other_bytes = 0
     assert source.cache_budget_bytes() == 792  # one step back up
     third = dataset[0]
     assert _forward_calls(calls) == 3  # still a miss, but now it is retained

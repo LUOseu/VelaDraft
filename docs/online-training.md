@@ -170,12 +170,15 @@ target. The store is LRU-evicted at the byte cap and never persisted; the
 train / overfit-sanity / calibration phases share it; a record larger than the
 whole cap is not retained (it would evict every other entry for one hit).
 
-The cache does not change which rows are consumed, their order, or the
-grouping of any forward it executes: hits return the stored tensors bitwise,
-and a miss (cold start, eviction, or a cap below the working set) re-extracts
-exactly as the reference path would. It stays out of the feature digest and
-the training-plan digest. A resume — exact or not — starts from a cold cache
-and re-extracts; it is functionally resumable, but under a shuffling loader
+The cache does not change which rows are consumed or their order, and hits
+return the stored tensors bitwise. A miss (cold start, eviction, or a cap
+below the working set) re-extracts through the reference extraction path;
+with `online_batch_size > 1` a partially cached capture group forwards only
+its missing rows, so eviction does not guarantee byte-identity with a
+cache-off run — the same grouping sensitivity documented for batching above
+(a cold start still forwards the full group). It stays out of the feature
+digest and the training-plan digest. A resume — exact or not — starts from a
+cold cache and re-extracts; it is functionally resumable, but under a shuffling loader
 it is not guaranteed bit-exact to an uninterrupted cached run, because
 post-resume re-extraction uses the resumed epoch's batch grouping instead of
 the original epoch-1 grouping the uninterrupted run's cache held (drift stays
@@ -190,15 +193,20 @@ already-written store took 548.8 s vs this cache's 470.9 s train stage, with
 zero disk bytes.
 
 `train.online_feature_cache_adaptive: true` (default `false`) additionally
-bounds the retained payload by the job's own memory headroom (cgroup limit or
-`MemAvailable`, minus a reserve): the byte budget shrinks immediately under
-pressure (early LRU evictions; later reads re-extract as usual) and grows back
-stepwise when headroom returns. It never changes which rows are consumed,
-their order, or the grouping of any forward; with the flag off the cache
-behaves exactly as above. Enabled runs report the extra state under
+bounds the retained payload by the job's own memory headroom (the process
+cgroup's tightest limit, combined with `MemAvailable`, minus a reserve): the
+byte budget shrinks immediately under pressure (early LRU evictions; later
+reads re-extract as usual) and grows back stepwise when headroom returns. It
+preserves the logical sample order and the training objective, but dynamic
+eviction changes which rows are missing from the next capture group, so the
+teacher forward's batch composition — and with it the padding numerics — can
+differ from an uncached or uninterrupted run: dynamic eviction does not
+guarantee a bit-exact numerical trajectory (the same grouping sensitivity the
+paragraph above documents). With the flag off the cache behaves exactly as
+above. Enabled runs report the extra state under
 `feature_source.feature_cache.adaptive_budget` (cap / job share / current
-budget, reserve, shrink / grow counts, sensor snapshot); like the cache
-itself it is runtime-only and outside every digest.
+budget, reserve, retained bytes, shrink / grow counts, sensor snapshot); like
+the cache itself it is runtime-only and outside every digest.
 
 Caveat (measured on the lane's 129-row and 2K-row slices, 2026-10-14): the
 default shuffled loader draws a different row order every epoch, so the
