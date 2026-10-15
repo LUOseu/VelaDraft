@@ -1,6 +1,6 @@
 # STATE — D1 convergence (single-agent round)
 
-Last update: 2026-10-15 ~12:20 CST. Branch `research/rsi-d1-conv` (base `origin/main` @ 6d99f04).
+Last update: 2026-10-15 ~12:45 CST. Branch `research/rsi-d1-conv` (base `origin/main` @ 6d99f04).
 
 ## 发现—证据—决定—下一步 log
 
@@ -39,6 +39,29 @@ Last update: 2026-10-15 ~12:20 CST. Branch `research/rsi-d1-conv` (base `origin/
   any arm had been executed and no gate statistic existed. No candidate (grid/sub2) *training* leg has been
   launched or read. The frozen gates were fixed in text/sha before every arm result that will be fed to them.
 
+
+### F7. Capacity probe re-verified at logical batch 16 (PREREG section 6 item)
+- 发现 (A6000 48GB, W3 store, 4 timed logical batches, harness protocol): canonical single-chunk
+  micro16 -> CUDA OOM 4/4; canonical micro8 fits at 24.21 GiB peak, 12.6% context padding waste;
+  split sub2 fits at 9.37 GiB / 4.9%; grid sub2 fits at 9.37 GiB / 3.3%, wall median 1057ms vs
+  canonical micro8 1301ms (-18.8%, n=4 indicative). Sorting by C x A removes ~1/4 of canonical's
+  padding; splitting alone captures the bulk but not all.
+- 证据: `research/convergence/evidence/capacity/` (raw jsonl + CAPACITY_BATCH16.md); server log
+  `logs/vconv_capacity_probe.log`; OOM rows carry `run_error=cuda_oom` + error text.
+- 决定: capacity claim re-cited from d1-006 is now re-verified this round; numbers folded into the
+  systems table. Peak-memory win at equal semantics: -61%.
+
+### F8. Mid-run checkpoints are resume-format; eval needs a converter (fixed)
+- 发现: the stability eval crashed on `ckpt_200.pt`: `Unrecognized checkpoint format ... '
+  vlm-dflash-train-state-v1'`. `write_train_state` saves exact-resume payloads (weights + fp32
+  masters + optimizer + RNG); the eval/export loader needs `vlm-dflash-ckpt-v1`, whose provenance
+  header (draft_config/algorithm/identity/feature_mode/plan digest) is written only into
+  `ckpt_init.pt`/`ckpt_final.pt`. The watcher-copied mid-run ckpts were therefore not evaluable.
+- 决定: added `scripts/convert_train_state_ckpt.py` + tests (graft the train-state `model`/`step`
+  onto the `ckpt_init.pt` header; no semantics touched) commit `bc87e8f`; converted the three
+  stability checkpoints to `ckpt_eval_{200,400,600}.pt`; eval relaunched 12:26 on GPU1.
+- Follow-up: `vconv_stability_leg.sh` should convert before eval on its next use.
+
 ### F5. Stability leg: full 800 steps trained; crashed only at final checkpoint write (disk full)
 - 发现: `conv_stab_canon_s42` trained steps 1..800 (train_log.jsonl complete, loss 12.875 -> 0.026, gn
   sane, lr schedule complete) and died at 11:33:18 inside the final `ckpt_last.pt` write (`.tmp` 669MB
@@ -65,13 +88,12 @@ Last update: 2026-10-15 ~12:20 CST. Branch `research/rsi-d1-conv` (base `origin/
 - `eval_samples.jsonl` lacked per-prompt verify_steps/accepted/draft counts; added (commit `5750c23`),
   eval tests pass; server repo pulled so the stability leg's eval writes the new fields.
 
-## Running now (12:20 CST)
-- GPU1: stability eval of `conv_stab_canon_s42` over ckpt_200/400/600 (started 12:17) -> L* decision via
-  `analyze_settle.py`.
-- GPU2: harness series `series1` (restarted 12:17 after harness files were committed to the repo and pulled;
-  the 11:20 failure was only the missing `research/convergence/harness/` path).
-- GPUs 0/3: tenants (GPU0 91%/14.7G at 12:17; GPU3 external as usual). Launches go wherever a GPU is free;
-  `vconv_confirm_series.sh <L> <gpus> [pilot]` is staged and syntax-checked for the confirmatory matrix.
+## Running now (12:45 CST)
+- GPU1: stability eval of `conv_stab_canon_s42` over the converted ckpt_eval_200/400/600 (relaunched 12:26
+  after the F8 converter fix) -> L* decision via `analyze_settle.py`.
+- GPU2: harness series `series1` rep 1/3 of w3_k4 done 12:29; ETA ~1.5h for the full series.
+- GPU0: external tenant. GPU3: free (kept idle for the confirm-leg wave).
+- Capacity probe done (F7); A100 matrix runner dry-run passed locally (32 entries, ~37 GPU-h).
 - GPU0: `conv_stab_canon_s42` — canonical seed 42, 800 steps, mid ckpt copies @200/400/600, 4-checkpoint eval.
 - GPU1: harness series `series1` — W3 k4 x3, W3 k2 x3, MIX k4 x2, W1 k4 x1, seam run (arms
   canonical,cp,ref,split,token,dual,cost,grid; 100 batches/rep; parity 3).
