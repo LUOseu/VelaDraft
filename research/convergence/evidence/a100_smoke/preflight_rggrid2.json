@@ -1,0 +1,31 @@
+{
+  "ts": "2026-10-15T09:51:43Z",
+  "config": "/home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rggrid2.yaml",
+  "config_sha256": "c67ed47440cab4d8add7df3d4daebf87839f302492b7f29d72e13e5a3d354064",
+  "run_dir": "/home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rggrid2",
+  "checks": [
+    "algorithm_name+validate_config",
+    "target_contract",
+    "store_identity+layers+final_hidden",
+    "val_split+media"
+  ],
+  "algorithm": "dflash",
+  "expected_algorithm": "dflash",
+  "contract_sha256": "3593fe1b49742fa3f7051c64a3b0671c5d68bd6f2147659f6b5b21c76a3b7373",
+  "store": {
+    "path": "/home/lyh/rsi-d1/runs/d1_w3_probe/features",
+    "rows": 192,
+    "capture_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "stores_final_hidden": false
+  },
+  "val": {
+    "path": "/home/lyh/veladraft-conv-smoke/smoke_val/val.jsonl",
+    "rows": 64,
+    "media_dir": "/home/lyh/veladraft-conv-smoke/smoke_val/images"
+  },
+  "status": "ok"
+}

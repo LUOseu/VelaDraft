@@ -1,0 +1,47 @@
+2026-10-15T09:36:52Z dflash__controlled__s42__rggrid2 prepare: features -> /home/lyh/rsi-d1/runs/d1_w3_probe/features
+2026-10-15T09:36:52Z dflash__controlled__s42__rgoff prepare: features -> /home/lyh/rsi-d1/runs/d1_w3_probe/features
+2026-10-15T09:36:52Z dflash__controlled__s42__rggrid2 prepare: val -> /home/lyh/rsi-d1/runs/d1q_val64/val.jsonl (media /home/lyh/rsi-d1/runs/d1q_val64/images)
+2026-10-15T09:36:52Z dflash__controlled__s42__rggrid2 prepare: /home/lyh/miniforge3/envs/c1vllm/bin/python research/convergence/a100/preflight_entry.py --repo /home/lyh/veladraft-conv/repo --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rggrid2.yaml --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rggrid2 --expect-algorithm dflash --store /home/lyh/rsi-d1/runs/d1_w3_probe/features --val /home/lyh/rsi-d1/runs/d1q_val64/val.jsonl --min-prompts 8
+2026-10-15T09:36:52Z dflash__controlled__s42__rgoff prepare: val -> /home/lyh/rsi-d1/runs/d1q_val64/val.jsonl (media /home/lyh/rsi-d1/runs/d1q_val64/images)
+2026-10-15T09:36:52Z dflash__controlled__s42__rgoff prepare: /home/lyh/miniforge3/envs/c1vllm/bin/python research/convergence/a100/preflight_entry.py --repo /home/lyh/veladraft-conv/repo --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rgoff.yaml --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rgoff --expect-algorithm dflash --store /home/lyh/rsi-d1/runs/d1_w3_probe/features --val /home/lyh/rsi-d1/runs/d1q_val64/val.jsonl --min-prompts 8
+preflight ok: algorithm=dflash checks=['algorithm_name+validate_config', 'target_contract', 'store_identity+layers+final_hidden', 'val_split+media']
+preflight ok: algorithm=dflash checks=['algorithm_name+validate_config', 'target_contract', 'store_identity+layers+final_hidden', 'val_split+media']
+2026-10-15T09:37:08Z gpu0 guard wait util=26% used=2693MiB free=45847MiB disk=20G
+2026-10-15T09:37:08Z dflash__controlled__s42__rgoff train: /home/lyh/miniforge3/envs/c1vllm/bin/python scripts/train_dflash.py --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rgoff.yaml --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rgoff --steps 2 --skip-sanity --set train.seed=42
+[17:37:29] train: features from /home/lyh/rsi-d1/runs/d1_w3_probe/features (192 samples, seq 2048, bfloat16, format vlm-dflash-features-v1)
+2026-10-15T09:37:40Z dflash__controlled__s42__rggrid2 train: /home/lyh/miniforge3/envs/c1vllm/bin/python scripts/train_dflash.py --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rggrid2.yaml --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rggrid2 --steps 2 --skip-sanity --set train.seed=42 --set train.regroup.mode=grid --set train.regroup.sub_batch=2 --set train.regroup.fp32_weights=true --set train.regroup.identity_bypass=true
+[17:37:40] train: dtypes {'feature_storage': 'bfloat16', 'target_native': None, 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[17:37:57] train: features from /home/lyh/rsi-d1/runs/d1_w3_probe/features (192 samples, seq 2048, bfloat16, format vlm-dflash-features-v1)
+[17:38:08] train: dtypes {'feature_storage': 'bfloat16', 'target_native': None, 'drafter_compute': 'bfloat16', 'frozen_embed': 'bfloat16', 'frozen_head': 'bfloat16'}
+[17:38:09] train.regroup enabled: mode=grid sub_batch=2 cost_weight=147.5 fp32_weights=True identity_bypass=True
+[17:38:13] gradient coverage: 36/36 trainable tensors with grad (1.000 of trainable elements)
+[17:38:13]   draft_model.fc: trainable=1 tensors/12582912 elements with_grad=1 grad_norm=41.06
+[17:38:13]   draft_model.hidden_norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.8239
+[17:38:13]   draft_model.layers: trainable=33 tensors/231224064 elements with_grad=33 grad_norm=79.01
+[17:38:13]   draft_model.norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.556
+[17:38:14] step 1/2 loss=12.5000 acc=0.000 al=1.00
+[17:38:21] train: wrote resumable checkpoint (step 1) -> /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rgoff/train/ckpt_last.pt
+[17:38:26] step 2/2 loss=20.0000 acc=0.000 al=1.00
+[17:38:54] gradient coverage: 36/36 trainable tensors with grad (1.000 of trainable elements)
+[17:38:54]   draft_model.fc: trainable=1 tensors/12582912 elements with_grad=1 grad_norm=41.19
+[17:38:54]   draft_model.hidden_norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.8264
+[17:38:54]   draft_model.layers: trainable=33 tensors/231224064 elements with_grad=33 grad_norm=79.26
+[17:38:54]   draft_model.norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.5579
+[17:38:54] step 1/2 loss=12.4945 acc=0.000 al=1.00
+[17:39:02] train: wrote resumable checkpoint (step 1) -> /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rggrid2/train/ckpt_last.pt
+[17:39:29] step 2/2 loss=20.0438 acc=0.000 al=1.00
+[17:40:15] train: wrote resumable checkpoint (step 2) -> /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rgoff/train/ckpt_last.pt
+[17:40:19] drafter visual check: logits_diff=0.5 ce_delta_swap=0.1227 ce_delta_perturb=0.1228 correction_delta=None passed=True
+[17:40:19] train_dflash done: steps=2 final_loss=20.0
+2026-10-15T09:40:32Z gpu1 guard wait util=10% used=15MiB free=48525MiB disk=11G
+[17:40:49] train: wrote resumable checkpoint (step 2) -> /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rggrid2/train/ckpt_last.pt
+[17:40:53] drafter visual check: logits_diff=0.5 ce_delta_swap=0.1224 ce_delta_perturb=0.122 correction_delta=None passed=True
+[17:40:53] train_dflash done: steps=2 final_loss=20.043840408325195
+2026-10-15T09:40:59Z gpu0 guard wait util=38% used=15MiB free=48525MiB disk=14G
+2026-10-15T09:41:02Z gpu1 guard wait util=0% used=15MiB free=48525MiB disk=14G
+2026-10-15T09:41:29Z gpu0 guard wait util=0% used=15MiB free=48525MiB disk=13G
+2026-10-15T09:41:32Z gpu1 guard wait util=0% used=15MiB free=48525MiB disk=13G
+2026-10-15T09:42:00Z gpu0 guard wait util=0% used=2753MiB free=45787MiB disk=13G
+2026-10-15T09:42:02Z gpu1 guard wait util=0% used=15MiB free=48525MiB disk=13G
+2026-10-15T09:42:31Z gpu0 guard wait util=0% used=15MiB free=48525MiB disk=13G
+2026-10-15T09:42:34Z gpu1 guard wait util=0% used=15MiB free=48525MiB disk=13G

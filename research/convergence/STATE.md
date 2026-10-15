@@ -150,10 +150,12 @@ Last update: 2026-10-15 ~13:20 CST. Branch `research/rsi-d1-conv` (base `origin/
 - 证据: `evidence/legs/conv_canon_s42/` vs `evidence/legs/conv_grid2_s42/` (+local log diff).
 
 ### F14. CONFIRMATORY VERDICT (frozen prereg): **FAIL** — grid/sub2 not non-inferior at L*=1600
-- 结果 (canonical x4 vs grid2 x4, val64, paired): seed rel-AL = +0.015% / +0.430% / **-3.042%** /
-  -0.501%; mean relAL **-0.775%**, hierarchical-bootstrap one-sided 95% lower bound **-2.000%**
+- 结果 (canonical x4 vs grid2 x4, val64, paired; registered per-prompt statistic
+  R_s = mean_p(dAL)/mean_p(AL_canon)): seed rel-AL = -0.022% / +0.638% / **-3.032%** /
+  -0.155%; mean relAL **-0.643%**, hierarchical-bootstrap one-sided 95% lower bound **-1.980%**
   (gate: >-1.0%) -> **AL gate FAIL**. dacc mean -0.00113, lower bound -0.00352 (gate >-0.005)
-  -> acc gate PASS. Prereg §5: both must hold -> **verdict FAIL**. All 8 legs token_exact=True.
+  -> acc gate PASS. Prereg §5: both must hold -> **verdict FAIL**. All 8 legs token_exact=True
+  and pass the §5 validity list (analyze_quality.py holds on invalid evidence).
 - 归因 (RSI checks): step-1 loss seams of the pairs = 4.4e-4 / 2.8e-3 / 1.9e-3 (same order for every
   seed -> same supervision/anchors; the seam is the fp32-vs-bf16 reduction). s44: grid2's TRAIN loss is
   slightly BETTER (last10 1.92e-3 vs 1.98e-3) while held-out AL is 3% worse -> endpoint divergence in
@@ -197,8 +199,12 @@ Last update: 2026-10-15 ~13:20 CST. Branch `research/rsi-d1-conv` (base `origin/
 ## Closed (16:45 CST) — confirm wave done, verdicts recorded
 - Confirm wave at L*=1600 (driver 13:55:54 -> "all legs done" 16:43:05): 12/12 legs rc=0
   (canonical x4 + grid2 x4 confirmatory; token2/split2 x2 pilots), all token_exact=True.
-  Frozen gates: grid2 FAIL (relAL -0.775%, lo -2.000%; acc pass); pilots exploratory (token2 -0.03%,
-  split2 +0.15%). Cost table (14 legs) + artifacts committed; REPORT status = closed/HOLD.
+  Frozen gates: grid2 FAIL (relAL -0.643%, lo -1.980%, registered per-prompt statistic; acc pass);
+  pilots exploratory (token2 +0.015%, split2 +0.355%). PR #9 review (2026-10-15) caught the pooled-AL
+  statistic + four tool bugs; all fixed in `533bfa8` (validity-gated analyzer, per-algorithm pinned
+  configs, prepare staging + preflight, per-workload benchmark reports) and re-verified with a server
+  smoke (prepare->train->eval->2 workloads->resume->summarize, see `evidence/a100_smoke/`).
+  Cost table (14 legs) + artifacts committed; REPORT status = closed/HOLD (merge = review gate).
   GPU-hours this round (wave): ~7.2 GPU-h train + ~1.5 GPU-h eval.
 - Server state: all our processes exited; GPU0/1/2 free; GPU3 external tenant only.
 - Earlier lines kept below for the record:

@@ -72,22 +72,34 @@ in this regime; absolute quality is a small-store artifact (the A100 2K-recipe
 round is where absolute quality is judged). Artifacts: `evidence/settle_decision.json`,
 `evidence/settle_decision_ext1600.json`, `evidence/legs/conv_stab1600/`.
 
-Confirmatory set (canonical ×4 vs grid2 ×4 at L\*=1600, val64, paired; all legs
-token_exact=True; frozen gates: AL rel > −1%, dacc > −0.5pp, hierarchical
-bootstrap B=10,000, seed 20261015):
+Confirmatory set (canonical ×4 vs grid2 ×4 at L\*=1600, val64, paired; all 8
+legs pass the prereg validity list — train summaries valid, token_exact=True,
+64 prompts/leg; frozen gates: AL rel > −1%, dacc > −0.5pp, hierarchical
+bootstrap B=10,000, seed 20261015). The AL columns are the per-prompt means the
+prereg registers (`R_s = mean_p(dAL) / mean_p(AL_canon)`); the run-level pooled
+means are kept in `quality_verdict.json` as `*_aggregate`:
 
-| seed | canonical AL | grid2 AL | rel ΔAL | canonical acc | grid2 acc | Δacc |
+| seed | canonical AL (pp mean) | grid2 AL (pp mean) | rel ΔAL | canonical acc | grid2 acc | Δacc |
 | --- | --- | --- | --- | --- | --- | --- |
-| 42 | 1.119269 | 1.119437 | +0.015% | 0.01715 | 0.01729 | +0.00031 |
-| 43 | 1.141853 | 1.146761 | +0.430% | 0.02054 | 0.02127 | +0.00097 |
-| 44 | 1.183648 | 1.147642 | **−3.042%** | 0.02668 | 0.02136 | −0.00544 |
-| 45 | 1.106339 | 1.100796 | −0.501% | 0.01533 | 0.01446 | −0.00035 |
+| 42 | 1.128909 | 1.128658 | −0.022% | 0.01715 | 0.01729 | +0.00031 |
+| 43 | 1.151123 | 1.158462 | +0.638% | 0.02054 | 0.02127 | +0.00097 |
+| 44 | 1.195482 | 1.159236 | **−3.032%** | 0.02668 | 0.02136 | −0.00544 |
+| 45 | 1.115507 | 1.113776 | −0.155% | 0.01533 | 0.01446 | −0.00035 |
 
-**Verdict: FAIL.** Mean relΔAL = −0.775%, one-sided 95% bootstrap lower bound
-= **−2.000%** (gate > −1.0%) → AL gate fails; dacc = −0.00113, lower bound
+**Verdict: FAIL.** Mean relΔAL = −0.643%, one-sided 95% bootstrap lower bound
+= **−1.980%** (gate > −1.0%) → AL gate fails; dacc = −0.00113, lower bound
 −0.00352 → acc gate passes; both must hold → FAIL (frozen `PREREGISTRATION.md` §5;
 `evidence/quality_verdict.json`). Secondary t-based CI across seeds:
-mean −0.775%, sd 1.559%, CI ≈ [−2.61%, +1.06%] — same story.
+mean −0.643%, sd 1.630%, CI ≈ [−3.24%, +1.95%] — same story.
+
+**Tool-review re-analysis (2026-10-15, PR #9 review).** The first table computed
+`rel` from the run-level pooled `mean_al` (sum(new_tokens)/sum(verify_steps))
+instead of the prereg's per-prompt statistic. `analyze_quality.py` now
+implements the registered functional exactly and gates every leg on the §5
+validity list (invalid/incomplete evidence → HOLD with reasons, never a silent
+PASS/FAIL). Corrected numbers: mean −0.775% → **−0.643%**, lower bound
+−2.000% → **−1.980%**; the reviewer's independent recomputation reproduced
+both. The verdict stays **FAIL** and the optimization stays default-off.
 
 **Attribution (RSI checks, no post-hoc loosening).** Step-1 loss seams of the
 pairs are 4.4e-4 / 2.8e-3 / 1.9e-3 (same order for every seed) → same
@@ -103,12 +115,12 @@ claim at this budget is below the regime's trajectory sensitivity.
 Pilot controls (token/sub2, split/sub2 ×2 seeds; exploratory, non-gating):
 | arm | mean relΔAL | bootstrap lo | mean Δacc | lo | mechanical verdict (2 seeds) |
 | --- | --- | --- | --- | --- | --- |
-| token2 (C-only) | −0.032% | −1.063% | +0.00013 | −0.00186 | FAIL (2-seed, exploratory) |
-| split2 (plain split) | +0.147% | −0.349% | +0.00066 | −0.00042 | PASS (2-seed, exploratory) |
+| token2 (C-only) | +0.015% | −1.053% | +0.00013 | −0.00186 | FAIL (2-seed, exploratory) |
+| split2 (plain split) | +0.355% | −0.345% | +0.00066 | −0.00042 | PASS (2-seed, exploratory) |
 
-Reading across all four layouts: the pooled confirmatory mean (−0.78%) is not
-significantly different from 0 (t ≈ −1.0, sd(seed rel) = 1.56%), and the 2-seed
-pilots land within ±0.15% of canonical. The FAIL is a **certification** outcome
+Reading across all four layouts: the pooled confirmatory mean (−0.64%) is not
+significantly different from 0 (t ≈ −0.79, sd(seed rel) = 1.63%), and the 2-seed
+pilots land within ±0.36% of canonical. The FAIL is a **certification** outcome
 (lower bound south of the registered −1% margin), driven by seed-level endpoint
 scatter — not an established systematic regression. Conversely, token2 does not
 rescue the gate either, and per the frozen prereg §4 no layout is swapped in
@@ -135,9 +147,11 @@ group-aware auxiliary accounting, with the smoke gates in
 
 ## 6. Repro + artifacts
 
-- Tests: `PYTHONPATH=. python -m pytest tests/ -q --ignore=tests/gpu` → **523
-  passed, 6 skipped, 0 failed** @ `e0fea27` (last code change; later commits are
-  docs/evidence/tables only).
+- Tests: `PYTHONPATH=. python -m pytest tests/ -q --ignore=tests/gpu` → **541
+  passed, 6 skipped, 0 failed** @ `533bfa8` (adds the PR#9-review regressions:
+  runner config binding/benchmark naming/stage-done/summarize mapping, analyzer
+  validity+registered statistic, converter provenance; later commits are
+  docs/evidence only).
 - Commands: stability leg, settle analyzer (default + `--extension`), confirm
   wave driver, harness series, capacity probe, finalizers (`finalize_quality.sh`,
   `finalize_systems.sh`, `analyze_costs.py`); exact invocations in STATE.md /
@@ -151,6 +165,12 @@ group-aware auxiliary accounting, with the smoke gates in
   harness (`evidence/systems_table.md`). Pooled wave train wall: canonical
   1798 s mean vs grid2 1728 s (−3.9%); peak 25.3 → 10.0 GiB (−60.5%).
 - PR: https://github.com/LUOseu/VelaDraft/pull/9 (open, HOLD; no merge to main; regroup default-off everywhere).
+- Review round (2026-10-15): all six PR-review findings fixed @ `533bfa8`
+  (per-algorithm pinned configs, `prepare` data binding + preflight, per-workload
+  benchmark reports, validity-gated analyzer with the registered statistic,
+  converter provenance); end-to-end smoke (prepare → train → eval → 2 workloads
+  → resume → summarize) under `evidence/a100_smoke/` (plumbing only; 2 steps,
+  quality metrics not meaningful by design).
 - A100: `a100/RUNBOOK.md` + `a100/run_matrix.py` (dry-run validated: 32 entries,
   37.3 GPU-h est., 0 errors; controlled + native tracks; train/val/test
   isolation; regroup gates + adaptation smoke).

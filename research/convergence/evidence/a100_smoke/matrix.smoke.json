@@ -1,0 +1,69 @@
+{
+  "version": 2,
+  "description": "PR #9 runner smoke: prepare -> train -> eval -> 2 workloads -> resume -> summarize (dflash controlled, seed 42, steps=2)",
+  "repo": "/home/lyh/veladraft-conv/repo",
+  "python": "/home/lyh/miniforge3/envs/c1vllm/bin/python",
+  "runs_root": "/home/lyh/veladraft-conv-smoke/runs",
+  "controlled_config": "/home/lyh/veladraft-conv-smoke/smoke_base.json",
+  "env": {
+    "VLM_DFLASH_TARGET": "/home/lyh/vlm-dflash/assets/models/Qwen2.5-VL-3B-Instruct",
+    "VLM_DFLASH_FLEX_FORCE_MAIN": "1"
+  },
+  "budget": {
+    "steps": 2,
+    "seeds": [
+      42
+    ]
+  },
+  "drafters": {
+    "dflash": {
+      "native_config": "/home/lyh/veladraft-conv-smoke/smoke_base.json",
+      "regroup_support": true,
+      "controlled_overrides": {}
+    }
+  },
+  "tracks": [
+    "controlled"
+  ],
+  "regroup_sets": {
+    "off": [],
+    "grid2": [
+      "train.regroup.mode=grid",
+      "train.regroup.sub_batch=2",
+      "train.regroup.fp32_weights=true",
+      "train.regroup.identity_bypass=true"
+    ]
+  },
+  "stages": [
+    "train",
+    "eval",
+    "benchmark"
+  ],
+  "eval": {
+    "num_prompts": 8,
+    "max_new_tokens": 16
+  },
+  "isolation": {
+    "train_store": "/home/lyh/rsi-d1/runs/d1_w3_probe/features",
+    "val_split": "/home/lyh/veladraft-conv-smoke/smoke_val/val.jsonl",
+    "test_workloads": [
+      "smoke_caption",
+      "smoke_val2"
+    ]
+  },
+  "benchmark": {
+    "manifests_dir": "/home/lyh/veladraft-conv-smoke/manifests",
+    "reports_dir": "/home/lyh/veladraft-conv-smoke/reports"
+  },
+  "cost_model": {
+    "sec_per_step": {
+      "default": 1.3
+    },
+    "eval_minutes": 5,
+    "benchmark_minutes": 5
+  },
+  "guard": {
+    "min_disk_gb": 8,
+    "min_free_mb": 30000
+  }
+}

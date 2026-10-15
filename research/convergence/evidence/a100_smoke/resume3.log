@@ -1,0 +1,58 @@
+2026-10-15T09:51:43Z dflash__controlled__s42__rgoff prepare: features -> /home/lyh/rsi-d1/runs/d1_w3_probe/features
+2026-10-15T09:51:43Z dflash__controlled__s42__rggrid2 prepare: features -> /home/lyh/rsi-d1/runs/d1_w3_probe/features
+2026-10-15T09:51:43Z dflash__controlled__s42__rgoff prepare: val -> /home/lyh/veladraft-conv-smoke/smoke_val/val.jsonl (media /home/lyh/veladraft-conv-smoke/smoke_val/images)
+2026-10-15T09:51:43Z dflash__controlled__s42__rgoff prepare: /home/lyh/miniforge3/envs/c1vllm/bin/python research/convergence/a100/preflight_entry.py --repo /home/lyh/veladraft-conv/repo --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rgoff.yaml --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rgoff --expect-algorithm dflash --store /home/lyh/rsi-d1/runs/d1_w3_probe/features --val /home/lyh/veladraft-conv-smoke/smoke_val/val.jsonl --min-prompts 8
+2026-10-15T09:51:43Z dflash__controlled__s42__rggrid2 prepare: val -> /home/lyh/veladraft-conv-smoke/smoke_val/val.jsonl (media /home/lyh/veladraft-conv-smoke/smoke_val/images)
+2026-10-15T09:51:43Z dflash__controlled__s42__rggrid2 prepare: /home/lyh/miniforge3/envs/c1vllm/bin/python research/convergence/a100/preflight_entry.py --repo /home/lyh/veladraft-conv/repo --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rggrid2.yaml --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rggrid2 --expect-algorithm dflash --store /home/lyh/rsi-d1/runs/d1_w3_probe/features --val /home/lyh/veladraft-conv-smoke/smoke_val/val.jsonl --min-prompts 8
+preflight ok: algorithm=dflash checks=['algorithm_name+validate_config', 'target_contract', 'store_identity+layers+final_hidden', 'val_split+media']
+preflight ok: algorithm=dflash checks=['algorithm_name+validate_config', 'target_contract', 'store_identity+layers+final_hidden', 'val_split+media']
+2026-10-15T09:51:49Z gpu0 guard wait util=77% used=6771MiB free=41769MiB disk=9G
+2026-10-15T09:51:49Z dflash__controlled__s42__rgoff eval: /home/lyh/miniforge3/envs/c1vllm/bin/python scripts/eval_dflash.py --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rgoff.yaml --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rgoff --num-prompts 8 --set eval.max_new_tokens=16
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 8569.61it/s]
+[17:52:04] eval: target-only greedy on 8 prompts
+[17:52:18] eval: speculative greedy with ckpt_final.pt (sequential)
+2026-10-15T09:52:19Z dflash__controlled__s42__rggrid2 eval: /home/lyh/miniforge3/envs/c1vllm/bin/python scripts/eval_dflash.py --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rggrid2.yaml --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rggrid2 --num-prompts 8 --set eval.max_new_tokens=16
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights:  38%|███▊      | 314/824 [00:00<00:00, 2693.61it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 4538.77it/s]
+[17:52:37] eval: speculative greedy with ckpt_init.pt (sequential)
+[17:52:51] eval_dflash done: token_exact=True
+[17:52:51]   ckpt_final.pt: AL=1.000 accept_rate=0.000
+[17:52:51]   ckpt_init.pt: AL=1.000 accept_rate=0.000
+[17:52:57] eval: target-only greedy on 8 prompts
+2026-10-15T09:52:59Z dflash__controlled__s42__rgoff benchmark: /home/lyh/miniforge3/envs/c1vllm/bin/python scripts/benchmark.py --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rgoff --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rgoff.yaml --workloads /home/lyh/veladraft-conv-smoke/manifests --out-dir /home/lyh/veladraft-conv-smoke/reports --workload smoke_caption --name benchmark_dflash__controlled__s42__rgoff_smoke_caption
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 8532.18it/s]
+[17:53:12] eval: speculative greedy with ckpt_final.pt (sequential)
+[17:53:31] eval: speculative greedy with ckpt_init.pt (sequential)
+[17:53:45] bench[smoke_caption]: target-only greedy on 6 prompts
+[17:53:50] eval_dflash done: token_exact=True
+[17:53:50]   ckpt_final.pt: AL=1.000 accept_rate=0.000
+[17:53:50]   ckpt_init.pt: AL=1.000 accept_rate=0.000
+2026-10-15T09:53:55Z gpu0 guard wait util=100% used=32185MiB free=16355MiB disk=8G
+[17:53:55] bench[smoke_caption]: speculative greedy with ckpt_final.pt (sequential)
+[17:54:18] bench[smoke_caption]: AL=1.000 exact=True speedup=0.2525079555834962
+[17:54:18] benchmark: wrote /home/lyh/veladraft-conv-smoke/reports/benchmark_dflash__controlled__s42__rgoff_smoke_caption.json and /home/lyh/veladraft-conv-smoke/reports/benchmark_dflash__controlled__s42__rgoff_smoke_caption.md
+[17:54:18] benchmark: done
+2026-10-15T09:54:26Z gpu0 guard wait util=79% used=32185MiB free=16355MiB disk=8G
+2026-10-15T09:54:29Z dflash__controlled__s42__rgoff benchmark: /home/lyh/miniforge3/envs/c1vllm/bin/python scripts/benchmark.py --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rgoff --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rgoff.yaml --workloads /home/lyh/veladraft-conv-smoke/manifests --out-dir /home/lyh/veladraft-conv-smoke/reports --workload smoke_val2 --name benchmark_dflash__controlled__s42__rgoff_smoke_val2
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 8955.94it/s]
+2026-10-15T09:54:56Z gpu0 guard wait util=0% used=32187MiB free=16353MiB disk=8G
+[17:55:14] bench[smoke_val2]: target-only greedy on 4 prompts
+Traceback (most recent call last):
+  File "/home/lyh/veladraft-conv/repo/scripts/benchmark.py", line 87, in <module>
+    main()
+  File "/home/lyh/veladraft-conv/repo/scripts/benchmark.py", line 70, in main
+    run_benchmark(
+  File "/home/lyh/veladraft-conv/repo/vlm_dflash/benchmark/harness.py", line 186, in run_benchmark
+    prompts = prepare_prompts(
+              ^^^^^^^^^^^^^^^^
+  File "/home/lyh/veladraft-conv/repo/vlm_dflash/eval/run.py", line 175, in prepare_prompts
+    images = [Image.open(image_paths[position]).convert("RGB") for position in image_indices]
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/PIL/Image.py", line 3635, in open
+    fp = builtins.open(filename, "rb")
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/lyh/rsi-d1/runs/d1q_val64/images/000000329592_b9d80a30eb11d896.jpg'
+2026-10-15T09:55:16Z dflash__controlled__s42__rgoff benchmark: FAILED rc=1; entry parked (rerun with resume)
+2026-10-15T09:55:26Z gpu0 guard wait util=100% used=32187MiB free=16353MiB disk=8G
+2026-10-15T09:55:58Z gpu0 guard wait util=74% used=32187MiB free=16353MiB disk=7G
+2026-10-15T09:56:28Z gpu0 guard wait util=7% used=32187MiB free=16353MiB disk=7G
+2026-10-15T09:57:01Z gpu0 guard wait util=0% used=15MiB free=48525MiB disk=7G

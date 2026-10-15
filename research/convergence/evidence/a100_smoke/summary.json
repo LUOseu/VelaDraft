@@ -1,0 +1,42 @@
+[
+  {
+    "entry": "dflash__controlled__s42__rggrid2",
+    "drafter": "dflash",
+    "track": "controlled",
+    "seed": 42,
+    "regroup": "grid2",
+    "train_wall_s": 54.06394863128662,
+    "peak_mem_gb": 4.0372608,
+    "mean_al": 1.0,
+    "acceptance_rate": 0.0,
+    "token_exact": true,
+    "bench": {
+      "smoke_caption": 1.0,
+      "smoke_val2": 1.0
+    },
+    "bench_token_exact": {
+      "smoke_caption": true,
+      "smoke_val2": true
+    }
+  },
+  {
+    "entry": "dflash__controlled__s42__rgoff",
+    "drafter": "dflash",
+    "track": "controlled",
+    "seed": 42,
+    "regroup": "off",
+    "train_wall_s": 150.5364887714386,
+    "peak_mem_gb": 23.3517312,
+    "mean_al": 1.0,
+    "acceptance_rate": 0.0,
+    "token_exact": true,
+    "bench": {
+      "smoke_caption": 1.0,
+      "smoke_val2": 1.0
+    },
+    "bench_token_exact": {
+      "smoke_caption": true,
+      "smoke_val2": true
+    }
+  }
+]

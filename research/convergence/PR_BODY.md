@@ -59,9 +59,10 @@ default-off; nothing here changes shipped training semantics unless
   1.155@800 → 1.119@1600) — small-store overfit; the arm comparison is a
   matched-budget test.
 - Confirmatory quality legs (canonical ×4, grid2 ×4 at L*=1600, val64, paired;
-  frozen gates in `PREREGISTRATION.md` §5, hierarchical bootstrap B=10,000):
-  per-seed relΔAL = +0.015% / +0.430% / −3.042% / −0.501%; mean −0.775%,
-  one-sided 95% lower bound **−2.000%** → **AL gate FAIL** (margin −1%);
+  frozen gates in `PREREGISTRATION.md` §5, hierarchical bootstrap B=10,000;
+  registered per-prompt statistic `R_s = mean_p(dAL)/mean_p(AL_canon)`):
+  per-seed relΔAL = −0.022% / +0.638% / −3.032% / −0.155%; mean −0.643%,
+  one-sided 95% lower bound **−1.980%** → **AL gate FAIL** (margin −1%);
   Δacc = −0.00113 (lo −0.00352) → acc gate passes; verdict **FAIL** (both must
   hold). Attribution: step-1 seams 4.4e-4–2.8e-3 (same supervision/anchors);
   seed-level endpoint chaos in the *not settled* regime (curve moves ~3%/800
@@ -70,7 +71,7 @@ default-off; nothing here changes shipped training semantics unless
   Artifacts: `evidence/quality_data.json`, `evidence/quality_verdict.json`,
   per-leg raw under `evidence/legs/`.
 - Pilots (token2 C-only, split2 plain split ×2 seeds; exploratory, non-gating):
-  −0.032% (lo −1.06%) and +0.147% (lo −0.35%).
+  +0.015% (lo −1.05%) and +0.355% (lo −0.34%).
 - Full cost table (14 legs): `evidence/costs_table.md` — train wall/GPU-h, peak
   (25.3 → 10.0 GiB for sub2 layouts, −60.5%), eval per-sample breakdown.
 - Second-drafter applicability: dflare **bypass bitwise PASS**; regroup
@@ -80,11 +81,58 @@ default-off; nothing here changes shipped training semantics unless
 - A100 matrix dry-run re-validated (32 entries, 37.3 GPU-h est, 0 errors;
   `evidence/a100_dryrun.txt`).
 
+## Review fixes (PR #9 review round, `533bfa8`)
+
+All six findings fixed with regression tests (the four P1s were merge-blocking;
+the reviewer's repros now fail closed):
+
+1. **P1 per-algorithm configs.** `run_matrix.py` materializes pinned per-entry
+   configs under `<runs_root>/_configs/<id>.yaml` — controlled tracks share one
+   recipe plus each algorithm's native block (+ `controlled_overrides`: jetspec
+   `capture.store_final_hidden=true`/gamma null, dflash2 same + gamma 4.0,
+   dflare/dfly `drafter.capture_layer_ids=[1,17,33]`). Dry-run parses and
+   `validate_config`s every generated config, asserts `algorithm_name`, and
+   train/eval/benchmark all consume the same pinned file.
+2. **P1 data binding.** New `prepare` stage binds the declared `train_store` →
+   `<run>/features` and `val_split` → `<run>/data/val.jsonl` with a normalized
+   `meta.json`; `a100/preflight_entry.py` checks the algorithm contract, store
+   identity/layers/final-hidden capture and val prompt count before any GPU
+   work.
+3. **P1 benchmark collisions.** Reports are per workload
+   (`benchmark_<entry>_<workload>.json`); `stage_done` parses each workload
+   report (measured needs numeric `al`, planned ok, `{}` fails — the empty-file
+   repro now fails closed); `summarize` reads `al` (was `mean_al`, the
+   empty-summary bug).
+4. **P1 analyzer validity gates.** `analyze_quality.py` enforces the prereg §5
+   validity list before statistics: train-summary validity (`loss_decreased`,
+   no NaN/violations/skips), `token_exact=True`, exact prompt counts
+   (`prompts_per_leg`), registered seed set. Violations → **HOLD with reasons**
+   instead of a silent PASS; the reviewer's 4×1-prompt, all-not-token-exact
+   case now returns HOLD.
+5. **P2 registered statistic.** AL uses the prereg's per-prompt functional
+   `R_s = mean_p(dAL)/mean_p(AL_canon)` (run-level pooled means kept as
+   `*_aggregate` only). Corrected verdict inputs: mean −0.775% → **−0.643%**,
+   bootstrap lo −2.000% → **−1.980%**; the reviewer's independent
+   recomputation matches. **Verdict stays FAIL**, no threshold loosening.
+6. **P2 converter provenance.** `convert_train_state_ckpt.py` now refuses
+   mismatched provenance (algorithm, identity, draft_config, feature_mode,
+   training_plan_digest, one-sided optional keys) instead of silently grafting
+   `ckpt_init.pt`'s block.
+
+End-to-end smoke on the server (evidence `evidence/a100_smoke/`): `prepare` →
+preflight → train 2 steps → eval (`token_exact=True`) → 2 workloads →
+interrupt (artifacts deleted) → `resume` from step 2 → re-eval + re-benchmark →
+`summarize` (AL populated). Regressions:
+`tests/test_convergence_a100_runner.py`, `tests/test_analyze_quality_validity.py`,
+extended converter tests.
+
 ## Reproduce
 
 ```bash
 # local tests
 PYTHONPATH=. python -m pytest tests/test_regroup.py tests/test_convert_train_state_ckpt.py -q
+# full suite @ 533bfa8: 541 passed, 6 skipped, 0 failed
+PYTHONPATH=. python -m pytest tests/ -q --ignore=tests/gpu -o addopts=""
 # server (4×A6000): stability curve -> L* (frozen rule)
 bash research/convergence/scripts/vconv_stability_leg.sh conv_stab_canon_s42 1 800 200 42
 python research/convergence/analyze_settle.py --leg evidence/legs/conv_stab_canon_s42 \
