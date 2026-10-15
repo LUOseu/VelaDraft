@@ -3,12 +3,20 @@
 canonical-only stability leg.
 
 settled(L) := |AL(L) - AL(L/2)| / AL(L/2) <= 0.5%%
-L* := 400 if settled(400); else 800 if settled(800); else 1600 (extend).
+L* := 400 if settled(400); else 800 if settled(800); else 1600 (extend with a
+fresh canonical 1600-step leg: same rule on {800, 1600}; if still unsettled,
+L* = 1600 with an explicit "not settled" disclosure).
 
-Reads the stability leg's eval_result.json (multi-checkpoint eval); prints the
-canonical AL curve for steps 200/400/600/800 (whichever exist), the settle
-tests, and the resulting L* decision. If a checkpoint needed by the rule is
-missing, it says exactly which extension run is required instead of guessing.
+Reads the stability leg's eval artifacts (`eval/eval_result.json`, plus any
+`--extra-result` files such as a tagged multi-checkpoint eval; runs are merged
+by checkpoint name, first file wins per step). The end-of-training checkpoint
+is named `ckpt_final.pt`; its step is read from `train/train_summary.json`
+(`steps`) or `--final-step`.
+
+Default mode prints the canonical AL curve and the settled(400)/settled(800)
+ladder. `--extension` mode applies the {800, 1600} clause to the fresh
+1600-step leg and emits the final L* verdict. If a checkpoint needed by the
+rule is missing, it says exactly which run is required instead of guessing.
 """
 from __future__ import annotations
 
@@ -19,17 +27,33 @@ from pathlib import Path
 TOL = 0.005
 
 
-def al_curve(leg_dir: Path):
-    result = json.loads((leg_dir / "eval" / "eval_result.json").read_text())
-    curve, exact = {}, {}
+def _merge_runs(path: Path, curve: dict, exact: dict, final_step) -> None:
+    result = json.loads(path.read_text())
     for name, run in result.get("runs", {}).items():
         digits = "".join(ch for ch in name if ch.isdigit())
-        if not digits or "init" in name:
+        if "init" in name:
             continue
-        step = int(digits)
-        curve[step] = float(run["mean_al"])
+        if digits:
+            step = int(digits)
+        elif "final" in name and final_step:
+            step = int(final_step)
+        else:
+            continue
+        curve.setdefault(step, float(run["mean_al"]))
         ex = result.get("equivalence_check", {}).get("runs", {}).get(name, {})
-        exact[step] = bool(ex.get("token_exact", False))
+        if "token_exact" in ex:
+            exact.setdefault(step, bool(ex["token_exact"]))
+
+
+def al_curve(leg_dir: Path, extras=(), final_step=None):
+    if final_step is None:
+        summary = leg_dir / "train" / "train_summary.json"
+        if summary.exists():
+            final_step = json.loads(summary.read_text()).get("steps")
+    curve, exact = {}, {}
+    _merge_runs(leg_dir / "eval" / "eval_result.json", curve, exact, final_step)
+    for extra in extras:
+        _merge_runs(Path(extra), curve, exact, final_step)
     return curve, exact
 
 
@@ -46,8 +70,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--leg", required=True, help="stability leg run dir")
     ap.add_argument("--out", default=None, help="optional JSON output path")
+    ap.add_argument("--extra-result", action="append", default=[],
+                    help="additional eval_result*.json to merge (fills missing steps)")
+    ap.add_argument("--final-step", type=int, default=None,
+                    help="step number of ckpt_final.pt (default: train_summary.json steps)")
+    ap.add_argument("--extension", action="store_true",
+                    help="apply the {800, 1600} extension clause (fresh 1600-step leg)")
     args = ap.parse_args()
-    curve, exact = al_curve(Path(args.leg))
+    curve, exact = al_curve(Path(args.leg), args.extra_result, args.final_step)
     if not curve:
         raise SystemExit("no checkpoint runs found in eval_result.json")
 
@@ -56,6 +86,30 @@ def main() -> int:
         print(f"  step {step:5d}: AL={curve[step]:.6f} token_exact={exact.get(step)}")
 
     verdict = {"curve": curve, "token_exact": exact, "tol": TOL}
+    if args.extension:
+        s1600 = settled(curve, 1600)
+        if s1600 is None:
+            raise SystemExit(
+                f"extension mode needs checkpoints 800 and 1600; available: {sorted(curve)}"
+            )
+        rel1600, ok1600 = s1600
+        verdict["settled_1600"] = {"rel": rel1600, "settled": ok1600}
+        print(f"settled(1600): |AL(1600)-AL(800)|/AL(800) = {rel1600:.4%} -> {ok1600}")
+        verdict["L_star"] = 1600
+        if ok1600:
+            verdict["action"] = (
+                "L* = 1600, settled(1600) True on the fresh extension leg "
+                "(same rule on {800, 1600})"
+            )
+        else:
+            verdict["action"] = (
+                f"L* = 1600, NOT settled ((800,1600) rel={rel1600:.4%} > 0.5%): "
+                "explicit disclosure path; claim scoped to the matched budget"
+            )
+        print("DECISION:", verdict["action"])
+        if args.out:
+            Path(args.out).write_text(json.dumps(verdict, indent=2) + "\n")
+        return 0
     s400 = settled(curve, 400)
     if s400 is None:
         raise SystemExit("need checkpoints 200 and 400 to test settled(400)")
