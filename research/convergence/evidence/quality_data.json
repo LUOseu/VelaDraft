@@ -1,0 +1,52 @@
+{
+  "reference_arm": "canonical",
+  "arms": {
+    "canonical": {
+      "42": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_canon_s42",
+      "43": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_canon_s43",
+      "44": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_canon_s44",
+      "45": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_canon_s45"
+    },
+    "grid2": {
+      "42": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_grid2_s42",
+      "43": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_grid2_s43",
+      "44": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_grid2_s44",
+      "45": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_grid2_s45"
+    },
+    "token2": {
+      "42": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_token2_s42",
+      "43": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_token2_s43"
+    },
+    "split2": {
+      "42": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_split2_s42",
+      "43": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_split2_s43"
+    }
+  },
+  "registered": {
+    "canonical": [
+      42,
+      43,
+      44,
+      45
+    ],
+    "grid2": [
+      42,
+      43,
+      44,
+      45
+    ],
+    "token2": [
+      42,
+      43
+    ],
+    "split2": [
+      42,
+      43
+    ]
+  },
+  "prompts_per_leg": 64,
+  "gate_al_rel": -0.01,
+  "gate_acc_abs": -0.005,
+  "bootstrap": 10000,
+  "bootstrap_seed": 20261015
+}

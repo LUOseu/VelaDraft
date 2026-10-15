@@ -1,0 +1,25 @@
+{
+  "curve": {
+    "200": 1.2017374517374517,
+    "400": 1.2105007292173067,
+    "600": 1.1631890376829648,
+    "800": 1.137
+  },
+  "token_exact": {
+    "200": true,
+    "400": true,
+    "600": true
+  },
+  "tol": 0.005,
+  "settled_400": {
+    "rel": 0.007292173067574076,
+    "settled": false
+  },
+  "L_star": null,
+  "action": "settled(400)=False (0.73%), settled(800)=False (6.07%): rule -> extend with fresh canonical 1600-step leg (conv_stab1600, running); same rule on {800,1600}.",
+  "al_800_resumed_leg": 1.137,
+  "settled_800": {
+    "rel": 0.060718711276332014,
+    "settled": false
+  }
+}

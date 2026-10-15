@@ -1,0 +1,33 @@
+2026-10-15T09:57:47Z dflash__controlled__s42__rgoff benchmark: /home/lyh/miniforge3/envs/c1vllm/bin/python scripts/benchmark.py --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rgoff --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rgoff.yaml --workloads /home/lyh/veladraft-conv-smoke/manifests --out-dir /home/lyh/veladraft-conv-smoke/reports --workload smoke_caption --name benchmark_dflash__controlled__s42__rgoff_smoke_caption
+2026-10-15T09:57:47Z gpu0 guard wait util=52% used=2631MiB free=45909MiB disk=16G
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights:  68%|██████▊   | 560/824 [00:00<00:00, 5574.73it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 5731.75it/s]
+[17:58:01] bench[smoke_caption]: target-only greedy on 6 prompts
+[17:58:11] bench[smoke_caption]: speculative greedy with ckpt_final.pt (sequential)
+2026-10-15T09:58:18Z gpu0 guard wait util=25% used=2869MiB free=45671MiB disk=16G
+[17:58:21] bench[smoke_caption]: AL=1.000 exact=True speedup=0.7636599336474695
+[17:58:21] benchmark: wrote /home/lyh/veladraft-conv-smoke/reports/benchmark_dflash__controlled__s42__rgoff_smoke_caption.json and /home/lyh/veladraft-conv-smoke/reports/benchmark_dflash__controlled__s42__rgoff_smoke_caption.md
+[17:58:21] benchmark: done
+2026-10-15T09:58:25Z dflash__controlled__s42__rgoff benchmark: /home/lyh/miniforge3/envs/c1vllm/bin/python scripts/benchmark.py --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rgoff --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rgoff.yaml --workloads /home/lyh/veladraft-conv-smoke/manifests --out-dir /home/lyh/veladraft-conv-smoke/reports --workload smoke_val2 --name benchmark_dflash__controlled__s42__rgoff_smoke_val2
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 8630.97it/s]
+2026-10-15T09:58:48Z dflash__controlled__s42__rggrid2 benchmark: /home/lyh/miniforge3/envs/c1vllm/bin/python scripts/benchmark.py --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rggrid2 --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rggrid2.yaml --workloads /home/lyh/veladraft-conv-smoke/manifests --out-dir /home/lyh/veladraft-conv-smoke/reports --workload smoke_caption --name benchmark_dflash__controlled__s42__rggrid2_smoke_caption
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 10721.60it/s]
+[17:58:59] bench[smoke_val2]: target-only greedy on 4 prompts
+[17:59:05] bench[smoke_val2]: speculative greedy with ckpt_final.pt (sequential)
+[17:59:13] bench[smoke_val2]: AL=1.000 exact=True speedup=0.4881441359253154
+[17:59:13] benchmark: wrote /home/lyh/veladraft-conv-smoke/reports/benchmark_dflash__controlled__s42__rgoff_smoke_val2.json and /home/lyh/veladraft-conv-smoke/reports/benchmark_dflash__controlled__s42__rgoff_smoke_val2.md
+[17:59:13] benchmark: done
+[17:59:17] bench[smoke_caption]: target-only greedy on 6 prompts
+2026-10-15T09:59:17Z dflash__controlled__s42__rgoff: all stages complete on gpu1
+[17:59:26] bench[smoke_caption]: speculative greedy with ckpt_final.pt (sequential)
+[17:59:36] bench[smoke_caption]: AL=1.000 exact=True speedup=0.6553570260515376
+[17:59:36] benchmark: wrote /home/lyh/veladraft-conv-smoke/reports/benchmark_dflash__controlled__s42__rggrid2_smoke_caption.json and /home/lyh/veladraft-conv-smoke/reports/benchmark_dflash__controlled__s42__rggrid2_smoke_caption.md
+[17:59:36] benchmark: done
+2026-10-15T09:59:39Z dflash__controlled__s42__rggrid2 benchmark: /home/lyh/miniforge3/envs/c1vllm/bin/python scripts/benchmark.py --run-dir /home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rggrid2 --config /home/lyh/veladraft-conv-smoke/runs/_configs/dflash__controlled__s42__rggrid2.yaml --workloads /home/lyh/veladraft-conv-smoke/manifests --out-dir /home/lyh/veladraft-conv-smoke/reports --workload smoke_val2 --name benchmark_dflash__controlled__s42__rggrid2_smoke_val2
+Loading weights:   0%|          | 0/824 [00:00<?, ?it/s]Loading weights:  84%|████████▍ | 692/824 [00:00<00:00, 6919.02it/s]Loading weights: 100%|██████████| 824/824 [00:00<00:00, 6969.97it/s]
+[18:00:02] bench[smoke_val2]: target-only greedy on 4 prompts
+[18:00:09] bench[smoke_val2]: speculative greedy with ckpt_final.pt (sequential)
+[18:00:16] bench[smoke_val2]: AL=1.000 exact=True speedup=0.5591035053447513
+[18:00:16] benchmark: wrote /home/lyh/veladraft-conv-smoke/reports/benchmark_dflash__controlled__s42__rggrid2_smoke_val2.json and /home/lyh/veladraft-conv-smoke/reports/benchmark_dflash__controlled__s42__rggrid2_smoke_val2.md
+[18:00:16] benchmark: done
+2026-10-15T10:00:20Z dflash__controlled__s42__rggrid2: all stages complete on gpu0
+2026-10-15T10:00:20Z matrix run done (2 entries)

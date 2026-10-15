@@ -292,6 +292,12 @@ def run_checkpoints(
                     "equivalent": equivalent,
                     "new_tokens": len(spec_tokens),
                     "target_new_tokens": len(entry["tokens"]),
+                    # Acceptance accounting per prompt (same definition as the
+                    # aggregate in ``summarize_samples``) so downstream analyses
+                    # can build paired per-prompt statistics + CIs.
+                    "verify_steps": int(stats["verify_steps"]),
+                    "accepted_tokens": int(stats["accepted_tokens"]),
+                    "draft_tokens": int(stats["draft_tokens"]),
                     "spec_tokens": spec_tokens,
                     "target_tokens": entry["tokens"],
                 }

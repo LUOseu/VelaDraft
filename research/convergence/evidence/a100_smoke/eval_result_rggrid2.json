@@ -1,0 +1,136 @@
+{
+  "format": "vlm-dflash-eval-v1",
+  "identity": {
+    "target_model_path": "/home/lyh/vlm-dflash/assets/models/Qwen2.5-VL-3B-Instruct",
+    "model_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+    "processor_fingerprint": "ed94e2fa5734073524651401de89882531084a817ed212300893591d6b35ff3e",
+    "mask_token_id": 151669,
+    "spatial_rope_sections": [
+      16,
+      24,
+      24
+    ],
+    "draft_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "capture_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "image_min_pixels": 200704,
+    "image_max_pixels": 1003520
+  },
+  "algorithm": "dflash",
+  "checkpoint_feature_modes": {
+    "ckpt_final.pt": "offline",
+    "ckpt_init.pt": "offline"
+  },
+  "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)",
+  "settings": {
+    "num_prompts": 8,
+    "workload": null,
+    "max_new_tokens": 16,
+    "temperature": 0.0,
+    "dtype": "bfloat16",
+    "attn_impl": "sdpa",
+    "block_size": 8,
+    "target_tie_word_embeddings": true
+  },
+  "equivalence_check": {
+    "num_prompts": 8,
+    "token_exact": true,
+    "runs": {
+      "ckpt_final.pt": {
+        "num_prompts": 8,
+        "token_exact": true,
+        "failed_ids": []
+      },
+      "ckpt_init.pt": {
+        "num_prompts": 8,
+        "token_exact": true,
+        "failed_ids": []
+      }
+    },
+    "dtype": "bfloat16",
+    "attn_impl": "sdpa",
+    "max_new_tokens": 16,
+    "verification": "sequential",
+    "sequential_target_verification": true,
+    "strict_parallel_margin": null,
+    "verify_sdpa_backend": "parity",
+    "verify_backend_switch_enabled": false,
+    "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+  },
+  "parallel_diagnostic": {
+    "num_prompts": 2,
+    "token_exact": 2,
+    "token_exact_rate": 1.0,
+    "mismatches": [],
+    "note": "Reference verify backend, parallel block verification; target_top2_margin is the logit gap at the first divergent step."
+  },
+  "runs": {
+    "ckpt_final.pt": {
+      "num_samples": 8,
+      "verify_steps": 128,
+      "new_tokens": 128,
+      "accepted_tokens": 0,
+      "draft_tokens": 672,
+      "mean_al": 1.0,
+      "tokens_per_target_forward": 1.0,
+      "acceptance_rate": 0.0,
+      "per_slot_acceptance": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "wall_seconds_per_sample": 1.603405912173912,
+      "target_verify_seconds_per_sample": 0.640188068151474,
+      "target_prefill_seconds_per_sample": 0.4594319896697998,
+      "draft_seconds_per_sample": 0.49488732689619064,
+      "role": "trained drafter",
+      "draft_inference_in_block_causal": false,
+      "draft_candidate_selector": false,
+      "speedup_vs_target_only": 0.5976322283952795
+    },
+    "ckpt_init.pt": {
+      "num_samples": 8,
+      "verify_steps": 128,
+      "new_tokens": 128,
+      "accepted_tokens": 0,
+      "draft_tokens": 672,
+      "mean_al": 1.0,
+      "tokens_per_target_forward": 1.0,
+      "acceptance_rate": 0.0,
+      "per_slot_acceptance": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "wall_seconds_per_sample": 0.703217726899311,
+      "target_verify_seconds_per_sample": 0.46412134170532227,
+      "target_prefill_seconds_per_sample": 0.14085961151123047,
+      "draft_seconds_per_sample": 0.09021650779247284,
+      "role": "acceptance baseline (random-init drafter)",
+      "draft_inference_in_block_causal": false,
+      "draft_candidate_selector": false,
+      "speedup_vs_target_only": 1.362660541195182
+    }
+  },
+  "target_only": {
+    "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+    "mean_new_tokens": 16.0,
+    "wall_seconds_per_sample": 0.9582470483146608,
+    "decode_tokens_per_second": 16.69715552804506
+  }
+}

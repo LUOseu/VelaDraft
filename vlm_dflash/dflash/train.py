@@ -198,6 +198,18 @@ def _regrouped_forward(module, batch, batch_lengths, regroup, *, accumulation, s
     path. The returned metrics mirror a single shipped forward: additive counters
     are summed and ratios recomputed (accuracy / accept_len must not be averaged
     per group, batches have different valid-token counts).
+
+    Identity bypass (``train.regroup.identity_bypass``, default true): when the
+    planned physical layout equals the canonical layout (single group, original
+    row order -- e.g. ``canonical`` mode with ``sub_batch >= batch_size``), the
+    shipped forward is executed verbatim instead of the machinery path. The
+    machinery path differs from shipped only in the loss reduction (fp32
+    preserved-weight sum vs bf16 mean) and is mathematically equivalent but
+    bf16-numerically distinct; routing identity plans to the shipped path keeps
+    the identity control leg bitwise equal to ``regroup=None`` (see the D1 bug
+    report #01 / convergence report). Reordered or split plans still take the
+    machinery path. ``identity_bypass=false`` restores the legacy machinery
+    path for the identity layout (kept as its own control group).
     """
     from .trainer_core import DFlashStepMetrics
 
@@ -211,6 +223,37 @@ def _regrouped_forward(module, batch, batch_lengths, regroup, *, accumulation, s
         raise ValueError("train.regroup requires the collated 'lengths' field; batch is missing it.")
     bsz, seq_len = input_ids.shape
     lengths = [int(value) for value in batch_lengths.view(-1).tolist()]
+    regroup_stats = regroup["stats"]
+    regroup_stats["batches"] += 1
+
+    def run_identity(anchor_table):
+        """Shipped forward on the full physical batch (identity layout)."""
+        regroup_stats["identity_batches"] += 1
+        module.loss_fn = regroup["orig_loss_fn"]
+        try:
+            metrics = module(
+                input_ids=input_ids,
+                hidden_states=hidden,
+                loss_mask=loss_mask,
+                image_mask=image_mask,
+                multimodal_position_ids=position3,
+                teacher_hidden=teacher_hidden,
+                anchor_table=anchor_table,
+            )
+        finally:
+            module.loss_fn = regroup["weighted_loss_fn"]
+        if not torch.isfinite(metrics.loss):
+            raise RuntimeError(
+                f"Non-finite training loss (train.regroup identity bypass): {float(metrics.loss)}"
+            )
+        (metrics.loss / accumulation).backward()
+        return metrics
+
+    # Fast path: canonical mode with a sub-batch at least as large as the batch
+    # plans the identity layout without needing per-sample stats; run the
+    # shipped call (self-sampled anchors) with no plan/z overhead at all.
+    if regroup["identity_bypass"] and regroup["mode"] == "canonical" and regroup["sub_batch"] >= bsz:
+        return run_identity(None)
 
     anchors, keep = module._sample_anchor_positions(seq_len, loss_mask, device)
     anchors_cpu = anchors.detach().cpu()
@@ -223,11 +266,17 @@ def _regrouped_forward(module, batch, batch_lengths, regroup, *, accumulation, s
         module.first_supervised_slot,
         module.loss_decay_gamma,
     )
-    stats = [
+    sample_stats = [
         SampleStat(key=str(i), C=lengths[i], A=int(keep_cpu[i].sum().item()), Z=float(z_rows[i]), index=i)
         for i in range(bsz)
     ]
-    groups = plan_groups(stats, regroup["mode"], regroup["sub_batch"], regroup["cost_weight"])
+    groups = plan_groups(sample_stats, regroup["mode"], regroup["sub_batch"], regroup["cost_weight"])
+    if regroup["identity_bypass"] and groups == [list(range(bsz))]:
+        # Non-canonical modes can also plan the identity layout (e.g. a batch
+        # whose rows happen to be sorted already). Replay the anchor table
+        # sampled above -- bitwise equal to self-sampling (see
+        # tests/test_regroup.py) -- so the leg stays numerically canonical.
+        return run_identity((anchors, keep))
     # Reference split = one canonical microbatch (the whole logical batch), i.e.
     # the shipped single-forward mean objective; see d1-002-c0 / d1-001 §1.
     weights = row_weights([str(i) for i in range(bsz)], [list(range(bsz))], z_rows, accumulation=1)
@@ -338,20 +387,34 @@ def run_training_loop(
             )
         cost_weight = float(regroup_cfg.get("cost_weight", COST_ANCHOR_WEIGHT))
         fp32_weights = bool(regroup_cfg.get("fp32_weights", True))
-        regroup = {"mode": str(regroup_mode), "sub_batch": sub_batch, "cost_weight": cost_weight}
+        identity_bypass = bool(regroup_cfg.get("identity_bypass", True))
         # Match the validated wave-2 configuration: the weighted path reduces in fp32
         # (bf16 quantisation of the preserved per-sample weights biases the loss by
         # ~0.4%; see the D1 precise-reduction arm). train.regroup.fp32_weights=false
         # reproduces the quantisation for studies.
-        module.loss_fn = DFlashDecayLoss(
+        weighted_loss_fn = DFlashDecayLoss(
             loss_gamma=module.loss_decay_gamma,
             normalize="tokens",
             first_slot=module.first_supervised_slot,
             weight_dtype="fp32" if fp32_weights else "auto",
         )
+        regroup = {
+            "mode": str(regroup_mode),
+            "sub_batch": sub_batch,
+            "cost_weight": cost_weight,
+            # Identity layouts execute the shipped forward/loss verbatim
+            # (bitwise-equal control leg); false keeps the legacy machinery
+            # path as its own numerically-distinct control.
+            "identity_bypass": identity_bypass,
+            "orig_loss_fn": module.loss_fn,
+            "weighted_loss_fn": weighted_loss_fn,
+            "stats": {"batches": 0, "identity_batches": 0},
+        }
+        module.loss_fn = weighted_loss_fn
         log(
             f"train.regroup enabled: mode={regroup['mode']} sub_batch={sub_batch} "
-            f"cost_weight={cost_weight:.1f} fp32_weights={fp32_weights}"
+            f"cost_weight={cost_weight:.1f} fp32_weights={fp32_weights} "
+            f"identity_bypass={identity_bypass}"
         )
     epochs = int(train_cfg.get("num_epochs", 6))
     image_token_id = int(contract["tokens"]["image_token_id"])
@@ -695,6 +758,15 @@ def run_training_loop(
             torch.cuda.get_device_name(device) if device.type == "cuda" else None
         ),
     }
+    if regroup is not None:
+        summary["regroup"] = {
+            "mode": regroup["mode"],
+            "sub_batch": regroup["sub_batch"],
+            "cost_weight": regroup["cost_weight"],
+            "identity_bypass": regroup["identity_bypass"],
+            "batches": regroup["stats"]["batches"],
+            "identity_batches": regroup["stats"]["identity_batches"],
+        }
     return {
         "summary": summary,
         "history": history,

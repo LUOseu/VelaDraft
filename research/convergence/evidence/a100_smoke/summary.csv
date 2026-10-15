@@ -1,0 +1,3 @@
+entry,drafter,track,seed,regroup,train_wall_s,peak_mem_gb,mean_al,acceptance_rate,token_exact,smoke_caption,smoke_val2
+dflash__controlled__s42__rggrid2,dflash,controlled,42,grid2,54.06394863128662,4.0372608,1.0,0.0,True,1.0,1.0
+dflash__controlled__s42__rgoff,dflash,controlled,42,off,150.5364887714386,23.3517312,1.0,0.0,True,1.0,1.0

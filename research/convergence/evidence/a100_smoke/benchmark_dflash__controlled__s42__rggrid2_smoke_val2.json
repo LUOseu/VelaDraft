@@ -1,0 +1,41 @@
+{
+  "format": "vlm-dflash-benchmark-v1",
+  "created": "2026-10-15T18:09:57+0800",
+  "algorithm": "dflash",
+  "run_dir": "/home/lyh/veladraft-conv-smoke/runs/dflash__controlled__s42__rggrid2",
+  "protocol": {
+    "temperature": 0.0,
+    "verification": "sequential",
+    "strict_parallel_margin": null,
+    "checkpoint": "ckpt_final.pt",
+    "prompt_overrides": {
+      "num_prompts": null,
+      "max_new_tokens": null
+    }
+  },
+  "experimental_runtime": false,
+  "workloads": {
+    "smoke_val2": {
+      "status": "measured",
+      "description": "Smoke workload B: external sharegpt_jsonl (copy of the val split, 4 prompts).",
+      "num_prompts": 4,
+      "max_new_tokens": 8,
+      "al": 1.0,
+      "acceptance_rate": 0.0,
+      "per_slot_acceptance": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "token_exact": true,
+      "failed_ids": [],
+      "wall_seconds_per_sample": 1.0043628988787532,
+      "target_only_wall_seconds_per_sample": 1.2284944369457662,
+      "speedup_vs_target_only": 1.223157922616644
+    }
+  }
+}

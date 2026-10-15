@@ -1,0 +1,83 @@
+{
+  "steps": 1600,
+  "first10_mean_loss": 6.831391364336014,
+  "last10_mean_loss": 0.0014427005742618348,
+  "final_loss": 0.0008214748231694102,
+  "loss_decreased": true,
+  "nan_seen": false,
+  "skipped_no_anchor_batches": 0,
+  "resumed_from_step": 0,
+  "resume_fast_forward_batches": 0,
+  "resume_fast_forward_reduced_cost": false,
+  "wall_seconds": 1823.5497374534607,
+  "peak_gpu_mem_gb": 9.987406848,
+  "gpu_name": "NVIDIA RTX A6000",
+  "regroup": {
+    "mode": "token",
+    "sub_batch": 2,
+    "cost_weight": 147.53768844221108,
+    "identity_bypass": true,
+    "batches": 1600,
+    "identity_batches": 0
+  },
+  "overfit_sanity": {
+    "enabled": false
+  },
+  "visual_dependence": {
+    "correction": {
+      "enabled": false,
+      "applied_in_diagnostic": true,
+      "delta_abs_mean": null
+    },
+    "full": {
+      "swap": {
+        "logits_max_abs_diff": 23.6171875,
+        "logits_mean_abs_diff": 0.8857614398002625,
+        "block_ce_a": 0.000799920002464205,
+        "block_ce_b": 0.8533415198326111,
+        "block_ce_delta": 0.8525415998301469
+      },
+      "perturb_span": {
+        "logits_max_abs_diff": 15.0712890625,
+        "logits_mean_abs_diff": 0.10090730339288712,
+        "block_ce_a": 0.000799920002464205,
+        "block_ce_perturbed": 0.0008275164873339236,
+        "block_ce_delta": 2.759648486971855e-05
+      }
+    },
+    "backbone": {
+      "swap": {
+        "logits_max_abs_diff": 23.6171875,
+        "logits_mean_abs_diff": 0.8857614398002625,
+        "block_ce_a": 0.000799920002464205,
+        "block_ce_b": 0.8533415198326111,
+        "block_ce_delta": 0.8525415998301469
+      },
+      "perturb_span": {
+        "logits_max_abs_diff": 15.0712890625,
+        "logits_mean_abs_diff": 0.10090730339288712,
+        "block_ce_a": 0.000799920002464205,
+        "block_ce_perturbed": 0.0008275164873339236,
+        "block_ce_delta": 2.759648486971855e-05
+      }
+    },
+    "full_vs_backbone": {
+      "logits_max_abs_diff": 0.0,
+      "logits_mean_abs_diff": 0.0
+    },
+    "draft_logits_differ": true,
+    "loss_changes_on_swap": true,
+    "loss_changes_on_perturb": true,
+    "passed": true
+  },
+  "confidence_calibration": null,
+  "feature_mode": "offline",
+  "dtypes": {
+    "feature_storage": "bfloat16",
+    "target_native": null,
+    "drafter_compute": "bfloat16",
+    "frozen_embed": "bfloat16",
+    "frozen_head": "bfloat16"
+  },
+  "train_recipe": null
+}
