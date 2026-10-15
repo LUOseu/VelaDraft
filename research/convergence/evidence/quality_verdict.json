@@ -1,0 +1,144 @@
+{
+  "reference_arm": "canonical",
+  "gate_al_rel": -0.01,
+  "gate_acc_abs": -0.005,
+  "arms": {
+    "grid2": {
+      "seeds": [
+        {
+          "seed": "42",
+          "canonical_al": 1.1192688043152532,
+          "arm_al": 1.119436535291473,
+          "d_al": -0.0002504032208140057,
+          "rel": 0.00014985763524644896,
+          "canonical_acc": 0.017145494911305036,
+          "arm_acc": 0.01729480276892649,
+          "d_acc": 0.0003053985768572925,
+          "canonical_token_exact": true,
+          "arm_token_exact": true,
+          "prompts": 64
+        },
+        {
+          "seed": "43",
+          "canonical_al": 1.1418526444512382,
+          "arm_al": 1.1467608228431072,
+          "d_al": 0.007339680540684224,
+          "rel": 0.004298434141848297,
+          "canonical_acc": 0.020540419329521248,
+          "arm_acc": 0.021266540642722116,
+          "d_acc": 0.0009684586999619062,
+          "canonical_token_exact": true,
+          "arm_token_exact": true,
+          "prompts": 64
+        },
+        {
+          "seed": "44",
+          "canonical_al": 1.1836475994295674,
+          "arm_al": 1.1476417268397603,
+          "d_al": -0.03624644194611044,
+          "rel": -0.030419419265632245,
+          "canonical_acc": 0.026682485402563565,
+          "arm_acc": 0.021361454742107752,
+          "d_acc": -0.005444269925555294,
+          "canonical_token_exact": true,
+          "arm_token_exact": true,
+          "prompts": 64
+        },
+        {
+          "seed": "45",
+          "canonical_al": 1.1063388625592416,
+          "arm_al": 1.1007957559681698,
+          "d_al": -0.0017315463122256868,
+          "rel": -0.005010315355142831,
+          "canonical_acc": 0.015325504156988733,
+          "arm_acc": 0.014455175990147144,
+          "d_acc": -0.000353487357007708,
+          "canonical_token_exact": true,
+          "arm_token_exact": true,
+          "prompts": 64
+        }
+      ],
+      "mean_rel_al_drop": -0.007745360710920083,
+      "mean_dacc": -0.0011309750014359507,
+      "bootstrap_lo_rel_al": -0.01999754056429083,
+      "bootstrap_lo_dacc": -0.003522308429538542,
+      "pass_al": false,
+      "pass_acc": true,
+      "verdict": "FAIL"
+    },
+    "token2": {
+      "seeds": [
+        {
+          "seed": "42",
+          "canonical_al": 1.1192688043152532,
+          "arm_al": 1.1280579885231048,
+          "d_al": 0.008713168742927487,
+          "rel": 0.007852612503775289,
+          "canonical_acc": 0.017145494911305036,
+          "arm_acc": 0.018571871814192634,
+          "d_acc": 0.0016057843803556435,
+          "canonical_token_exact": true,
+          "arm_token_exact": true,
+          "prompts": 64
+        },
+        {
+          "seed": "43",
+          "canonical_al": 1.1418526444512382,
+          "arm_al": 1.1321612609881782,
+          "d_al": -0.008545425622942845,
+          "rel": -0.008487420430433613,
+          "canonical_acc": 0.020540419329521248,
+          "arm_acc": 0.019073448337186556,
+          "d_acc": -0.001343508074790546,
+          "canonical_token_exact": true,
+          "arm_token_exact": true,
+          "prompts": 64
+        }
+      ],
+      "mean_rel_al_drop": -0.00031740396332916206,
+      "mean_dacc": 0.0001311381527825488,
+      "bootstrap_lo_rel_al": -0.010634133945521849,
+      "bootstrap_lo_dacc": -0.0018622179629210645,
+      "pass_al": false,
+      "pass_acc": true,
+      "verdict": "FAIL"
+    },
+    "split2": {
+      "seeds": [
+        {
+          "seed": "42",
+          "canonical_al": 1.1192688043152532,
+          "arm_al": 1.118430902829765,
+          "d_al": 0.001369333086230367,
+          "rel": -0.0007486150621350041,
+          "canonical_acc": 0.017145494911305036,
+          "arm_acc": 0.01716521242225104,
+          "d_acc": 0.00044654233685667317,
+          "canonical_token_exact": true,
+          "arm_token_exact": true,
+          "prompts": 64
+        },
+        {
+          "seed": "43",
+          "canonical_al": 1.1418526444512382,
+          "arm_al": 1.1460570727216939,
+          "d_al": 0.006783216203194661,
+          "rel": 0.0036821110770175096,
+          "canonical_acc": 0.020540419329521248,
+          "arm_acc": 0.02116640396307138,
+          "d_acc": 0.0008736869972494103,
+          "canonical_token_exact": true,
+          "arm_token_exact": true,
+          "prompts": 64
+        }
+      ],
+      "mean_rel_al_drop": 0.0014667480074412528,
+      "mean_dacc": 0.0006601146670530418,
+      "bootstrap_lo_rel_al": -0.003487705617375332,
+      "bootstrap_lo_dacc": -0.00042397332734503553,
+      "pass_al": true,
+      "pass_acc": true,
+      "verdict": "PASS"
+    }
+  }
+}
