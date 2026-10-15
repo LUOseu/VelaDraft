@@ -491,3 +491,9 @@ round-2.1 `--parity 3` 队列收尾（C0 服务器直读）：**7/7 格 rc=0**�
 - 就绪核验（09:13 C0 实测）：runner sha256 双端一致（`d1r_run_leg.sh` 9bfae9c0… / `d1r_m1.sh` 162b80e6…）；smokes 已 stage（`d1r_smoke_token8_off` / `d1r_smoke_canon2_off`）；4 卡全空、/home 18G、无 d1q/d1r 残留进程。
 - 弹性裁定：P4 双 seed 替换 **不启用**（M1 保持 5 腿@43；如需改动须 C0 书面修订租约）；M2 PASS 不自动开长训练（另立租约）。
 - 转发文本 `_coord/messages/20261015_d1-007_receipt.md`；D5 `staged_b32` 维持终态 HOLD（与 M1 不共卡）。
+
+### 用户指示：成熟集并入 main + 双动态登记（2026-10-15 10:25，C0）
+
+- **合并指示（用户）**：把现阶段成熟、可确定的技术优化整合并入 main。并入内容=本分支 `research/rsi-c0`（`4e1674e` D1 regroup opt-in【默认关】+ `192554a` 测试 + 协调/判决文档全集）；`1f8963e` D4 缓存预算**已在 main**（PR #7，00:54，`ce4bcee`）。**regroup 保持默认关、禁止用于正式训练**（d1-006 质量轴 FAIL + bug #01 未结）。D2/D3（STOP）与 D5（HOLD）无系统代码并入。合并前套件复跑：**509 passed / 6 skipped / 0 failed**（7.33s；日志 `evidence/pytest_rsi_c0_premerge_20261015.log`）。
+- **动态 1（待 C0 收讫）**：D1 `d1-007` M1 按冻结规则**停于 P1 控制腿**（出带 2.59×/2.47×；0.37/2.0 GPU-h；bug report #01 + 取证在 lane）→ C0 复核后裁定（不自动接 M2）。
+- **动态 2（待 C0 收讫）**：D5 `staged_b32` **完成**（`b64b559` 09:57；1506s；`s3_b32` store parity `ok=True`；0.83 GPU-h 记账待与 ≤0.75 上限对账）。

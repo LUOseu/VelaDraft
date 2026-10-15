@@ -106,6 +106,7 @@
 - D5 `staged_b32`（L-W3-D5B ≤0.75 GPU-h）——**维持终态 HOLD**（D5 侧未开跑；重启动 = 用户/D5 发起，C0 复核入口就绪：`research/rsi/d5/runner/split_verify.py`）；
 - D1 `d1-007`（机制归因 + in-band 复验）——**L-W3-D1R7 ≤2.0 GPU-h staged 已接收**（09:18；`proposals/d1-007-c0.md`；先 M1 报数 → C0 决定 M2）；D1 侧就绪（runner 双端 hash 一致、smokes 预 stage），等 D1 执行；转发文本 `_coord/messages/20261015_d1-007_receipt.md`。
 - 转发文本：`_coord/messages/20261015_d1q_recovery.md`（D1 终裁通知 + D5 提醒）。
+- **10:25 变更（用户指示）**：成熟集并入 main 本次执行——`research/rsi-c0`（D1 regroup opt-in、默认关，**不建议启用**；`192554a` 测试 + 文档全集）；D2/D3/D5 无系统代码并入；随附两条待收讫动态（d1-007 M1 停于 P1→bug #01；D5 staged_b32 完成）。
 
 ## 7. 晋级复核 checklist（wave-2 放行前 C0 逐项取证）
 
