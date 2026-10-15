@@ -46,6 +46,10 @@
 - **拿到可检查的训练产物。** checkpoint、目标身份、训练记录和评测结果一起保留，
   便于恢复、复现和继续接入工具链。
 
+<p align="center">
+  <img src="docs/assets/how-it-works.svg" alt="图文数据通过目标模型生成回答并捕获特征。训练可选 offline feature store 路径，或 online 实时提取（带可选内存缓存）；校验面板比较投机输出与 target-only 贪心解码是否逐 token 一致，随后导出 checkpoint。" width="1100" />
+</p>
+
 这里的“统一”是统一接口与协议记录，不代表所有算法拥有相同 objective、同样预算
 或相同成熟度。
 

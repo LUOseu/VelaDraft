@@ -1,3 +1,3 @@
-"""vlm-dflash: minimal multimodal DFlash drafter training for Qwen2.5-VL."""
+"""vlm-dflash: VelaDraft - train and benchmark multimodal speculative drafters in one workflow."""
 
 __version__ = "0.3.1"

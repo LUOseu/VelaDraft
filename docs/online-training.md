@@ -88,9 +88,8 @@ plumbing checks, not benchmarks):
 
 ## What is shared with the offline path
 
-The two paths differ only in where the per-sample records come from. (The
-README pipeline image, `docs/assets/how-it-works.svg`, draws the offline
-staged path; the diagram below adds the live source.)
+The two paths differ only in where the per-sample records come from (the
+`docs/assets/how-it-works.svg` pipeline image in the README draws both).
 
 ```mermaid
 flowchart LR
@@ -134,8 +133,9 @@ vlm-dflash export runs/qwen25_online_smoke
 
 Like the other configs, these commands need prepared inputs: a **local target
 checkout** (`--target` / `TARGET.model`), and a single-image JSONL pool with a
-100%-valid image dir (`--dataset` / `--images-dir`); see the README *Train on
-your data* section and `docs/env-preflight.md`.
+100%-valid image dir (`--dataset` / `--images-dir`); see
+[getting-started.md](getting-started.md) and [data.md](data.md), plus the
+historical host notes in `docs/env-preflight.md`.
 
 Split devices (target on `cuda:1`, drafter on `cuda:0`):
 

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1560" height="800" viewBox="0 0 1560 800" role="img" aria-labelledby="title desc">
-<title id="title">VelaDraft pipeline: reusable visual context, offline or online drafter training, validation and export</title>
-<desc id="desc">Image-text data is used by the target VLM to generate responses and capture hidden states. Compatible captured features can be reused to train DFlash, DSpark, Domino, JetSpec, DFlash2, DFlare or DFly. Training runs offline from the store, or online against the live frozen target; the target is reloaded for evaluation. Checkpoint export follows validation.</desc>
+<title id="title">VelaDraft pipeline: prepare and capture, train offline from the feature store or online against the live frozen target, validate token-exactly, export</title>
+<desc id="desc">Image-text data goes through target-native regen and hidden-state capture to a reusable feature store. Training reads either that store (offline, target off the GPU) or a live frozen target (online, target resident; optional host-RAM record cache). One of seven drafter algorithms trains in each run. Validation compares the verified speculative output against target-only greedy decoding (token-exact), then the checkpoint is exported.</desc>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#8795A5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
   <marker id="mintArrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#0D9488" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
@@ -9,140 +9,115 @@
 <rect width="1560" height="800" rx="30" fill="#F7F9FC"/>
 
 <text x="48" y="40" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="700" fill="#0D9488" text-anchor="start" letter-spacing="2.2">VELADRAFT / THE SHARED TRAINING STACK</text>
-<text x="48" y="94" font-family="Arial, Nimbus Sans, sans-serif" font-size="46" font-weight="700" fill="#12263A" text-anchor="start" >Capture. Train. Verify.</text>
-<text x="48" y="133" font-family="Arial, Nimbus Sans, sans-serif" font-size="24" font-weight="400" fill="#607187" text-anchor="start" >Turn image–text data into validated multimodal drafters.</text>
+<text x="48" y="94" font-family="Arial, Nimbus Sans, sans-serif" font-size="46" font-weight="700" fill="#12263A" text-anchor="start">Capture. Train. Verify.</text>
+<text x="48" y="133" font-family="Arial, Nimbus Sans, sans-serif" font-size="24" font-weight="400" fill="#607187" text-anchor="start">Turn image–text data into validated multimodal drafters.</text>
 <rect x="1148" y="77" width="364" height="30" rx="15" fill="#EAF7F1" stroke="#EAF7F1" />
-<text x="1330.0" y="98" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#087F73" text-anchor="middle" >ONE CAPTURE · SEVEN DRAFTING PATHS</text>
+<text x="1330" y="98" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#087F73" text-anchor="middle">ONE CAPTURE · SEVEN DRAFTING PATHS</text>
+
+<!-- Panel 01 -->
 <rect x="48" y="170" width="464" height="534" rx="22" fill="#F0F8F5" stroke="#E0E8EF" />
 <rect x="78" y="194" width="40" height="30" rx="9" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="98" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#0D9488" text-anchor="middle" >01</text>
+<text x="98" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#0D9488" text-anchor="middle">01</text>
 <text x="130" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="700" fill="#12263A" text-anchor="start" letter-spacing=".8">PREPARE &amp; CAPTURE</text>
-<text x="78" y="254" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start" >Target-generated responses</text>
+<text x="78" y="254" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start">Target-generated answers, then features</text>
+
+<rect x="78" y="286" width="404" height="74" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<text x="100" y="318" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start">image-text data</text>
+<text x="100" y="342" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">JSONL rows + images · single or multi-turn</text>
+<path d="M280 362 V 392" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+<rect x="78" y="398" width="404" height="74" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<text x="100" y="430" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start">target-native regen</text>
+<text x="100" y="454" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">greedy answers recorded with provenance</text>
+<path d="M280 474 V 504" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+<rect x="78" y="510" width="404" height="92" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<text x="100" y="542" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start">hidden-state capture</text>
+<text x="100" y="566" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">bf16 shards · image spans · target head</text>
+<text x="100" y="588" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">visual-path check keeps the pipeline honest</text>
+
+<rect x="78" y="630" width="404" height="30" rx="8" fill="#FFFFFF" stroke="#FFFFFF" />
+<text x="280" y="650" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="500" fill="#52667B" text-anchor="middle">Target loaded for regen + capture (frozen)</text>
+
+<!-- Panel 02 -->
 <rect x="548" y="170" width="432" height="534" rx="22" fill="#F5F4FC" stroke="#E0E8EF" />
 <rect x="578" y="194" width="40" height="30" rx="9" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="598" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#0D9488" text-anchor="middle" >02</text>
-<text x="630" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="700" fill="#12263A" text-anchor="start" letter-spacing=".8">TRAIN OFFLINE</text>
-<text x="578" y="254" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start" >Choose a drafter algorithm</text>
+<text x="598" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#0D9488" text-anchor="middle">02</text>
+<text x="630" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="700" fill="#12263A" text-anchor="start" letter-spacing=".8">TRAIN</text>
+<text x="578" y="254" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start">Two input paths, one trainer</text>
+
+<rect x="578" y="286" width="372" height="72" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<text x="600" y="316" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#12263A" text-anchor="start">offline (default)</text>
+<text x="600" y="340" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">feature store · target off the GPU</text>
+<path d="M956 322 H 964 Q 970 322 970 328 V 564 Q 970 570 964 570 H 952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
+
+<rect x="578" y="388" width="372" height="104" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
+<text x="600" y="418" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#12263A" text-anchor="start">online</text>
+<text x="600" y="442" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">live frozen target resident on GPU</text>
+<text x="600" y="462" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">recorded smoke: ~7.5 GB (3B) / ~17.5 GB (8B)</text>
+<text x="600" y="482" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#087F73" text-anchor="start">optional RAM cache: train.online_feature_cache_gb</text>
+<path d="M956 440 H 964 Q 970 440 970 446 V 594 Q 970 600 964 600 H 952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
+
+<rect x="578" y="520" width="372" height="120" rx="12" fill="#EFF6FF" stroke="#93C5FD" filter="url(#shadow)"/>
+<text x="600" y="550" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#1D4ED8" text-anchor="start">trainer</text>
+<text x="600" y="574" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#1E40AF" text-anchor="start">one of seven algorithms (docs/algorithms/):</text>
+<text x="600" y="596" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="700" fill="#1E40AF" text-anchor="start"><a href="../algorithms/dflash.md"><tspan fill="#0D9488">DFlash</tspan></a><tspan> · </tspan><a href="../algorithms/dspark.md"><tspan fill="#0D9488">DSpark</tspan></a><tspan> · </tspan><a href="../algorithms/domino.md"><tspan fill="#0D9488">Domino</tspan></a><tspan> · </tspan><a href="../algorithms/jetspec.md"><tspan fill="#0D9488">JetSpec</tspan></a></text>
+<text x="600" y="618" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="700" fill="#1E40AF" text-anchor="start"><a href="../algorithms/dflash2.md"><tspan fill="#0D9488">DFlash2</tspan></a><tspan> · </tspan><a href="../algorithms/dflare.md"><tspan fill="#0D9488">DFlare</tspan></a><tspan> · </tspan><a href="../algorithms/dfly.md"><tspan fill="#0D9488">DFly</tspan></a></text>
+<text x="600" y="634" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#1E40AF" text-anchor="start">target: frozen forwards only · drafter updates</text>
+
+<rect x="578" y="657" width="372" height="28" rx="8" fill="#FFFFFF" stroke="#FFFFFF" />
+<text x="764" y="676" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="500" fill="#52667B" text-anchor="middle">one process, one GPU - no DDP path</text>
+
+<!-- Panel 03 -->
 <rect x="1016" y="170" width="496" height="534" rx="22" fill="#F1F5FA" stroke="#E0E8EF" />
 <rect x="1046" y="194" width="40" height="30" rx="9" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="1066" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#0D9488" text-anchor="middle" >03</text>
+<text x="1066" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#0D9488" text-anchor="middle">03</text>
 <text x="1098" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="700" fill="#12263A" text-anchor="start" letter-spacing=".8">VALIDATE &amp; EXPORT</text>
-<text x="1046" y="254" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start" >Check the resulting checkpoint</text>
-<path d="M240 369 H280" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
-<path d="M384 450 V476 Q384 488 372 488 H286 Q280 488 280 497 V505" fill="none" stroke="#0D9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M456 570 H574" fill="none" stroke="#0D9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M574 322 V597" fill="none" stroke="#0D9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M952 322 V597" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M952 400 H1040" fill="none" stroke="#8795A5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
-<path d="M1264 484 V517" fill="none" stroke="#8795A5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
-<rect x="80" y="286" width="160" height="164" rx="16" fill="#FFFFFF" stroke="#DEE6EE" filter="url(#shadow)"/>
-<rect x="102" y="307" width="116" height="72" rx="10" fill="#E9F5F1" stroke="#E9F5F1" />
-<circle cx="192" cy="325" r="8" fill="#34D399"/>
-<path d="M112 368 l27 -28 l22 17 l15 -12 l30 23" fill="none" stroke="#0D9488" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="160" y="408" font-family="Arial, Nimbus Sans, sans-serif" font-size="20" font-weight="700" fill="#12263A" text-anchor="middle" >Image + text</text>
-<text x="160" y="433" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="400" fill="#607187" text-anchor="middle" >Your dataset</text>
-<rect x="288" y="286" width="192" height="164" rx="16" fill="#FFFFFF" stroke="#DEE6EE" filter="url(#shadow)"/>
-<rect x="348" y="306" width="62" height="18" rx="5" fill="#D7EEE8" stroke="none" />
-<rect x="354" y="317" width="62" height="18" rx="5" fill="#BFE4D9" stroke="none" />
-<rect x="360" y="328" width="62" height="18" rx="5" fill="#8BD3BE" stroke="none" />
-<text x="384" y="381" font-family="Arial, Nimbus Sans, sans-serif" font-size="22" font-weight="700" fill="#12263A" text-anchor="middle" >Target VLM</text>
-<text x="384" y="409" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="400" fill="#607187" text-anchor="middle" >Generate responses</text>
-<text x="384" y="433" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="400" fill="#607187" text-anchor="middle" >Capture hidden states</text>
-<rect x="104" y="510" width="352" height="126" rx="16" fill="#FFFFFF" stroke="#8CCDBB" filter="url(#shadow)"/>
-<rect x="125" y="535" width="8" height="12" rx="2" fill="#34D399" stroke="none" />
-<rect x="137" y="535" width="8" height="12" rx="2" fill="#0D9488" stroke="none" />
-<rect x="149" y="535" width="8" height="12" rx="2" fill="#89BEB0" stroke="none" />
-<rect x="161" y="535" width="8" height="12" rx="2" fill="#34D399" stroke="none" />
-<rect x="125" y="552" width="8" height="12" rx="2" fill="#0D9488" stroke="none" />
-<rect x="137" y="552" width="8" height="12" rx="2" fill="#89BEB0" stroke="none" />
-<rect x="149" y="552" width="8" height="12" rx="2" fill="#34D399" stroke="none" />
-<rect x="161" y="552" width="8" height="12" rx="2" fill="#0D9488" stroke="none" />
-<rect x="125" y="569" width="8" height="12" rx="2" fill="#89BEB0" stroke="none" />
-<rect x="137" y="569" width="8" height="12" rx="2" fill="#34D399" stroke="none" />
-<rect x="149" y="569" width="8" height="12" rx="2" fill="#0D9488" stroke="none" />
-<rect x="161" y="569" width="8" height="12" rx="2" fill="#89BEB0" stroke="none" />
-<text x="190" y="546" font-family="Arial, Nimbus Sans, sans-serif" font-size="24" font-weight="700" fill="#12263A" text-anchor="start" >Reusable features</text>
-<text x="190" y="580" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="400" fill="#607187" text-anchor="start" >Hidden states · positions</text>
-<text x="190" y="608" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="400" fill="#607187" text-anchor="start" >Image spans · target head</text>
-<path d="M574 314 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 314 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="290" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="301" width="5" height="26" rx="2" fill="#0D9488" stroke="#0D9488" />
-<text x="632" y="312" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >DFlash</text>
-<text x="632" y="330" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >Frozen reference</text>
-<path d="M574 365 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 365 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="341" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="352" width="5" height="26" rx="2" fill="#4F46E5" stroke="#4F46E5" />
-<text x="632" y="363" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >DSpark</text>
-<text x="632" y="381" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >Markov + confidence</text>
-<path d="M574 416 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 416 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="392" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="403" width="5" height="26" rx="2" fill="#0284C7" stroke="#0284C7" />
-<text x="632" y="414" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >Domino</text>
-<text x="632" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >GRU correction</text>
-<path d="M574 467 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 467 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="443" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="454" width="5" height="26" rx="2" fill="#B77931" stroke="#B77931" />
-<text x="632" y="465" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >JetSpec</text>
-<text x="632" y="483" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >Causal mask + KL</text>
-<path d="M574 518 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 518 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="494" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="505" width="5" height="26" rx="2" fill="#64748B" stroke="#64748B" />
-<text x="632" y="516" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >DFlash2</text>
-<text x="632" y="534" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >Conv + selector (exp.)</text>
-<path d="M574 569 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 569 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="545" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="556" width="5" height="26" rx="2" fill="#8B5CF6" stroke="#8B5CF6" />
-<text x="632" y="567" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >DFlare</text>
-<text x="632" y="585" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >Layer fusion + context K/V</text>
-<path d="M574 620 H591" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M924 620 H952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="598" y="596" width="326" height="48" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<rect x="612" y="607" width="5" height="26" rx="2" fill="#DB2777" stroke="#DB2777" />
-<text x="632" y="618" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start" >DFly</text>
-<text x="632" y="636" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#607187" text-anchor="start" >FC + fusion + correction (CE)</text>
-<rect x="1048" y="286" width="432" height="198" rx="16" fill="#FFFFFF" stroke="#DEE6EE" filter="url(#shadow)"/>
-<circle cx="1079" cy="320" r="14" fill="#E7F6EF"/>
-<path d="M1073 320 l4 4 l9 -10" fill="none" stroke="#0D9488" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1104" y="327" font-family="Arial, Nimbus Sans, sans-serif" font-size="25" font-weight="700" fill="#12263A" text-anchor="start" >Validate</text>
-<text x="1074" y="360" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start" >Compare with target greedy output</text>
-<text x="1074" y="406" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#607187" text-anchor="start" >Target</text>
-<rect x="1148" y="382" width="58" height="34" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1177" y="406" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="500" fill="#087F73" text-anchor="middle" >The</text>
-<rect x="1215" y="382" width="58" height="34" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1244" y="406" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="500" fill="#087F73" text-anchor="middle" >cat</text>
-<rect x="1282" y="382" width="58" height="34" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1311" y="406" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="500" fill="#087F73" text-anchor="middle" >sits</text>
-<rect x="1349" y="382" width="58" height="34" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1378" y="406" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="500" fill="#087F73" text-anchor="middle" >.</text>
-<text x="1074" y="452" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#607187" text-anchor="start" >Drafter</text>
-<rect x="1148" y="428" width="58" height="34" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1177" y="452" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="500" fill="#087F73" text-anchor="middle" >The</text>
-<rect x="1215" y="428" width="58" height="34" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1244" y="452" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="500" fill="#087F73" text-anchor="middle" >cat</text>
-<rect x="1282" y="428" width="58" height="34" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1311" y="452" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="500" fill="#087F73" text-anchor="middle" >sits</text>
-<rect x="1349" y="428" width="58" height="34" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1378" y="452" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="500" fill="#087F73" text-anchor="middle" >.</text>
-<circle cx="1451" cy="422" r="14" fill="#0D9488"/>
-<path d="M1445.6 422 l3.6 3.6 l8.1 -9.0" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1048" y="525" width="432" height="111" rx="16" fill="#FFFFFF" stroke="#DEE6EE" filter="url(#shadow)"/>
-<rect x="1073" y="550" width="35" height="48" rx="6" fill="#EDF2F8" stroke="#C8D5E4" />
-<path d="M1082 570 H1099 M1082 581 H1095" fill="none" stroke="#607187" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1127" y="564" font-family="Arial, Nimbus Sans, sans-serif" font-size="24" font-weight="700" fill="#12263A" text-anchor="start" >Export checkpoint</text>
-<text x="1127" y="597" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="400" fill="#607187" text-anchor="start" >Weights · config · model card</text>
-<rect x="80" y="657" width="400" height="28" rx="8" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="280.0" y="677" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#52667B" text-anchor="middle" >Target loaded for regen + capture</text>
-<rect x="578" y="657" width="372" height="28" rx="8" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="764.0" y="677" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#52667B" text-anchor="middle" >Target off GPU during training</text>
-<rect x="1048" y="657" width="432" height="28" rx="8" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="1264.0" y="677" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#52667B" text-anchor="middle" >Target + drafter loaded for eval</text>
+<text x="1046" y="254" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start">Check the resulting checkpoint</text>
+
+<rect x="1046" y="286" width="436" height="212" rx="16" fill="#FFFFFF" stroke="#DEE6EE" filter="url(#shadow)"/>
+<circle cx="1077" cy="320" r="14" fill="#E7F6EF"/>
+<path d="M1071 320 l4 4 l9 -10" fill="none" stroke="#0D9488" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1102" y="327" font-family="Arial, Nimbus Sans, sans-serif" font-size="22" font-weight="700" fill="#12263A" text-anchor="start">Validate</text>
+<text x="1072" y="364" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#607187" text-anchor="start">Target-only</text>
+<rect x="1210" y="342" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
+<text x="1238" y="364" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">The</text>
+<rect x="1274" y="342" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
+<text x="1302" y="364" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">cat</text>
+<rect x="1338" y="342" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
+<text x="1366" y="364" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">sits</text>
+<rect x="1402" y="342" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
+<text x="1430" y="364" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">.</text>
+
+<text x="1072" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#0D9488" text-anchor="start">Verified speculative output</text>
+<rect x="1210" y="410" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
+<text x="1238" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">The</text>
+<rect x="1274" y="410" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
+<text x="1302" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">cat</text>
+<rect x="1338" y="410" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
+<text x="1366" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">sits</text>
+<rect x="1402" y="410" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
+<text x="1430" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">.</text>
+<circle cx="1462" cy="426" r="13" fill="#0D9488"/>
+<path d="M1457 426 l3.4 3.4 l7.6 -8.6" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1072" y="478" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">token-exact gate: token-for-token equal to target greedy decoding</text>
+
+<rect x="1046" y="512" width="436" height="100" rx="16" fill="#FFFFFF" stroke="#DEE6EE" filter="url(#shadow)"/>
+<rect x="1071" y="536" width="35" height="48" rx="6" fill="#EDF2F8" stroke="#C8D5E4" />
+<path d="M1080 556 H1097 M1080 567 H1093" fill="none" stroke="#607187" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1125" y="550" font-family="Arial, Nimbus Sans, sans-serif" font-size="22" font-weight="700" fill="#12263A" text-anchor="start">Export checkpoint</text>
+<text x="1125" y="582" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="400" fill="#607187" text-anchor="start">weights · config · model card · checksums</text>
+
+<rect x="1046" y="630" width="436" height="30" rx="8" fill="#FFFFFF" stroke="#FFFFFF" />
+<text x="1264" y="650" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="500" fill="#52667B" text-anchor="middle">Target + drafter loaded for eval</text>
+
+<!-- flow between panels -->
+<path d="M512 437 H 548" fill="none" stroke="#0D9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
+<path d="M980 470 H 1016" fill="none" stroke="#0D9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
+<text x="530" y="424" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="500" fill="#087F73" text-anchor="middle">store</text>
+<text x="998" y="457" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="500" fill="#087F73" text-anchor="middle">ckpt</text>
+
 <path d="M48 739 H1512" fill="none" stroke="#DEE6EE" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="48" y="773" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start" >Compatible captured features are shared; each algorithm is trained in its own run.</text>
-<text x="1512" y="773" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="400" fill="#64748B" text-anchor="end" >DFlash2: experimental objective · DFly: CE adaptation</text>
+<text x="48" y="773" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start">Compatible captures are shared across methods; each algorithm is trained in its own run.</text>
+<text x="1512" y="773" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="400" fill="#64748B" text-anchor="end"><a href="../README.md" fill="#0D9488">Docs</a> · <a href="../../SUPPORT_MATRIX.md" fill="#0D9488">Support matrix</a> · <a href="../../BENCHMARKS.md" fill="#0D9488">Benchmarks</a></text>
 </svg>

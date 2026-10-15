@@ -25,7 +25,7 @@
   <g>
     <rect x="412" y="70" width="172" height="84" rx="10" fill="#f3f4f6" stroke="#d1d5db"/>
     <text x="498" y="102" text-anchor="middle" font-size="14" font-weight="600" fill="#111827">hidden-state capture</text>
-    <text x="498" y="122" text-anchor="middle" font-size="11" fill="#4b5563">staged feature store (fp16 shards</text>
+    <text x="498" y="122" text-anchor="middle" font-size="11" fill="#4b5563">staged feature store (bf16 shards</text>
     <text x="498" y="138" text-anchor="middle" font-size="11" fill="#4b5563">+ image spans + target head)</text>
   </g>
   <line x1="586" y1="112" x2="618" y2="112" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow)"/>
@@ -52,5 +52,6 @@
     <text x="498" y="196" text-anchor="middle">reusable: DFlash / DSpark / Domino / JetSpec / DFlash2 / DFlare / DFly from one capture</text>
     <text x="972" y="196" text-anchor="end">speculative output must match</text>
     <text x="972" y="212" text-anchor="end">the target's greedy tokens exactly</text>
+    <text x="490" y="238" text-anchor="middle" font-size="11" fill="#9ca3af">Legacy diagram - offline path only. Current main flow: docs/assets/how-it-works.svg</text>
   </g>
 </svg>

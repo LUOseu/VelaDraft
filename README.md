@@ -50,6 +50,10 @@
   records and evaluation results stay together for resume, reproduction and
   further tooling.
 
+<p align="center">
+  <img src="docs/assets/how-it-works.svg" alt="Image-text data goes through target-native regen and feature capture; training reads either the offline feature store or a live frozen target (with an optional RAM cache); validation checks the speculative output token-for-token against target-only greedy decoding before export." width="1100" />
+</p>
+
 "Unified" means shared interfaces and protocol records &mdash; not identical
 objectives, budgets or maturity across algorithms.
 
