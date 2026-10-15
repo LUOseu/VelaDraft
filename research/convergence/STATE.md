@@ -137,6 +137,18 @@ Last update: 2026-10-15 ~13:20 CST. Branch `research/rsi-d1-conv` (base `origin/
   workers while it runs; the chain is idempotent per leg.
 - 证据: `logs/vconv_status.log` 14:24:38 (LEG-FAIL x4) / 14:31:45 (manual start); nvidia-smi snapshots.
 
+### F13. Seed-42 confirmatory pair: seam at step 1 = 4.4e-4 rel; trajectories then diverge chaotically
+- 发现: canon_s42 vs grid2_s42 (same seed/data/anchors/steps; only regroup). Step-1 loss: 12.500000 vs
+  12.494547 (rel 4.36e-4 — the fp32-preserved vs bf16-mean reduction seam, consistent with the harness
+  paired-parity bound loss_rel med 0.21% / max 0.7%). Steps 2+: all rows differ (chaotic bf16
+  amplification; largest |dloss| 0.397 @step 414 on run-level losses 1.16/1.55); both runs end at
+  last10 ~1.3e-3. Full trajectories are NOT bitwise (as PREREGISTRATION §2 allows); the quality verdict
+  rests on the multi-seed paired gates, not on trajectory identity.
+- 配对结果 (eval): canon AL=1.1192688043152532 / acc=0.0171455; grid2 AL=1.119436535291473 / acc=0.0172948
+  (dAL=+1.68e-4, dacc=+1.49e-4 — both non-negative on this seed).
+- 配对成本: train wall 1805.2s vs 1690.4s (-6.4%); peak 25.34 vs 9.99 GiB (-61%).
+- 证据: `evidence/legs/conv_canon_s42/` vs `evidence/legs/conv_grid2_s42/` (+local log diff).
+
 ### F5. Stability leg: full 800 steps trained; crashed only at final checkpoint write (disk full)
 - 发现: `conv_stab_canon_s42` trained steps 1..800 (train_log.jsonl complete, loss 12.875 -> 0.026, gn
   sane, lr schedule complete) and died at 11:33:18 inside the final `ckpt_last.pt` write (`.tmp` 669MB
