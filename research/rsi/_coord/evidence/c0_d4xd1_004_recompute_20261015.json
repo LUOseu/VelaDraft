@@ -1,0 +1,106 @@
+{
+  "schema": "c0_d4xd1_004_recompute_v1",
+  "read_time_cst": "2026-10-15 04:24",
+  "leg": "d4xd1_w3_cacheoff_bucketon_fp32off",
+  "ref": "d4xd1_w3_cacheoff_bucketoff",
+  "gate": 0.0075,
+  "verdict": "FAIL",
+  "F1B": {
+    "max_rel": 0.022727272727272728,
+    "max_step": 11,
+    "median": 0.004319674578295268,
+    "over_gate_n": 17,
+    "over_gate_steps": [
+      10,
+      11,
+      12,
+      13,
+      15,
+      16,
+      18,
+      43,
+      47,
+      54,
+      60,
+      73,
+      82,
+      95,
+      96,
+      97,
+      98
+    ]
+  },
+  "aux_vs_fp32true_bucket_on": {
+    "max_rel": 0.014080119744733355,
+    "max_step": 15,
+    "median": 0.0025755415668771552,
+    "over_gate_n": 7,
+    "over_gate_steps": [
+      10,
+      11,
+      12,
+      14,
+      15,
+      16,
+      18
+    ]
+  },
+  "sanity_fp32true_vs_ref": {
+    "max_rel": 0.012475216027462122,
+    "max_step": 11,
+    "median": 0.0018540770637703995,
+    "over_gate_n": 4,
+    "over_gate_steps": [
+      11,
+      12,
+      13,
+      14
+    ]
+  },
+  "identity": {
+    "rel": 6.132632331099557e-08,
+    "tol": 1e-06,
+    "pass": true
+  },
+  "anchors": {
+    "n_calls": 104,
+    "prefix": "96c5a117436f9d35",
+    "full_digest": "4347a983417d07f0",
+    "identical_across_legs": true
+  },
+  "run": {
+    "rc": 0,
+    "end": "2026-10-15 04:22:43",
+    "steps": 101,
+    "train_wall_s": 236.83007192611694,
+    "peak_gpu_mem_gb": 17.484787712,
+    "final_loss": 6.9375,
+    "nan_seen": false,
+    "feature_cache_disabled": true
+  },
+  "lease": {
+    "id": "L-W3-D4xD1B",
+    "cap_gpu_h": 0.1,
+    "spent_gpu_h": 0.081,
+    "window": "2026-10-15 04:17:50-04:22:43 CST",
+    "gpu": "a6000xuyang GPU3",
+    "note": "incl. 8s staging rc=1 retry"
+  },
+  "method": "C0 reads raw train/train_log.jsonl (steps 2..101 = timed calls 1..100) from leg and ref run dirs on the server; loss_rel=|leg-ref|/|ref|; independent of D1 scripts; reproduces D1 evidence/d4xd1_004_f1b.json headline stats exactly (cross-check sha below).",
+  "files_sha256": {
+    "anchors_fp32off.jsonl": "4c4ba9c4a642d62fd9af968408bfbde7ed73fdebaac68b72301fba1ec7d2978b",
+    "anchors_ref.jsonl": "4c4ba9c4a642d62fd9af968408bfbde7ed73fdebaac68b72301fba1ec7d2978b",
+    "identity_fp32off.json": "aeb2f617efe12190389504ad7b9c0bf59c291059c6c05a6cecec9a474c3cf629",
+    "leg_fp32off.jsonl": "12979edab25e4087134050100f071fb78dadc4dcccf394f5155d23de8d1e3cad",
+    "leg_fp32true.jsonl": "d75d58c3fe6af21a9783bd9956b963f653100ed78ec8ab0edb72d2376777d80c",
+    "leg_summary.json": "e394cf710249bd66e6312764685f870ea73b55e4919e7e43585116e6e2232f93",
+    "parity_fp32off.json": "ca43936167edebf194e05fe58813de66d5f0f638027d2db6f896257246c3a221",
+    "parity_fp32true.json": "b95e4f949bd041feca9e19d949c9ab997db6226c3f5299c9fe0b73f0e32c5575",
+    "ref_bucketoff.jsonl": "082b1f48453fd2980f7f41449c3b9d894f092619f27422637a2560a1076ffd11"
+  },
+  "d1_side": {
+    "path": "/Users/Admin/grounding-parallel/vlm-dflash-d1/research/rsi/d1/evidence/d4xd1_004_f1b.json",
+    "sha256": "208420098a2e0741850fa592e81c088971dfd3dc67e5a5d52c02c73ad1253490",
+    "status": "uncommitted at read time"
+  }
+}

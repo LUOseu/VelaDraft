@@ -87,3 +87,5 @@ D5 提交的跨层命名（REGISTRY §7 00:20 回合），C0 接受为候选。*
 | `host_ram_budget_gb` | **已确认（D4 00:46；默认 null；冻结走 §11）** | launcher 级 host RAM 总预算；D4 cache payload 与 D5 queue/staging 记入同一份额；product 侧只读；不进 `training_plan_digest`；接线需提案 |
 
 补充（00:52，D1 `d1-001` 接收后）：v0.2 主体另含 D1 增量——可选 forward kwargs `anchor_table`/`sample_weights`、可选 config 块 `train.regroup.{mode,sub_batch,cost_weight,fp32_weights}`（默认全关、行为逐字节不变）、layout contract v0.2 字段组（D1 handoff "Layout contract v0.2"；C0 已阅）。冻结仍走 §11 流程。
+
+补充（02:22，D1 增量实现落地）：上述 D1 增量已在集成分支实现（`research/rsi-c0` @ `4e1674e`，见 `d1-003-c0` §3）——`anchor_table`/`sample_weights` 为 trainer forward 可选 kwargs（含边界校验；packed/variable_prefix 不支持时响亮报错），`train.regroup` 默认 off，默认路径 byte-identical（测试锁；全套 509 pass/6 skip）。字段状态切为 **已实现（语义不变，仍为候选版本）**；v0.2 正式冻结待 D5 侧对接后按 §11 走。

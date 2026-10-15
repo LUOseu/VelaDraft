@@ -1,0 +1,48 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/Admin/grounding-parallel/veladraft-c0
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collected 515 items
+
+tests/test_algorithms.py ............................................... [  9%]
+                                                                         [  9%]
+tests/test_benchmark_manifests.py ...........                            [ 11%]
+tests/test_cache_budget.py .............                                 [ 13%]
+tests/test_cli.py ..............                                         [ 16%]
+tests/test_contract_integration.py ssssss                                [ 17%]
+tests/test_demo.py .............                                         [ 20%]
+tests/test_dflare.py ..............                                      [ 22%]
+tests/test_dflash2.py ........................                           [ 27%]
+tests/test_dfly.py ...............                                       [ 30%]
+tests/test_domino.py ...........                                         [ 32%]
+tests/test_dspark.py ............................                        [ 38%]
+tests/test_eval_checkpoints.py ...                                       [ 38%]
+tests/test_export_roundtrip.py ....                                      [ 39%]
+tests/test_export_vllm_bridge.py .....                                   [ 40%]
+tests/test_feature_contract.py ........                                  [ 41%]
+tests/test_flex_kernel_options.py ...                                    [ 42%]
+tests/test_jetspec.py ..................                                 [ 46%]
+tests/test_mrope_layouts.py ........                                     [ 47%]
+tests/test_multimodal_supervision.py .........                           [ 49%]
+tests/test_multiturn_layout.py .................                         [ 52%]
+tests/test_objectives.py ............................................    [ 61%]
+tests/test_online_mode.py .............................................. [ 70%]
+........................                                                 [ 74%]
+tests/test_prepare_media.py .......                                      [ 76%]
+tests/test_probe_divergence_margin.py .......                            [ 77%]
+tests/test_profile_length_buckets.py ..........                          [ 79%]
+tests/test_reference_manifest.py ...                                     [ 80%]
+tests/test_regroup.py ....................                               [ 83%]
+tests/test_resume.py ...                                                 [ 84%]
+tests/test_schema_jsonl.py ...                                           [ 85%]
+tests/test_smolvlm_adapter.py ...............                            [ 87%]
+tests/test_stage_cache.py ......                                         [ 89%]
+tests/test_strict_parallel.py ...                                        [ 89%]
+tests/test_trainer_smoke.py .                                            [ 89%]
+tests/test_training_plan_fusion.py .................                     [ 93%]
+tests/test_units.py ........                                             [ 94%]
+tests/test_untied_head.py ........                                       [ 96%]
+tests/test_wp2_multiturn.py ...................                          [100%]
+
+======================== 509 passed, 6 skipped in 7.69s ========================
