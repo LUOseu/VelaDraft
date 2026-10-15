@@ -116,8 +116,10 @@ run_matrix.py summarize --out-dir research/convergence/evidence/a100
 ## 6. Algorithm adaptation notes
 
 - `dflash`: primary; regroup verified on this round's W3 store (bitwise).
-- `dflare`, `dfly`: shared trainer core; dflare is the second-drafter
-  adaptation candidate (smoke gates above). dfly stays `off` until gated.
+- `dflare`, `dfly`: shared trainer core. dflare smoke (2026-10-15, real 2k store):
+  canonical/8+bypass bitwise PASS, grid/2 refused by the auxiliary-metrics
+  gate (`train.py:321`). Adapting dflare = make its aux-metric accounting
+  group-aware, then re-run the smoke gates. dfly stays `off` until gated.
 - `jetspec`: serve/eval with the causal-mask path it was trained with (the
   canonical zoo used `eval_result_jetspec_2k_causalmask.json`); benchmark
   reports keep the default protocol.

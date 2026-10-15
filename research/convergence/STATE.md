@@ -1,6 +1,6 @@
 # STATE — D1 convergence (single-agent round)
 
-Last update: 2026-10-15 ~12:45 CST. Branch `research/rsi-d1-conv` (base `origin/main` @ 6d99f04).
+Last update: 2026-10-15 ~12:52 CST. Branch `research/rsi-d1-conv` (base `origin/main` @ 6d99f04).
 
 ## 发现—证据—决定—下一步 log
 
@@ -61,6 +61,25 @@ Last update: 2026-10-15 ~12:45 CST. Branch `research/rsi-d1-conv` (base `origin/
   onto the `ckpt_init.pt` header; no semantics touched) commit `bc87e8f`; converted the three
   stability checkpoints to `ckpt_eval_{200,400,600}.pt`; eval relaunched 12:26 on GPU1.
 - Follow-up: `vconv_stability_leg.sh` should convert before eval on its next use.
+
+
+### F9. Second-drafter applicability (dflare smoke): bypass PASS, machinery refused
+- 发现: 3-step smoke on the real dflare 2k store (`qwen25vl3b_dflare_2k`, 1050 samples, seq 2048):
+  regroup-off leg rc=0; canonical/8+bypass leg rc=0 with GATE1 bitwise identity **PASS** (loss/grad_norm
+  equal on every step); grid/2 leg rc=1 with `NotImplementedError: train.regroup does not support
+  auxiliary/recipe losses yet` (dflash/train.py:321) -- dflare's forward surfaces auxiliary metrics, so
+  the physical-group accounting path is unavailable without an adaptation.
+- 证据: `research/convergence/evidence/second_drafter/` (logs + per-leg train logs); server log
+  `logs/vconv_smoke_dflare.log`.
+- 代码级边界 map (guard `loss_type=="dflash" and not sample_from_anchor`, plus the extra_metrics gate):
+  dflash = full pass (this round's W3 legs); dflare = bypass-safe / machinery blocked (aux metrics);
+  dflash2 and jetspec = blocked (aux metrics: unary_kl / kd_loss); dspark = blocked (sample_from_anchor);
+  domino = blocked (shift_label -> sample_from_anchor + aux). Adapting a second drafter = teaching the
+  group loop to aggregate each algorithm's auxiliary accounting per group, then re-running these gates.
+- 决定: keep regroup default-off across all drafters; dflare's `regroup_adaptation` note in the A100
+  package updated with the concrete block. The applicability statement for the paper: D1's physical
+  regrouping is currently a dflash-family-only optimization (boundary documented, negative result for
+  the others recorded, not papered over).
 
 ### F5. Stability leg: full 800 steps trained; crashed only at final checkpoint write (disk full)
 - 发现: `conv_stab_canon_s42` trained steps 1..800 (train_log.jsonl complete, loss 12.875 -> 0.026, gn
