@@ -99,6 +99,22 @@ Last update: 2026-10-15 ~13:20 CST. Branch `research/rsi-d1-conv` (base `origin/
 - 下一步: stab1600 done (~13:40) -> AL(800 fresh), AL(1600) -> L* verdict -> launch the confirm wave at
   L* on all free GPUs (`vconv_confirm_driver.sh <L*> <gpus> pilot`, with `VCONV_EVAL_CKPTS=ckpt_final.pt`).
 
+### F11. L* verdict: fresh 1600-step extension -> NOT settled; L*=1600 via disclosure path
+- 发现: fresh canonical 1600-step leg (seed 42) held-out AL = 400:1.2015 / 800:1.1547 / 1600:1.1193;
+  settled(1600) = |AL(1600)-AL(800)|/AL(800) = 3.07% > 0.5% -> frozen rule: L*=1600 with the explicit
+  "not settled" disclosure; the quality claim is scoped to the matched budget (PREREGISTRATION.md §3).
+- 证据: `evidence/legs/conv_stab1600/` (train_summary: loss_decreased=true, nan_seen=false,
+  skipped_no_anchor=0, wall 1794.3s, peak 25.34 GiB; eval token_exact=true at all three ckpts);
+  `evidence/settle_decision_ext1600.json`; server log 13:54:44 / done 13:54:47.
+- 注意: AL *and* acceptance decline monotonically at longer budgets (1.202/0.029@400 -> 1.155/0.022@800 ->
+  1.119/0.017@1600; train loss ~8e-4) -- overfitting on the 192-row store. The arm comparison is therefore
+  a matched-budget non-inferiority test in this regime; absolute quality is a small-store artifact (the
+  A100 2K-recipe round is where absolute quality is judged).
+- 附注: fresh-leg AL(800)=1.1547 differs from the resume-leg AL(800)=1.1373 because the cosine schedules
+  differ (1600-step vs 800-step total) -- expected, not a determinism discrepancy.
+- 下一步: confirm wave at L*=1600 launched 13:55:54 on GPU 0,1,2 (canonical x4 + grid2 x4; pilots
+  token2/split2 x2; VCONV_EVAL_CKPTS=ckpt_final.pt, ckpt_final kept) -> analyze_quality.py gates.
+
 ### F5. Stability leg: full 800 steps trained; crashed only at final checkpoint write (disk full)
 - 发现: `conv_stab_canon_s42` trained steps 1..800 (train_log.jsonl complete, loss 12.875 -> 0.026, gn
   sane, lr schedule complete) and died at 11:33:18 inside the final `ckpt_last.pt` write (`.tmp` 669MB
@@ -125,15 +141,15 @@ Last update: 2026-10-15 ~13:20 CST. Branch `research/rsi-d1-conv` (base `origin/
 - `eval_samples.jsonl` lacked per-prompt verify_steps/accepted/draft counts; added (commit `5750c23`),
   eval tests pass; server repo pulled so the stability leg's eval writes the new fields.
 
-## Running now (12:45 CST)
-- GPU1: stability eval of `conv_stab_canon_s42` over the converted ckpt_eval_200/400/600 (relaunched 12:26
-  after the F8 converter fix) -> L* decision via `analyze_settle.py`.
-- GPU2: harness series `series1` rep 1/3 of w3_k4 done 12:29; ETA ~1.5h for the full series.
-- GPU0: external tenant. GPU3: free (kept idle for the confirm-leg wave).
-- Capacity probe done (F7); A100 matrix runner dry-run passed locally (32 entries, ~37 GPU-h).
-- GPU0: `conv_stab_canon_s42` — canonical seed 42, 800 steps, mid ckpt copies @200/400/600, 4-checkpoint eval.
-- GPU1: harness series `series1` — W3 k4 x3, W3 k2 x3, MIX k4 x2, W1 k4 x1, seam run (arms
-  canonical,cp,ref,split,token,dual,cost,grid; 100 batches/rep; parity 3).
+## Running now (13:56 CST)
+- GPU0/1/2: confirm wave at L*=1600 (driver pid 600986, launched 13:55:54): canonical x4 + grid2 x4 (gates)
+  + pilots token2/split2 x2. Queue per GPU: gpu0 canon_s42, grid2_s43, canon_s45, split2_s42; gpu1
+  grid2_s42, canon_s44, grid2_s45, token2_s43; gpu2 canon_s43, grid2_s44, token2_s42, split2_s43.
+  ETA ~16:30. Driver retries epochs=8; VCONV_EVAL_CKPTS=ckpt_final.pt; ckpt_final kept.
+- GPU3: external tenant (generate_target_data.py) — excluded by the >=40GiB-free guard.
+- Done since 12:45: harness series1 complete (all 10 tags rc=0, 12:17:48-13:39:42) -> 3-rep systems
+  table committed (470c0ee); stability curve re-eval restored (tagged) + L* verdict (F11); extension leg
+  done (F11); A100 dry-run re-validated (32 entries, 37.3 GPU-h; evidence/a100_dryrun.txt committed).
 
 ## Incidents
 - `conv_smoke_grid` rc=1 at ckpt_final save (torch zip write error, host writeback/ENOSPC class) after
@@ -144,8 +160,8 @@ Last update: 2026-10-15 ~13:20 CST. Branch `research/rsi-d1-conv` (base `origin/
   and are cleaned after eval. At most 2 legs in flight.
 
 ## Next
-1. Read stability curve (200/400/600/800) -> L* per the frozen rule.
-2. Launch confirmatory legs (canonical x4, grid/sub2 x4) + pilot legs (token/sub2 x2, split/sub2 x2) at L*.
-3. Harness series -> systems table (wall/peak/padding; canonical vs split vs token vs cost/grid).
-4. Capacity probe (batch 16 canonical OOM vs grid fits) + second-drafter applicability (DFlare) smoke.
-5. A100 matrix runner (dry-run/run/resume/aggregate) + final report + PR.
+1. Monitor confirm wave (~16:30); then `scripts/finalize_quality.sh` -> `evidence/quality_verdict.json`
+   (frozen gates: AL rel > -1%, acc drop > -0.5pp, hierarchical bootstrap).
+2. `analyze_costs.py` full leg cost table (train wall/GPU-h/peak + eval per-sample) after the wave.
+3. Final REPORT numbers + PR body; push branch; open PR (no merge to main).
+4. A100 handoff list (matrix/runbook/dry-run) — done, cite in the final message.
