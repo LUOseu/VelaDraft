@@ -28,7 +28,16 @@ done
 wait $TPID || { echo "train FAIL $LEG" >> "$STATUS"; exit 1; }
 echo "train done $LEG $(date '+%F %H:%M:%S')" >> "$STATUS"
 if [ -f "$RUN/train/ckpt_last.pt" ]; then rm "$RUN/train/ckpt_last.pt"; fi
-CKPTS=$(cd "$RUN/train" && ls ckpt_*.pt | sort -V | paste -sd, -)
+STATE_ARGS=()
+for c in "$RUN"/train/ckpt_*.pt; do
+  case "$c" in *ckpt_eval_*|*ckpt_init.pt|*ckpt_final.pt) continue;; esac
+  STATE_ARGS+=(--state "$(basename "$c")")
+done
+if [ "${#STATE_ARGS[@]}" -gt 0 ]; then
+  /home/lyh/miniforge3/envs/c1vllm/bin/python /home/lyh/veladraft-conv/repo/scripts/convert_train_state_ckpt.py \
+    --run-dir "$RUN" "${STATE_ARGS[@]}" >> "$STATUS" 2>&1 || { echo "convert FAIL $LEG" >> "$STATUS"; exit 1; }
+fi
+CKPTS=$(cd "$RUN/train" && ls ckpt_eval_*.pt | sort -V | paste -sd, -)
 echo "start eval  $LEG ckpts=$CKPTS $(date '+%F %H:%M:%S')" >> "$STATUS"
 VCONV_GPU=$GPU bash /home/lyh/veladraft-conv/scripts/vconv_run.sh "$LEG" eval \
   --set "eval.checkpoints=[$CKPTS]" >> "$STATUS" 2>&1 || { echo "eval FAIL $LEG" >> "$STATUS"; exit 1; }
