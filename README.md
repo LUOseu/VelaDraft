@@ -43,7 +43,7 @@
 
 ## 📍 Overview
 
-**VelaDraft** is a unified training toolkit for multimodal speculative drafters.
+**VelaDraft** is a unified training toolkit for multimodal speculative drafters，especially focus on parallel block diffusion drafter,like Dflash,Dspark.
 
 It keeps the VLM-specific plumbing shared while letting the drafter algorithm change.
 
