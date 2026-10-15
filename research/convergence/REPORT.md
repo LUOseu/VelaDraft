@@ -72,10 +72,36 @@ in this regime; absolute quality is a small-store artifact (the A100 2K-recipe
 round is where absolute quality is judged). Artifacts: `evidence/settle_decision.json`,
 `evidence/settle_decision_ext1600.json`, `evidence/legs/conv_stab1600/`.
 
-<placeholder: confirm table — canonical ×4 vs grid2 ×4 at L*: per-seed AL/acc +
-hierarchical bootstrap gates (-1% AL rel; -0.5pp acc) → PASS/FAIL/HOLD>
+Confirmatory set (canonical ×4 vs grid2 ×4 at L\*=1600, val64, paired; all legs
+token_exact=True; frozen gates: AL rel > −1%, dacc > −0.5pp, hierarchical
+bootstrap B=10,000, seed 20261015):
 
-Pilot controls (token/sub2, split/sub2 ×2 seeds): <placeholder>.
+| seed | canonical AL | grid2 AL | rel ΔAL | canonical acc | grid2 acc | Δacc |
+| --- | --- | --- | --- | --- | --- | --- |
+| 42 | 1.119269 | 1.119437 | +0.015% | 0.01715 | 0.01729 | +0.00031 |
+| 43 | 1.141853 | 1.146761 | +0.430% | 0.02054 | 0.02127 | +0.00097 |
+| 44 | 1.183648 | 1.147642 | **−3.042%** | 0.02668 | 0.02136 | −0.00544 |
+| 45 | 1.106339 | 1.100796 | −0.501% | 0.01533 | 0.01446 | −0.00035 |
+
+**Verdict: FAIL.** Mean relΔAL = −0.775%, one-sided 95% bootstrap lower bound
+= **−2.000%** (gate > −1.0%) → AL gate fails; dacc = −0.00113, lower bound
+−0.00352 → acc gate passes; both must hold → FAIL (frozen `PREREGISTRATION.md` §5;
+`evidence/quality_verdict.json`). Secondary t-based CI across seeds:
+mean −0.775%, sd 1.559%, CI ≈ [−2.61%, +1.06%] — same story.
+
+**Attribution (RSI checks, no post-hoc loosening).** Step-1 loss seams of the
+pairs are 4.4e-4 / 2.8e-3 / 1.9e-3 (same order for every seed) → same
+supervision, data order and anchors; the residual is the fp32-preserved vs
+bf16-mean reduction seam, which then amplifies chaotically over 1600 steps of
+bf16 SGD (as the prereg allows; cf. the bitwise cross-GPU control, STATE F12).
+Seed 44 shows grid2 *training* slightly better (last10 1.92e-3 vs 1.98e-3) but
+held-out AL 3% worse — an endpoint divergence in the still-fast-moving
+(unsettled) held-out regime, not a semantic change and not a bug. Context: the
+L\* extension curve itself moves ≈3% per 800 steps, so a ±1% non-inferiority
+claim at this budget is below the regime's trajectory sensitivity.
+
+Pilot controls (token/sub2, split/sub2 ×2 seeds; exploratory, non-gating):
+<placeholder — filled by the final `finalize_quality.sh` run>.
 
 ## 5. Applicability boundary (second drafter)
 
