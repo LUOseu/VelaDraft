@@ -115,6 +115,28 @@ Last update: 2026-10-15 ~13:20 CST. Branch `research/rsi-d1-conv` (base `origin/
 - 下一步: confirm wave at L*=1600 launched 13:55:54 on GPU 0,1,2 (canonical x4 + grid2 x4; pilots
   token2/split2 x2; VCONV_EVAL_CKPTS=ckpt_final.pt, ckpt_final kept) -> analyze_quality.py gates.
 
+### F12. Cross-GPU bitwise reproduction: wave canon_s42 == extension leg stab1600
+- 发现: two independent full 1600-step runs of the *same* config (seed 42, canonical) — the extension
+  leg `conv_stab1600` (GPU1, 13:06-13:54) and the confirm-wave `conv_canon_s42` (GPU0, 13:55-14:35) —
+  produce **bit-identical evaluations**: AL=1.1192688043152532, acc=0.017145494911305036, and all 64
+  per-prompt rows identical (incl. generated `spec_tokens`). Training+eval is deterministic across the
+  4xA6000 for this config.
+- 证据: `evidence/legs/conv_canon_s42/eval/*` vs `evidence/legs/conv_stab1600/eval/*` (local compare, 0/64
+  rows differ); server logs 14:35:25 vs 13:54:44.
+- 决定: the wave's legs share the registered stability data's execution semantics; no cross-GPU noise
+  term is needed between arms trained on different GPUs (pairing stays seed-wise).
+- Next: wave ETA ~16:30; then `finalize_quality.sh` -> frozen gates.
+
+### Incident (14:24, wave epoch 1): transient sglang tenant grabbed GPU1; safe restart
+- 发现: at 14:24:38 an external `sglang::scheduler` (26.8 GiB, 97% util) appeared on GPU1 (same-user
+  sibling lane; also one on GPU3, 29 GiB, gone by 14:31) -> `conv_grid2_s42` eval + 3 gpu1 legs hit
+  `GUARD FAIL (tenant)` and were parked; gpu0/gpu2 unaffected.
+- 决定: no interference with the tenant; at 14:31:45, after GPU1 freed (15 MiB), a manual
+  `.vconv_worker_gpu1.sh` (same chain, retry x3/leg) was started on the existing gpu1 queue. Race-safety:
+  the retry driver's `pgrep .vconv_worker_gpu` wait includes this worker, so epoch 2 cannot start new
+  workers while it runs; the chain is idempotent per leg.
+- 证据: `logs/vconv_status.log` 14:24:38 (LEG-FAIL x4) / 14:31:45 (manual start); nvidia-smi snapshots.
+
 ### F5. Stability leg: full 800 steps trained; crashed only at final checkpoint write (disk full)
 - 发现: `conv_stab_canon_s42` trained steps 1..800 (train_log.jsonl complete, loss 12.875 -> 0.026, gn
   sane, lr schedule complete) and died at 11:33:18 inside the final `ckpt_last.pt` write (`.tmp` 669MB
