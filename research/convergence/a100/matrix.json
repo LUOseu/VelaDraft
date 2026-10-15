@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "description": "VelaDraft A100 experiment matrix: multimodal parallel-drafter benchmark (controlled + native tracks) with the D1 regroup systems factor. Runner: research/convergence/a100/run_matrix.py (dry-run / run / resume / summarize).",
+  "version": 2,
+  "description": "VelaDraft A100 experiment matrix: multimodal parallel-drafter benchmark (controlled + native tracks) with the D1 regroup systems factor. Runner: research/convergence/a100/run_matrix.py (dry-run / run / resume / summarize); prepare stage binds the declared train store + val split and runs preflight_entry.py before any GPU work.",
   "repo": "${VELADRAFT_REPO}",
   "python": "${VELADRAFT_PYTHON}",
   "runs_root": "${VELADRAFT_RUNS_ROOT}",
@@ -20,38 +20,63 @@
     "dflash": {
       "native_config": "configs/qwen2_5_vl_3b_2k.yaml",
       "regroup_support": true,
-      "regroup_adaptation": false
+      "regroup_adaptation": false,
+      "controlled_overrides": {}
     },
     "dspark": {
       "native_config": "configs/dspark/qwen2_5_vl_3b_2k.yaml",
       "regroup_support": false,
-      "regroup_adaptation": false
+      "regroup_adaptation": false,
+      "controlled_overrides": {}
     },
     "domino": {
       "native_config": "configs/domino/qwen2_5_vl_3b_2k.yaml",
       "regroup_support": false,
-      "regroup_adaptation": false
+      "regroup_adaptation": false,
+      "controlled_overrides": {}
     },
     "jetspec": {
       "native_config": "configs/jetspec/qwen2_5_vl_3b_2k.yaml",
       "regroup_support": false,
-      "regroup_adaptation": false
+      "regroup_adaptation": false,
+      "controlled_overrides": {
+        "capture.store_final_hidden": true,
+        "drafter.loss_decay_gamma": null
+      }
     },
     "dflash2": {
       "native_config": "configs/dflash2/qwen2_5_vl_3b_2k.yaml",
       "regroup_support": false,
-      "regroup_adaptation": false
+      "regroup_adaptation": false,
+      "controlled_overrides": {
+        "capture.store_final_hidden": true,
+        "drafter.loss_decay_gamma": 4.0
+      }
     },
     "dflare": {
       "native_config": "configs/dflare/qwen2_5_vl_3b_2k.yaml",
       "regroup_support": false,
       "regroup_adaptation": true,
-      "regroup_adaptation_note": "smoke 2026-10-15: canonical/8+bypass bitwise PASS on the dflare 2k store, but grid/2 is refused at the auxiliary-metrics gate (NotImplementedError, train.py:321). Adaptation = make aux-metric accounting group-aware, then re-run regroup_adaptation_smoke.sh."
+      "regroup_adaptation_note": "smoke 2026-10-15: canonical/8+bypass bitwise PASS on the dflare 2k store, but grid/2 is refused at the auxiliary-metrics gate (NotImplementedError, train.py:321). Adaptation = make aux-metric accounting group-aware, then re-run regroup_adaptation_smoke.sh.",
+      "controlled_overrides": {
+        "drafter.capture_layer_ids": [
+          1,
+          17,
+          33
+        ]
+      }
     },
     "dfly": {
       "native_config": "configs/dfly/qwen2_5_vl_3b_2k.yaml",
       "regroup_support": false,
-      "regroup_adaptation": false
+      "regroup_adaptation": false,
+      "controlled_overrides": {
+        "drafter.capture_layer_ids": [
+          1,
+          17,
+          33
+        ]
+      }
     }
   },
   "tracks": [
@@ -85,7 +110,7 @@
       "docvqa",
       "chartqa"
     ],
-    "note": "test workloads are public datasets exported by scripts/prepare_benchmark.py; the val split is disjoint from the train store; the runner refuses identical train/val paths"
+    "note": "test workloads are public datasets exported by scripts/prepare_benchmark.py; the val split is disjoint from the train store; the runner refuses identical train/val paths, binds train_store -> <run>/features and val_split -> <run>/data/val.jsonl (media_dir normalized from <val>/meta.json or <val>/images), and validates store identity/layers in the prepare preflight"
   },
   "cost_model": {
     "sec_per_step": {
@@ -100,5 +125,9 @@
     },
     "eval_minutes": 12,
     "benchmark_minutes": 10
+  },
+  "benchmark": {
+    "manifests_dir": "benchmarks/manifests",
+    "reports_dir": "benchmarks/reports"
   }
 }

@@ -24,6 +24,7 @@ ARMS = {
     "split2": {s: f"conv_split2_s{s}" for s in (42, 43)},
 }
 GATES = {"gate_al_rel": -0.01, "gate_acc_abs": -0.005, "bootstrap": 10000, "bootstrap_seed": 20261015}
+PROMPTS_PER_LEG = 64  # d1q_val64 held-out split (prereg section 2)
 
 
 def main() -> int:
@@ -31,6 +32,8 @@ def main() -> int:
     ap.add_argument("--legs-dir", default="evidence/legs")
     ap.add_argument("--out", default="evidence/quality_data.json")
     ap.add_argument("--include-pilot", action="store_true")
+    ap.add_argument("--allow-missing", action="store_true",
+                    help="write the spec even when registered legs are absent (exploration only)")
     args = ap.parse_args()
     legs_dir = Path(args.legs_dir)
     arms, missing = {}, []
@@ -43,9 +46,12 @@ def main() -> int:
                 arms[arm][str(seed)] = str((legs_dir / leg).resolve())
             else:
                 missing.append(leg)
-    if not arms.get("canonical") or not arms.get("grid2"):
-        raise SystemExit(f"confirmatory arms incomplete; missing legs: {missing}")
-    data = {"reference_arm": "canonical", "arms": arms, **GATES}
+    if not arms.get("canonical") or not arms.get("grid2") or (missing and not args.allow_missing):
+        raise SystemExit(f"registered legs incomplete; missing: {missing} (use --allow-missing to override)")
+    registered = {arm: sorted(seeds) for arm, seeds in ARMS.items()
+                  if arm in arms or (arm in ("token2", "split2") and args.include_pilot)}
+    data = {"reference_arm": "canonical", "arms": arms, "registered": registered,
+            "prompts_per_leg": PROMPTS_PER_LEG, **GATES}
     Path(args.out).write_text(json.dumps(data, indent=2) + "\n")
     print(f"wrote {args.out}: " + ", ".join(f"{a}={sorted(s)}" for a, s in arms.items()))
     if missing:

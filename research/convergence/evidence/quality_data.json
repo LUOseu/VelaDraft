@@ -22,6 +22,29 @@
       "43": "/Users/Admin/grounding-parallel/veladraft-conv/research/convergence/evidence/legs/conv_split2_s43"
     }
   },
+  "registered": {
+    "canonical": [
+      42,
+      43,
+      44,
+      45
+    ],
+    "grid2": [
+      42,
+      43,
+      44,
+      45
+    ],
+    "token2": [
+      42,
+      43
+    ],
+    "split2": [
+      42,
+      43
+    ]
+  },
+  "prompts_per_leg": 64,
   "gate_al_rel": -0.01,
   "gate_acc_abs": -0.005,
   "bootstrap": 10000,

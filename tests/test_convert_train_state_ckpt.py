@@ -22,14 +22,23 @@ def _template():
     }
 
 
-def _state(step=600):
-    return {
+def _state(step=600, **provenance_overrides):
+    state = {
         "format": "vlm-dflash-train-state-v1",
         "step": step,
         "model": {"w": torch.ones(2) * step},
         "optimizer": {"state": {}},
         "torch_rng_state": torch.tensor([1], dtype=torch.uint8),
+        # train-states merge the same checkpoint_common header as init drafts;
+        # the converter refuses pairings whose provenance disagrees.
+        "algorithm": "dflash",
+        "identity": {"target": "qwen2.5-vl-3b"},
+        "draft_config": {"hidden_size": 8},
+        "feature_mode": "offline",
+        "training_plan_digest": "abc",
     }
+    state.update(provenance_overrides)
+    return state
 
 
 def test_conversion_grafts_weights_and_step():
@@ -51,3 +60,31 @@ def test_conversion_refuses_wrong_formats():
         convert_train_state({"format": "nope"}, _state())
     with pytest.raises(ValueError):
         convert_train_state(_template(), {"format": "vlm-dflash-train-state-v1"})
+
+
+def test_conversion_refuses_plan_digest_mismatch():
+    with pytest.raises(ValueError, match="training_plan_digest"):
+        convert_train_state(_template(), _state(training_plan_digest="other-plan"))
+
+
+def test_conversion_refuses_data_identity_mismatch():
+    with pytest.raises(ValueError, match="identity"):
+        convert_train_state(_template(), _state(identity={"target": "other-store"}))
+
+
+def test_conversion_refuses_feature_mode_mismatch():
+    with pytest.raises(ValueError, match="feature_mode"):
+        convert_train_state(_template(), _state(feature_mode="online"))
+
+
+def test_conversion_refuses_missing_state_provenance():
+    state = _state()
+    del state["training_plan_digest"]
+    with pytest.raises(ValueError, match="missing from train-state"):
+        convert_train_state(_template(), state)
+
+
+def test_conversion_refuses_one_sided_optional_provenance():
+    state = _state(capture_layer_ids=[1, 17, 33])
+    with pytest.raises(ValueError, match="present only in train-state"):
+        convert_train_state(_template(), state)

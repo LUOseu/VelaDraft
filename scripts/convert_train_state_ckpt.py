@@ -16,12 +16,63 @@ re-running training.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import torch  # noqa: E402
+
+# Provenance fields carried by every checkpoint (init drafts and train-states
+# both merge the same ``checkpoint_common`` header). Grafting a train-state onto
+# an init template is only sound when these agree: otherwise the converted
+# checkpoint would claim the template's data/plan identity while holding
+# another run's weights. Required keys must exist on both sides; optional keys
+# are compared when present on either side (one side only => refuse).
+_PROVENANCE_REQUIRED = (
+    "algorithm",
+    "identity",
+    "draft_config",
+    "feature_mode",
+    "training_plan_digest",
+)
+_PROVENANCE_OPTIONAL = (
+    "capture_layer_ids",
+    "feature_source_digest",
+    "training_plan_version",
+    "head",
+)
+
+
+def _canonical(value) -> str:
+    return json.dumps(value, sort_keys=True, default=str)
+
+
+def check_provenance(template: dict, state: dict) -> None:
+    """Refuse to graft weights whose recorded provenance differs from the template."""
+    problems: list[str] = []
+    for key in _PROVENANCE_REQUIRED:
+        if key not in template or key not in state:
+            side = "train-state" if key not in state else "init template"
+            problems.append(f"{key}: missing from {side}")
+            continue
+        if _canonical(template[key]) != _canonical(state[key]):
+            problems.append(f"{key}: train-state={state[key]!r} != init template={template[key]!r}")
+    for key in _PROVENANCE_OPTIONAL:
+        in_template = key in template
+        in_state = key in state
+        if in_template != in_state:
+            side = "init template" if in_template else "train-state"
+            problems.append(f"{key}: present only in {side}; cannot verify the pairing")
+            continue
+        if in_template and _canonical(template[key]) != _canonical(state[key]):
+            problems.append(f"{key}: train-state={state[key]!r} != init template={template[key]!r}")
+    if problems:
+        raise ValueError(
+            "refusing to convert: train-state provenance does not match the init template:\n  "
+            + "\n  ".join(problems)
+        )
 
 
 def convert_train_state(template: dict, state: dict, state_name: str = "") -> dict:
@@ -32,12 +83,14 @@ def convert_train_state(template: dict, state: dict, state_name: str = "") -> di
         raise ValueError(f"state must be format 'vlm-dflash-train-state-v1', got {state.get('format')!r}")
     if "model" not in state:
         raise ValueError("train-state payload has no 'model' weights")
+    check_provenance(template, state)
     out = {key: value for key, value in template.items() if key != "model"}
     out["model"] = state["model"]
     out["step"] = int(state.get("step", 0))
     out["converted_from"] = {
         "train_state": state_name,
         "step": int(state.get("step", 0)),
+        "provenance_check": "matched",
         "note": "weights from train-state; header (draft_config/provenance) from train/ckpt_init.pt",
     }
     return out
