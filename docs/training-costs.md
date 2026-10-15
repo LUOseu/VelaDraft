@@ -13,8 +13,10 @@ Protocol (the matched 2K program):
   (batch 8) -> 1050 kept;
 - capture: seq 2048, shard 32, bf16 -> one feature store per layer set
   (1050 rows, 35 shards);
-- train: 792 optimizer steps (6 epochs x 132 at micro-batch 8 = 16 samples per
-  step), plus a 200-step / 16-sample overfit-sanity gate;
+- train: 792 optimizer steps (6 epochs x 132 steps/epoch; micro-batch 8 x
+  grad-accumulation 1 = **8 samples per optimizer step** — the 16-sample batch
+  belongs to the overfit-sanity gate, not the main loop), plus a 200-step
+  overfit-sanity gate;
 - eval: 128 held-out prompts x <= 128 new tokens, sequential verification,
   token-exact gate, `ckpt_final` + `ckpt_init` + target-only reference.
 
@@ -24,8 +26,8 @@ Protocol (the matched 2K program):
 | --- | ---: | --- |
 | prepare | ~20 s | pool 64969 -> 2000/128, digest `5dfc5d7e9aa5` |
 | regen (target generate) | ~23.5 min | 2000 prompts at batch 8 - the single largest target-compute block |
-| capture | ~2.6 min | 1050 samples, seq 2048 -> 9.4 GB store (3 layers + final hidden); 5-layer store ~3.5 min / 12.4 GB |
-| train | 9.8-24 min | 792-step main loop (`train_summary.wall_seconds`); sanity adds ~3-5 min |
+| capture | ~2.6 min | 1050 samples, seq 2048 -> 10.04 GB (9.4 GiB) store (3 layers + final hidden); 5-layer store ~3.5 min / 12.4 GB (11.5 GiB) |
+| train | 9.8-24 min | 792-step main loop (`train_summary.wall_seconds`); the main train loop alone is the 10-24 min range, sanity adds ~3-5 min |
 | eval | ~28 min | 128 prompts x 128 tokens x (final + init + target-only) |
 | **end-to-end** | **~65-80 min = 1.1-1.3 GPU-h** | one GPU wall-to-wall, including data generation and capture |
 
@@ -47,13 +49,18 @@ rows are in `docs/plan/RUN_LOG.md`.
 
 \* JetSpec AL = causal-mask serving variant (`eval_result_jetspec_2k_causalmask.json`);
 the in-block default scored 1.338. AL = 128 prompts / 128 tokens, sequential
-verification, token-exact 128/128 for every row.
+verification, token-exact 128/128 for every row. **Peak GPU =
+`torch.cuda.max_memory_allocated` in 10^9 bytes (allocated, not reserved)** -
+compare it with other allocated readings, not with reserved-memory numbers.
 
 The walls are wall-clock on a *shared* node: identical protocols vary by up to
 ~1.7x between runs (DFlare 1444 s vs the same-config `fixed_fusion` ablation at
-864 s). Treat the fastest wall per algorithm as the uncontended estimate;
-`s/step` is the protocol-comparable number. All 2K runs train the same 16
-samples/step over one shared store, so there is no per-algorithm data cost.
+864 s). Dividing an interfered wall by its step count does **not** remove the
+interference, so `s/step` inherits the same noise: it is a within-host pacing
+figure, not a fair ranking device. Treat the fastest wall per algorithm as an
+estimate of uncontended pace on this node. All 2K runs train the same 8
+samples per optimizer step (micro-batch 8 x accumulation 1) over one shared
+store, so there is no per-algorithm data cost.
 
 ## DFly upstream recipe (canonical run, 792 steps)
 
@@ -110,8 +117,8 @@ serving bridge; see `docs/serving-bridge.md`.
 | Artifact | Size | Note |
 | --- | ---: | --- |
 | Target model (3B / 8B) | 7.1 GB / 17 GB | per target family |
-| Feature store, 3 layers + final hidden | 9.4 GB | 1050 x seq 2048 bf16, 35 shards |
-| Feature store, 5 layers | 12.4 GB | serves DFlare/DFly routing |
+| Feature store, 3 layers + final hidden | 10.04 GB (9.4 GiB) | 1050 x seq 2048 bf16, 35 shards |
+| Feature store, 5 layers | 12.4 GB (11.5 GiB) | serves DFlare/DFly routing |
 | Run checkpoints | 1.06 GB init + 0.53 GB final (+ ~3.7 GB transient `ckpt_last`) | `ckpt_init` is kept for the parity eval |
 | Run directory (train + eval + export, store excluded) | ~2-6 GB | - |
 

@@ -27,6 +27,8 @@ jobs:
         env:
           CUDA_VISIBLE_DEVICES: ""
         run: pytest tests/ -q
+      - name: Documentation checks (links, paths, CLI examples, generated drift)
+        run: python scripts/check_docs.py
 
   package:
     name: package build + fresh wheel install

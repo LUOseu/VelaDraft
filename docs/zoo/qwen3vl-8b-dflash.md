@@ -1,7 +1,7 @@
 > Copy of the released export's generated `model_card.md` (the downloaded archive keeps it
 > verbatim, including the authoring host's local target path). Target-support fields are
 > the values recorded at export time; current machine-readable states:
-> [`SUPPORT_MATRIX.md`](../SUPPORT_MATRIX.md).
+> [`SUPPORT_MATRIX.md`](../../SUPPORT_MATRIX.md).
 
 # vlm-dflash drafter — Qwen3-VL-8B-Instruct
 

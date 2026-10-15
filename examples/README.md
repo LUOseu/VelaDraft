@@ -25,7 +25,25 @@ python examples/train_from_jsonl.py \
 ```
 
 Runs the full staged pipeline (prepare → target-native regen → capture →
-train → eval) on ≤32 rows; the target is loaded for regen/capture only.
+train → eval); the target is loaded for regen/capture only.
+
+`--limit` is the number of **training** rows — the 4 validation rows are drawn
+on top, so this example needs **at least 36 usable rows** in the pool
+(32 train plus 4 val); a pool of 32 rows with `--limit 32` leaves an empty val
+split. Rows can also shrink during the pipeline: target-native regen drops rows whose
+regenerated answer is shorter than `regen.min_response_tokens` (16 in this
+example; the default long-answer recipes use 128), so check the counts in
+`data/manifest.json` (`num_train` / `num_val`) and `regen/regen_stats.json`
+(`num_kept`) before training. JSONL input is not length-filtered — the
+`min_answer_chars` filter belongs to the LLaVA-Instruct source, not to JSONL.
+
+One JSON object per line (JSONL — not a pretty-printed JSON array); `image` is
+resolved against `--images-dir`:
+
+```jsonl
+{"id":"row-001","image":"cat.jpg","question":"What is in this image?","answer":"A cat sleeps on a sofa."}
+{"id":"row-002","image":"street.png","question":"Describe the sign in the photo.","answer":"A blue rectangle street sign reads 'Main St'."}
+```
 
 ## Reuse one capture across algorithms
 

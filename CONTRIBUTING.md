@@ -1,10 +1,17 @@
 # Contributing
 
-Thanks for helping. v0.3.0 is published; v0.3.1 is in development as a
-distribution/first-run fix release. Until v0.3.1 is out, the acceptance scope
-is bug fixes, documentation, packaging, release tooling, benchmark adapters,
-reduced validation, CI, and license/security cleanup. New algorithms, targets,
-video/multi-image and serving-runtime work wait for after the release.
+Thanks for helping. v0.3.1 (distribution/first-run fixes) and the
+`zoo-v0.3.0/1/2` checkpoint releases are published; `main` keeps moving with
+changes that carry recorded evidence.
+
+What is accepted today: bug fixes, documentation, packaging, release tooling,
+benchmark adapters, reduced validation, CI, and license/security cleanup — and
+new algorithms or targets that meet the acceptance bar below. Multi-image /
+multi-turn (schema v2) is implemented with a recorded GPU smoke; video and
+serving runtimes remain out of scope until the gates in `docs/serving-bridge.md`
+are met. (The earlier "v0.3.1 not yet released, freeze everything else" policy
+applied while that release was in flight; it is kept in the CHANGELOG history,
+not as current guidance.)
 
 ## Development setup
 

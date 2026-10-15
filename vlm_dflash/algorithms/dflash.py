@@ -87,7 +87,7 @@ class DFlashAlgorithm(DrafterAlgorithm):
                 feature_mode="offline",
                 state="gpu_smoke",
                 evidence=(
-                    "R-20261014-08 E2 smoke (2-image/2-turn rows, 16 train + 4 val, token-exact eval; configs/smoke_multiturn.yaml; recorded before the R3/R4 review remediations)"
+                    "R-20261014-08 E2 smoke (2-image/2-turn rows, 16 train + 4 val, token-exact eval; configs/smoke_multiturn.yaml; pre-R3/R4 remediations) + R-20261014-19 post-remediation recheck (fresh rebuild under the R3 last_turn_only protocol; one regenerated turn per row; token-exact 4/4 both checkpoints)"
                 ),
             ),
             EvidenceRecord(

@@ -635,6 +635,11 @@ def cmd_train(args) -> int:
         feature_mode=feature_mode,
     )
     log(f"train: done with steps={summary['steps']} final_loss={summary['final_loss']}")
+    log(
+        f"train: checkpoints under {run_dir / 'train'} "
+        "(ckpt_final.pt = trained model, ckpt_init.pt = random-init baseline); "
+        f"next: `vlm-dflash eval {run_dir}` then `vlm-dflash export {run_dir}`"
+    )
     return 0
 
 
@@ -737,7 +742,7 @@ def build_parser() -> argparse.ArgumentParser:
         parser.add_argument("--dataset", default=None, help="multimodal jsonl pool to use instead of the synthetic sample")
         parser.add_argument("--images-dir", default=None, help="image root for --dataset (default: its sibling meta.json)")
         parser.add_argument("--images", type=int, default=8, help="synthetic sample size (>= 2)")
-        parser.add_argument("--run-dir", default=None)
+        parser.add_argument("--run-dir", default=None, help="output directory for the demo run")
         parser.add_argument("--num-prompts", type=int, default=4)
         parser.add_argument("--max-new-tokens", type=int, default=64)
         parser.add_argument("--set", dest="set_list", action="append", default=[], help="dotted key=value override")
@@ -756,7 +761,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_demo_args(train_demo, with_steps=True)
     train_demo.set_defaults(func=cmd_train_demo)
 
-    train = sub.add_parser("train", help="prepare -> regen -> capture -> train in one command")
+    train = sub.add_parser(
+        "train",
+        help="prepare -> regen -> capture -> train in one command (online mode skips capture; --features reuses an external store)",
+    )
     train.add_argument("--target", default=None, help="local target model directory")
     train.add_argument("--dataset", default=None, help="JSONL of multimodal rows")
     train.add_argument("--dataset-source", default=None, choices=["llava_instruct", "coco_caption", "jsonl", "hf"])
@@ -771,9 +779,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="drafter algorithm name (registered; default: config value or dflash)",
     )
     train.add_argument("--config", default=None, help="advanced: YAML config (merged over the preset)")
-    train.add_argument("--run-dir", default=None)
-    train.add_argument("--limit", type=int, default=None)
-    train.add_argument("--steps", type=int, default=None)
+    train.add_argument(
+        "--run-dir",
+        default=None,
+        help="output directory for stages, checkpoints and logs; --resume continues from this directory",
+    )
+    train.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="cap on the training rows drawn from the dataset (validation rows are drawn on top)",
+    )
+    train.add_argument(
+        "--steps",
+        type=int,
+        default=None,
+        help=(
+            "optimizer steps to run (overfit-sanity / eval phases are extra); default: "
+            "num_epochs x steps-per-epoch computed from the dataset length and batch geometry"
+        ),
+    )
     train.add_argument(
         "--mode",
         "--feature-mode",
@@ -795,7 +820,16 @@ def build_parser() -> argparse.ArgumentParser:
             "skips regen + capture so several algorithms can train from one capture"
         ),
     )
-    train.add_argument("--set", dest="set_list", action="append", default=[], help="dotted key=value override")
+    train.add_argument(
+        "--set",
+        dest="set_list",
+        action="append",
+        default=[],
+        help=(
+            "dotted key=value override; merge order: preset -> --config YAML -> dedicated flags -> --set "
+            "(--mode/--feature-mode overrides train.feature_mode with explicit priority)"
+        ),
+    )
     train.set_defaults(func=cmd_train)
 
     evaluate = sub.add_parser("eval", help="acceptance + token-exact evaluation for a finished run")

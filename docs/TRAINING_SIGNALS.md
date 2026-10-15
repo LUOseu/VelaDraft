@@ -15,6 +15,11 @@ Generated from `AlgorithmMetadata.training_signals`
 requirement stated here must match the trainer's behavior, and any change is
 reviewed together with its tests.
 
+In the accepted-recipes list below, ``none`` means the method has no
+*additional* selectable recipe on top of its default training objective - it
+does not mean the method lacks training. The default objective of each method
+is the "Hard label" / "Distribution objective" row of its table.
+
 ## Recipes accepted per algorithm
 
 - `dflare`: `controlled_ce`, `upstream_two_stage`

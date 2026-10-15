@@ -1,7 +1,15 @@
-# Environment preflight (development host findings)
+# Environment notes (historical development-host findings)
 
 Recorded 2026-10-11 on the development hosts. Personal paths are kept out of
 the repository on purpose; substitute your own checkout and dataset roots.
+
+**These are one host's operational notes, not project capability limits.** In
+particular the "other cards belong to other users; never run multi-GPU" line
+below was that shared cluster's scheduling convention. For what this repo
+actually supports on one or several GPUs, see the device table in
+`docs/online-training.md` and the hardware notes in the READMEs: same-process
+single-GPU is the validated path, target/drafter split devices are a recorded
+smoke, and a distributed (DDP/multi-node) launch path does not exist here.
 
 ## GPU host layout
 

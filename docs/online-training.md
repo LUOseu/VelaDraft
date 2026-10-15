@@ -15,6 +15,30 @@ vlm-dflash train --mode online --config configs/qwen2_5_vl_3b.yaml \
 are CLI aliases for `train.feature_mode`; the two modes are mutually exclusive
 with `--features`.
 
+## Configuration at a glance
+
+All knobs live under `train.`. In every setup below the target does **frozen
+forward passes only**; the drafter is what updates its parameters. And "no
+feature store on disk" does not mean "no disk": a run still writes data,
+regen, checkpoints, logs and eval output - online only removes the multi-GiB
+`features/` store.
+
+| Setup | Config | Default | What it does | Extra resources | Recorded evidence |
+| --- | --- | --- | --- | --- | --- |
+| Online, per-sample | `--mode online` | offline (presets pin it) | extracts live features instead of reading a store | frozen target resident on GPU for the whole run | GPU smokes: train -> token-exact eval -> export (3B, 8B untied, split devices) |
+| Batched capture | `train.online_batch_size: N` | `1` (per-sample) | one padded target forward per N rows | may move the teacher batch composition (bf16 ulp scale) | 3-row smoke + a 16-row slice: 16 -> 4 forward calls, step losses bit-identical; extraction-wall re-measured under a unified boundary (pending, see below) |
+| RAM record cache | `train.online_feature_cache_gb: <GiB>` | `0` (off) | serves repeat epochs from a byte-bounded host-RAM store | up to the configured GiB of host RAM; never persisted | 129 rows / 6 epochs: 645 hits / 129 misses / 129 stores / 0 evictions, peak 830 MiB; trajectory caveat below |
+| Adaptive budget | `train.online_feature_cache_adaptive: true` | `false` | shrinks/grows the cache payload with the job's memory headroom | requires the RAM cache; eviction becomes dynamic | measured on the lane's slices; state under `feature_source.feature_cache.adaptive_budget` |
+
+Enabling them is one flag each, e.g.
+`--set train.online_batch_size=4` or
+`--set train.online_feature_cache_gb=8` (see the commands below). Runtime
+counters land in `train_summary.json` under `feature_source`:
+`target_forwards_total` / `target_samples_total` for extraction, and
+`feature_source.feature_cache` (capacity, hits, misses, stores, evictions,
+retained/peak bytes) for the cache. The sections below document each setup,
+its constraints and its numerical caveats.
+
 ## Offline vs online
 
 | | offline (default) | online |
@@ -26,7 +50,7 @@ with `--features`.
 | `capture` stage | runs | skipped (config still parsed + validated) |
 | `train.num_workers` | any | must be 0 |
 | Share a capture across algorithms | yes (`--features`) | no |
-| Multi-run / multi-node reuse | store is portable | one target, one process |
+| Reuse across runs | store is portable and reusable | one target, one process; no multi-node launch path |
 | Visual-path check | on captured features (`features/visual_path_check.json`) | on the live model (`online/visual_path_check.json`) |
 
 Use **online** when you want a single-command train without managing a feature
@@ -34,7 +58,25 @@ store, when disk or IO for a multi-GiB store is the bottleneck, or when the
 target should provably be the model the trainer holds. Use **offline** when
 several algorithms share one capture, when the target is expensive relative to
 the drafter (the cost is paid once, not per epoch), or when you need DataLoader
-workers, multi-node training or a portable artifact.
+workers or a portable feature store. Neither mode ships a distributed
+(DDP/multi-node) launch path: a store can be copied to another host, but
+multi-node training is not a supported configuration of this repo today.
+
+## Devices: what is supported today
+
+| Layout | Status | Notes |
+| --- | --- | --- |
+| One process, target + drafter on the same GPU | validated path | The canonical protocol and all quality numbers train this way (offline); online smokes use the same layout. |
+| One process, target / drafter on two GPUs | recorded smoke | `--set target.device=cuda:1 --set train.device=cuda:0` (GPU smoke 6 in *Validation status*). This is co-location, not DDP or tensor parallel: there is no gradient sync and no automatic producer/consumer overlap between the two devices — both live in the training loop's forward path. |
+| Distributed (DDP / tensor parallel / multi-node) | not supported | No launcher or sync path exists in the trainer. Do not plan a multi-node job around this CLI. |
+
+Device indices are logical: they refer to the process's visible devices after
+`CUDA_VISIBLE_DEVICES`. With `CUDA_VISIBLE_DEVICES=2,3`, `cuda:0` in the config
+is physical GPU 2 and `cuda:1` is physical GPU 3; without the mask, `cuda:1` is
+physical GPU 1. Memory requirements depend on target, recipe, micro-batch,
+sequence length and whether the overfit sanity runs: the 24 GB preset stays a
+*suggested* configuration (no recorded run on a real 24 GB card), and the
+DFlash demo peak is not a lower bound for every algorithm.
 
 Measured smoke costs on one A6000 (3-row demo slice, 4 steps, batch 1 —
 plumbing checks, not benchmarks):
@@ -46,9 +88,8 @@ plumbing checks, not benchmarks):
 
 ## What is shared with the offline path
 
-The two paths differ only in where the per-sample records come from. (The
-README pipeline image, `docs/assets/how-it-works.svg`, draws the offline
-staged path; the diagram below adds the live source.)
+The two paths differ only in where the per-sample records come from (the
+`docs/assets/how-it-works.svg` pipeline image in the README draws both).
 
 ```mermaid
 flowchart LR
@@ -92,8 +133,9 @@ vlm-dflash export runs/qwen25_online_smoke
 
 Like the other configs, these commands need prepared inputs: a **local target
 checkout** (`--target` / `TARGET.model`), and a single-image JSONL pool with a
-100%-valid image dir (`--dataset` / `--images-dir`); see the README *Train on
-your data* section and `docs/env-preflight.md`.
+100%-valid image dir (`--dataset` / `--images-dir`); see
+[getting-started.md](getting-started.md) and [data.md](data.md), plus the
+historical host notes in `docs/env-preflight.md`.
 
 Split devices (target on `cuda:1`, drafter on `cuda:0`):
 
@@ -359,7 +401,28 @@ startup visual-path check runs a fixed 3 capture forwards **outside** these
 counters; a resumed run does not re-extract fast-forwarded items and reuses
 the recorded visual-path check.
 
-## Validation status
+## Current validation status
+
+Short version, for users:
+
+- **CPU (dev venv): full suite green (222 tests).** The online-mode
+  correctness contracts - content digest v2, the training-plan gate, resume
+  write-order and log-reconciliation regressions, dtype/head factory checks -
+  run without a GPU (`CUDA_VISIBLE_DEVICES="" python -m pytest tests/ -q`).
+- **GPU (recorded on the reference host, single RTX A6000 48 GB):** the
+  smokes in the ledger below cover per-sample extraction on Qwen2.5-VL-3B and
+  Qwen3-VL-8B (untied head), all five algorithms, split devices (target on
+  one card, drafter on another) and interrupted-resume reconciliation; every
+  run went train -> token-exact eval -> export. They validate **plumbing**
+  (token-exactness, provenance, counters) - their AL is 1.000 after 4 steps
+  and is **not** a quality result.
+- **Numbers elsewhere:** the recorded benchmarks in `BENCHMARKS.md` and the
+  Model Zoo are **offline-path** numbers and must not be relabelled as
+  online. The batched-capture extraction-wall gain awaits its paired
+  re-measurement (see *Batched capture*).
+
+<details>
+<summary>Development validation ledger (smokes 1-7, historical; click to expand)</summary>
 
 - CPU (dev venv): full suite green (214 tests) including the online review
   fixes: content-digest v2 (token-value edits, image swaps, path-stability,
@@ -453,10 +516,7 @@ the recorded visual-path check.
   consults only the `data` stage → negative case still refuses) rather than
   a GPU rerun.
 
-These smokes validate plumbing (token-exactness, provenance, counters). Their
-AL is 1.000 after 4 steps and is **not** a quality result. The recorded
-benchmarks in `BENCHMARKS.md` / the Model Zoo are offline-path numbers and
-must not be relabelled as online.
+</details>
 
 ## Scope of the first version (v0.3.2)
 

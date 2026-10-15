@@ -4,20 +4,61 @@ All acceptance numbers below use **sequential verification** (the only
 token-exact path), greedy decoding, and the target's own greedy output as the
 reference. Do not mix experimental parallel-runtime numbers into these tables.
 
+## What we measure (and what we don't)
+
+| Metric class | What it says | Where |
+| --- | --- | --- |
+| Drafter acceptance quality | AL = accepted tokens per target verification round, per-slot acceptance, draft acceptance rate. **AL is not a speedup multiplier.** | every results table; raw `eval_result*.json` on the reference host |
+| Target-output consistency | `token_exact`: the speculative output reproduces the target's own greedy decoding token-for-token | token-exact columns |
+| Training cost | loss traces, optimizer steps, peak VRAM, wall time | per-row notes; `benchmarks/results/*.json` |
+| Serving latency | wall seconds/sample and the ratio vs target-only on the correctness path (sequential). Parallel-mode rows are experimental throughput, not lossless | *Runtime probe* |
+| Task score (accuracy vs ground truth) | **Not reported.** The public-workload tables (TextVQA / DocVQA / ChartQA) measure acceptance and output consistency *on* those workloads, not answer accuracy | - |
+
+The wording to use today: "a unified benchmark harness with recorded
+results", not "a completed, exhaustive multimodal benchmark".
+
+## Coverage
+
+Which method x target x workload combinations have recorded rows (protocols per
+section below):
+
+| Target | Corpus / workload | Methods with recorded rows |
+| --- | --- | --- |
+| Qwen2.5-VL-3B | 512-row slice | DFlash |
+| Qwen2.5-VL-3B | 2K shared capture (128 prompts / 128 tokens) | DFlash, DSpark, Domino, JetSpec, DFlash2, DFlare, DFly, DFly upstream recipe (+ ablations) |
+| Qwen2.5-VL-3B | 5K slice | DFlash |
+| Qwen2.5-VL-3B | TextVQA 128-prompt subset | DFlash, DSpark, Domino |
+| Qwen2.5-VL-3B | DocVQA / ChartQA 128-prompt subsets | DFlash |
+| Qwen3-VL-8B | 512 / 2K slices | DFlash |
+| Qwen3-VL-8B | 256-row reduced slice (192 steps, 16 prompts) | DSpark, Domino, JetSpec, DFlash2, DFlare, DFly |
+
+Not covered: task accuracy on any workload; any other target family (SmolVLM2
+has a DFlash smoke in `SUPPORT_MATRIX.md`, not a benchmark row).
+
 ## Acceptance (trained DFlash vs random-init drafter)
 
-| Target | Corpus | Train rows | Prompts | AL (trained) | AL (random init) | Token-exact | Per-slot acceptance (trained) |
-| --- | --- | ---: | ---: | ---: | ---: | --- | --- |
-| Qwen2.5-VL-3B | 512 | 278 kept | 64 | 1.198 | 1.003 | 64/64 | see eval_result.json |
-| Qwen2.5-VL-3B | 2K | 1050 kept | 128 | 1.630 | 1.003 | 128/128 | .413, .149, .048, .015, .004, .001, 0 |
-| Qwen2.5-VL-3B (dspark) | 2K | 1050 kept | 128 | 1.735 | 1.003 | 128/128 | .432, .173, .075, .034, .015, .007, .003 |
-| Qwen2.5-VL-3B (domino) | 2K | 1050 kept | 128 | 1.764 | 1.003 | 128/128 | .443, .180, .078, .036, .016, .009, .005 |
-| Qwen3-VL-8B | 512 | 274 kept | 32 | 1.322 | 1.003 | 32/32 | see eval_result.json |
-| Qwen3-VL-8B | 2K | 1996 kept | 32 | 1.665 | 1.000 | 32/32 | .413, .160, .063, .027, .010, .002, .0004 |
-| Qwen2.5-VL-3B | 5K | 2629 kept | 128 | 1.817 | 1.003 | 128/128 | .482, .210, .080, .030, .011, .005, .001 |
-| Qwen2.5-VL-3B (dflash2, experimental) | 2K | 1050 kept | 128 | 1.954 | 1.003 | 128/128 | .495, .243, .118, .060, .027, .013, .006 |
+| Target | Corpus | Train rows | Prompts | AL (trained) | AL (random init) | Token-exact | Per-slot acceptance (trained) | Recorded run |
+| --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
+| Qwen2.5-VL-3B | 512 | 278 kept† | 64 | 1.198 | 1.003 | 64/64 | see eval_result.json | `runs/qwen25vl3b_refresh` (2026-10-11 rerun; first run AL 1.220) |
+| Qwen2.5-VL-3B | 2K | 1050 kept | 128 | 1.630 | 1.003 | 128/128 | .413, .149, .048, .015, .004, .001, 0 | `runs/qwen25vl3b_2k` |
+| Qwen2.5-VL-3B (dspark) | 2K | 1050 kept | 128 | 1.735 | 1.003 | 128/128 | .432, .173, .075, .034, .015, .007, .003 | `runs/qwen25vl3b_dspark_2k` |
+| Qwen2.5-VL-3B (domino) | 2K | 1050 kept | 128 | 1.764 | 1.003 | 128/128 | .443, .180, .078, .036, .016, .009, .005 | `runs/qwen25vl3b_domino_2k` |
+| Qwen3-VL-8B | 512 | 274 kept† | 32† | 1.322 | 1.003 | 32/32 | see eval_result.json | `runs/qwen3vl8b_dflash` (protocol says 64 prompts) |
+| Qwen3-VL-8B | 2K | 1996 kept | 32 | 1.665 | 1.000 | 32/32 | .413, .160, .063, .027, .010, .002, .0004 | `runs/qwen3vl8b_2k` |
+| Qwen2.5-VL-3B | 5K | 2629 kept | 128 | 1.817 | 1.003 | 128/128 | .482, .210, .080, .030, .011, .005, .001 | `runs/qwen25vl3b_5k` |
+| Qwen2.5-VL-3B (dflash2, experimental) | 2K | 1050 kept | 128 | 1.954 | 1.003 | 128/128 | .495, .243, .118, .060, .027, .013, .006 | `runs/qwen25vl3b_dflash2_2k` |
+
+Run dirs live on the reference host (`runs/` is gitignored); the frozen DFlash
+rows are mirrored with their metric definitions in
+`tests/reference_dflash/manifest.json`.
 
 Notes
+- † **Number-trace pending (2026-10-15).** The kept/prompt cells of the two
+  512 rows disagree with the stage records in `docs/measured-runs.md`
+  (3B/512: 274 kept / 64-prompt eval; 8B/512: 512/512 kept / 64 prompts).
+  The underlying run artifacts live on the reference host, so both records
+  stay visible until they are re-checked; the marked cells must not be used
+  for capacity planning. AL / token-exact are quoted the same in both records.
 - The 512-corpus 3B row is the 2026-10-11 rerun (original v0.1: AL 1.220);
   bf16 runs reproduce the protocol, not the bits (< ~2% AL noise).
 - Slot-0/1 acceptance dominates; 2K is the first point with stable non-zero
@@ -49,28 +90,45 @@ Notes
 
 ### Algorithm-zoo scoreboard (3B / 2K corpus / 128 prompts / 128 tokens)
 
-All rows use the same data, regen, captured features, block size 8, seed
-protocol, sequential (token-exact) verification and eval prompts. Ablations
-are the same run recipe with one algorithm knob flipped.
+Protocol for every row: the same data, regen, shared capture-v2 store
+(`[1,17,33]`, 1050 kept rows), block size 8, seed protocol, sequential
+(token-exact) verification and eval prompts; random-init control AL ~1.003.
+Run dirs are on the reference host.
 
-| Run | AL | slot 1 | slot 2 | slot 3 | slot 4 | slot 5 | slot 6 | slot 7 | Token-exact |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| DFlash (frozen baseline) | 1.630 | .413 | .149 | .048 | .015 | .004 | .001 | 0 | 128/128 |
-| DSpark (anchor mode, upstream default) | 1.735 | .432 | .173 | .075 | .034 | .015 | .007 | .003 | 128/128 |
-| DSpark `sample_from_anchor: false` (DFlash-width ablation) | 1.719 | .418 | .170 | .075 | .033 | .016 | .006 | .003 | 128/128 |
-| Domino (correction enabled) | 1.764 | .443 | .180 | .078 | .036 | .016 | .009 | .005 | 128/128 |
-| Domino `enable_correction_head: false` (ablation) | 1.662 | .457 | .148 | .042 | .013 | .002 | .001 | 0 | 128/128 |
-| JetSpec (causal-mask serving, faithful) | 1.599 | .408 | .137 | .040 | .011 | .003 | .001 | 0 | 128/128 |
-| JetSpec (shared runtime, no in-block mask) | 1.338 | .242 | .069 | .020 | .005 | .001 | .0004 | .0002 | 128/128 |
-| DFlash2 (conv + selector, experimental objective) | 1.954 | .495 | .243 | .118 | .060 | .027 | .013 | .006 | 128/128 |
-| DFlash2 `conv_kernel_size: 1` + `selector_loss_alpha: 0` (ablation) | 1.798 | .482 | .203 | .077 | .027 | .009 | .003 | .001 | 128/128 |
-| DFlare (fusion + separate context K/V, matched `[1,17,33]`) | 1.637 | .421 | .154 | .049 | .011 | .003 | .001 | 0 | 128/128 |
-| DFly (fusion residual + hidden correction, matched `[1,17,33]`) | 1.682 | .384 | .160 | .073 | .037 | .019 | .008 | .004 | 128/128 |
-| DFlare (5-layer recipe `[1,9,17,25,33]`) | 1.670 | .435 | .162 | .055 | .016 | .004 | .001 | .0001 | 128/128 |
-| DFly (5-layer recipe `[1,9,17,25,33]`) | 1.709 | .394 | .169 | .079 | .037 | .019 | .010 | .005 | 128/128 |
-| DFly `enable_hidden_correction: false` (ablation) | 1.569 | .391 | .126 | .038 | .011 | .004 | .001 | .0004 | 128/128 |
-| DFlare `fusion_trainable: false` (fixed prior, ablation) | 1.637 | .422 | .154 | .049 | .010 | .002 | .001 | .0001 | 128/128 |
-| DFlare `separate_context_kv: false` (shared K/V, ablation) | 1.579 | .401 | .129 | .037 | .010 | .002 | .001 | .0002 | 128/128 |
+#### Main results
+
+| Run | AL | slot 1 | slot 2 | slot 3 | slot 4 | slot 5 | slot 6 | slot 7 | Token-exact | Recorded run |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| DFlash (frozen baseline) | 1.630 | .413 | .149 | .048 | .015 | .004 | .001 | 0 | 128/128 | `qwen25vl3b_2k` |
+| DSpark (anchor mode, upstream default) | 1.735 | .432 | .173 | .075 | .034 | .015 | .007 | .003 | 128/128 | `qwen25vl3b_dspark_2k` |
+| Domino (correction enabled) | 1.764 | .443 | .180 | .078 | .036 | .016 | .009 | .005 | 128/128 | `qwen25vl3b_domino_2k` |
+| JetSpec (causal-mask serving, faithful) | 1.599 | .408 | .137 | .040 | .011 | .003 | .001 | 0 | 128/128 | `qwen25vl3b_jetspec_2k` |
+| DFlash2 (conv + selector, experimental objective) | 1.954 | .495 | .243 | .118 | .060 | .027 | .013 | .006 | 128/128 | `qwen25vl3b_dflash2_2k` |
+| DFlare (fusion + separate context K/V, matched `[1,17,33]`) | 1.637 | .421 | .154 | .049 | .011 | .003 | .001 | 0 | 128/128 | `qwen25vl3b_dflare_2k` |
+| DFly (fusion residual + hidden correction, matched `[1,17,33]`) | 1.682 | .384 | .160 | .073 | .037 | .019 | .008 | .004 | 128/128 | `qwen25vl3b_dfly_2k` |
+| DFlare (5-layer recipe `[1,9,17,25,33]`) | 1.670 | .435 | .162 | .055 | .016 | .004 | .001 | .0001 | 128/128 | `qwen25vl3b_dflare_2k_layers` |
+| DFly (5-layer recipe `[1,9,17,25,33]`) | 1.709 | .394 | .169 | .079 | .037 | .019 | .010 | .005 | 128/128 | `qwen25vl3b_dfly_2k_layers` |
+| DFly upstream two-stage recipe (canonical, 792 steps) | 1.839 | .440 | .207 | .103 | .051 | .024 | .014 | .007 | 128/128 | `qwen25vl3b_dfly_2k_recipe` (`R-20261014-11`) |
+
+#### Ablations (one knob flipped on the matched run; same recipe/features/seed)
+
+| Run | AL | slot 1 | slot 2 | slot 3 | slot 4 | slot 5 | slot 6 | slot 7 | Token-exact | Recorded run |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| DSpark `sample_from_anchor: false` (DFlash-width ablation) | 1.719 | .418 | .170 | .075 | .033 | .016 | .006 | .003 | 128/128 | run dir not recorded in-tree (2026-10-12 logs) |
+| Domino `enable_correction_head: false` (ablation) | 1.662 | .457 | .148 | .042 | .013 | .002 | .001 | 0 | 128/128 | run dir not recorded in-tree (2026-10-12 logs) |
+| JetSpec (shared runtime, no in-block mask) | 1.338 | .242 | .069 | .020 | .005 | .001 | .0004 | .0002 | 128/128 | serving-mode diagnostic on `qwen25vl3b_jetspec_2k` |
+| DFlash2 `conv_kernel_size: 1` + `selector_loss_alpha: 0` (ablation) | 1.798 | .482 | .203 | .077 | .027 | .009 | .003 | .001 | 128/128 | `qwen25vl3b_dflash2_2k_ablate_nomix` |
+| DFly `enable_hidden_correction: false` (ablation) | 1.569 | .391 | .126 | .038 | .011 | .004 | .001 | .0004 | 128/128 | `qwen25vl3b_dfly_2k_no_correction` |
+| DFlare `fusion_trainable: false` (fixed prior, ablation) | 1.637 | .422 | .154 | .049 | .010 | .002 | .001 | .0001 | 128/128 | `qwen25vl3b_dflare_2k_fixed_fusion` |
+| DFlare `separate_context_kv: false` (shared K/V, ablation) | 1.579 | .401 | .129 | .037 | .010 | .002 | .001 | .0002 | 128/128 | `qwen25vl3b_dflare_2k_shared_kv` |
+
+Note on the machine-readable results
+(`benchmarks/results/zoo_canonical.json`, extracted 2026-10-13): it is a
+15-run subset - the zoo-export runs plus the extra DFlare/DFly layer and
+ablation runs and the two reduced 8B runs recorded at extraction time. It does
+**not** contain the DFly upstream recipe run (`R-20261014-11`), the DFlash2
+conv/selector ablation, or the DSpark/Domino ablations; for those, the records
+are this page's rows and `docs/plan/RUN_LOG.md` / `STATE.md`.
 
 - DSpark decomposition: at the frozen DFlash round width the Markov head alone
   lifts AL 1.630 -> 1.719 (+0.089, deep slots roughly doubled); drafting the
@@ -253,6 +311,9 @@ and per-row question/image hashes pinned in
 `verification: sequential` (token-exact gate); same 3B/2K checkpoints as the
 scoreboard above.
 
+These are acceptance and output-consistency metrics *on* the workload - not
+answer accuracy against the dataset's ground-truth answers.
+
 | Algorithm | AL | acceptance rate | token-exact | per-slot acceptance (1..7) |
 | --- | ---: | ---: | --- | --- |
 | DFlash | 1.263 | 3.15% | 128/128 | [.178,.031,.004,.001,0,0,0] |
@@ -276,6 +337,9 @@ subset definitions and per-row question/image hashes pinned in
 protocols in `benchmarks/manifests/03_docvqa.json` / `04_chartqa.json`);
 greedy, `max_new_tokens=64`, `verification: sequential` (token-exact gate);
 frozen 3B/2K DFlash checkpoint (`runs/qwen25vl3b_2k`).
+
+Again: acceptance / output-consistency on these workloads, not task accuracy
+vs ground truth.
 
 | Workload | AL | acceptance rate | token-exact | per-slot acceptance (1..7) | wall/s | target-only/s |
 | --- | ---: | ---: | --- | --- | ---: | ---: |

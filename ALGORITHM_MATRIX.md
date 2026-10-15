@@ -18,7 +18,7 @@ row up to `Documentation` is `DONE` (GOAL §30); otherwise it stays
 | Checkpoint save/load | DONE | DONE (roundtrip test) | DONE (eval loads ckpts) | DONE (eval loads ckpts) | DONE (eval + export round trip) | DONE (roundtrip test) | DONE (roundtrip test) |
 | Eval (canonical metrics) | DONE | DONE (AL 1.735) | DONE (AL 1.764) | DONE (AL 1.599, causal-mask serving) | DONE (AL 1.954, 128/128 exact) | DONE (AL 1.637, 128/128 exact) | DONE (AL 1.682, 128/128 exact) |
 | Export | DONE | DONE (verified) | DONE (verified) | DONE (verified, serving flag recorded) | DONE (verified + reload) | DONE (smoke verified) | DONE (smoke verified) |
-| Documentation | DONE | DONE | DONE | DONE | DONE (marked Experimental) | DONE (marked Experimental) | DONE (marked Experimental) |
+| Documentation | DONE | DONE | DONE | DONE | DONE (marked Experimental) | DONE (runtime noted experimental) | DONE (runtime noted experimental) |
 | 2K apples-to-apples benchmark | DONE (baseline) | DONE (+ ablation) | DONE (+ ablation) | DONE (runtime-mask decomposition) | DONE (AL 1.954 + conv/selector decomposition) | DONE (+ fixed-fusion & shared-KV ablations) | DONE (+ no-correction ablation) |
 | Runtime integration | N/A (future) | N/A | N/A | N/A | N/A | N/A | N/A |
 

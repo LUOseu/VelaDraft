@@ -1,13 +1,28 @@
 # Serving bridge — first build (vLLM 0.22.1), strict gate not passed
 
-Status (2026-10-14): **builder implemented and load-verified; the token-exact
-gate is NOT passed; no vLLM/SGLang support claim.** The repo trains,
-evaluates and exports drafters; the only token-exact inference path is the
-in-repo sequential verifier. A converter +
-check harness for vLLM's native `dflash` method now exists (see below), and
-WP5 measured exactly how far it gets and where it stops — full numbers,
-divergence analysis and registered gaps in
-[`plan/WP5_REPORT.md`](plan/WP5_REPORT.md) (runs R-20261014-14/15/16).
+## Status at a glance (2026-10-14, unchanged since)
+
+- **What you can export today:** `export` (and `export --format hf`) writes an
+  HF-style *weights + metadata bundle* — `config.json`, `draft_config.json`,
+  `target_contract.json`, `algorithm.json`, `model.safetensors`, `model_card.md`,
+  `checksums.json`. It is a self-describing training artifact, not a model
+  class that every `AutoModel` / vLLM / SGLang can load as-is.
+- **What can load it today:** this repo's `load_export` / `demo` / `eval`, and
+  the experimental vLLM bridge (converter + check harness for vLLM 0.22.1's
+  native `dflash` method; weights load, generation runs, metrics readable).
+- **What production serving still lacks:** a complete serving correctness
+  verification on a pinned runtime, and closure of the recorded AL gap
+  (-17% vs the in-repo sequential path). Until both are resolved there is
+  **no vLLM/SGLang support claim** and no quotable speed number.
+
+The repo trains, evaluates and exports drafters; the only in-repo token-exact
+inference path is the sequential verifier. The original bridge gate
+(greedy token-exactness on ≥32 prompts) failed at 5/32 and was **retired as a
+criterion for this stack** (R-20261014-24/25: the engine is not token-reproducible
+even against itself) — retirement is not a pass, and a complete serving
+correctness verification remains outstanding. Full numbers, divergence
+analysis and registered gaps: [`plan/WP5_REPORT.md`](plan/WP5_REPORT.md)
+(runs R-20261014-14/15/16/24/25).
 
 ## Build status (2026-10-14)
 
@@ -78,10 +93,13 @@ Pick **one** target, **one** drafter, **one** runtime and build a thin adapter:
 3. Port the verification bookkeeping from `vlm_dflash/eval/run.py`
    (sequential verify: accepted tokens, bonus token, cache rewind) onto the
    runtime's spec-decode hooks.
-4. Prove, before any speed number is quoted: **greedy token-exactness against
-   target-only decoding on ≥32 prompts**, with the runtime's own target call
-   (same dtype/backends), reusing the equivalence harness
-   (`tests/` + `eval_result.json` format).
+4. Prove correctness on the pinned prompt set under the stack's current
+   acceptance protocol. The original gate — **greedy token-exactness against
+   target-only decoding on ≥32 prompts** with the runtime's own target call —
+   failed (5/32) and was retired in `R-20261014-24/25` because the engine is
+   not token-reproducible even against itself; the replacement (a complete
+   serving correctness verification) is still outstanding. No speed number
+   before it lands.
 5. Only then measure latency (time-to-first-token, inter-token, tokens/forward)
    and state hardware + verification mode next to every number.
 
@@ -95,8 +113,9 @@ and the residual AL gap (-17%) is the registered blocker
 
 ## What must not be claimed until it is real
 
-- No "vLLM/SGLang support" line in the README before a token-exact run exists
-  on a pinned runtime version.
+- No "vLLM/SGLang support" line in the README until a complete serving
+  correctness verification lands on a pinned runtime version (the retired
+  token-exact gate does not count as either pass or requirement-relief).
 - No speedup claim from a non-exact path (`parallel` / `strict_parallel` are
   diagnostics; see `docs/verification-modes.md`).
 - No re-labeled AL: runtime acceptance must be measured with the same
@@ -104,7 +123,7 @@ and the residual AL gap (-17%) is the registered blocker
   set as the in-repo numbers, otherwise the tables are not comparable.
 - No vLLM AL or latency table until the registered AL gap (1.4059 vs
   1.6866/1.6924 on identical weights, `plan/WP5_REPORT.md`) is resolved and
-  the run is token-exact on the pinned prompt set.
+  the serving correctness verification has landed on the pinned prompt set.
 
 ## What the repo already provides for the bridge
 
