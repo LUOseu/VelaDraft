@@ -101,7 +101,18 @@ L\* extension curve itself moves ≈3% per 800 steps, so a ±1% non-inferiority
 claim at this budget is below the regime's trajectory sensitivity.
 
 Pilot controls (token/sub2, split/sub2 ×2 seeds; exploratory, non-gating):
-<placeholder — filled by the final `finalize_quality.sh` run>.
+| arm | mean relΔAL | bootstrap lo | mean Δacc | lo | mechanical verdict (2 seeds) |
+| --- | --- | --- | --- | --- | --- |
+| token2 (C-only) | −0.032% | −1.063% | +0.00013 | −0.00186 | FAIL (2-seed, exploratory) |
+| split2 (plain split) | +0.147% | −0.349% | +0.00066 | −0.00042 | PASS (2-seed, exploratory) |
+
+Reading across all four layouts: the pooled confirmatory mean (−0.78%) is not
+significantly different from 0 (t ≈ −1.0, sd(seed rel) = 1.56%), and the 2-seed
+pilots land within ±0.15% of canonical. The FAIL is a **certification** outcome
+(lower bound south of the registered −1% margin), driven by seed-level endpoint
+scatter — not an established systematic regression. Conversely, token2 does not
+rescue the gate either, and per the frozen prereg §4 no layout is swapped in
+post-hoc; these rows are reported as exploratory only.
 
 ## 5. Applicability boundary (second drafter)
 
@@ -125,17 +136,33 @@ group-aware auxiliary accounting, with the smoke gates in
 ## 6. Repro + artifacts
 
 - Tests: `PYTHONPATH=. python -m pytest tests/ -q --ignore=tests/gpu` → **523
-  passed, 6 skipped, 0 failed** @ `b74532d` (local).
-- Commands: stability leg, settle analyzer, confirm wave driver, harness series,
-  capacity probe (see `scripts/`; exact invocations in STATE.md).
-- SHAs: branch tip + per-leg `repo_head` in server launch logs.
-- PR: <placeholder link> (no merge to main; regroup default-off).
+  passed, 6 skipped, 0 failed** @ `e0fea27` (last code change; later commits are
+  docs/evidence/tables only).
+- Commands: stability leg, settle analyzer (default + `--extension`), confirm
+  wave driver, harness series, capacity probe, finalizers (`finalize_quality.sh`,
+  `finalize_systems.sh`, `analyze_costs.py`); exact invocations in STATE.md /
+  PR body.
+- SHAs: all training/eval legs ran at server repo pin `bc87e8f` (no code diffs in
+  `vlm_dflash/`/`scripts/`/`tests/` through the branch tip; per-leg `repo_head`
+  recorded in launch logs). Branch tip at close-out: see PR.
+- Cost table: `evidence/costs_table.md` (14 legs: train wall/GPU-h, peak, eval
+  per-sample breakdown, token_exact). Wave walls are contended wall-clock (3
+  concurrent legs + tenant flicker); paired per-step numbers come from the
+  harness (`evidence/systems_table.md`). Pooled wave train wall: canonical
+  1798 s mean vs grid2 1728 s (−3.9%); peak 25.3 → 10.0 GiB (−60.5%).
+- PR: <placeholder link> (no merge to main; regroup default-off everywhere).
 - A100: `a100/RUNBOOK.md` + `a100/run_matrix.py` (dry-run validated: 32 entries,
-  ~37 GPU-h; two tracks; isolation checks; regroup gates).
+  37.3 GPU-h est., 0 errors; controlled + native tracks; train/val/test
+  isolation; regroup gates + adaptation smoke).
 
-## 7. Open items / next
+## 7. Outcome / next
 
-- Confirm wave completion + verdict JSON (`evidence/quality_verdict.json`).
-- 3-rep harness aggregation (`analyze_systems.py`).
-- Full-pipeline wall/GPU-hour accounting from per-leg logs (train + eval split).
-- Pilot token/split interpretation (+2 seeds if the boundary is interesting).
+- **Status: HOLD for the optimization claim.** Systems/capacity/applicability
+  results are final and positive; the registered quality gate is FAIL; regroup
+  ships default-off (unverified for quality at this budget).
+- Natural next steps on A100 (see runbook): re-run the same confirmatory design
+  at the 2K-step registered recipe where the held-out curve is expected to be
+  settled (the L\* "not settled" disclosure and the FAIL are the same fact: at
+  1600 steps the regime moves ~3%/800 steps, below a ±1% margin); consider a
+  pre-registered margin informed by a fresh settle curve, and keep the same
+  paired multi-seed gates.
