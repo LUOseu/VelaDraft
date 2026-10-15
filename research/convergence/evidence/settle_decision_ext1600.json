@@ -1,0 +1,19 @@
+{
+  "curve": {
+    "400": 1.2015441531285185,
+    "800": 1.1547379811408254,
+    "1600": 1.1192688043152532
+  },
+  "token_exact": {
+    "400": true,
+    "800": true,
+    "1600": true
+  },
+  "tol": 0.005,
+  "settled_1600": {
+    "rel": 0.03071621216661664,
+    "settled": false
+  },
+  "L_star": 1600,
+  "action": "L* = 1600, NOT settled ((800,1600) rel=3.0716% > 0.5%): explicit disclosure path; claim scoped to the matched budget"
+}

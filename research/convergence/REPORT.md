@@ -57,13 +57,18 @@ Peak −61% at equal semantics; batch 16 unlockable only with sub-batching.
 
 ## 4. Quality (frozen prereg; confirm wave)
 
-L* verdict: settled(400)=False (0.73%), settled(800)=False (6.07%) → fresh
-1600-step extension leg (`conv_stab1600`) → same rule on {800, 1600}:
-<placeholder>. Canonical curve (held-out AL, seed 42):
-200=1.2017, 400=1.2105, 600=1.1632, 800=1.1370, 1600=<placeholder> — peaks near
-step 400 then declines (overfit on the 192-row store; train loss 0.026 with
-held-out AL falling). If unsettled at 1600 the prereg's disclosure path applies
-(L*=1600, claim scoped to the matched budget).
+L* verdict (frozen rule, canonical-only data): settled(400)=False (0.73%),
+settled(800)=False (6.04%) → fresh 1600-step extension leg (`conv_stab1600`);
+same rule on {800, 1600}: **3.07% → NOT settled**. **L* = 1600** under the
+prereg's explicit not-settled disclosure; the quality claim is scoped to the
+matched budget. Canonical curves (held-out AL, seed 42, all token_exact):
+800-step schedule 200=1.2017, 400=1.2105, 600=1.1632, 800=1.1373; 1600-step
+schedule 400=1.2015, 800=1.1547, 1600=1.1193. AL *and* acceptance decline at
+longer budgets (acc 0.029 → 0.022 → 0.017; train loss ≈ 8e-4) — overfitting on
+the 192-row store. The arm comparison is a matched-budget non-inferiority test
+in this regime; absolute quality is a small-store artifact (the A100 2K-recipe
+round is where absolute quality is judged). Artifacts: `evidence/settle_decision.json`,
+`evidence/settle_decision_ext1600.json`, `evidence/legs/conv_stab1600/`.
 
 <placeholder: confirm table — canonical ×4 vs grid2 ×4 at L*: per-seed AL/acc +
 hierarchical bootstrap gates (-1% AL rel; -0.5pp acc) → PASS/FAIL/HOLD>
