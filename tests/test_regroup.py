@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from vlm_dflash.dflash.decay_loss import DFlashDecayLoss
 from vlm_dflash.dflash.draft_model import Qwen3DFlashDraftModel
+from vlm_dflash.dflash.train import _regrouped_forward
 from vlm_dflash.dflash.regroup import (
     COST_ANCHOR_WEIGHT,
     SampleStat,
@@ -435,3 +436,113 @@ def test_default_loss_settings_unchanged():
     module = _build_module(dtype=torch.float32)
     assert module.loss_fn.normalize == "mean"
     assert module.loss_fn.weight_dtype == "auto"
+
+
+# --------------------------------------------------------------------------- #
+# 4) identity bypass (shipped path for identity layouts; D1 bug report #01)
+# --------------------------------------------------------------------------- #
+
+def _regroup_config(module, *, mode, sub_batch, identity_bypass):
+    return {
+        "mode": mode,
+        "sub_batch": sub_batch,
+        "cost_weight": COST_ANCHOR_WEIGHT,
+        "identity_bypass": identity_bypass,
+        "orig_loss_fn": module.loss_fn,
+        "weighted_loss_fn": DFlashDecayLoss(
+            loss_gamma=module.loss_decay_gamma, normalize="tokens",
+            first_slot=module.first_supervised_slot, weight_dtype="fp32",
+        ),
+        "stats": {"batches": 0, "identity_batches": 0},
+    }
+
+
+def _collated_batch(rows, dtype):
+    ids, lm, hidden = _collate(rows, dtype)
+    return {
+        "input_ids": ids,
+        "loss_mask": lm,
+        "hidden": hidden,
+        "image_mask": ids == MASK_ID,
+        "lengths": torch.tensor([r["C"] for r in rows], dtype=torch.long),
+    }
+
+
+def _shipped_arm(module, batch, seed):
+    module.zero_grad(set_to_none=True)
+    torch.manual_seed(seed)
+    metrics = module(input_ids=batch["input_ids"], hidden_states=batch["hidden"], loss_mask=batch["loss_mask"])
+    metrics.loss.backward()
+    grads = {n: p.grad.detach().clone() for n, p in module.named_parameters() if p.grad is not None}
+    return float(metrics.loss.detach()), grads, torch.get_rng_state()
+
+
+def _run_regroup_arm(module, batch, regroup, seed):
+    module.zero_grad(set_to_none=True)
+    module.loss_fn = regroup["weighted_loss_fn"]
+    torch.manual_seed(seed)
+    metrics = _regrouped_forward(
+        module, batch, batch["lengths"], regroup,
+        accumulation=1, spatial=False, device=torch.device("cpu"),
+    )
+    grads = {n: p.grad.detach().clone() for n, p in module.named_parameters() if p.grad is not None}
+    return float(metrics.loss.detach()), grads, torch.get_rng_state()
+
+
+def test_identity_bypass_canonical_is_bitwise_equal_to_shipped():
+    torch.set_num_threads(2)
+    rows = _make_rows()
+    batch = _collated_batch(rows, torch.float32)
+    base = _build_module(dtype=torch.float32)
+    loss_ship, grads_ship, rng_ship = _shipped_arm(copy.deepcopy(base), batch, seed=7)
+
+    module = copy.deepcopy(base)
+    regroup = _regroup_config(module, mode="canonical", sub_batch=len(rows), identity_bypass=True)
+    loss_bypass, grads_bypass, rng_bypass = _run_regroup_arm(module, batch, regroup, seed=7)
+    assert regroup["stats"] == {"batches": 1, "identity_batches": 1}
+    assert loss_bypass == loss_ship
+    assert torch.equal(rng_bypass, rng_ship)  # identical sampler consumption
+    for name in grads_ship:
+        assert torch.equal(grads_bypass[name], grads_ship[name]), name
+
+
+def test_identity_bypass_token_sorted_order_is_bitwise_equal_to_shipped():
+    torch.set_num_threads(2)
+    rows = sorted(_make_rows(), key=lambda row: row["C"])  # token plan = identity order
+    batch = _collated_batch(rows, torch.float32)
+    base = _build_module(dtype=torch.float32)
+    loss_ship, grads_ship, _ = _shipped_arm(copy.deepcopy(base), batch, seed=11)
+
+    module = copy.deepcopy(base)
+    regroup = _regroup_config(module, mode="token", sub_batch=len(rows), identity_bypass=True)
+    loss_bypass, grads_bypass, _ = _run_regroup_arm(module, batch, regroup, seed=11)
+    assert regroup["stats"] == {"batches": 1, "identity_batches": 1}
+    assert loss_bypass == loss_ship
+    for name in grads_ship:
+        assert torch.equal(grads_bypass[name], grads_ship[name]), name
+
+
+def test_identity_bypass_false_keeps_legacy_machinery_path():
+    torch.set_num_threads(2)
+    rows = _make_rows()
+    batch = _collated_batch(rows, torch.float32)
+    base = _build_module(dtype=torch.float32)
+    loss_ship, _, _ = _shipped_arm(copy.deepcopy(base), batch, seed=7)
+
+    module = copy.deepcopy(base)
+    regroup = _regroup_config(module, mode="canonical", sub_batch=len(rows), identity_bypass=False)
+    loss_machinery, _, _ = _run_regroup_arm(module, batch, regroup, seed=7)
+    # Legacy control: machinery runs (no bypass) and stays numerically close
+    # while the fp32 preserved-weight reduction is mathematically equivalent.
+    assert regroup["stats"] == {"batches": 1, "identity_batches": 0}
+    assert loss_machinery == pytest.approx(loss_ship, rel=1e-5)
+
+
+def test_split_plan_does_not_take_the_identity_bypass():
+    torch.set_num_threads(2)
+    rows = _make_rows()
+    batch = _collated_batch(rows, torch.float32)
+    module = _build_module(dtype=torch.float32)
+    regroup = _regroup_config(module, mode="canonical", sub_batch=2, identity_bypass=True)
+    _run_regroup_arm(module, batch, regroup, seed=7)
+    assert regroup["stats"] == {"batches": 1, "identity_batches": 0}
