@@ -49,6 +49,11 @@ def test_summarize_samples_al_math():
     ]
     summary = summarize_samples(samples, block_size=8)
     assert summary["mean_al"] == 3.0
+    # Dual acceptance metrics: mean_al is the progress-inclusive alias, the
+    # draft-only number is what ViSpec/Medusa tables print as tau.
+    assert summary["al_progress_tokens_per_round"] == 3.0
+    assert summary["al_draft_tokens_per_round"] == pytest.approx(4 / 2)
+    assert summary["al_progress_tokens_per_round"] - summary["al_draft_tokens_per_round"] == pytest.approx(1.0)
     assert summary["acceptance_rate"] == pytest.approx(4 / 14)
     # Per-offset acceptance: offset 1 accepted by both rounds, offsets 2 and 3
     # accepted by the first round only (both rounds drafted all 7 offsets).

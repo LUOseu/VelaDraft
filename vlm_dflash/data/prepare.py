@@ -21,6 +21,7 @@ Outputs (under ``<run>/data``): ``data.jsonl``, ``val.jsonl``, copied images,
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from pathlib import Path
@@ -215,8 +216,13 @@ def _safe_sample_component(sample_id: str) -> str:
     return cleaned or "sample"
 
 
-def _materialise_media(src_image: Path, *, sample_id: str, images_out: Path) -> tuple[str, str]:
-    """Copy one media file under a collision-free, content-verified name.
+LINK_MODES = ("copy", "hardlink", "symlink")
+
+
+def _materialise_media(
+    src_image: Path, *, sample_id: str, images_out: Path, link_mode: str = "copy"
+) -> tuple[str, str]:
+    """Materialise one media file under a collision-free, content-verified name.
 
     The output name embeds the sample id and the first 16 hex digits of the
     file's sha256, so two different source files can never share an output name
@@ -226,19 +232,39 @@ def _materialise_media(src_image: Path, *, sample_id: str, images_out: Path) -> 
     (same bytes) therefore shares one file, while a tampered/foreign file at
     that name is a loud error.
 
+    ``link_mode`` controls how the bytes reach the data directory:
+
+    * ``copy`` (default): byte copy via :func:`shutil.copyfile`;
+    * ``hardlink``: ``os.link`` to the source inode (zero extra disk on the
+      same filesystem), falling back to a copy when the link syscall is not
+      permitted (cross-device, no-hardlink filesystems);
+    * ``symlink``: a relative-free symlink to the resolved source path.
+
+    Hardlinked/symlinked outputs keep the same content hash as the source, so
+    the manifest traceability and the read-only media audit are unchanged.
+
     Returns ``(dst_name, content_sha256)``.
     """
+    if link_mode not in LINK_MODES:
+        raise ValueError(f"image_link_mode must be one of {LINK_MODES}, got {link_mode!r}.")
     content_sha256 = sha256_file(src_image)
     stem = _safe_sample_component(sample_id)
     dst_name = f"{stem}_{content_sha256[:16]}{src_image.suffix.lower()}"
     dst = images_out / dst_name
-    if dst.exists():
+    if dst.exists() or dst.is_symlink():
         if sha256_file(dst) != content_sha256:
             raise RuntimeError(
                 f"prepare_data: existing output image {dst_name!r} does not match source "
                 f"{str(src_image)!r} (content hash mismatch). Refusing to reuse it; remove the "
                 "stale file or rebuild into a fresh data directory."
             )
+    elif link_mode == "hardlink":
+        try:
+            os.link(src_image, dst)
+        except OSError:
+            shutil.copyfile(src_image, dst)
+    elif link_mode == "symlink":
+        os.symlink(src_image.resolve(), dst)
     else:
         shutil.copyfile(src_image, dst)
     return dst_name, content_sha256
@@ -260,13 +286,97 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
     seed = int(dataset_cfg.get("seed", 42))
     train_size = int(limit if limit is not None else dataset_cfg["slice"])
     val_size = int(dataset_cfg.get("val_size", 64))
-    total = min(train_size + val_size, len(pool))
+    test_size = int(dataset_cfg.get("test_size", 0))
+    link_mode = str(dataset_cfg.get("image_link_mode", "copy")).lower()
+    if link_mode not in LINK_MODES:
+        raise ValueError(f"dataset.image_link_mode must be one of {LINK_MODES}, got {link_mode!r}.")
+
+    # ---- image-content grouping -------------------------------------------
+    # Rows that reference the same image bytes (across different questions or
+    # layouts) form one group; whole groups are assigned to exactly one split,
+    # so train/val/test are disjoint by image *content*, not by row index.
+    # (The previous split sampled row indices, sorted them and truncated
+    # front/back -- unrelated to image identity, which let the same picture
+    # leak across splits via different questions.)
+    media_signatures: list[tuple[str, ...]] = []
+    hash_cache: dict[Path, str] = {}
+
+    def content_hash(path: Path) -> str:
+        resolved = Path(path)
+        cached = hash_cache.get(resolved)
+        if cached is None:
+            cached = sha256_file(resolved)
+            hash_cache[resolved] = cached
+        return cached
+
+    for sample in pool:
+        paths = sample.get("image_paths")
+        if paths is None:
+            paths = [sample["image_path"]]
+        media_signatures.append(tuple(content_hash(path) for path in paths))
+
+    parent = list(range(len(pool)))
+
+    def find(index: int) -> int:
+        root = index
+        while parent[root] != root:
+            root = parent[root]
+        while parent[index] != root:
+            parent[index], index = root, parent[index]
+        return root
+
+    def union(left: int, right: int) -> None:
+        left_root, right_root = find(left), find(right)
+        if left_root == right_root:
+            return
+        # Keep the smallest pool index as the root so group order is a pure
+        # function of the pool (deterministic before the shuffle).
+        if left_root < right_root:
+            parent[right_root] = left_root
+        else:
+            parent[left_root] = right_root
+
+    hash_owner: dict[str, int] = {}
+    for index, signatures in enumerate(media_signatures):
+        for content_hash in signatures:
+            owner = hash_owner.setdefault(content_hash, index)
+            if owner != index:
+                union(owner, index)
+
+    groups: dict[int, list[int]] = {}
+    for index in range(len(pool)):
+        groups.setdefault(find(index), []).append(index)
+
     rng = random.Random(seed)
-    chosen = sorted(rng.sample(range(len(pool)), total))
-    train_idx = chosen[: min(train_size, total)]
-    val_idx = chosen[min(train_size, total) :]
+    group_order = sorted(groups)
+    rng.shuffle(group_order)
+    train_idx: list[int] = []
+    val_idx: list[int] = []
+    test_idx: list[int] = []
+    for root in group_order:
+        members = groups[root]
+        if len(test_idx) < test_size:
+            test_idx.extend(members)
+        elif len(val_idx) < val_size:
+            val_idx.extend(members)
+        else:
+            train_idx.extend(members)
+            if len(train_idx) >= train_size:
+                break
+    # Shuffle each split once more so file order is a seeded random order (the
+    # evaluator's periodic subset is a fixed prefix of val.jsonl and must not
+    # inherit the source annotation's block structure).
+    rng.shuffle(train_idx)
+    rng.shuffle(val_idx)
+    rng.shuffle(test_idx)
+    log(
+        f"prepare_data: groups={len(groups)} train={len(train_idx)} val={len(val_idx)} "
+        f"test={len(test_idx)} (image-grouped split, seed={seed})"
+    )
 
     manifest_rows = []
+
+    split_of = {"data.jsonl": "train", "val.jsonl": "val", "test.jsonl": "test"}
 
     def materialise(indices: list[int], jsonl_name: str) -> list[dict]:
         rows_out = []
@@ -277,7 +387,10 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
                 content_hashes = []
                 for src_image in sample["image_paths"]:
                     dst_name, content_hash = _materialise_media(
-                        src_image, sample_id=sample["sample_id"], images_out=images_out
+                        src_image,
+                        sample_id=sample["sample_id"],
+                        images_out=images_out,
+                        link_mode=link_mode,
                     )
                     dst_names.append(dst_name)
                     content_hashes.append(content_hash)
@@ -293,7 +406,7 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
                 manifest_rows.append(
                     {
                         "id": sample["sample_id"],
-                        "split": "train" if jsonl_name == "data.jsonl" else "val",
+                        "split": split_of[jsonl_name],
                         "src_index": sample["src_index"],
                         "image": dst_names[0],
                         "images": dst_names,
@@ -308,7 +421,7 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
                 continue
             src_image = sample["image_path"]
             dst_name, content_hash = _materialise_media(
-                src_image, sample_id=sample["sample_id"], images_out=images_out
+                src_image, sample_id=sample["sample_id"], images_out=images_out, link_mode=link_mode
             )
             row = {
                 "id": sample["sample_id"],
@@ -322,7 +435,7 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
             manifest_rows.append(
                 {
                     "id": sample["sample_id"],
-                    "split": "train" if jsonl_name == "data.jsonl" else "val",
+                    "split": split_of[jsonl_name],
                     "src_index": sample["src_index"],
                     "image": dst_name,
                     "image_sha256": content_hash,
@@ -333,7 +446,7 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
             )
         return rows_out
 
-    selected_ids = [pool[index]["sample_id"] for index in chosen]
+    selected_ids = [pool[index]["sample_id"] for index in train_idx + val_idx + test_idx]
     duplicates = sorted({sample_id for sample_id in selected_ids if selected_ids.count(sample_id) > 1})
     if duplicates:
         log(
@@ -352,8 +465,21 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
         )
     write_jsonl(data_dir / "data.jsonl", train_rows)
     write_jsonl(data_dir / "val.jsonl", val_rows)
+    if test_size:
+        test_rows = materialise(test_idx, "test.jsonl")
+        write_jsonl(data_dir / "test.jsonl", test_rows)
+    else:
+        test_rows = []
     write_json(data_dir / "meta.json", {"media_dir": "images", "source": source})
 
+    def image_hashes(indices: list[int]) -> set[str]:
+        return {content for index in indices for content in media_signatures[index]}
+
+    split_images = {
+        "train": image_hashes(train_idx),
+        "val": image_hashes(val_idx),
+        "test": image_hashes(test_idx),
+    }
     manifest = {
         "created": now_iso(),
         "source": source,
@@ -361,11 +487,29 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
         "seed": seed,
         "slice": train_size,
         "val_size": val_size,
+        "test_size": test_size,
+        "image_link_mode": link_mode,
+        "num_pool": len(pool),
         "num_train": len(train_rows),
         "num_val": len(val_rows),
+        "num_test": len(test_rows),
+        "num_groups": len(groups),
+        "num_images": {name: len(hashes) for name, hashes in split_images.items()},
+        "image_overlap": {
+            "train_val": len(split_images["train"] & split_images["val"]),
+            "train_test": len(split_images["train"] & split_images["test"]),
+            "val_test": len(split_images["val"] & split_images["test"]),
+        },
         "rows_sha256": sha256_json(manifest_rows),
         "rows": manifest_rows,
     }
     write_json(data_dir / "manifest.json", manifest)
-    log(f"prepare_data: train={len(train_rows)} val={len(val_rows)} digest={manifest['rows_sha256'][:12]}")
+    log(
+        f"prepare_data: train={len(train_rows)} val={len(val_rows)} test={len(test_rows)} "
+        f"images={{'train': {len(split_images['train'])}, 'val': {len(split_images['val'])}, "
+        f"'test': {len(split_images['test'])}}} overlap={{train/val: "
+        f"{manifest['image_overlap']['train_val']}, train/test: "
+        f"{manifest['image_overlap']['train_test']}, val/test: "
+        f"{manifest['image_overlap']['val_test']}}} digest={manifest['rows_sha256'][:12]}"
+    )
     return manifest

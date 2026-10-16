@@ -1,0 +1,128 @@
+{
+  "created_freeze": "2026-10-16T00:11:45+0800",
+  "dataset": {
+    "config": {
+      "source": "llava_instruct",
+      "slice": 24000,
+      "val_size": 256,
+      "test_size": 256,
+      "seed": 42,
+      "min_answer_chars": 0,
+      "image_link_mode": "hardlink"
+    },
+    "num_pool": 157712,
+    "num_train_selected": 24002,
+    "num_val": 257,
+    "num_test": 257,
+    "num_groups": 81469,
+    "num_images": {
+      "train": 12449,
+      "val": 128,
+      "test": 132
+    },
+    "image_overlap": {
+      "train_val": 0,
+      "train_test": 0,
+      "val_test": 0
+    },
+    "rows_sha256": "fdffa4c226eac4589db24fcb7f6bc97c9a0182c1e5508b652b6bf268edc6c7f4",
+    "val_sha256": "6229aa8bb1c564b7509f6dea4c41cc3af758b86b2c7befb1d61dd38a0307840a",
+    "test_sha256": "9a12e74f0f417fe29e3fcb0a1068c87ff5e6d6f44551679b3b9f65f0d134561e",
+    "data_sha256": "3ac88aa5314d615d981fd3de1373b13606d2c5a57b736c8e7291b6e15f3a914c"
+  },
+  "regen": {
+    "num_input": 24002,
+    "num_kept": 23942,
+    "num_skipped": 60,
+    "skip_reasons": {
+      "too_short": 60
+    },
+    "generation_protocol": {
+      "do_sample": false,
+      "num_beams": 1,
+      "repetition_penalty": 1.0,
+      "temperature": null,
+      "max_new_tokens": 256,
+      "eos_token_ids": [
+        151643,
+        151645
+      ],
+      "pad_token_id": 151643
+    },
+    "batch_size": 64,
+    "multi_turn_mode": "last_turn_only",
+    "answer_token_histogram": {
+      "count": 23942,
+      "min": 8,
+      "p10": 11,
+      "median": 90,
+      "p90": 161,
+      "max": 256,
+      "mean": 85.43233647982625,
+      "cap": 256,
+      "at_cap": 886,
+      "at_cap_fraction": 0.03700609807033665
+    },
+    "prompt_token_histogram": {
+      "count": 23942,
+      "min": 286,
+      "p10": 309,
+      "median": 382,
+      "p90": 430,
+      "max": 575,
+      "mean": 391.0150363378164
+    }
+  },
+  "freeze": {
+    "created": "2026-10-16T00:11:45+0800",
+    "num_kept_total": 23942,
+    "num_frozen": 20000,
+    "num_dropped_excess": 3942,
+    "seed": 42,
+    "selection": "random.Random(seed).shuffle(range(kept)); take first N; frozen rows kept in original file order",
+    "frozen_ids_sha256": "5fc1ae2424cd5847271b4fe823c2a9f590bc76e832ab9ba1e09948ff6a1dba8e",
+    "dropped_ids_sha256": "e5a86d89c2f9d3b32cec48a6b5d8cedaa02a6f7e19783192a4dae2f7143e9c26",
+    "target_data_all_sha256": "9ac59c3effa94867af6ca55617310cd9802c14fe7e19d679aa8af23f6f69037d",
+    "frozen_file_sha256": "44e357c7a1ab5993a7eaf6f987619f236b3e41d26e7ed5bc87a0ab93e33a1584",
+    "answer_tokens_frozen": 1701868,
+    "prompt_tokens_frozen": 7822274,
+    "note": "target_data.jsonl now contains exactly the frozen rows; both R3 and R5 train on it"
+  },
+  "frozen_train": {
+    "num_rows": 20000,
+    "answer_tokens": 1701868,
+    "prompt_tokens": 7822274,
+    "answer_len": {
+      "min": 8,
+      "p10": 11,
+      "median": 89,
+      "p90": 161,
+      "max": 256,
+      "mean": 85.0934,
+      "at_cap": 730
+    },
+    "prompt_len": {
+      "min": 286,
+      "median": 382,
+      "p90": 430,
+      "max": 575,
+      "mean": 391.1137
+    },
+    "rows_over_seq_length": 0,
+    "rows_over_seq_fraction": 0.0,
+    "distinct_images": 11702
+  },
+  "image_bands": {
+    "min_pixels": 200704,
+    "max_pixels": 1003520,
+    "below_min_upscaled": 2765,
+    "above_max_downscaled": 0,
+    "in_band": 17235,
+    "note": "raw original pixels vs configured band; the processor resizes every image into the band"
+  },
+  "supervision_accounting": {
+    "unique_supervised_answer_tokens": 1701868,
+    "epochs_planned": 3,
+    "note": "repeated epochs re-present the same tokens; they are NOT new independent supervision"
+  }
+}

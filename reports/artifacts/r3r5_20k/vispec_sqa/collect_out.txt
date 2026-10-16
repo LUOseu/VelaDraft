@@ -1,0 +1,10 @@
+questions baseline/spec/common: 100 100 100
+baseline: 9514 retok tokens, 313 wall-time total, 3.1 s/ q
+spec    : 8624 new tokens, 141 wall-time total, 1.4 s/ q
+baseline mean per-q tok/s: 28.04
+spec     mean per-q tok/s: 57.15
+official-style speedup (mean tok/s ratio): 2.038
+pooled tok/s ratio: 2.005
+paired wall ratio mean 1.956 median 1.859
+tau pooled mean over 2893 rounds: 1.9810
+exact-output-match prompts: 32/100

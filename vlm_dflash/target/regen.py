@@ -52,6 +52,32 @@ MULTI_TURN_MODES = ("last_turn_only", "all_turns")
 DEFAULT_MULTI_TURN_MODE = "last_turn_only"
 
 
+def _length_summary(lengths: list[int], cap: int | None) -> dict:
+    """Sorted length summary (min/p10/median/p90/max) + cap-hit counts."""
+    if not lengths:
+        return {"count": 0, "min": None, "p10": None, "median": None, "p90": None, "max": None}
+    ordered = sorted(lengths)
+
+    def quantile(q: float) -> int:
+        position = min(len(ordered) - 1, max(0, int(round(q * (len(ordered) - 1)))))
+        return ordered[position]
+
+    summary = {
+        "count": len(ordered),
+        "min": ordered[0],
+        "p10": quantile(0.1),
+        "median": quantile(0.5),
+        "p90": quantile(0.9),
+        "max": ordered[-1],
+        "mean": sum(ordered) / len(ordered),
+    }
+    if cap is not None:
+        summary["cap"] = int(cap)
+        summary["at_cap"] = sum(1 for value in ordered if value >= cap)
+        summary["at_cap_fraction"] = summary["at_cap"] / len(ordered)
+    return summary
+
+
 def _cut_at_stop(ids: list[int], stop_ids: set[int]) -> list[int]:
     for index, token in enumerate(ids):
         if token in stop_ids:
@@ -90,7 +116,13 @@ def _regen_single_turn_rows(
         ).to(device)
         prompt_len = int(inputs["input_ids"].shape[1])
         with torch.inference_mode():
-            generated = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+            generated = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                num_beams=1,
+                repetition_penalty=1.0,
+            )
         for offset, row in enumerate(batch):
             attention = inputs["attention_mask"][offset]
             unpadded_prompt_ids = inputs["input_ids"][offset][attention.bool()].tolist()
@@ -193,7 +225,13 @@ def _regen_multi_turn_row(
         inputs = processor(text=[text], images=[images[position] for position in image_indices], return_tensors="pt").to(device)
         prompt_ids = inputs["input_ids"][0].tolist()
         with torch.inference_mode():
-            generated = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+            generated = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                num_beams=1,
+                repetition_penalty=1.0,
+            )
         answer_ids = _cut_at_stop(generated[0, len(prompt_ids) :].tolist(), stop_ids)
         if not answer_ids:
             return None, {"id": row.get("id"), "reason": "empty_answer", "turn": target_index}, []
@@ -247,7 +285,13 @@ def _regen_multi_turn_row(
                 "template does not reproduce the committed prefix; refusing to store misaligned ids."
             )
         with torch.inference_mode():
-            generated = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+            generated = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                num_beams=1,
+                repetition_penalty=1.0,
+            )
         answer_ids = _cut_at_stop(generated[0, len(prompt_ids) :].tolist(), stop_ids)
         if not answer_ids:
             return None, {"id": row.get("id"), "reason": "empty_answer", "turn": msg_index}, []
@@ -400,13 +444,27 @@ def run_regen(cfg: dict, run_dir: str | Path, contract: dict, limit: int | None 
         "min_response_tokens": min_response_tokens,
         "batch_size": batch_size,
         "greedy": True,
+        # Effective token-selection protocol, pinned explicitly at every
+        # generate() call site (the target's generation_config.json otherwise
+        # leaks repetition_penalty=1.05 / do_sample=true into these calls).
+        "generation_protocol": {
+            "do_sample": False,
+            "num_beams": 1,
+            "repetition_penalty": 1.0,
+            "temperature": None,
+            "max_new_tokens": max_new_tokens,
+            "eos_token_ids": sorted(stop_ids),
+            "pad_token_id": getattr(getattr(model, "generation_config", None), "pad_token_id", None),
+        },
         # Supervision protocol for schema-v2 rows (data records carry the same
         # value per row; legacy records without a mode are all-turn artifacts).
         "multi_turn_mode": multi_turn_mode,
-        "answer_token_histogram": {
-            "min": min((len(r["regen"]["answer_ids"]) for r in v1_rows), default=None),
-            "max": max((len(r["regen"]["answer_ids"]) for r in v1_rows), default=None),
-        },
+        "answer_token_histogram": _length_summary(
+            [len(r["regen"]["answer_ids"]) for r in v1_rows], cap=max_new_tokens
+        ),
+        "prompt_token_histogram": _length_summary(
+            [len(r["regen"]["prompt_ids"]) for r in v1_rows], cap=None
+        ),
         "prompt_template_sha256": _template_sha(processor, rows[0]) if rows else None,
     }
     if v2_count:

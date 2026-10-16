@@ -1,0 +1,834 @@
+diff --git a/scripts/eval_dflash.py b/scripts/eval_dflash.py
+index 4b0370e..4e55e60 100755
+--- a/scripts/eval_dflash.py
++++ b/scripts/eval_dflash.py
+@@ -24,6 +24,11 @@ def main() -> None:
+     parser.add_argument("--verification", default=None, choices=["sequential", "parallel", "strict_parallel"])
+     parser.add_argument("--strict-margin", type=float, default=None)
+     parser.add_argument("--tag", default=None)
++    parser.add_argument(
++        "--prompt-source-split",
++        default=None,
++        help="evaluate a different split of the run's data dir (e.g. test.jsonl) instead of val.jsonl",
++    )
+     parser.add_argument("--set", action="append", default=[])
+     args = parser.parse_args()
+ 
+@@ -35,8 +40,19 @@ def main() -> None:
+     if args.strict_margin is not None:
+         cfg.setdefault("eval", {})["strict_parallel_margin"] = float(args.strict_margin)
+     contract = ensure_contract(cfg, run_dir)
++    prompt_source = (
++        {"type": "run_val", "split": args.prompt_source_split}
++        if args.prompt_source_split
++        else None
++    )
+     result = evaluate(
+-        cfg, run_dir, contract, num_prompts=args.num_prompts, max_new_tokens=args.max_new_tokens, tag=args.tag
++        cfg,
++        run_dir,
++        contract,
++        num_prompts=args.num_prompts,
++        max_new_tokens=args.max_new_tokens,
++        tag=args.tag,
++        prompt_source=prompt_source,
+     )
+     equivalence = result["equivalence_check"]
+     log(f"eval_dflash done: token_exact={equivalence['token_exact']}")
+diff --git a/tests/test_units.py b/tests/test_units.py
+index 47f521f..26c9860 100644
+--- a/tests/test_units.py
++++ b/tests/test_units.py
+@@ -49,6 +49,11 @@ def test_summarize_samples_al_math():
+     ]
+     summary = summarize_samples(samples, block_size=8)
+     assert summary["mean_al"] == 3.0
++    # Dual acceptance metrics: mean_al is the progress-inclusive alias, the
++    # draft-only number is what ViSpec/Medusa tables print as tau.
++    assert summary["al_progress_tokens_per_round"] == 3.0
++    assert summary["al_draft_tokens_per_round"] == pytest.approx(4 / 2)
++    assert summary["al_progress_tokens_per_round"] - summary["al_draft_tokens_per_round"] == pytest.approx(1.0)
+     assert summary["acceptance_rate"] == pytest.approx(4 / 14)
+     # Per-offset acceptance: offset 1 accepted by both rounds, offsets 2 and 3
+     # accepted by the first round only (both rounds drafted all 7 offsets).
+diff --git a/vlm_dflash/data/prepare.py b/vlm_dflash/data/prepare.py
+index b795427..923eaa4 100644
+--- a/vlm_dflash/data/prepare.py
++++ b/vlm_dflash/data/prepare.py
+@@ -21,6 +21,7 @@ Outputs (under ``<run>/data``): ``data.jsonl``, ``val.jsonl``, copied images,
+ 
+ from __future__ import annotations
+ 
++import os
+ import re
+ import shutil
+ from pathlib import Path
+@@ -215,8 +216,13 @@ def _safe_sample_component(sample_id: str) -> str:
+     return cleaned or "sample"
+ 
+ 
+-def _materialise_media(src_image: Path, *, sample_id: str, images_out: Path) -> tuple[str, str]:
+-    """Copy one media file under a collision-free, content-verified name.
++LINK_MODES = ("copy", "hardlink", "symlink")
++
++
++def _materialise_media(
++    src_image: Path, *, sample_id: str, images_out: Path, link_mode: str = "copy"
++) -> tuple[str, str]:
++    """Materialise one media file under a collision-free, content-verified name.
+ 
+     The output name embeds the sample id and the first 16 hex digits of the
+     file's sha256, so two different source files can never share an output name
+@@ -226,19 +232,39 @@ def _materialise_media(src_image: Path, *, sample_id: str, images_out: Path) ->
+     (same bytes) therefore shares one file, while a tampered/foreign file at
+     that name is a loud error.
+ 
++    ``link_mode`` controls how the bytes reach the data directory:
++
++    * ``copy`` (default): byte copy via :func:`shutil.copyfile`;
++    * ``hardlink``: ``os.link`` to the source inode (zero extra disk on the
++      same filesystem), falling back to a copy when the link syscall is not
++      permitted (cross-device, no-hardlink filesystems);
++    * ``symlink``: a relative-free symlink to the resolved source path.
++
++    Hardlinked/symlinked outputs keep the same content hash as the source, so
++    the manifest traceability and the read-only media audit are unchanged.
++
+     Returns ``(dst_name, content_sha256)``.
+     """
++    if link_mode not in LINK_MODES:
++        raise ValueError(f"image_link_mode must be one of {LINK_MODES}, got {link_mode!r}.")
+     content_sha256 = sha256_file(src_image)
+     stem = _safe_sample_component(sample_id)
+     dst_name = f"{stem}_{content_sha256[:16]}{src_image.suffix.lower()}"
+     dst = images_out / dst_name
+-    if dst.exists():
++    if dst.exists() or dst.is_symlink():
+         if sha256_file(dst) != content_sha256:
+             raise RuntimeError(
+                 f"prepare_data: existing output image {dst_name!r} does not match source "
+                 f"{str(src_image)!r} (content hash mismatch). Refusing to reuse it; remove the "
+                 "stale file or rebuild into a fresh data directory."
+             )
++    elif link_mode == "hardlink":
++        try:
++            os.link(src_image, dst)
++        except OSError:
++            shutil.copyfile(src_image, dst)
++    elif link_mode == "symlink":
++        os.symlink(src_image.resolve(), dst)
+     else:
+         shutil.copyfile(src_image, dst)
+     return dst_name, content_sha256
+@@ -260,14 +286,98 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) ->
+     seed = int(dataset_cfg.get("seed", 42))
+     train_size = int(limit if limit is not None else dataset_cfg["slice"])
+     val_size = int(dataset_cfg.get("val_size", 64))
+-    total = min(train_size + val_size, len(pool))
++    test_size = int(dataset_cfg.get("test_size", 0))
++    link_mode = str(dataset_cfg.get("image_link_mode", "copy")).lower()
++    if link_mode not in LINK_MODES:
++        raise ValueError(f"dataset.image_link_mode must be one of {LINK_MODES}, got {link_mode!r}.")
++
++    # ---- image-content grouping -------------------------------------------
++    # Rows that reference the same image bytes (across different questions or
++    # layouts) form one group; whole groups are assigned to exactly one split,
++    # so train/val/test are disjoint by image *content*, not by row index.
++    # (The previous split sampled row indices, sorted them and truncated
++    # front/back -- unrelated to image identity, which let the same picture
++    # leak across splits via different questions.)
++    media_signatures: list[tuple[str, ...]] = []
++    hash_cache: dict[Path, str] = {}
++
++    def content_hash(path: Path) -> str:
++        resolved = Path(path)
++        cached = hash_cache.get(resolved)
++        if cached is None:
++            cached = sha256_file(resolved)
++            hash_cache[resolved] = cached
++        return cached
++
++    for sample in pool:
++        paths = sample.get("image_paths")
++        if paths is None:
++            paths = [sample["image_path"]]
++        media_signatures.append(tuple(content_hash(path) for path in paths))
++
++    parent = list(range(len(pool)))
++
++    def find(index: int) -> int:
++        root = index
++        while parent[root] != root:
++            root = parent[root]
++        while parent[index] != root:
++            parent[index], index = root, parent[index]
++        return root
++
++    def union(left: int, right: int) -> None:
++        left_root, right_root = find(left), find(right)
++        if left_root == right_root:
++            return
++        # Keep the smallest pool index as the root so group order is a pure
++        # function of the pool (deterministic before the shuffle).
++        if left_root < right_root:
++            parent[right_root] = left_root
++        else:
++            parent[left_root] = right_root
++
++    hash_owner: dict[str, int] = {}
++    for index, signatures in enumerate(media_signatures):
++        for content_hash in signatures:
++            owner = hash_owner.setdefault(content_hash, index)
++            if owner != index:
++                union(owner, index)
++
++    groups: dict[int, list[int]] = {}
++    for index in range(len(pool)):
++        groups.setdefault(find(index), []).append(index)
++
+     rng = random.Random(seed)
+-    chosen = sorted(rng.sample(range(len(pool)), total))
+-    train_idx = chosen[: min(train_size, total)]
+-    val_idx = chosen[min(train_size, total) :]
++    group_order = sorted(groups)
++    rng.shuffle(group_order)
++    train_idx: list[int] = []
++    val_idx: list[int] = []
++    test_idx: list[int] = []
++    for root in group_order:
++        members = groups[root]
++        if len(test_idx) < test_size:
++            test_idx.extend(members)
++        elif len(val_idx) < val_size:
++            val_idx.extend(members)
++        else:
++            train_idx.extend(members)
++            if len(train_idx) >= train_size:
++                break
++    # Shuffle each split once more so file order is a seeded random order (the
++    # evaluator's periodic subset is a fixed prefix of val.jsonl and must not
++    # inherit the source annotation's block structure).
++    rng.shuffle(train_idx)
++    rng.shuffle(val_idx)
++    rng.shuffle(test_idx)
++    log(
++        f"prepare_data: groups={len(groups)} train={len(train_idx)} val={len(val_idx)} "
++        f"test={len(test_idx)} (image-grouped split, seed={seed})"
++    )
+ 
+     manifest_rows = []
+ 
++    split_of = {"data.jsonl": "train", "val.jsonl": "val", "test.jsonl": "test"}
++
+     def materialise(indices: list[int], jsonl_name: str) -> list[dict]:
+         rows_out = []
+         for index in indices:
+@@ -277,7 +387,10 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) ->
+                 content_hashes = []
+                 for src_image in sample["image_paths"]:
+                     dst_name, content_hash = _materialise_media(
+-                        src_image, sample_id=sample["sample_id"], images_out=images_out
++                        src_image,
++                        sample_id=sample["sample_id"],
++                        images_out=images_out,
++                        link_mode=link_mode,
+                     )
+                     dst_names.append(dst_name)
+                     content_hashes.append(content_hash)
+@@ -293,7 +406,7 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) ->
+                 manifest_rows.append(
+                     {
+                         "id": sample["sample_id"],
+-                        "split": "train" if jsonl_name == "data.jsonl" else "val",
++                        "split": split_of[jsonl_name],
+                         "src_index": sample["src_index"],
+                         "image": dst_names[0],
+                         "images": dst_names,
+@@ -308,7 +421,7 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) ->
+                 continue
+             src_image = sample["image_path"]
+             dst_name, content_hash = _materialise_media(
+-                src_image, sample_id=sample["sample_id"], images_out=images_out
++                src_image, sample_id=sample["sample_id"], images_out=images_out, link_mode=link_mode
+             )
+             row = {
+                 "id": sample["sample_id"],
+@@ -322,7 +435,7 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) ->
+             manifest_rows.append(
+                 {
+                     "id": sample["sample_id"],
+-                    "split": "train" if jsonl_name == "data.jsonl" else "val",
++                    "split": split_of[jsonl_name],
+                     "src_index": sample["src_index"],
+                     "image": dst_name,
+                     "image_sha256": content_hash,
+@@ -333,7 +446,7 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) ->
+             )
+         return rows_out
+ 
+-    selected_ids = [pool[index]["sample_id"] for index in chosen]
++    selected_ids = [pool[index]["sample_id"] for index in train_idx + val_idx + test_idx]
+     duplicates = sorted({sample_id for sample_id in selected_ids if selected_ids.count(sample_id) > 1})
+     if duplicates:
+         log(
+@@ -345,8 +458,21 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) ->
+     val_rows = materialise(val_idx, "val.jsonl")
+     write_jsonl(data_dir / "data.jsonl", train_rows)
+     write_jsonl(data_dir / "val.jsonl", val_rows)
++    if test_size:
++        test_rows = materialise(test_idx, "test.jsonl")
++        write_jsonl(data_dir / "test.jsonl", test_rows)
++    else:
++        test_rows = []
+     write_json(data_dir / "meta.json", {"media_dir": "images", "source": source})
+ 
++    def image_hashes(indices: list[int]) -> set[str]:
++        return {content for index in indices for content in media_signatures[index]}
++
++    split_images = {
++        "train": image_hashes(train_idx),
++        "val": image_hashes(val_idx),
++        "test": image_hashes(test_idx),
++    }
+     manifest = {
+         "created": now_iso(),
+         "source": source,
+@@ -354,11 +480,29 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) ->
+         "seed": seed,
+         "slice": train_size,
+         "val_size": val_size,
++        "test_size": test_size,
++        "image_link_mode": link_mode,
++        "num_pool": len(pool),
+         "num_train": len(train_rows),
+         "num_val": len(val_rows),
++        "num_test": len(test_rows),
++        "num_groups": len(groups),
++        "num_images": {name: len(hashes) for name, hashes in split_images.items()},
++        "image_overlap": {
++            "train_val": len(split_images["train"] & split_images["val"]),
++            "train_test": len(split_images["train"] & split_images["test"]),
++            "val_test": len(split_images["val"] & split_images["test"]),
++        },
+         "rows_sha256": sha256_json(manifest_rows),
+         "rows": manifest_rows,
+     }
+     write_json(data_dir / "manifest.json", manifest)
+-    log(f"prepare_data: train={len(train_rows)} val={len(val_rows)} digest={manifest['rows_sha256'][:12]}")
++    log(
++        f"prepare_data: train={len(train_rows)} val={len(val_rows)} test={len(test_rows)} "
++        f"images={{'train': {len(split_images['train'])}, 'val': {len(split_images['val'])}, "
++        f"'test': {len(split_images['test'])}}} overlap={{train/val: "
++        f"{manifest['image_overlap']['train_val']}, train/test: "
++        f"{manifest['image_overlap']['train_test']}, val/test: "
++        f"{manifest['image_overlap']['val_test']}}} digest={manifest['rows_sha256'][:12]}"
++    )
+     return manifest
+diff --git a/vlm_dflash/dflash/draft_model.py b/vlm_dflash/dflash/draft_model.py
+index 0b5e8e3..6894a34 100644
+--- a/vlm_dflash/dflash/draft_model.py
++++ b/vlm_dflash/dflash/draft_model.py
+@@ -109,6 +109,7 @@ class _DFlashGenerationStats(TypedDict):
+     strict_parallel_rounds: float
+     strict_fallback_rounds: float
+     strict_min_decision_margin: Optional[float]
++    decision_trace: list[dict]
+ 
+ 
+ def _min_decision_margin(logits: torch.Tensor, num_positions: int) -> float:
+@@ -1322,6 +1323,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
+         strict_parallel_margin: float | None = None,
+         draft_image_context_mode: str = "keep",
+         draft_image_token_id: int | None = None,
++        capture_decision_trace: bool = False,
+     ) -> torch.LongTensor | tuple[torch.LongTensor, _DFlashGenerationStats]:
+         """Run block-parallel speculative decoding against a Transformers target.
+ 
+@@ -1402,14 +1404,54 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
+         draft_tokens = 0
+         accepted_tokens = 0
+         verify_steps = 0
++        # Actual target forward invocations (prefill + every verification
++        # forward: one per sequential step, one per parallel block, plus the
++        # sequential re-verify of a strict-parallel fallback). Distinct from
++        # ``verify_steps`` (speculative rounds): under sequential verification
++        # one round issues several target forwards, and a strict fallback
++        # round issues two; rounds must never be reported as target-call
++        # savings.
++        target_forward_calls = 0
+         strict_parallel_rounds = 0
+         strict_fallback_rounds = 0
+         strict_min_decision_margin = float("inf")
+         acceptance_events: list[_DFlashAcceptanceEvent] = []
++        # Optional per-verification-forward decision trace, used by the
++        # parallel-vs-sequential mismatch diagnosis (scripts/scale/
++        # diag_parallel_first_divergence.py). Each entry is keyed by the
++        # absolute output position it decides, so the two verification shapes
++        # can be compared position by position.
++        decision_trace: list[dict] = []
++
++        def record_decision(row_logits: torch.Tensor, positions: list[int], shape: str, kv_len: int) -> None:
++            if not capture_decision_trace or row_logits.numel() == 0:
++                return
++            row_logits = row_logits.reshape(-1, row_logits.shape[-1])
++            topk = min(5, row_logits.shape[-1])
++            top2 = torch.topk(row_logits.float(), k=topk, dim=-1)
++            for index, position in enumerate(positions):
++                if index >= top2.values.shape[0]:
++                    break
++                decision_trace.append(
++                    {
++                        "position": int(position),
++                        "shape": shape,
++                        "kv_len": int(kv_len),
++                        "argmax": int(top2.indices[index, 0]),
++                        "top1": float(top2.values[index, 0]),
++                        "top2": float(top2.values[index, 1]),
++                        "margin": float(top2.values[index, 0] - top2.values[index, 1]),
++                        "top_ids": [int(value) for value in top2.indices[index]],
++                        "top_values": [float(value) for value in top2.values[index]],
++                    }
++                )
+         timing_events: dict[str, list[tuple[torch.cuda.Event, torch.cuda.Event]]] = {
+             "target_prefill": [],
++            "round_prep": [],
+             "draft": [],
++            "verify_prep": [],
+             "target_verify": [],
++            "commit": [],
+         }
+ 
+         def start_timing() -> torch.cuda.Event | None:
+@@ -1465,6 +1507,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
+             prefill_kwargs["position_ids"] = position_ids[:, :num_input_tokens]
+             prefill_input_ids = input_ids
+         phase_start = start_timing()
++        target_forward_calls += 1
+         output = target(prefill_input_ids, **prefill_kwargs)
+         end_timing("target_prefill", phase_start)
+         output_ids[:, :num_input_tokens] = input_ids
+@@ -1527,10 +1570,12 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
+             round_block_ids: torch.LongTensor,
+         ) -> tuple[torch.Tensor, int, torch.Tensor]:
+             """Verify the drafted block one target step at a time (generate()-parity path)."""
++            nonlocal target_forward_calls
+             posterior_tokens: list[torch.Tensor] = []
+             verified_hidden_states: list[torch.Tensor] = []
+             acceptance_length = 0
+             for block_index in range(round_block_ids.shape[1]):
++                verify_prep_start = start_timing()
+                 token_ids = round_block_ids[:, block_index : block_index + 1]
+                 if target_is_vlm:
+                     prompt_attention_mask = target_kwargs.get("attention_mask")
+@@ -1599,11 +1644,19 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
+                         "use_cache": True,
+                     }
+                 verify_kwargs["output_hidden_states"] = True
++                end_timing("verify_prep", verify_prep_start)
+                 phase_start = start_timing()
++                target_forward_calls += 1
+                 with target_verify_backend():
+                     step_output = target(verify_input_ids, **verify_kwargs)
+                 end_timing("target_verify", phase_start)
+                 step_posterior = sample(step_output.logits[:, -1:], temperature)
++                record_decision(
++                    step_output.logits[0, -1],
++                    [round_start + block_index + 1],
++                    "sequential",
++                    past_key_values_target.get_seq_length(),
++                )
+                 posterior_tokens.append(step_posterior)
+                 verified_hidden_states.append(
+                     extract_context_feature(step_output.hidden_states, self.target_layer_ids)
+@@ -1622,6 +1675,8 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
+             round_block_ids: torch.LongTensor,
+         ) -> tuple[torch.Tensor, int, torch.Tensor, float]:
+             """Verify the whole drafted block in one target forward (fast path)."""
++            nonlocal target_forward_calls
++            verify_prep_start = start_timing()
+             if target_is_vlm:
+                 prompt_attention_mask = target_kwargs.get("attention_mask")
+                 if prompt_attention_mask is None:
+@@ -1693,11 +1748,19 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
+                     "output_hidden_states": True,
+                 }
+                 verify_kwargs["position_ids"] = position_ids[:, round_start : round_start + round_block_ids.shape[1]]
++            end_timing("verify_prep", verify_prep_start)
+             phase_start = start_timing()
++            target_forward_calls += 1
+             with target_verify_backend():
+                 output = target(verify_input_ids, **verify_kwargs)
+             end_timing("target_verify", phase_start)
+             posterior = sample(output.logits, temperature)
++            record_decision(
++                output.logits[0],
++                [round_start + row + 1 for row in range(output.logits.shape[1])],
++                "parallel",
++                past_key_values_target.get_seq_length(),
++            )
+             acceptance_length = (round_block_ids[:, 1:] == posterior[:, :-1]).cumprod(dim=1).sum(dim=1)[0].item()
+             verified_target_hidden = extract_context_feature(output.hidden_states, self.target_layer_ids)
+ 
+@@ -1708,12 +1771,14 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
+             return posterior, acceptance_length, verified_target_hidden, min_decision_margin
+ 
+         while start < max_length:
++            prep_start = start_timing()
+             block_output_ids = output_ids[:, start : start + round_width].clone()
+             block_position_ids = position_ids[:, start : start + block_size]
+             # The draft always consumes its own block window (anchor + block_size-1
+             # mask slots); sample_from_anchor rounds only widen the verification
+             # window, not the draft's input block.
+             noise_embedding = target_embeddings(block_output_ids[:, :block_size])
++            end_timing("round_prep", prep_start)
+             phase_start = start_timing()
+             draft_hidden = self(
+                 target_hidden=target_hidden,
+@@ -1771,6 +1836,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
+                 block_size=block_output_ids.shape[1],
+                 acceptance_length=int(acceptance_length),
+             )
++            commit_start = start_timing()
+             draft_tokens += round_draft_tokens
+             accepted_tokens += round_accepted_tokens
+             verify_steps += 1
+@@ -1786,6 +1852,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
+             start += acceptance_length + 1
+             past_key_values_target.crop(start)
+             target_hidden = verified_target_hidden[:, : acceptance_length + 1, :]
++            end_timing("commit", commit_start)
+             if stop_token_ids is not None and any(
+                 stop_id in output_ids[:, num_input_tokens:] for stop_id in stop_token_ids
+             ):
+@@ -1811,9 +1878,11 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
+             "draft_tokens": float(draft_tokens),
+             "accepted_tokens": float(accepted_tokens),
+             "verify_steps": float(verify_steps),
++            "target_forward_calls": float(target_forward_calls),
+             "acceptance_events": acceptance_events,
+             "strict_parallel_rounds": float(strict_parallel_rounds),
+             "strict_fallback_rounds": float(strict_fallback_rounds),
++            "decision_trace": decision_trace,
+             "strict_min_decision_margin": (
+                 None if strict_parallel_rounds == 0 or strict_min_decision_margin == float("inf")
+                 else float(strict_min_decision_margin)
+diff --git a/vlm_dflash/dflash/train.py b/vlm_dflash/dflash/train.py
+index 911d9d7..1522129 100644
+--- a/vlm_dflash/dflash/train.py
++++ b/vlm_dflash/dflash/train.py
+@@ -364,6 +364,7 @@ def run_training_loop(
+     resume_state: dict | None = None,
+     on_checkpoint=None,
+     save_every: int | None = None,
++    extra_save_steps: set[int] | None = None,
+ ) -> dict:
+     train_cfg = cfg.get("train", {})
+     micro_batch = int(train_cfg.get("micro_batch_size", 8))
+@@ -688,7 +689,12 @@ def run_training_loop(
+                 if log_every and step % log_every == 0:
+                     log(f"step {step}/{total_steps} loss={row['loss']:.4f} acc={row['accuracy']:.3f} "
+                         f"al={row['accept_len']:.2f}")
+-                if on_checkpoint is not None and save_every and step % save_every == 0 and step < total_steps:
++                if (
++                    on_checkpoint is not None
++                    and save_every
++                    and (step % save_every == 0 or step in (extra_save_steps or ()))
++                    and step < total_steps
++                ):
+                     on_checkpoint(
+                         gather_train_state(
+                             module,
+@@ -1251,7 +1257,9 @@ def train_dflash(
+             # Read-only gate before any write: a refused resume must leave
+             # config / ckpt_init / logs / provenance byte-identical, and a legal
+             # resume keeps the original ckpt_init instead of regenerating it.
+-            resume_path = train_dir / "ckpt_last.pt"
++            resume_dir_cfg2 = train_cfg.get("resume_state_dir")
++            resume_read_dir = Path(str(resume_dir_cfg2)) if resume_dir_cfg2 else train_dir
++            resume_path = resume_read_dir / "ckpt_last.pt"
+             if not resume_path.exists():
+                 raise FileNotFoundError(f"--resume requested but no resume checkpoint at {resume_path}.")
+             resume_state = torch.load(resume_path, map_location="cpu", weights_only=False)
+@@ -1288,13 +1296,53 @@ def train_dflash(
+             # Exact-resume gate passed: make the log reflect the checkpoint's
+             # committed progress before the replay appends new rows.
+             _reconcile_train_log(log_path, int(resume_state["step"]))
+-        save_every = int(train_cfg.get("save_every_steps", max(1, total_steps // 4)))
++        epochs_for_cadence = max(1, int(train_cfg.get("num_epochs", 6)))
++        steps_per_epoch = max(1, total_steps // epochs_for_cadence)
++        cadence_fraction = train_cfg.get("save_every_fraction_of_epoch")
++        if cadence_fraction is not None:
++            save_every = max(1, int(round(steps_per_epoch * float(cadence_fraction))))
++        else:
++            save_every = int(train_cfg.get("save_every_steps", max(1, total_steps // 4)))
++        milestone_snapshots = bool(train_cfg.get("milestone_snapshots", False))
++        from ..objectives import resolve_recipe as _resolve_recipe
++
++        _recipe = _resolve_recipe(cfg, algorithm.name)
++        boundary_step = _recipe.split_step(total_steps) if _recipe is not None else None
++        extra_save_steps = set()
++        if boundary_step is not None and 0 < int(boundary_step) < total_steps:
++            extra_save_steps.add(int(boundary_step))
++        log(
++            f"train: save cadence every {save_every} steps "
++            f"(stage boundary step={boundary_step}, milestone_snapshots={milestone_snapshots})"
++        )
++
++        resume_dir_cfg = train_cfg.get("resume_state_dir")
++        resume_state_dir = ensure_dir(Path(str(resume_dir_cfg))) if resume_dir_cfg else train_dir
++        if resume_state is not None and resume_state_dir != train_dir:
++            log(f"train: resumable state is staged at {resume_state_dir}")
+ 
+         def write_train_state(state: dict) -> None:
+-            tmp_path = train_dir / "ckpt_last.pt.tmp"
++            tmp_path = resume_state_dir / "ckpt_last.pt.tmp"
+             torch.save({**checkpoint_common, **state}, tmp_path)
+-            tmp_path.replace(train_dir / "ckpt_last.pt")
+-            log(f"train: wrote resumable checkpoint (step {state['step']}) -> {train_dir / 'ckpt_last.pt'}")
++            tmp_path.replace(resume_state_dir / "ckpt_last.pt")
++            log(
++                f"train: wrote resumable checkpoint (step {state['step']}) -> "
++                f"{resume_state_dir / 'ckpt_last.pt'}"
++            )
++            # Milestone eval-format snapshot: the train-state above is only the
++            # resume payload (the eval/export loaders reject it by design), so
++            # every scheduled save ALSO drops the pure trainable weights in the
++            # same ``vlm-dflash-ckpt-v1`` format eval loads. The final step is
++            # covered by ckpt_final.pt and is skipped here.
++            if milestone_snapshots and int(state["step"]) < total_steps:
++                snapshot_path = train_dir / f"ckpt_step{int(state['step']):07d}.pt"
++                snapshot_tmp = snapshot_path.with_name(snapshot_path.name + ".tmp")
++                torch.save(
++                    {**checkpoint_common, "step": int(state["step"]), "model": state["model"]},
++                    snapshot_tmp,
++                )
++                snapshot_tmp.replace(snapshot_path)
++                log(f"train: wrote eval-format milestone snapshot (step {state['step']}) -> {snapshot_path.name}")
+ 
+         output = run_training_loop(
+             module,
+@@ -1309,6 +1357,7 @@ def train_dflash(
+             resume_state=resume_state,
+             on_checkpoint=write_train_state,
+             save_every=save_every,
++            extra_save_steps=extra_save_steps,
+         )
+         torch.save({**checkpoint_common, "step": output["summary"]["steps"], "model": module.draft_model.state_dict()},
+                    train_dir / "ckpt_final.pt")
+diff --git a/vlm_dflash/eval/accept.py b/vlm_dflash/eval/accept.py
+index e5da0db..3e825b0 100644
+--- a/vlm_dflash/eval/accept.py
++++ b/vlm_dflash/eval/accept.py
+@@ -1,10 +1,29 @@
+ """Acceptance-length aggregation for speculative runs.
+ 
+-AL definition (recorded in ``eval_result.json``): ``AL = new_tokens /
+-target_verification_steps``, the bonus-token-inclusive number of tokens produced
+-per target forward pass. Per-slot acceptance is the per-offset acceptance rate
+-``accepted(k) / opportunities(k)``, where opportunities are the verification
+-rounds that drafted at least ``k`` tokens (mirrors the reference
++Two acceptance numbers are reported side by side, because the literature uses
++both and they differ by the guaranteed-progress token:
++
++``al_draft_tokens_per_round``
++    ``accepted_tokens / verify_steps`` -- mean raw accepted *draft* tokens per
++    speculative round (0 when the first drafted token is rejected). This is the
++    definition ViSpec's official README/``speed.py`` reports as ``tau``
++    (``acceptance_len.append(int(accept_length))`` while
++    ``new_token += accept_length + 1``), and the one Medusa/EAGLE tables use.
++
++``al_progress_tokens_per_round``
++    ``new_tokens / verify_steps`` -- mean output tokens committed per
++    speculative round, i.e. the draft tokens plus the correction/bonus token
++    that is emitted from the verifier's own logits. In the single-path greedy
++    case this is ``al_draft + 1`` up to EOS/budget truncation.
++
++``mean_al`` is kept as an alias of ``al_progress_tokens_per_round`` so existing
++artifacts stay readable; new code should use the explicit names. Never compare
++``mean_al`` against a published ``tau`` without checking which of the two the
++other side computes (see ``docs/benchmark_metric_alignment.md``).
++
++Per-slot acceptance is the per-offset acceptance rate ``accepted(k) /
++opportunities(k)``, where opportunities are the verification rounds that drafted
++at least ``k`` tokens (mirrors the reference
+ ``_aggregate_proposal_offset_acceptance``: a round clipped by the output budget
+ is excluded from the denominator of offsets it never drafted). Acceptance rate
+ is accepted draft tokens / drafted tokens.
+@@ -19,6 +38,7 @@ def _mean(values, count):
+ 
+ def summarize_samples(samples: list[dict], block_size: int) -> dict:
+     rounds = sum(sample["verify_steps"] for sample in samples)
++    target_calls = sum(sample.get("target_forward_calls", 0) for sample in samples)
+     new_tokens = sum(sample["new_tokens"] for sample in samples)
+     accepted = sum(sample["accepted_tokens"] for sample in samples)
+     drafted = sum(sample["draft_tokens"] for sample in samples)
+@@ -32,11 +52,23 @@ def summarize_samples(samples: list[dict], block_size: int) -> dict:
+     return {
+         "num_samples": count,
+         "verify_steps": rounds,
++        "speculative_rounds": rounds,
++        "target_forward_calls": target_calls,
+         "new_tokens": new_tokens,
+         "accepted_tokens": accepted,
+         "draft_tokens": drafted,
++        # AL definition (unchanged): tokens produced per speculative round
++        # (bonus token included). ``tokens_per_target_forward`` now divides by
++        # the counted target forwards instead of the round count, so the two
++        # are reported side by side -- a round is NOT a target forward under
++        # sequential verification or a strict-parallel fallback.
+         "mean_al": (new_tokens / rounds) if rounds else None,
+-        "tokens_per_target_forward": (new_tokens / rounds) if rounds else None,
++        # Explicit dual reporting; ``mean_al`` above is the same number as
++        # ``al_progress_tokens_per_round`` (legacy alias, kept for old readers).
++        "al_progress_tokens_per_round": (new_tokens / rounds) if rounds else None,
++        "al_draft_tokens_per_round": (accepted / rounds) if rounds else None,
++        "tokens_per_target_forward": (new_tokens / target_calls) if target_calls else None,
++        "target_forwards_per_round": (target_calls / rounds) if rounds else None,
+         "acceptance_rate": (accepted / drafted) if drafted else None,
+         "per_slot_acceptance": per_slot,
+         "wall_seconds_per_sample": _mean([s.get("wall_seconds", 0.0) for s in samples], count),
+diff --git a/vlm_dflash/eval/run.py b/vlm_dflash/eval/run.py
+index 5a34242..94a15fb 100644
+--- a/vlm_dflash/eval/run.py
++++ b/vlm_dflash/eval/run.py
+@@ -276,6 +276,7 @@ def run_checkpoints(
+                     "id": entry["id"],
+                     "new_tokens": len(spec_tokens),
+                     "verify_steps": int(stats["verify_steps"]),
++                    "target_forward_calls": int(stats.get("target_forward_calls", 0)),
+                     "accepted_tokens": int(stats["accepted_tokens"]),
+                     "draft_tokens": int(stats["draft_tokens"]),
+                     "acceptance_events": stats["acceptance_events"],
+@@ -296,8 +297,18 @@ def run_checkpoints(
+                     # aggregate in ``summarize_samples``) so downstream analyses
+                     # can build paired per-prompt statistics + CIs.
+                     "verify_steps": int(stats["verify_steps"]),
++                    # Actual target forward invocations (prefill + verify
++                    # forwards + strict fallbacks); NOT equal to rounds.
++                    "target_forward_calls": int(stats.get("target_forward_calls", 0)),
+                     "accepted_tokens": int(stats["accepted_tokens"]),
+                     "draft_tokens": int(stats["draft_tokens"]),
++                    # Per-prompt wall decomposition (same fields the aggregate
++                    # ``summarize_samples`` averages); recorded so ML analyses
++                    # (E3) can pair prefill/decode/verify with prompt features.
++                    "wall_seconds": wall,
++                    "target_verify_seconds": float(stats.get("target_verify_seconds", 0.0)),
++                    "target_prefill_seconds": float(stats.get("target_prefill_seconds", 0.0)),
++                    "draft_seconds": float(stats.get("draft_seconds", 0.0)),
+                     "spec_tokens": spec_tokens,
+                     "target_tokens": entry["tokens"],
+                 }
+diff --git a/vlm_dflash/target/regen.py b/vlm_dflash/target/regen.py
+index df07ccb..bd5daf5 100644
+--- a/vlm_dflash/target/regen.py
++++ b/vlm_dflash/target/regen.py
+@@ -52,6 +52,32 @@ MULTI_TURN_MODES = ("last_turn_only", "all_turns")
+ DEFAULT_MULTI_TURN_MODE = "last_turn_only"
+ 
+ 
++def _length_summary(lengths: list[int], cap: int | None) -> dict:
++    """Sorted length summary (min/p10/median/p90/max) + cap-hit counts."""
++    if not lengths:
++        return {"count": 0, "min": None, "p10": None, "median": None, "p90": None, "max": None}
++    ordered = sorted(lengths)
++
++    def quantile(q: float) -> int:
++        position = min(len(ordered) - 1, max(0, int(round(q * (len(ordered) - 1)))))
++        return ordered[position]
++
++    summary = {
++        "count": len(ordered),
++        "min": ordered[0],
++        "p10": quantile(0.1),
++        "median": quantile(0.5),
++        "p90": quantile(0.9),
++        "max": ordered[-1],
++        "mean": sum(ordered) / len(ordered),
++    }
++    if cap is not None:
++        summary["cap"] = int(cap)
++        summary["at_cap"] = sum(1 for value in ordered if value >= cap)
++        summary["at_cap_fraction"] = summary["at_cap"] / len(ordered)
++    return summary
++
++
+ def _cut_at_stop(ids: list[int], stop_ids: set[int]) -> list[int]:
+     for index, token in enumerate(ids):
+         if token in stop_ids:
+@@ -90,7 +116,13 @@ def _regen_single_turn_rows(
+         ).to(device)
+         prompt_len = int(inputs["input_ids"].shape[1])
+         with torch.inference_mode():
+-            generated = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
++            generated = model.generate(
++                **inputs,
++                max_new_tokens=max_new_tokens,
++                do_sample=False,
++                num_beams=1,
++                repetition_penalty=1.0,
++            )
+         for offset, row in enumerate(batch):
+             attention = inputs["attention_mask"][offset]
+             unpadded_prompt_ids = inputs["input_ids"][offset][attention.bool()].tolist()
+@@ -193,7 +225,13 @@ def _regen_multi_turn_row(
+         inputs = processor(text=[text], images=[images[position] for position in image_indices], return_tensors="pt").to(device)
+         prompt_ids = inputs["input_ids"][0].tolist()
+         with torch.inference_mode():
+-            generated = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
++            generated = model.generate(
++                **inputs,
++                max_new_tokens=max_new_tokens,
++                do_sample=False,
++                num_beams=1,
++                repetition_penalty=1.0,
++            )
+         answer_ids = _cut_at_stop(generated[0, len(prompt_ids) :].tolist(), stop_ids)
+         if not answer_ids:
+             return None, {"id": row.get("id"), "reason": "empty_answer", "turn": target_index}, []
+@@ -247,7 +285,13 @@ def _regen_multi_turn_row(
+                 "template does not reproduce the committed prefix; refusing to store misaligned ids."
+             )
+         with torch.inference_mode():
+-            generated = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
++            generated = model.generate(
++                **inputs,
++                max_new_tokens=max_new_tokens,
++                do_sample=False,
++                num_beams=1,
++                repetition_penalty=1.0,
++            )
+         answer_ids = _cut_at_stop(generated[0, len(prompt_ids) :].tolist(), stop_ids)
+         if not answer_ids:
+             return None, {"id": row.get("id"), "reason": "empty_answer", "turn": msg_index}, []
+@@ -400,13 +444,27 @@ def run_regen(cfg: dict, run_dir: str | Path, contract: dict, limit: int | None
+         "min_response_tokens": min_response_tokens,
+         "batch_size": batch_size,
+         "greedy": True,
++        # Effective token-selection protocol, pinned explicitly at every
++        # generate() call site (the target's generation_config.json otherwise
++        # leaks repetition_penalty=1.05 / do_sample=true into these calls).
++        "generation_protocol": {
++            "do_sample": False,
++            "num_beams": 1,
++            "repetition_penalty": 1.0,
++            "temperature": None,
++            "max_new_tokens": max_new_tokens,
++            "eos_token_ids": sorted(stop_ids),
++            "pad_token_id": getattr(getattr(model, "generation_config", None), "pad_token_id", None),
++        },
+         # Supervision protocol for schema-v2 rows (data records carry the same
+         # value per row; legacy records without a mode are all-turn artifacts).
+         "multi_turn_mode": multi_turn_mode,
+-        "answer_token_histogram": {
+-            "min": min((len(r["regen"]["answer_ids"]) for r in v1_rows), default=None),
+-            "max": max((len(r["regen"]["answer_ids"]) for r in v1_rows), default=None),
+-        },
++        "answer_token_histogram": _length_summary(
++            [len(r["regen"]["answer_ids"]) for r in v1_rows], cap=max_new_tokens
++        ),
++        "prompt_token_histogram": _length_summary(
++            [len(r["regen"]["prompt_ids"]) for r in v1_rows], cap=None
++        ),
+         "prompt_template_sha256": _template_sha(processor, rows[0]) if rows else None,
+     }
+     if v2_count:

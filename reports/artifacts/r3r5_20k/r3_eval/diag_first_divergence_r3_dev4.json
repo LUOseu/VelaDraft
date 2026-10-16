@@ -1,0 +1,587 @@
+{
+  "format": "vlm-dflash-first-divergence-v1",
+  "tag": "r3_dev4",
+  "checkpoint": "ckpt_final.pt",
+  "num_prompts": 4,
+  "max_new_tokens": 32,
+  "gpu_name": "NVIDIA RTX A6000",
+  "target_dtype": "bfloat16",
+  "verify_sdpa_backend_cfg": "parity",
+  "strict_parallel_margin": 2.0,
+  "mismatch_counts": {
+    "sequential": 0,
+    "parallel": 1,
+    "parallel_parity": 1,
+    "strict_parallel": 0
+  },
+  "case_counts": {
+    "A_parallel_and_parity_agree_wrong": 0,
+    "B_parity_ok_perf_flips": 1,
+    "C_reference_unstable": 0,
+    "other": 0
+  },
+  "target_only_stability": [
+    {
+      "id": "000000233703",
+      "target_only_bit_stable": true,
+      "repeats": 2
+    },
+    {
+      "id": "000000405843",
+      "target_only_bit_stable": true,
+      "repeats": 2
+    },
+    {
+      "id": "000000000575",
+      "target_only_bit_stable": true,
+      "repeats": 2
+    },
+    {
+      "id": "000000115506",
+      "target_only_bit_stable": true,
+      "repeats": 2
+    }
+  ],
+  "rows": [
+    {
+      "id": "000000233703",
+      "prompt_len": 372,
+      "reference_tokens": [
+        785,
+        9780,
+        4419,
+        264,
+        8045,
+        315,
+        22360,
+        36228,
+        11,
+        448,
+        1045,
+        7407,
+        3403,
+        279,
+        60110,
+        453,
+        323,
+        3800,
+        3685,
+        13,
+        362,
+        41274,
+        23387,
+        374,
+        34228,
+        389,
+        279,
+        60110,
+        453,
+        11,
+        323,
+        264
+      ],
+      "paths": {
+        "sequential": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 32,
+          "rounds": 8,
+          "accepted_tokens": 24,
+          "target_forward_calls": 33,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 3.8339951895177364,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        },
+        "parallel": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 32,
+          "rounds": 8,
+          "accepted_tokens": 24,
+          "target_forward_calls": 9,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 0.49033680371940136,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        },
+        "parallel_parity": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 32,
+          "rounds": 8,
+          "accepted_tokens": 24,
+          "target_forward_calls": 9,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 0.4450304303318262,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        },
+        "strict_parallel": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 32,
+          "rounds": 8,
+          "accepted_tokens": 24,
+          "target_forward_calls": 41,
+          "strict_fallback_rounds": 8.0,
+          "wall_seconds": 1.6062803510576487,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        }
+      }
+    },
+    {
+      "id": "000000405843",
+      "prompt_len": 423,
+      "reference_tokens": [
+        785,
+        2168,
+        70749,
+        264,
+        4426,
+        315,
+        20269,
+        19270,
+        11,
+        1817,
+        448,
+        4911,
+        14431,
+        323,
+        7987,
+        11,
+        9099,
+        2348,
+        264,
+        22360,
+        24650,
+        13,
+        2619,
+        525,
+        518,
+        3245,
+        8063,
+        20269,
+        19270,
+        304,
+        2790,
+        11
+      ],
+      "paths": {
+        "sequential": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 32,
+          "rounds": 11,
+          "accepted_tokens": 21,
+          "target_forward_calls": 35,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 1.6885765083134174,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        },
+        "parallel": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 32,
+          "rounds": 11,
+          "accepted_tokens": 21,
+          "target_forward_calls": 12,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 0.5925201587378979,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        },
+        "parallel_parity": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 32,
+          "rounds": 11,
+          "accepted_tokens": 21,
+          "target_forward_calls": 12,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 0.6030223574489355,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        },
+        "strict_parallel": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 32,
+          "rounds": 11,
+          "accepted_tokens": 21,
+          "target_forward_calls": 46,
+          "strict_fallback_rounds": 11.0,
+          "wall_seconds": 2.1105869486927986,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        }
+      }
+    },
+    {
+      "id": "000000000575",
+      "prompt_len": 444,
+      "reference_tokens": [
+        785,
+        8251,
+        374,
+        5619,
+        448,
+        264,
+        28977,
+        304,
+        279,
+        16359,
+        13,
+        151645
+      ],
+      "paths": {
+        "sequential": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 12,
+          "rounds": 3,
+          "accepted_tokens": 9,
+          "target_forward_calls": 13,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 0.5188337489962578,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        },
+        "parallel": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 12,
+          "rounds": 3,
+          "accepted_tokens": 9,
+          "target_forward_calls": 4,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 0.2534611690789461,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        },
+        "parallel_parity": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 12,
+          "rounds": 3,
+          "accepted_tokens": 9,
+          "target_forward_calls": 4,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 0.2475542426109314,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        },
+        "strict_parallel": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 12,
+          "rounds": 3,
+          "accepted_tokens": 9,
+          "target_forward_calls": 16,
+          "strict_fallback_rounds": 3.0,
+          "wall_seconds": 0.6055716332048178,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        }
+      }
+    },
+    {
+      "id": "000000115506",
+      "prompt_len": 427,
+      "reference_tokens": [
+        785,
+        15145,
+        304,
+        279,
+        2168,
+        17167,
+        315,
+        1378,
+        59980,
+        315,
+        3607,
+        11,
+        825,
+        8482,
+        264,
+        35481,
+        12000,
+        323,
+        279,
+        1008,
+        8482,
+        264,
+        19653,
+        12000,
+        13,
+        576,
+        35481,
+        12000,
+        7952,
+        311,
+        387,
+        264
+      ],
+      "paths": {
+        "sequential": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 32,
+          "rounds": 10,
+          "accepted_tokens": 22,
+          "target_forward_calls": 33,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 1.2000546846538782,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        },
+        "parallel": {
+          "equivalent": false,
+          "first_divergence": 14,
+          "new_tokens": 32,
+          "rounds": 11,
+          "accepted_tokens": 21,
+          "target_forward_calls": 12,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 0.5766195543110371,
+          "token_at_divergence": 23880,
+          "reference_token_at_divergence": 264,
+          "decision_at_divergence": [
+            {
+              "position": 442,
+              "shape": "parallel",
+              "kv_len": 442,
+              "argmax": 10199,
+              "top1": 15.0,
+              "top2": 14.9375,
+              "margin": 0.0625
+            },
+            {
+              "position": 442,
+              "shape": "parallel",
+              "kv_len": 447,
+              "argmax": 323,
+              "top1": 22.75,
+              "top2": 21.625,
+              "margin": 1.125
+            },
+            {
+              "position": 442,
+              "shape": "parallel",
+              "kv_len": 449,
+              "argmax": 323,
+              "top1": 27.0,
+              "top2": 25.0,
+              "margin": 2.0
+            }
+          ],
+          "decision_before_divergence": [
+            {
+              "position": 441,
+              "shape": "parallel",
+              "kv_len": 442,
+              "argmax": 10223,
+              "top1": 15.5,
+              "top2": 15.5,
+              "margin": 0.0
+            },
+            {
+              "position": 441,
+              "shape": "parallel",
+              "kv_len": 447,
+              "argmax": 23880,
+              "top1": 15.0,
+              "top2": 14.9375,
+              "margin": 0.0625
+            }
+          ]
+        },
+        "parallel_parity": {
+          "equivalent": false,
+          "first_divergence": 14,
+          "new_tokens": 32,
+          "rounds": 11,
+          "accepted_tokens": 21,
+          "target_forward_calls": 12,
+          "strict_fallback_rounds": 0.0,
+          "wall_seconds": 0.5723818130791187,
+          "token_at_divergence": 23880,
+          "reference_token_at_divergence": 264,
+          "decision_at_divergence": [
+            {
+              "position": 442,
+              "shape": "parallel",
+              "kv_len": 442,
+              "argmax": 10199,
+              "top1": 15.0,
+              "top2": 14.9375,
+              "margin": 0.0625
+            },
+            {
+              "position": 442,
+              "shape": "parallel",
+              "kv_len": 447,
+              "argmax": 323,
+              "top1": 22.75,
+              "top2": 21.625,
+              "margin": 1.125
+            },
+            {
+              "position": 442,
+              "shape": "parallel",
+              "kv_len": 449,
+              "argmax": 323,
+              "top1": 27.0,
+              "top2": 25.0,
+              "margin": 2.0
+            }
+          ],
+          "decision_before_divergence": [
+            {
+              "position": 441,
+              "shape": "parallel",
+              "kv_len": 442,
+              "argmax": 10223,
+              "top1": 15.5,
+              "top2": 15.5,
+              "margin": 0.0
+            },
+            {
+              "position": 441,
+              "shape": "parallel",
+              "kv_len": 447,
+              "argmax": 23880,
+              "top1": 15.0,
+              "top2": 14.9375,
+              "margin": 0.0625
+            }
+          ]
+        },
+        "strict_parallel": {
+          "equivalent": true,
+          "first_divergence": null,
+          "new_tokens": 32,
+          "rounds": 10,
+          "accepted_tokens": 22,
+          "target_forward_calls": 43,
+          "strict_fallback_rounds": 10.0,
+          "wall_seconds": 1.476326584815979,
+          "token_at_divergence": null,
+          "reference_token_at_divergence": null
+        }
+      },
+      "divergence_evidence": {
+        "position": 441,
+        "sequential": [
+          {
+            "position": 442,
+            "shape": "sequential",
+            "kv_len": 442,
+            "argmax": 35481,
+            "top1": 12.8125,
+            "top2": 12.625,
+            "margin": 0.1875
+          }
+        ],
+        "parallel": [
+          {
+            "position": 442,
+            "shape": "parallel",
+            "kv_len": 442,
+            "argmax": 10199,
+            "top1": 15.0,
+            "top2": 14.9375,
+            "margin": 0.0625
+          },
+          {
+            "position": 442,
+            "shape": "parallel",
+            "kv_len": 447,
+            "argmax": 323,
+            "top1": 22.75,
+            "top2": 21.625,
+            "margin": 1.125
+          },
+          {
+            "position": 442,
+            "shape": "parallel",
+            "kv_len": 449,
+            "argmax": 323,
+            "top1": 27.0,
+            "top2": 25.0,
+            "margin": 2.0
+          }
+        ],
+        "parallel_parity": [
+          {
+            "position": 442,
+            "shape": "parallel",
+            "kv_len": 442,
+            "argmax": 10199,
+            "top1": 15.0,
+            "top2": 14.9375,
+            "margin": 0.0625
+          },
+          {
+            "position": 442,
+            "shape": "parallel",
+            "kv_len": 447,
+            "argmax": 323,
+            "top1": 22.75,
+            "top2": 21.625,
+            "margin": 1.125
+          },
+          {
+            "position": 442,
+            "shape": "parallel",
+            "kv_len": 449,
+            "argmax": 323,
+            "top1": 27.0,
+            "top2": 25.0,
+            "margin": 2.0
+          }
+        ],
+        "strict_parallel": [
+          {
+            "position": 442,
+            "shape": "parallel",
+            "kv_len": 442,
+            "argmax": 10199,
+            "top1": 15.0,
+            "top2": 14.9375,
+            "margin": 0.0625
+          },
+          {
+            "position": 442,
+            "shape": "parallel",
+            "kv_len": 447,
+            "argmax": 323,
+            "top1": 22.75,
+            "top2": 21.5,
+            "margin": 1.25
+          },
+          {
+            "position": 442,
+            "shape": "parallel",
+            "kv_len": 449,
+            "argmax": 35481,
+            "top1": 12.8125,
+            "top2": 12.625,
+            "margin": 0.1875
+          },
+          {
+            "position": 442,
+            "shape": "sequential",
+            "kv_len": 442,
+            "argmax": 35481,
+            "top1": 12.8125,
+            "top2": 12.625,
+            "margin": 0.1875
+          }
+        ]
+      }
+    }
+  ]
+}
