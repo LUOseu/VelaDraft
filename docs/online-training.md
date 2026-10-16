@@ -28,6 +28,7 @@ regen, checkpoints, logs and eval output - online only removes the multi-GiB
 | Online, per-sample | `--mode online` | offline (presets pin it) | extracts live features instead of reading a store | frozen target resident on GPU for the whole run | GPU smokes: train -> token-exact eval -> export (3B, 8B untied, split devices) |
 | Batched capture | `train.online_batch_size: N` | `1` (per-sample) | one padded target forward per N rows | may move the teacher batch composition (bf16 ulp scale) | 3-row smoke + a 16-row slice: 16 -> 4 forward calls, step losses bit-identical; extraction-wall re-measured under a unified boundary (pending, see below) |
 | RAM record cache | `train.online_feature_cache_gb: <GiB>` | `0` (off) | serves repeat epochs from a byte-bounded host-RAM store | up to the configured GiB of host RAM; never persisted | 129 rows / 6 epochs: 645 hits / 129 misses / 129 stores / 0 evictions, peak 830 MiB; trajectory caveat below |
+| Pinned retention | `train.online_feature_cache_policy: pinned` | `lru` | freezes a static smallest-size-first retention plan at the first train-phase epoch end and admits only planned records afterwards | requires the RAM cache | research-harness A/B (512-row subset, 3 epochs): -7.6% / -13.0% step time at 0.8 / 1.6 GiB caps; production-CLI re-validation in the pinned section below |
 | Adaptive budget | `train.online_feature_cache_adaptive: true` | `false` | shrinks/grows the cache payload with the job's memory headroom | requires the RAM cache; eviction becomes dynamic | measured on the lane's slices; state under `feature_source.feature_cache.adaptive_budget` |
 
 Enabling them is one flag each, e.g.
@@ -35,8 +36,10 @@ Enabling them is one flag each, e.g.
 `--set train.online_feature_cache_gb=8` (see the commands below). Runtime
 counters land in `train_summary.json` under `feature_source`:
 `target_forwards_total` / `target_samples_total` for extraction, and
-`feature_source.feature_cache` (capacity, hits, misses, stores, evictions,
-retained/peak bytes) for the cache. The sections below document each setup,
+`feature_source.feature_cache` (policy, capacity, budget, hits, misses,
+stores, evictions, hit_rate, saved_extractions, retained/peak bytes; pinned
+runs add admitted/rejected/pinned counters and the frozen plan) for the
+cache. The sections below document each setup,
 its constraints and its numerical caveats.
 
 ## Offline vs online
@@ -249,6 +252,80 @@ above. Enabled runs report the extra state under
 `feature_source.feature_cache.adaptive_budget` (cap / job share / current
 budget, reserve, retained bytes, shrink / grow counts, sensor snapshot); like
 the cache itself it is runtime-only and outside every digest.
+
+### Static pinned retention (`train.online_feature_cache_policy: pinned`)
+
+The byte budget decides *how much* RAM the cache may hold;
+`train.online_feature_cache_policy` (default `lru`) decides which records are
+kept inside it:
+
+- `lru` - the shipped behavior: every extracted record is admitted and the
+  oldest entries are evicted at the cap. With a shuffled loader the reuse
+  distance between epochs usually exceeds the cap, so a row is typically gone
+  by its next epoch (research harness: 512-row subset, 3 epochs, 0.8 GiB cap
+  -> 21 hits, versus 264 hits for the pinned plan on the same budget).
+- `pinned` - a static plan: at the **first train-phase epoch end** the source
+  ranks the record sizes observed during that epoch (one full pass, i.e. the
+  whole working set) smallest-first and packs records into the plan until
+  `95%` of the configured cap is used. Planned records are retained across
+  epochs; records outside the plan are purged once at the freeze, later
+  stores of non-planned rows are refused (`rejected_records`), and their
+  reads keep re-extracting through the reference path. No labels, validation
+  data or future information enter the plan - only the byte sizes of records
+  this run already extracted.
+
+While the plan is being learned (epoch 1) the cache behaves exactly like
+`lru`; that pass pays the same extractions under either policy. From epoch 2
+on planned rows are served from RAM and non-planned rows re-extract, so the
+policy only changes *recompute vs. reuse* - consumed rows, their order,
+preprocessing, supervision and the optimizer stay untouched.
+
+Rules and edge cases:
+
+- The 5% headroom keeps the plan strictly inside the cap, so a byte-cap
+  eviction never has to drop a planned record (`pinned_bytes` stays within
+  `pinned.plan.budget_bytes`). A planned record evicted before the freeze by
+  epoch-1 LRU churn is re-admitted the first time it is read again.
+- `train.online_feature_cache_adaptive` still owns the *budget*: under memory
+  pressure the controller can shrink the effective budget below the plan and
+  evict planned records; the policy only decides which records are eligible.
+- Runs with a single epoch (`train.num_epochs: 1`) or without a completed
+  epoch never freeze a plan - no later pass could reuse it, so the policy is
+  inert. If the cache already holds the whole working set, `lru` and `pinned`
+  keep the same records; the pinned plan then only changes the epoch-1
+  admission pattern.
+- When it pays: the working set of extracted records is *larger* than the
+  cache budget **and** samples are revisited across epochs. It adds nothing
+  for single-epoch training or when the budget already fits the working set.
+- Host RAM grows by at most the configured GiB; GPU peak memory is unchanged
+  (the target and the extraction shapes do not change).
+- The cache stays runtime-only: a resume (exact or not) starts cold, behaves
+  like `lru` again until its next train-phase epoch end, and then re-freezes
+  an equivalent plan from the records it re-extracts. Fast-forwarded resume
+  replay items are placeholders and are not sized until actually read again.
+- Training numerics: hits return the first extraction's stored bytes, so on
+  the per-sample path (`online_batch_size: 1`) the trajectory is bitwise
+  identical to an uncached run; with `online_batch_size > 1` the usual
+  grouping caveat below applies - the pinned policy changes *which* rows hit
+  relative to `lru`, so the two policies differ at that same bf16-rounding
+  scale, deterministically per (policy, seed).
+
+The freeze is logged once (`online cache: pinned plan frozen at epoch end
+(...)`) and every counter lands in `train_summary.json` ->
+`feature_source.feature_cache`: `policy`, `budget_bytes`, `hits`, `misses`,
+`hit_rate`, `saved_extractions` (one hit replaces one extraction),
+`evictions`, `admitted_records`, `rejected_records`, `purged_records` /
+`purged_bytes`, and for `pinned` the live `pinned_records` / `pinned_bytes` /
+`known_sizes` plus the frozen `pinned.plan` (budget, `n_pinned`,
+`planned_bytes`, `sized_records`). All counters are host-side - no added GPU
+synchronization.
+
+```bash
+vlm-dflash train --config configs/dfly/qwen2_5_vl_3b_2k.yaml --mode online \
+  --run-dir runs/dfly_online \
+  --set train.online_feature_cache_gb=32 \
+  --set train.online_feature_cache_policy=pinned
+```
 
 Caveat (measured on the lane's 129-row and 2K-row slices, 2026-10-14): the
 default shuffled loader draws a different row order every epoch, so the
