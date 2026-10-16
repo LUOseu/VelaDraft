@@ -1,0 +1,108 @@
+{
+  "format": "vlm-dflash-parallel-profile-v1",
+  "tag": "smoke_parallel",
+  "checkpoint": "ckpt_final.pt",
+  "verification": "parallel",
+  "num_prompts": 2,
+  "max_new_tokens": 16,
+  "gpu_name": "NVIDIA RTX A6000",
+  "startup": {
+    "target_only_warmup_seconds": 1.7641973458230495,
+    "spec_warmup_seconds": 32.45514815300703
+  },
+  "startup_note": "excluded from every measured window (warmup prefills + one warmup spec generate)",
+  "target_only_total_s": 1.12022509239614,
+  "spec_total_s": 0.6470826026052237,
+  "s_wall_ratio_of_means": 1.731193340519424,
+  "al_progress_tokens_per_round": 3.2,
+  "al_draft_tokens_per_round": 2.2,
+  "al_progress_minus_draft": 1.0,
+  "rounds_total": 10,
+  "target_forward_calls_total": 12,
+  "tokens_per_target_forward": 2.6666666666666665,
+  "single_token_target_decode_ms": 29.858940094709396,
+  "single_token_target_decode_source": "two-point HF generate probe (median over probes)",
+  "r_block_verify_over_single_decode": 0.991399150279278,
+  "d_draft_over_single_decode": 0.4367815317654902,
+  "s_model_al_over_r_plus_d": 2.2406128581843485,
+  "phase_seconds_total": {
+    "round_prep": 0.0008351680040359497,
+    "draft": 0.13041833591461183,
+    "verify_prep": 0.0004742400050163269,
+    "target_verify": 0.2960212783813476,
+    "target_prefill": 0.2109090576171875,
+    "commit": 0.0020934399738907813,
+    "misc": 0.006331082709133629
+  },
+  "phase_fraction_of_spec_wall": {
+    "round_prep": 0.001290666756722363,
+    "draft": 0.2015482032580287,
+    "verify_prep": 0.0007328894380825353,
+    "target_verify": 0.45747061841801084,
+    "target_prefill": 0.32593838370564304,
+    "commit": 0.0032351974314598604,
+    "misc": 0.009784040992052658
+  },
+  "phase_ms_per_round": {
+    "round_prep": 0.08351680040359497,
+    "draft": 13.041833591461183,
+    "verify_prep": 0.04742400050163269,
+    "target_verify": 29.602127838134763,
+    "target_prefill": 21.09090576171875,
+    "commit": 0.20934399738907813,
+    "misc": 0.6331082709133629
+  },
+  "decode_probe": [
+    {
+      "id": "000000233703",
+      "wall_1_token": 0.10107971541583538,
+      "wall_k_tokens": 0.5489638168364763,
+      "prefill_plus_one_s": 0.10107971541583538,
+      "single_token_decode_s": 0.029858940094709397,
+      "prefill_s": 0.07122077532112599,
+      "target_only_harness_wall_s": 0.5549026802182198,
+      "peak_gpu_mem_gb": 8.267402752
+    }
+  ],
+  "token_exact": true,
+  "token_exact_count": 2,
+  "non_equivalent_ids": [],
+  "per_sample": [
+    {
+      "id": "000000233703",
+      "target_only_wall": 0.5549026802182198,
+      "spec_wall": 0.31360225565731525,
+      "new_tokens": 16,
+      "equivalent": true,
+      "rounds": 5,
+      "accepted_tokens": 11,
+      "draft_tokens": 28,
+      "target_forward_calls": 6,
+      "strict_fallback_rounds": 0.0,
+      "round_prep": 0.0004230399951338768,
+      "draft": 0.06523766422271729,
+      "verify_prep": 0.00023667200282216072,
+      "target_verify": 0.14686310386657714,
+      "target_prefill": 0.0966961898803711,
+      "commit": 0.0009709439799189568
+    },
+    {
+      "id": "000000405843",
+      "target_only_wall": 0.5653224121779203,
+      "spec_wall": 0.3334803469479084,
+      "new_tokens": 16,
+      "equivalent": true,
+      "rounds": 5,
+      "accepted_tokens": 11,
+      "draft_tokens": 19,
+      "target_forward_calls": 6,
+      "strict_fallback_rounds": 0.0,
+      "round_prep": 0.0004121280089020729,
+      "draft": 0.06518067169189454,
+      "verify_prep": 0.0002375680021941662,
+      "target_verify": 0.1491581745147705,
+      "target_prefill": 0.11421286773681641,
+      "commit": 0.0011224959939718246
+    }
+  ]
+}

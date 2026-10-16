@@ -24,6 +24,11 @@ def main() -> None:
     parser.add_argument("--verification", default=None, choices=["sequential", "parallel", "strict_parallel"])
     parser.add_argument("--strict-margin", type=float, default=None)
     parser.add_argument("--tag", default=None)
+    parser.add_argument(
+        "--prompt-source-split",
+        default=None,
+        help="evaluate a different split of the run's data dir (e.g. test.jsonl) instead of val.jsonl",
+    )
     parser.add_argument("--set", action="append", default=[])
     args = parser.parse_args()
 
@@ -35,8 +40,19 @@ def main() -> None:
     if args.strict_margin is not None:
         cfg.setdefault("eval", {})["strict_parallel_margin"] = float(args.strict_margin)
     contract = ensure_contract(cfg, run_dir)
+    prompt_source = (
+        {"type": "run_val", "split": args.prompt_source_split}
+        if args.prompt_source_split
+        else None
+    )
     result = evaluate(
-        cfg, run_dir, contract, num_prompts=args.num_prompts, max_new_tokens=args.max_new_tokens, tag=args.tag
+        cfg,
+        run_dir,
+        contract,
+        num_prompts=args.num_prompts,
+        max_new_tokens=args.max_new_tokens,
+        tag=args.tag,
+        prompt_source=prompt_source,
     )
     equivalence = result["equivalence_check"]
     log(f"eval_dflash done: token_exact={equivalence['token_exact']}")

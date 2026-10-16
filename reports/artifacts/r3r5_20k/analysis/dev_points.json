@@ -1,0 +1,1889 @@
+{
+  "r3": {
+    "arm": "r3",
+    "eval": {
+      "dev_final": {
+        "runs": {
+          "ckpt_final.pt": {
+            "mean_al": 2.855733843662594,
+            "acceptance_rate": 0.2677826049919073,
+            "per_slot_acceptance": [
+              0.6843814585178624,
+              0.4484444444444444,
+              0.28953626634958385,
+              0.18654935878317924,
+              0.1236543062200957,
+              0.08009599520024,
+              0.05283757338551859
+            ],
+            "target_forward_calls": 19689,
+            "speculative_rounds": 6793,
+            "verify_steps": 6793,
+            "tokens_per_target_forward": 0.9852709634821474,
+            "target_forwards_per_round": 2.8984248491093774,
+            "num_samples": 256,
+            "new_tokens": 19399,
+            "accepted_tokens": 12574,
+            "draft_tokens": 46956,
+            "draft_seconds_per_sample": 0.3608158287703991,
+            "target_verify_seconds_per_sample": 2.2884612292572855,
+            "target_prefill_seconds_per_sample": 0.10859333899617195,
+            "wall_seconds_per_sample": 2.8007351639753324,
+            "speedup_vs_target_only": 0.8308339798157711,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 256,
+          "token_exact": true,
+          "runs": {
+            "ckpt_final.pt": {
+              "num_prompts": 256,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 75.77734375,
+          "wall_seconds_per_sample": 2.326945942695602,
+          "decode_tokens_per_second": 32.56515003619608
+        },
+        "settings": {
+          "num_prompts": 256,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "dev_step6250": {
+        "runs": {
+          "ckpt_step0006250.pt": {
+            "mean_al": 2.779624588049864,
+            "acceptance_rate": 0.25734378889718695,
+            "per_slot_acceptance": [
+              0.6715538306741412,
+              0.43407386035776113,
+              0.27638627479368755,
+              0.17315514235909354,
+              0.11302068161957472,
+              0.07351651563870214,
+              0.05046948356807512
+            ],
+            "target_forward_calls": 19702,
+            "speculative_rounds": 6979,
+            "verify_steps": 6979,
+            "tokens_per_target_forward": 0.9846208506750583,
+            "target_forwards_per_round": 2.8230405502220948,
+            "num_samples": 256,
+            "new_tokens": 19399,
+            "accepted_tokens": 12405,
+            "draft_tokens": 48204,
+            "draft_seconds_per_sample": 0.37134538298100234,
+            "target_verify_seconds_per_sample": 2.2807144132852555,
+            "target_prefill_seconds_per_sample": 0.1055964725613594,
+            "wall_seconds_per_sample": 2.800931620193296,
+            "speedup_vs_target_only": 0.8456279658158201,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 256,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0006250.pt": {
+              "num_prompts": 256,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 75.77734375,
+          "wall_seconds_per_sample": 2.368546108373266,
+          "decode_tokens_per_second": 31.993189189820924
+        },
+        "settings": {
+          "num_prompts": 256,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "p1250": {
+        "runs": {
+          "ckpt_step0001250.pt": {
+            "mean_al": 2.0543429844097996,
+            "acceptance_rate": 0.15106711236821804,
+            "per_slot_acceptance": [
+              0.5198572066041945,
+              0.2621923937360179,
+              0.13728129205921938,
+              0.06837606837606838,
+              0.03564981949458484,
+              0.019013128112267994,
+              0.009078529278256923
+            ],
+            "target_forward_calls": 4665,
+            "speculative_rounds": 2245,
+            "verify_steps": 2245,
+            "tokens_per_target_forward": 0.9886387995712754,
+            "target_forwards_per_round": 2.0779510022271714,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 2350,
+            "draft_tokens": 15556,
+            "draft_seconds_per_sample": 1.3000753765702249,
+            "target_verify_seconds_per_sample": 2.1612494731545446,
+            "target_prefill_seconds_per_sample": 0.12110656452178956,
+            "wall_seconds_per_sample": 3.6198444269539323,
+            "speedup_vs_target_only": 0.6941115703376397,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0001250.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.5125758995709475,
+          "decode_tokens_per_second": 28.680725629942376
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "p1875": {
+        "runs": {
+          "ckpt_step0001875.pt": {
+            "mean_al": 2.277530864197531,
+            "acceptance_rate": 0.18378108743675622,
+            "per_slot_acceptance": [
+              0.5828797624938149,
+              0.32043650793650796,
+              0.1791044776119403,
+              0.10623441396508729,
+              0.0535,
+              0.025589563472152535,
+              0.012072434607645875
+            ],
+            "target_forward_calls": 4677,
+            "speculative_rounds": 2025,
+            "verify_steps": 2025,
+            "tokens_per_target_forward": 0.9861022022664101,
+            "target_forwards_per_round": 2.3096296296296295,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 2579,
+            "draft_tokens": 14033,
+            "draft_seconds_per_sample": 0.755853232935071,
+            "target_verify_seconds_per_sample": 2.195930800795555,
+            "target_prefill_seconds_per_sample": 0.11090565359592437,
+            "wall_seconds_per_sample": 3.1065605630574282,
+            "speedup_vs_target_only": 0.7475614372007979,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0001875.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.3223448792705312,
+          "decode_tokens_per_second": 31.03005959331736
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "p2500": {
+        "runs": {
+          "ckpt_step0002500.pt": {
+            "mean_al": 2.3117794486215537,
+            "acceptance_rate": 0.18804159445407279,
+            "per_slot_acceptance": [
+              0.5807422266800402,
+              0.33182503770739064,
+              0.18850806451612903,
+              0.10661950480040425,
+              0.055752660922453116,
+              0.028963414634146343,
+              0.017338092809790925
+            ],
+            "target_forward_calls": 4669,
+            "speculative_rounds": 1995,
+            "verify_steps": 1995,
+            "tokens_per_target_forward": 0.9877918183765261,
+            "target_forwards_per_round": 2.3403508771929826,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 2604,
+            "draft_tokens": 13848,
+            "draft_seconds_per_sample": 0.8742805070132017,
+            "target_verify_seconds_per_sample": 2.2541791329085825,
+            "target_prefill_seconds_per_sample": 0.18045222187042237,
+            "wall_seconds_per_sample": 3.477343681646744,
+            "speedup_vs_target_only": 0.737209440534841,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0002500.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.5635305900941603,
+          "decode_tokens_per_second": 28.110645637879085
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "p3750": {
+        "runs": {
+          "ckpt_step0003750.pt": {
+            "mean_al": 2.5494748479823106,
+            "acceptance_rate": 0.22290502793296088,
+            "per_slot_acceptance": [
+              0.6105263157894737,
+              0.3759022765130483,
+              0.2391304347826087,
+              0.15259921743991056,
+              0.09360986547085202,
+              0.052779337450870295,
+              0.028716216216216218
+            ],
+            "target_forward_calls": 4681,
+            "speculative_rounds": 1809,
+            "verify_steps": 1809,
+            "tokens_per_target_forward": 0.9852595599230933,
+            "target_forwards_per_round": 2.587617468214483,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 2793,
+            "draft_tokens": 12530,
+            "draft_seconds_per_sample": 3.3804268140941858,
+            "target_verify_seconds_per_sample": 2.1811732694506647,
+            "target_prefill_seconds_per_sample": 0.14434589290618896,
+            "wall_seconds_per_sample": 5.76410269193002,
+            "speedup_vs_target_only": 0.48448280116466136,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0003750.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.792608618387021,
+          "decode_tokens_per_second": 25.80472592024817
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "p5000": {
+        "runs": {
+          "ckpt_step0005000.pt": {
+            "mean_al": 2.7452380952380953,
+            "acceptance_rate": 0.25085763293310465,
+            "per_slot_acceptance": [
+              0.6553571428571429,
+              0.42388059701492536,
+              0.2619904076738609,
+              0.17127403846153846,
+              0.11552346570397112,
+              0.07297949336550061,
+              0.04779189352692075
+            ],
+            "target_forward_calls": 4681,
+            "speculative_rounds": 1680,
+            "verify_steps": 1680,
+            "tokens_per_target_forward": 0.9852595599230933,
+            "target_forwards_per_round": 2.786309523809524,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 2925,
+            "draft_tokens": 11660,
+            "draft_seconds_per_sample": 1.0814806653410196,
+            "target_verify_seconds_per_sample": 2.3543489030599596,
+            "target_prefill_seconds_per_sample": 0.27163161754608156,
+            "wall_seconds_per_sample": 4.006444660248235,
+            "speedup_vs_target_only": 0.7069685308419206,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0005000.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.8324302953551523,
+          "decode_tokens_per_second": 25.441932363939866
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "p6250": {
+        "runs": {
+          "ckpt_step0006250.pt": {
+            "mean_al": 2.8681592039800994,
+            "acceptance_rate": 0.26858985844830674,
+            "per_slot_acceptance": [
+              0.6884328358208955,
+              0.4470074812967581,
+              0.28142589118198874,
+              0.18706842435655996,
+              0.12641509433962264,
+              0.08443604284814114,
+              0.05755850727387729
+            ],
+            "target_forward_calls": 4683,
+            "speculative_rounds": 1608,
+            "verify_steps": 1608,
+            "tokens_per_target_forward": 0.9848387785607516,
+            "target_forwards_per_round": 2.912313432835821,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 2998,
+            "draft_tokens": 11162,
+            "draft_seconds_per_sample": 1.0590157379359006,
+            "target_verify_seconds_per_sample": 2.379583433777094,
+            "target_prefill_seconds_per_sample": 0.23662265253067016,
+            "wall_seconds_per_sample": 3.9732026049750857,
+            "speedup_vs_target_only": 0.6993389799991169,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0006250.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.7786154570931103,
+          "decode_tokens_per_second": 25.934679020100628
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "pfinal": {
+        "runs": {
+          "ckpt_final.pt": {
+            "mean_al": 2.922686945500634,
+            "acceptance_rate": 0.2761487165433452,
+            "per_slot_acceptance": [
+              0.6907477820025348,
+              0.4691671964399237,
+              0.29336734693877553,
+              0.19334186939820744,
+              0.13213598460551634,
+              0.08676092544987146,
+              0.05931656995486783
+            ],
+            "target_forward_calls": 4684,
+            "speculative_rounds": 1578,
+            "verify_steps": 1578,
+            "tokens_per_target_forward": 0.9846285226302306,
+            "target_forwards_per_round": 2.9683143219264894,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 3023,
+            "draft_tokens": 10947,
+            "draft_seconds_per_sample": 0.364264344856143,
+            "target_verify_seconds_per_sample": 2.178969538748264,
+            "target_prefill_seconds_per_sample": 0.11082481122016907,
+            "wall_seconds_per_sample": 2.6956819685874507,
+            "speedup_vs_target_only": 0.83844900052116,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_final.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.260191852285061,
+          "decode_tokens_per_second": 31.883355356380296
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "test_final": {
+        "runs": {
+          "ckpt_final.pt": {
+            "mean_al": 2.8022598870056497,
+            "acceptance_rate": 0.26098497928176795,
+            "per_slot_acceptance": [
+              0.6703493580173187,
+              0.4324648098233004,
+              0.27874774232390126,
+              0.18518518518518517,
+              0.12103746397694524,
+              0.0791476407914764,
+              0.048944631385744876
+            ],
+            "target_forward_calls": 19152,
+            "speculative_rounds": 6726,
+            "verify_steps": 6726,
+            "tokens_per_target_forward": 0.9841269841269841,
+            "target_forwards_per_round": 2.847457627118644,
+            "num_samples": 256,
+            "new_tokens": 18848,
+            "accepted_tokens": 12093,
+            "draft_tokens": 46336,
+            "draft_seconds_per_sample": 0.35776643532514574,
+            "target_verify_seconds_per_sample": 2.18185732242465,
+            "target_prefill_seconds_per_sample": 0.11162934556603432,
+            "wall_seconds_per_sample": 2.6923302029026672,
+            "speedup_vs_target_only": 0.8356066292200536,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 256,
+          "token_exact": true,
+          "runs": {
+            "ckpt_final.pt": {
+              "num_prompts": 256,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 73.625,
+          "wall_seconds_per_sample": 2.2497289655948407,
+          "decode_tokens_per_second": 32.72616440733479
+        },
+        "settings": {
+          "num_prompts": 256,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      }
+    },
+    "periodic": [
+      {
+        "time": "2026-10-16 01:40:39",
+        "checkpoint": "ckpt_step0001250.pt",
+        "tag": "p1250",
+        "rc": 0,
+        "wall_seconds": 842.6,
+        "mean_al": 2.0543429844097996,
+        "acceptance_rate": 0.15106711236821804,
+        "per_slot_acceptance": [
+          0.5198572066041945,
+          0.2621923937360179,
+          0.13728129205921938,
+          0.06837606837606838,
+          0.03564981949458484,
+          0.019013128112267994,
+          0.009078529278256923
+        ],
+        "target_forward_calls": 4665,
+        "tokens_per_target_forward": 0.9886387995712754,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 02:05:26",
+        "checkpoint": "ckpt_step0001875.pt",
+        "tag": "p1875",
+        "rc": 0,
+        "wall_seconds": 484.2,
+        "mean_al": 2.277530864197531,
+        "acceptance_rate": 0.18378108743675622,
+        "per_slot_acceptance": [
+          0.5828797624938149,
+          0.32043650793650796,
+          0.1791044776119403,
+          0.10623441396508729,
+          0.0535,
+          0.025589563472152535,
+          0.012072434607645875
+        ],
+        "target_forward_calls": 4677,
+        "tokens_per_target_forward": 0.9861022022664101,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 02:40:03",
+        "checkpoint": "ckpt_step0002500.pt",
+        "tag": "p2500",
+        "rc": 0,
+        "wall_seconds": 542.1,
+        "mean_al": 2.3117794486215537,
+        "acceptance_rate": 0.18804159445407279,
+        "per_slot_acceptance": [
+          0.5807422266800402,
+          0.33182503770739064,
+          0.18850806451612903,
+          0.10661950480040425,
+          0.055752660922453116,
+          0.028963414634146343,
+          0.017338092809790925
+        ],
+        "target_forward_calls": 4669,
+        "tokens_per_target_forward": 0.9877918183765261,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 03:54:26",
+        "checkpoint": "ckpt_step0003750.pt",
+        "tag": "p3750",
+        "rc": 0,
+        "wall_seconds": 1265.5,
+        "mean_al": 2.5494748479823106,
+        "acceptance_rate": 0.22290502793296088,
+        "per_slot_acceptance": [
+          0.6105263157894737,
+          0.3759022765130483,
+          0.2391304347826087,
+          0.15259921743991056,
+          0.09360986547085202,
+          0.052779337450870295,
+          0.028716216216216218
+        ],
+        "target_forward_calls": 4681,
+        "tokens_per_target_forward": 0.9852595599230933,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 05:14:34",
+        "checkpoint": "ckpt_step0005000.pt",
+        "tag": "p5000",
+        "rc": 0,
+        "wall_seconds": 764.8,
+        "mean_al": 2.7452380952380953,
+        "acceptance_rate": 0.25085763293310465,
+        "per_slot_acceptance": [
+          0.6553571428571429,
+          0.42388059701492536,
+          0.2619904076738609,
+          0.17127403846153846,
+          0.11552346570397112,
+          0.07297949336550061,
+          0.04779189352692075
+        ],
+        "target_forward_calls": 4681,
+        "tokens_per_target_forward": 0.9852595599230933,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 06:47:55",
+        "checkpoint": "ckpt_step0006250.pt",
+        "tag": "p6250",
+        "rc": 0,
+        "wall_seconds": 806.6,
+        "mean_al": 2.8681592039800994,
+        "acceptance_rate": 0.26858985844830674,
+        "per_slot_acceptance": [
+          0.6884328358208955,
+          0.4470074812967581,
+          0.28142589118198874,
+          0.18706842435655996,
+          0.12641509433962264,
+          0.08443604284814114,
+          0.05755850727387729
+        ],
+        "target_forward_calls": 4683,
+        "tokens_per_target_forward": 0.9848387785607516,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 07:04:52",
+        "checkpoint": "ckpt_final.pt",
+        "tag": "pfinal",
+        "rc": 0,
+        "wall_seconds": 332.8,
+        "mean_al": 2.922686945500634,
+        "acceptance_rate": 0.2761487165433452,
+        "per_slot_acceptance": [
+          0.6907477820025348,
+          0.4691671964399237,
+          0.29336734693877553,
+          0.19334186939820744,
+          0.13213598460551634,
+          0.08676092544987146,
+          0.05931656995486783
+        ],
+        "target_forward_calls": 4684,
+        "tokens_per_target_forward": 0.9846285226302306,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 07:27:10",
+        "checkpoint": "ckpt_final.pt",
+        "tag": "dev_final",
+        "rc": 0,
+        "wall_seconds": 1337.7,
+        "mean_al": 2.855733843662594,
+        "acceptance_rate": 0.2677826049919073,
+        "per_slot_acceptance": [
+          0.6843814585178624,
+          0.4484444444444444,
+          0.28953626634958385,
+          0.18654935878317924,
+          0.1236543062200957,
+          0.08009599520024,
+          0.05283757338551859
+        ],
+        "target_forward_calls": 19689,
+        "tokens_per_target_forward": 0.9852709634821474,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 256
+      },
+      {
+        "time": "2026-10-16 07:49:36",
+        "checkpoint": "ckpt_step0006250.pt",
+        "tag": "dev_step6250",
+        "rc": 0,
+        "wall_seconds": 1345.1,
+        "mean_al": 2.779624588049864,
+        "acceptance_rate": 0.25734378889718695,
+        "per_slot_acceptance": [
+          0.6715538306741412,
+          0.43407386035776113,
+          0.27638627479368755,
+          0.17315514235909354,
+          0.11302068161957472,
+          0.07351651563870214,
+          0.05046948356807512
+        ],
+        "target_forward_calls": 19702,
+        "tokens_per_target_forward": 0.9846208506750583,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 256
+      },
+      {
+        "time": "2026-10-16 08:11:07",
+        "checkpoint": "ckpt_final.pt",
+        "tag": "test_final",
+        "rc": 0,
+        "wall_seconds": 1290.3,
+        "mean_al": 2.8022598870056497,
+        "acceptance_rate": 0.26098497928176795,
+        "per_slot_acceptance": [
+          0.6703493580173187,
+          0.4324648098233004,
+          0.27874774232390126,
+          0.18518518518518517,
+          0.12103746397694524,
+          0.0791476407914764,
+          0.048944631385744876
+        ],
+        "target_forward_calls": 19152,
+        "tokens_per_target_forward": 0.9841269841269841,
+        "token_exact": true,
+        "split": "test.jsonl",
+        "num_prompts": 256
+      }
+    ],
+    "selection": {
+      "time": "2026-10-16 07:49:36",
+      "selection_split": "val.jsonl",
+      "selection_num_prompts": 256,
+      "periodic_64_ranking": {
+        "ckpt_final.pt": 2.922686945500634,
+        "ckpt_step0006250.pt": 2.8681592039800994,
+        "ckpt_step0005000.pt": 2.7452380952380953,
+        "ckpt_step0003750.pt": 2.5494748479823106,
+        "ckpt_step0002500.pt": 2.3117794486215537,
+        "ckpt_step0001875.pt": 2.277530864197531,
+        "ckpt_step0001250.pt": 2.0543429844097996
+      },
+      "skipped_missing_candidates": [],
+      "confirmed_full_dev": {
+        "ckpt_final.pt": 2.855733843662594,
+        "ckpt_step0006250.pt": 2.779624588049864
+      },
+      "best_ckpt": "ckpt_final.pt",
+      "best_full_dev_al": 2.855733843662594,
+      "note": "test split is evaluated for reporting only and never selects the checkpoint",
+      "test_report": {
+        "ckpt_final.pt": {
+          "split": "test.jsonl",
+          "num_prompts": 256,
+          "mean_al": 2.8022598870056497,
+          "acceptance_rate": 0.26098497928176795,
+          "per_slot_acceptance": [
+            0.6703493580173187,
+            0.4324648098233004,
+            0.27874774232390126,
+            0.18518518518518517,
+            0.12103746397694524,
+            0.0791476407914764,
+            0.048944631385744876
+          ],
+          "target_forward_calls": 19152,
+          "tokens_per_target_forward": 0.9841269841269841
+        }
+      }
+    },
+    "train": {
+      "rows": 7500,
+      "last_step": 7500,
+      "last": {
+        "step": 7500,
+        "loss": 1.5,
+        "accuracy": 0.5861081480979919,
+        "accept_len": 3.1785714626312256,
+        "valid_tokens": 2793,
+        "lr": 2.9999999999999997e-05,
+        "grad_norm": 1.6804136037826538,
+        "fusion_entropy_mean": 0.47884315252304077,
+        "fusion_entropy_min": 0.3922826945781708,
+        "fusion_num_layers": 3.0,
+        "fusion_trainable": 1.0,
+        "fusion_weight_abs_mean": 1.8449897766113281,
+        "fusion_weights_source_fp32_master": 1.0,
+        "fusion_prob_l1_drift": 0.011113529093563557,
+        "fusion_prob_l1_drift_live": 0.011021732352674007,
+        "context_base_abs_mean": 5.499821662902832,
+        "context_fusion_residual_abs_mean": 1.346393326918284,
+        "correction_enabled": 1.0,
+        "correction_delta_abs_mean": 1.531283974647522,
+        "ce_loss": 0.7740876078605652,
+        "e2e_tv_loss": 0.7230217456817627,
+        "e2e_accept_len": 1.7114779949188232,
+        "recipe_stage": 1.0,
+        "slot0_accuracy": 0.7166666388511658
+      },
+      "wall_seconds": null
+    },
+    "train_summary": {
+      "steps": 7500,
+      "final_loss": 1.5,
+      "feature_source": {
+        "format": "vlm-dflash-online-source-v1",
+        "digest_version": "vlm-dflash-online-source-digest-v2",
+        "feature_mode": "online",
+        "backend": "huggingface",
+        "num_samples": 20000,
+        "online_batch_size": 8,
+        "seq_length": 2048,
+        "storage_dtype": "bfloat16",
+        "stores_final_hidden": true,
+        "draft_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "capture_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "hidden_size": 2048,
+        "hidden_layout": "concat_capture_layers",
+        "target_dtype": "bfloat16",
+        "attn_implementation": "sdpa",
+        "target_device": "cuda:0",
+        "target_train_device": "cuda:0",
+        "digest": "23c6c5899fc5dd3d439a1f51ee4ecd9e3d0978939ef8ab7589a1d2f4c60b1f32",
+        "target_resident_params": 3754622976,
+        "target_resident_bytes": 7509245952,
+        "extractions": {
+          "overfit": {
+            "target_forwards": 1,
+            "wall_seconds": 0.5056414045393467,
+            "prepare_seconds": 0.0541037879884243,
+            "forward_seconds": 0.4515376165509224,
+            "target_samples": 4,
+            "target_device_peak_gb": 25.598420992
+          },
+          "train": {
+            "target_forwards": 7500,
+            "wall_seconds": 11364.11437966302,
+            "target_device_peak_gb": 47.616912896,
+            "prepare_seconds": 4460.0713534504175,
+            "target_samples": 58935,
+            "forward_seconds": 6904.043026212603
+          },
+          "visual_check": {
+            "target_forwards": 0,
+            "wall_seconds": 0.0,
+            "target_device_peak_gb": 7.701311488
+          }
+        },
+        "target_forwards_total": 7501,
+        "target_samples_total": 58939,
+        "extraction_wall_seconds_total": 11364.62002106756,
+        "extraction_prepare_seconds_total": 4460.125457238406,
+        "extraction_forward_seconds_total": 6904.494563829154,
+        "fast_forward_items_total": 0,
+        "feature_cache": {
+          "capacity_bytes": 34359738368,
+          "hits": 1861,
+          "misses": 58939,
+          "stores": 58939,
+          "evictions": 54542,
+          "skipped_too_large": 0,
+          "peak_bytes": 34359736680,
+          "enabled": true,
+          "current_bytes": 34355040560,
+          "note": "opt-in bounded host-RAM retention of extracted records across epochs (train.online_feature_cache_gb; 0 = disabled). A cache hit replaces the target forward for that row; hits/misses are per lookup, evictions are LRU byte-cap evictions, and the cache is runtime-only."
+        },
+        "target_forwards_note": "target_forwards counts model forward calls; target_samples counts extracted rows. They differ when train.online_batch_size > 1 (one forward per capture group).",
+        "extraction_wall_seconds_note": "wall_seconds is the full extraction boundary for one row: render/decode + processor (prepare_seconds) plus the teacher-forced target forward and record finalisation (forward_seconds), with the target device synchronized around each timed stage. Per-sample reads (extract) and batched reads (fetch_batch) charge the same boundary, so their extraction_wall_seconds_total values are comparable. Counters are per phase (train / overfit sanity / calibration); the startup visual-path check runs a fixed 3 capture forwards outside these counters, and a resumed run answers fast-forwarded items with cheap placeholders that consume no target work (counted as fast_forward_items, never as wall_seconds)",
+        "target_device_peak_note": "target_device_peak_gb is the CUDA peak on the target's device during that phase (reset per phase). When target.device == train.device the phase peak includes the trainer's own allocations; on split devices it isolates the target, which target_resident_bytes (weights only) cannot show."
+      }
+    },
+    "run_complete": {
+      "time": "2026-10-16 08:11:07",
+      "event": "run_complete",
+      "evaluated": {
+        "ckpt_step0001250.pt": 2.0543429844097996,
+        "ckpt_step0001875.pt": 2.277530864197531,
+        "ckpt_step0002500.pt": 2.3117794486215537,
+        "ckpt_step0003750.pt": 2.5494748479823106,
+        "ckpt_step0005000.pt": 2.7452380952380953,
+        "ckpt_step0006250.pt": 2.8681592039800994,
+        "ckpt_final.pt": 2.922686945500634
+      },
+      "best_ckpt": "ckpt_final.pt",
+      "best_al": 2.922686945500634,
+      "wall_min": 475.7
+    },
+    "last_tick": {
+      "time": "2026-10-16 06:58:59",
+      "event": "tick",
+      "step": 7500,
+      "total_steps": 7500,
+      "elapsed_min": 403.5,
+      "s_per_step": 2.631,
+      "eta_hours": 0.0,
+      "home_free_gb": 0.48,
+      "train_gpu_util": 0,
+      "train_gpu_free_mib": 2003,
+      "evaluated": {
+        "ckpt_step0001250.pt": 2.0543429844097996,
+        "ckpt_step0001875.pt": 2.277530864197531,
+        "ckpt_step0002500.pt": 2.3117794486215537,
+        "ckpt_step0003750.pt": 2.5494748479823106,
+        "ckpt_step0005000.pt": 2.7452380952380953,
+        "ckpt_step0006250.pt": 2.8681592039800994
+      },
+      "best_al": 2.8681592039800994,
+      "best_ckpt": "ckpt_step0006250.pt"
+    }
+  },
+  "r5": {
+    "arm": "r5",
+    "eval": {
+      "p1250": {
+        "runs": {
+          "ckpt_step0001250.pt": {
+            "mean_al": 2.036203090507726,
+            "acceptance_rate": 0.1482471209518356,
+            "per_slot_acceptance": [
+              0.517683465959328,
+              0.2556490917146655,
+              0.12444444444444444,
+              0.06948775055679288,
+              0.03794642857142857,
+              0.018344519015659956,
+              0.008976660682226212
+            ],
+            "target_forward_calls": 4667,
+            "speculative_rounds": 2265,
+            "verify_steps": 2265,
+            "tokens_per_target_forward": 0.9882151274908935,
+            "target_forwards_per_round": 2.060485651214128,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 2330,
+            "draft_tokens": 15717,
+            "draft_seconds_per_sample": 1.3821903633773327,
+            "target_verify_seconds_per_sample": 2.1783352124094963,
+            "target_prefill_seconds_per_sample": 0.13370939362049103,
+            "wall_seconds_per_sample": 3.790370054572122,
+            "speedup_vs_target_only": 0.6038242889854534,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0001250.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.288717503193766,
+          "decode_tokens_per_second": 31.48597408786413
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "p1875": {
+        "runs": {
+          "ckpt_step0001875.pt": {
+            "mean_al": 2.210930009587728,
+            "acceptance_rate": 0.17412350459857548,
+            "per_slot_acceptance": [
+              0.5664906385021603,
+              0.30813673567645644,
+              0.16264478764478765,
+              0.0866408518877057,
+              0.049490538573508006,
+              0.02531645569620253,
+              0.013671875
+            ],
+            "target_forward_calls": 4682,
+            "speculative_rounds": 2086,
+            "verify_steps": 2086,
+            "tokens_per_target_forward": 0.9850491243058522,
+            "target_forwards_per_round": 2.2444870565675936,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 2518,
+            "draft_tokens": 14461,
+            "draft_seconds_per_sample": 0.6130624905228614,
+            "target_verify_seconds_per_sample": 2.0806137987971307,
+            "target_prefill_seconds_per_sample": 0.11526893818378449,
+            "wall_seconds_per_sample": 2.846432140097022,
+            "speedup_vs_target_only": 0.8419296097016434,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0001875.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.3964955007540993,
+          "decode_tokens_per_second": 30.06995004886271
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "p2500": {
+        "runs": {
+          "ckpt_step0002500.pt": {
+            "mean_al": 2.3071535767883944,
+            "acceptance_rate": 0.18700886742123857,
+            "per_slot_acceptance": [
+              0.5875875875875876,
+              0.3232931726907631,
+              0.1790744466800805,
+              0.10494450050454086,
+              0.05873417721518987,
+              0.032470826991374935,
+              0.01628498727735369
+            ],
+            "target_forward_calls": 4665,
+            "speculative_rounds": 1999,
+            "verify_steps": 1999,
+            "tokens_per_target_forward": 0.9886387995712754,
+            "target_forwards_per_round": 2.3336668334167086,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 2594,
+            "draft_tokens": 13871,
+            "draft_seconds_per_sample": 0.6017393137812614,
+            "target_verify_seconds_per_sample": 2.0892900996804236,
+            "target_prefill_seconds_per_sample": 0.12621261382102966,
+            "wall_seconds_per_sample": 2.853950968128629,
+            "speedup_vs_target_only": 0.7784235233489988,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0002500.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.2215825680759735,
+          "decode_tokens_per_second": 32.43746194066086
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "p3750": {
+        "runs": {
+          "ckpt_step0003750.pt": {
+            "mean_al": 2.5257393209200436,
+            "acceptance_rate": 0.21936961845327435,
+            "per_slot_acceptance": [
+              0.6130625686059276,
+              0.36688668866886687,
+              0.22694643843180562,
+              0.14499169894853348,
+              0.09584487534626039,
+              0.051637978900610775,
+              0.030083565459610027
+            ],
+            "target_forward_calls": 4673,
+            "speculative_rounds": 1826,
+            "verify_steps": 1826,
+            "tokens_per_target_forward": 0.986946287181682,
+            "target_forwards_per_round": 2.559145673603505,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 2777,
+            "draft_tokens": 12659,
+            "draft_seconds_per_sample": 0.9290795636624098,
+            "target_verify_seconds_per_sample": 2.288525723963976,
+            "target_prefill_seconds_per_sample": 0.22348819100856782,
+            "wall_seconds_per_sample": 3.6816505520546343,
+            "speedup_vs_target_only": 0.7520347585784991,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0003750.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.7687291840848047,
+          "decode_tokens_per_second": 26.027283713491844
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "p5000": {
+        "runs": {
+          "ckpt_step0005000.pt": {
+            "mean_al": 2.7387173396674585,
+            "acceptance_rate": 0.24959370455906252,
+            "per_slot_acceptance": [
+              0.6466745843230404,
+              0.4175104228707564,
+              0.26240286909742977,
+              0.170760934691432,
+              0.11831831831831832,
+              0.07456404088995791,
+              0.05006031363088058
+            ],
+            "target_forward_calls": 4689,
+            "speculative_rounds": 1684,
+            "verify_steps": 1684,
+            "tokens_per_target_forward": 0.9835785881851141,
+            "target_forwards_per_round": 2.784441805225653,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 2918,
+            "draft_tokens": 11691,
+            "draft_seconds_per_sample": 1.246093860298395,
+            "target_verify_seconds_per_sample": 2.8279769897460936,
+            "target_prefill_seconds_per_sample": 0.3225557634830475,
+            "wall_seconds_per_sample": 4.865954948298167,
+            "speedup_vs_target_only": 0.6895885479141727,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0005000.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 3.3555068070127163,
+          "decode_tokens_per_second": 21.475891465752852
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "p6250": {
+        "runs": {
+          "ckpt_step0006250.pt": {
+            "mean_al": 2.884302689180738,
+            "acceptance_rate": 0.27018270182701826,
+            "per_slot_acceptance": [
+              0.6752190237797246,
+              0.44200626959247646,
+              0.2941546197360151,
+              0.1953371140516698,
+              0.13068181818181818,
+              0.08981657179000632,
+              0.057777777777777775
+            ],
+            "target_forward_calls": 4676,
+            "speculative_rounds": 1599,
+            "verify_steps": 1599,
+            "tokens_per_target_forward": 0.9863130881094953,
+            "target_forwards_per_round": 2.92432770481551,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 3002,
+            "draft_tokens": 11111,
+            "draft_seconds_per_sample": 1.1421818931400776,
+            "target_verify_seconds_per_sample": 2.852119537770748,
+            "target_prefill_seconds_per_sample": 0.32904221773147585,
+            "wall_seconds_per_sample": 4.748548090195982,
+            "speedup_vs_target_only": 0.7899588632261935,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_step0006250.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 3.75115765130613,
+          "decode_tokens_per_second": 19.210736177645927
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      },
+      "pfinal": {
+        "runs": {
+          "ckpt_final.pt": {
+            "mean_al": 2.9171410499683743,
+            "acceptance_rate": 0.27518673711058483,
+            "per_slot_acceptance": [
+              0.6793168880455408,
+              0.45685279187817257,
+              0.29980903882877147,
+              0.20178799489144317,
+              0.13618925831202047,
+              0.08706786171574904,
+              0.05840821566110398
+            ],
+            "target_forward_calls": 4675,
+            "speculative_rounds": 1581,
+            "verify_steps": 1581,
+            "tokens_per_target_forward": 0.986524064171123,
+            "target_forwards_per_round": 2.956989247311828,
+            "num_samples": 64,
+            "new_tokens": 4612,
+            "accepted_tokens": 3021,
+            "draft_tokens": 10978,
+            "draft_seconds_per_sample": 0.6444616681784392,
+            "target_verify_seconds_per_sample": 2.1955373107492924,
+            "target_prefill_seconds_per_sample": 0.18054565727710725,
+            "wall_seconds_per_sample": 3.1636992762214504,
+            "speedup_vs_target_only": 0.7663086441733942,
+            "role": "trained drafter"
+          }
+        },
+        "equivalence_check": {
+          "num_prompts": 64,
+          "token_exact": true,
+          "runs": {
+            "ckpt_final.pt": {
+              "num_prompts": 64,
+              "token_exact": true,
+              "failed_ids": []
+            }
+          },
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "max_new_tokens": 128,
+          "verification": "sequential",
+          "sequential_target_verification": true,
+          "strict_parallel_margin": null,
+          "verify_sdpa_backend": "parity",
+          "verify_backend_switch_enabled": false,
+          "note": "Parity mode (sequential verification + generate()-backend logits) reproduces target-only greedy exactly. Parallel block verification can flip bf16 near-tie argmax decisions (see parallel_diagnostic)."
+        },
+        "target_only": {
+          "role": "output/speed reference (no drafter; AL is undefined without draft proposals)",
+          "mean_new_tokens": 72.0625,
+          "wall_seconds_per_sample": 2.424370102933608,
+          "decode_tokens_per_second": 29.724215751052533
+        },
+        "settings": {
+          "num_prompts": 64,
+          "workload": null,
+          "max_new_tokens": 128,
+          "temperature": 0.0,
+          "dtype": "bfloat16",
+          "attn_impl": "sdpa",
+          "block_size": 8,
+          "target_tie_word_embeddings": true
+        },
+        "al_definition": "AL = new_tokens / target_verification_steps (bonus-token-inclusive tokens per target forward)"
+      }
+    },
+    "periodic": [
+      {
+        "time": "2026-10-16 02:56:49",
+        "checkpoint": "ckpt_step0001250.pt",
+        "tag": "p1250",
+        "rc": 0,
+        "wall_seconds": 483.1,
+        "mean_al": 2.036203090507726,
+        "acceptance_rate": 0.1482471209518356,
+        "per_slot_acceptance": [
+          0.517683465959328,
+          0.2556490917146655,
+          0.12444444444444444,
+          0.06948775055679288,
+          0.03794642857142857,
+          0.018344519015659956,
+          0.008976660682226212
+        ],
+        "target_forward_calls": 4667,
+        "tokens_per_target_forward": 0.9882151274908935,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 03:32:38",
+        "checkpoint": "ckpt_step0001875.pt",
+        "tag": "p1875",
+        "rc": 0,
+        "wall_seconds": 762.7,
+        "mean_al": 2.210930009587728,
+        "acceptance_rate": 0.17412350459857548,
+        "per_slot_acceptance": [
+          0.5664906385021603,
+          0.30813673567645644,
+          0.16264478764478765,
+          0.0866408518877057,
+          0.049490538573508006,
+          0.02531645569620253,
+          0.013671875
+        ],
+        "target_forward_calls": 4682,
+        "tokens_per_target_forward": 0.9850491243058522,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 04:57:56",
+        "checkpoint": "ckpt_step0002500.pt",
+        "tag": "p2500",
+        "rc": 0,
+        "wall_seconds": 502.3,
+        "mean_al": 2.3071535767883944,
+        "acceptance_rate": 0.18700886742123857,
+        "per_slot_acceptance": [
+          0.5875875875875876,
+          0.3232931726907631,
+          0.1790744466800805,
+          0.10494450050454086,
+          0.05873417721518987,
+          0.032470826991374935,
+          0.01628498727735369
+        ],
+        "target_forward_calls": 4665,
+        "tokens_per_target_forward": 0.9886387995712754,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 05:52:58",
+        "checkpoint": "ckpt_step0003750.pt",
+        "tag": "p3750",
+        "rc": 0,
+        "wall_seconds": 665.1,
+        "mean_al": 2.5257393209200436,
+        "acceptance_rate": 0.21936961845327435,
+        "per_slot_acceptance": [
+          0.6130625686059276,
+          0.36688668866886687,
+          0.22694643843180562,
+          0.14499169894853348,
+          0.09584487534626039,
+          0.051637978900610775,
+          0.030083565459610027
+        ],
+        "target_forward_calls": 4673,
+        "tokens_per_target_forward": 0.986946287181682,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 07:42:40",
+        "checkpoint": "ckpt_step0005000.pt",
+        "tag": "p5000",
+        "rc": 0,
+        "wall_seconds": 562.6,
+        "mean_al": 2.7387173396674585,
+        "acceptance_rate": 0.24959370455906252,
+        "per_slot_acceptance": [
+          0.6466745843230404,
+          0.4175104228707564,
+          0.26240286909742977,
+          0.170760934691432,
+          0.11831831831831832,
+          0.07456404088995791,
+          0.05006031363088058
+        ],
+        "target_forward_calls": 4689,
+        "tokens_per_target_forward": 0.9835785881851141,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 08:29:56",
+        "checkpoint": "ckpt_step0006250.pt",
+        "tag": "p6250",
+        "rc": 0,
+        "wall_seconds": 583.5,
+        "mean_al": 2.884302689180738,
+        "acceptance_rate": 0.27018270182701826,
+        "per_slot_acceptance": [
+          0.6752190237797246,
+          0.44200626959247646,
+          0.2941546197360151,
+          0.1953371140516698,
+          0.13068181818181818,
+          0.08981657179000632,
+          0.057777777777777775
+        ],
+        "target_forward_calls": 4676,
+        "tokens_per_target_forward": 0.9863130881094953,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      },
+      {
+        "time": "2026-10-16 09:15:58",
+        "checkpoint": "ckpt_final.pt",
+        "tag": "pfinal",
+        "rc": 0,
+        "wall_seconds": 378.6,
+        "mean_al": 2.9171410499683743,
+        "acceptance_rate": 0.27518673711058483,
+        "per_slot_acceptance": [
+          0.6793168880455408,
+          0.45685279187817257,
+          0.29980903882877147,
+          0.20178799489144317,
+          0.13618925831202047,
+          0.08706786171574904,
+          0.05840821566110398
+        ],
+        "target_forward_calls": 4675,
+        "tokens_per_target_forward": 0.986524064171123,
+        "token_exact": true,
+        "split": "val.jsonl",
+        "num_prompts": 64
+      }
+    ],
+    "selection": null,
+    "train": {
+      "rows": 7500,
+      "last_step": 7500,
+      "last": {
+        "step": 7500,
+        "loss": 1.8515625,
+        "accuracy": 0.5169366598129272,
+        "accept_len": 2.7100000381469727,
+        "valid_tokens": 2037,
+        "lr": 2.9999999999999997e-05,
+        "grad_norm": 1.7039544582366943,
+        "fusion_entropy_mean": 0.47898736596107483,
+        "fusion_entropy_min": 0.3589991331100464,
+        "fusion_num_layers": 3.0,
+        "fusion_trainable": 1.0,
+        "fusion_weight_abs_mean": 1.922513484954834,
+        "fusion_weights_source_fp32_master": 1.0,
+        "fusion_prob_l1_drift": 0.022197343409061432,
+        "fusion_prob_l1_drift_live": 0.021981729194521904,
+        "context_base_abs_mean": 6.09141731262207,
+        "context_fusion_residual_abs_mean": 1.5197441935539246,
+        "correction_enabled": 1.0,
+        "correction_delta_abs_mean": 1.5750436782836914,
+        "ce_loss": 1.066233515739441,
+        "e2e_tv_loss": 0.7872081398963928,
+        "e2e_accept_len": 1.3423783779144287,
+        "recipe_stage": 1.0,
+        "slot0_accuracy": 0.6433333158493042
+      },
+      "wall_seconds": null
+    },
+    "train_summary": {
+      "steps": 7500,
+      "final_loss": 1.8515625,
+      "feature_source": {
+        "format": "vlm-dflash-online-source-v1",
+        "digest_version": "vlm-dflash-online-source-digest-v2",
+        "feature_mode": "online",
+        "backend": "huggingface",
+        "num_samples": 20000,
+        "online_batch_size": 8,
+        "seq_length": 2048,
+        "storage_dtype": "bfloat16",
+        "stores_final_hidden": true,
+        "draft_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "capture_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "hidden_size": 2048,
+        "hidden_layout": "concat_capture_layers",
+        "target_dtype": "bfloat16",
+        "attn_implementation": "sdpa",
+        "target_device": "cuda:0",
+        "target_train_device": "cuda:0",
+        "digest": "cd275ed13463c30d3d0fbf13bdee3ec44dcaeb02561f6a2f234b53b7eac58670",
+        "target_resident_params": 3754622976,
+        "target_resident_bytes": 7509245952,
+        "extractions": {
+          "train": {
+            "target_forwards": 7499,
+            "wall_seconds": 3809.0315801184624,
+            "prepare_seconds": 576.5173030756414,
+            "forward_seconds": 3232.514277042821,
+            "fast_forward_items": 30000,
+            "target_samples": 29475,
+            "target_device_peak_gb": 34.869710336
+          }
+        },
+        "target_forwards_total": 7499,
+        "target_samples_total": 29475,
+        "extraction_wall_seconds_total": 3809.0315801184624,
+        "extraction_prepare_seconds_total": 576.5173030756414,
+        "extraction_forward_seconds_total": 3232.514277042821,
+        "fast_forward_items_total": 30000,
+        "feature_cache": {
+          "capacity_bytes": 34359738368,
+          "hits": 525,
+          "misses": 29475,
+          "stores": 29475,
+          "evictions": 25078,
+          "skipped_too_large": 0,
+          "peak_bytes": 34359736680,
+          "enabled": true,
+          "current_bytes": 34355040560,
+          "note": "opt-in bounded host-RAM retention of extracted records across epochs (train.online_feature_cache_gb; 0 = disabled). A cache hit replaces the target forward for that row; hits/misses are per lookup, evictions are LRU byte-cap evictions, and the cache is runtime-only."
+        },
+        "target_forwards_note": "target_forwards counts model forward calls; target_samples counts extracted rows. They differ when train.online_batch_size > 1 (one forward per capture group).",
+        "extraction_wall_seconds_note": "wall_seconds is the full extraction boundary for one row: render/decode + processor (prepare_seconds) plus the teacher-forced target forward and record finalisation (forward_seconds), with the target device synchronized around each timed stage. Per-sample reads (extract) and batched reads (fetch_batch) charge the same boundary, so their extraction_wall_seconds_total values are comparable. Counters are per phase (train / overfit sanity / calibration); the startup visual-path check runs a fixed 3 capture forwards outside these counters, and a resumed run answers fast-forwarded items with cheap placeholders that consume no target work (counted as fast_forward_items, never as wall_seconds)",
+        "target_device_peak_note": "target_device_peak_gb is the CUDA peak on the target's device during that phase (reset per phase). When target.device == train.device the phase peak includes the trainer's own allocations; on split devices it isolates the target, which target_resident_bytes (weights only) cannot show."
+      }
+    },
+    "run_complete": null,
+    "last_tick": {
+      "time": "2026-10-16 09:09:19",
+      "event": "tick",
+      "step": 7500,
+      "total_steps": 7500,
+      "elapsed_min": 154.6,
+      "s_per_step": 2.383,
+      "eta_hours": 0.0,
+      "home_free_gb": 1.78,
+      "train_gpu_util": 0,
+      "train_gpu_free_mib": 13977,
+      "evaluated": {
+        "ckpt_step0001250.pt": 2.036203090507726,
+        "ckpt_step0001875.pt": 2.210930009587728,
+        "ckpt_step0002500.pt": 2.3071535767883944,
+        "ckpt_step0003750.pt": 2.5257393209200436,
+        "ckpt_step0005000.pt": 2.7387173396674585,
+        "ckpt_step0006250.pt": 2.884302689180738
+      },
+      "best_al": 2.884302689180738,
+      "best_ckpt": "ckpt_step0006250.pt"
+    }
+  }
+}

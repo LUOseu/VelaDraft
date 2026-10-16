@@ -276,6 +276,7 @@ def run_checkpoints(
                     "id": entry["id"],
                     "new_tokens": len(spec_tokens),
                     "verify_steps": int(stats["verify_steps"]),
+                    "target_forward_calls": int(stats.get("target_forward_calls", 0)),
                     "accepted_tokens": int(stats["accepted_tokens"]),
                     "draft_tokens": int(stats["draft_tokens"]),
                     "acceptance_events": stats["acceptance_events"],
@@ -296,8 +297,18 @@ def run_checkpoints(
                     # aggregate in ``summarize_samples``) so downstream analyses
                     # can build paired per-prompt statistics + CIs.
                     "verify_steps": int(stats["verify_steps"]),
+                    # Actual target forward invocations (prefill + verify
+                    # forwards + strict fallbacks); NOT equal to rounds.
+                    "target_forward_calls": int(stats.get("target_forward_calls", 0)),
                     "accepted_tokens": int(stats["accepted_tokens"]),
                     "draft_tokens": int(stats["draft_tokens"]),
+                    # Per-prompt wall decomposition (same fields the aggregate
+                    # ``summarize_samples`` averages); recorded so ML analyses
+                    # (E3) can pair prefill/decode/verify with prompt features.
+                    "wall_seconds": wall,
+                    "target_verify_seconds": float(stats.get("target_verify_seconds", 0.0)),
+                    "target_prefill_seconds": float(stats.get("target_prefill_seconds", 0.0)),
+                    "draft_seconds": float(stats.get("draft_seconds", 0.0)),
                     "spec_tokens": spec_tokens,
                     "target_tokens": entry["tokens"],
                 }

@@ -109,6 +109,7 @@ class _DFlashGenerationStats(TypedDict):
     strict_parallel_rounds: float
     strict_fallback_rounds: float
     strict_min_decision_margin: Optional[float]
+    decision_trace: list[dict]
 
 
 def _min_decision_margin(logits: torch.Tensor, num_positions: int) -> float:
@@ -1322,6 +1323,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         strict_parallel_margin: float | None = None,
         draft_image_context_mode: str = "keep",
         draft_image_token_id: int | None = None,
+        capture_decision_trace: bool = False,
     ) -> torch.LongTensor | tuple[torch.LongTensor, _DFlashGenerationStats]:
         """Run block-parallel speculative decoding against a Transformers target.
 
@@ -1402,14 +1404,54 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         draft_tokens = 0
         accepted_tokens = 0
         verify_steps = 0
+        # Actual target forward invocations (prefill + every verification
+        # forward: one per sequential step, one per parallel block, plus the
+        # sequential re-verify of a strict-parallel fallback). Distinct from
+        # ``verify_steps`` (speculative rounds): under sequential verification
+        # one round issues several target forwards, and a strict fallback
+        # round issues two; rounds must never be reported as target-call
+        # savings.
+        target_forward_calls = 0
         strict_parallel_rounds = 0
         strict_fallback_rounds = 0
         strict_min_decision_margin = float("inf")
         acceptance_events: list[_DFlashAcceptanceEvent] = []
+        # Optional per-verification-forward decision trace, used by the
+        # parallel-vs-sequential mismatch diagnosis (scripts/scale/
+        # diag_parallel_first_divergence.py). Each entry is keyed by the
+        # absolute output position it decides, so the two verification shapes
+        # can be compared position by position.
+        decision_trace: list[dict] = []
+
+        def record_decision(row_logits: torch.Tensor, positions: list[int], shape: str, kv_len: int) -> None:
+            if not capture_decision_trace or row_logits.numel() == 0:
+                return
+            row_logits = row_logits.reshape(-1, row_logits.shape[-1])
+            topk = min(5, row_logits.shape[-1])
+            top2 = torch.topk(row_logits.float(), k=topk, dim=-1)
+            for index, position in enumerate(positions):
+                if index >= top2.values.shape[0]:
+                    break
+                decision_trace.append(
+                    {
+                        "position": int(position),
+                        "shape": shape,
+                        "kv_len": int(kv_len),
+                        "argmax": int(top2.indices[index, 0]),
+                        "top1": float(top2.values[index, 0]),
+                        "top2": float(top2.values[index, 1]),
+                        "margin": float(top2.values[index, 0] - top2.values[index, 1]),
+                        "top_ids": [int(value) for value in top2.indices[index]],
+                        "top_values": [float(value) for value in top2.values[index]],
+                    }
+                )
         timing_events: dict[str, list[tuple[torch.cuda.Event, torch.cuda.Event]]] = {
             "target_prefill": [],
+            "round_prep": [],
             "draft": [],
+            "verify_prep": [],
             "target_verify": [],
+            "commit": [],
         }
 
         def start_timing() -> torch.cuda.Event | None:
@@ -1465,6 +1507,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             prefill_kwargs["position_ids"] = position_ids[:, :num_input_tokens]
             prefill_input_ids = input_ids
         phase_start = start_timing()
+        target_forward_calls += 1
         output = target(prefill_input_ids, **prefill_kwargs)
         end_timing("target_prefill", phase_start)
         output_ids[:, :num_input_tokens] = input_ids
@@ -1527,10 +1570,12 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             round_block_ids: torch.LongTensor,
         ) -> tuple[torch.Tensor, int, torch.Tensor]:
             """Verify the drafted block one target step at a time (generate()-parity path)."""
+            nonlocal target_forward_calls
             posterior_tokens: list[torch.Tensor] = []
             verified_hidden_states: list[torch.Tensor] = []
             acceptance_length = 0
             for block_index in range(round_block_ids.shape[1]):
+                verify_prep_start = start_timing()
                 token_ids = round_block_ids[:, block_index : block_index + 1]
                 if target_is_vlm:
                     prompt_attention_mask = target_kwargs.get("attention_mask")
@@ -1599,11 +1644,19 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                         "use_cache": True,
                     }
                 verify_kwargs["output_hidden_states"] = True
+                end_timing("verify_prep", verify_prep_start)
                 phase_start = start_timing()
+                target_forward_calls += 1
                 with target_verify_backend():
                     step_output = target(verify_input_ids, **verify_kwargs)
                 end_timing("target_verify", phase_start)
                 step_posterior = sample(step_output.logits[:, -1:], temperature)
+                record_decision(
+                    step_output.logits[0, -1],
+                    [round_start + block_index + 1],
+                    "sequential",
+                    past_key_values_target.get_seq_length(),
+                )
                 posterior_tokens.append(step_posterior)
                 verified_hidden_states.append(
                     extract_context_feature(step_output.hidden_states, self.target_layer_ids)
@@ -1622,6 +1675,8 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             round_block_ids: torch.LongTensor,
         ) -> tuple[torch.Tensor, int, torch.Tensor, float]:
             """Verify the whole drafted block in one target forward (fast path)."""
+            nonlocal target_forward_calls
+            verify_prep_start = start_timing()
             if target_is_vlm:
                 prompt_attention_mask = target_kwargs.get("attention_mask")
                 if prompt_attention_mask is None:
@@ -1693,11 +1748,19 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                     "output_hidden_states": True,
                 }
                 verify_kwargs["position_ids"] = position_ids[:, round_start : round_start + round_block_ids.shape[1]]
+            end_timing("verify_prep", verify_prep_start)
             phase_start = start_timing()
+            target_forward_calls += 1
             with target_verify_backend():
                 output = target(verify_input_ids, **verify_kwargs)
             end_timing("target_verify", phase_start)
             posterior = sample(output.logits, temperature)
+            record_decision(
+                output.logits[0],
+                [round_start + row + 1 for row in range(output.logits.shape[1])],
+                "parallel",
+                past_key_values_target.get_seq_length(),
+            )
             acceptance_length = (round_block_ids[:, 1:] == posterior[:, :-1]).cumprod(dim=1).sum(dim=1)[0].item()
             verified_target_hidden = extract_context_feature(output.hidden_states, self.target_layer_ids)
 
@@ -1708,12 +1771,14 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             return posterior, acceptance_length, verified_target_hidden, min_decision_margin
 
         while start < max_length:
+            prep_start = start_timing()
             block_output_ids = output_ids[:, start : start + round_width].clone()
             block_position_ids = position_ids[:, start : start + block_size]
             # The draft always consumes its own block window (anchor + block_size-1
             # mask slots); sample_from_anchor rounds only widen the verification
             # window, not the draft's input block.
             noise_embedding = target_embeddings(block_output_ids[:, :block_size])
+            end_timing("round_prep", prep_start)
             phase_start = start_timing()
             draft_hidden = self(
                 target_hidden=target_hidden,
@@ -1771,6 +1836,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                 block_size=block_output_ids.shape[1],
                 acceptance_length=int(acceptance_length),
             )
+            commit_start = start_timing()
             draft_tokens += round_draft_tokens
             accepted_tokens += round_accepted_tokens
             verify_steps += 1
@@ -1786,6 +1852,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             start += acceptance_length + 1
             past_key_values_target.crop(start)
             target_hidden = verified_target_hidden[:, : acceptance_length + 1, :]
+            end_timing("commit", commit_start)
             if stop_token_ids is not None and any(
                 stop_id in output_ids[:, num_input_tokens:] for stop_id in stop_token_ids
             ):
@@ -1811,9 +1878,11 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             "draft_tokens": float(draft_tokens),
             "accepted_tokens": float(accepted_tokens),
             "verify_steps": float(verify_steps),
+            "target_forward_calls": float(target_forward_calls),
             "acceptance_events": acceptance_events,
             "strict_parallel_rounds": float(strict_parallel_rounds),
             "strict_fallback_rounds": float(strict_fallback_rounds),
+            "decision_trace": decision_trace,
             "strict_min_decision_margin": (
                 None if strict_parallel_rounds == 0 or strict_min_decision_margin == float("inf")
                 else float(strict_min_decision_margin)

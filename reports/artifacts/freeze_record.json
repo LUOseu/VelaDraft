@@ -1,0 +1,15 @@
+{
+  "created": "2026-10-16T00:11:45+0800",
+  "num_kept_total": 23942,
+  "num_frozen": 20000,
+  "num_dropped_excess": 3942,
+  "seed": 42,
+  "selection": "random.Random(seed).shuffle(range(kept)); take first N; frozen rows kept in original file order",
+  "frozen_ids_sha256": "5fc1ae2424cd5847271b4fe823c2a9f590bc76e832ab9ba1e09948ff6a1dba8e",
+  "dropped_ids_sha256": "e5a86d89c2f9d3b32cec48a6b5d8cedaa02a6f7e19783192a4dae2f7143e9c26",
+  "target_data_all_sha256": "9ac59c3effa94867af6ca55617310cd9802c14fe7e19d679aa8af23f6f69037d",
+  "frozen_file_sha256": "44e357c7a1ab5993a7eaf6f987619f236b3e41d26e7ed5bc87a0ab93e33a1584",
+  "answer_tokens_frozen": 1701868,
+  "prompt_tokens_frozen": 7822274,
+  "note": "target_data.jsonl now contains exactly the frozen rows; both R3 and R5 train on it"
+}

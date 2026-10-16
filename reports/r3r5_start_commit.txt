@@ -1,0 +1,23 @@
+5750c23d4f27a4086f5cba0d50214914402b160f
+ M benchmarks/manifests/02_textvqa.json
+ M benchmarks/manifests/03_docvqa.json
+ M benchmarks/manifests/04_chartqa.json
+ M scripts/eval_dflash.py
+ M scripts/prepare_benchmark.py
+ M vlm_dflash/benchmark/adapters.py
+ M vlm_dflash/data/prepare.py
+ M vlm_dflash/dflash/draft_model.py
+ M vlm_dflash/dflash/train.py
+ M vlm_dflash/eval/accept.py
+ M vlm_dflash/eval/run.py
+ M vlm_dflash/target/regen.py
+?? benchmarks/manifests/05_gqa.json
+?? benchmarks/manifests/06_mantis.json
+?? benchmarks/manifests/07_long_answer.json
+?? configs/scale/
+?? reports/
+?? research/cvpr_benchmark/
+?? scripts/scale/
+?? tests/__init__.py
+?? tests/test_benchmark_scoring.py
+?? vlm_dflash/benchmark/scoring.py

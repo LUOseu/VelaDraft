@@ -364,6 +364,7 @@ def run_training_loop(
     resume_state: dict | None = None,
     on_checkpoint=None,
     save_every: int | None = None,
+    extra_save_steps: set[int] | None = None,
 ) -> dict:
     train_cfg = cfg.get("train", {})
     micro_batch = int(train_cfg.get("micro_batch_size", 8))
@@ -688,7 +689,12 @@ def run_training_loop(
                 if log_every and step % log_every == 0:
                     log(f"step {step}/{total_steps} loss={row['loss']:.4f} acc={row['accuracy']:.3f} "
                         f"al={row['accept_len']:.2f}")
-                if on_checkpoint is not None and save_every and step % save_every == 0 and step < total_steps:
+                if (
+                    on_checkpoint is not None
+                    and save_every
+                    and (step % save_every == 0 or step in (extra_save_steps or ()))
+                    and step < total_steps
+                ):
                     on_checkpoint(
                         gather_train_state(
                             module,
@@ -1251,7 +1257,9 @@ def train_dflash(
             # Read-only gate before any write: a refused resume must leave
             # config / ckpt_init / logs / provenance byte-identical, and a legal
             # resume keeps the original ckpt_init instead of regenerating it.
-            resume_path = train_dir / "ckpt_last.pt"
+            resume_dir_cfg2 = train_cfg.get("resume_state_dir")
+            resume_read_dir = Path(str(resume_dir_cfg2)) if resume_dir_cfg2 else train_dir
+            resume_path = resume_read_dir / "ckpt_last.pt"
             if not resume_path.exists():
                 raise FileNotFoundError(f"--resume requested but no resume checkpoint at {resume_path}.")
             resume_state = torch.load(resume_path, map_location="cpu", weights_only=False)
@@ -1288,13 +1296,53 @@ def train_dflash(
             # Exact-resume gate passed: make the log reflect the checkpoint's
             # committed progress before the replay appends new rows.
             _reconcile_train_log(log_path, int(resume_state["step"]))
-        save_every = int(train_cfg.get("save_every_steps", max(1, total_steps // 4)))
+        epochs_for_cadence = max(1, int(train_cfg.get("num_epochs", 6)))
+        steps_per_epoch = max(1, total_steps // epochs_for_cadence)
+        cadence_fraction = train_cfg.get("save_every_fraction_of_epoch")
+        if cadence_fraction is not None:
+            save_every = max(1, int(round(steps_per_epoch * float(cadence_fraction))))
+        else:
+            save_every = int(train_cfg.get("save_every_steps", max(1, total_steps // 4)))
+        milestone_snapshots = bool(train_cfg.get("milestone_snapshots", False))
+        from ..objectives import resolve_recipe as _resolve_recipe
+
+        _recipe = _resolve_recipe(cfg, algorithm.name)
+        boundary_step = _recipe.split_step(total_steps) if _recipe is not None else None
+        extra_save_steps = set()
+        if boundary_step is not None and 0 < int(boundary_step) < total_steps:
+            extra_save_steps.add(int(boundary_step))
+        log(
+            f"train: save cadence every {save_every} steps "
+            f"(stage boundary step={boundary_step}, milestone_snapshots={milestone_snapshots})"
+        )
+
+        resume_dir_cfg = train_cfg.get("resume_state_dir")
+        resume_state_dir = ensure_dir(Path(str(resume_dir_cfg))) if resume_dir_cfg else train_dir
+        if resume_state is not None and resume_state_dir != train_dir:
+            log(f"train: resumable state is staged at {resume_state_dir}")
 
         def write_train_state(state: dict) -> None:
-            tmp_path = train_dir / "ckpt_last.pt.tmp"
+            tmp_path = resume_state_dir / "ckpt_last.pt.tmp"
             torch.save({**checkpoint_common, **state}, tmp_path)
-            tmp_path.replace(train_dir / "ckpt_last.pt")
-            log(f"train: wrote resumable checkpoint (step {state['step']}) -> {train_dir / 'ckpt_last.pt'}")
+            tmp_path.replace(resume_state_dir / "ckpt_last.pt")
+            log(
+                f"train: wrote resumable checkpoint (step {state['step']}) -> "
+                f"{resume_state_dir / 'ckpt_last.pt'}"
+            )
+            # Milestone eval-format snapshot: the train-state above is only the
+            # resume payload (the eval/export loaders reject it by design), so
+            # every scheduled save ALSO drops the pure trainable weights in the
+            # same ``vlm-dflash-ckpt-v1`` format eval loads. The final step is
+            # covered by ckpt_final.pt and is skipped here.
+            if milestone_snapshots and int(state["step"]) < total_steps:
+                snapshot_path = train_dir / f"ckpt_step{int(state['step']):07d}.pt"
+                snapshot_tmp = snapshot_path.with_name(snapshot_path.name + ".tmp")
+                torch.save(
+                    {**checkpoint_common, "step": int(state["step"]), "model": state["model"]},
+                    snapshot_tmp,
+                )
+                snapshot_tmp.replace(snapshot_path)
+                log(f"train: wrote eval-format milestone snapshot (step {state['step']}) -> {snapshot_path.name}")
 
         output = run_training_loop(
             module,
@@ -1309,6 +1357,7 @@ def train_dflash(
             resume_state=resume_state,
             on_checkpoint=write_train_state,
             save_every=save_every,
+            extra_save_steps=extra_save_steps,
         )
         torch.save({**checkpoint_common, "step": output["summary"]["steps"], "model": module.draft_model.state_dict()},
                    train_dir / "ckpt_final.pt")

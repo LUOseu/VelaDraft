@@ -1,0 +1,46 @@
+# R3/R5 next-round shared data config (2026-10-15). One corpus, used by both
+# runs; frozen member list recorded in regen/freeze_record.json.
+dataset:
+  source: llava_instruct
+  annotation: /home/dhz/Data/llava_instruct_150k.json
+  images_dir: /home/dhz/Data/COCO-caption/train2017
+  slice: 24000            # input rows sampled (image-grouped, seed 42)
+  val_size: 256           # fixed dev (first 64 = periodic subset, fixed by file order)
+  test_size: 256          # final test; never used for checkpoint selection
+  seed: 42
+  min_answer_chars: 0
+  image_link_mode: hardlink   # same-filesystem hardlinks: no extra disk for images
+regen:
+  max_new_tokens: 256
+  min_response_tokens: 8
+  batch_size: 64
+  temperature: 0.0
+capture:
+  seq_length: 2048
+  shard_size: 32
+  dtype: bfloat16
+  store_final_hidden: true
+  visual_path_check: true
+  visual_check_samples: 2
+drafter:
+  num_hidden_layers: 3
+  block_size: 8
+  num_anchors: 256
+  loss_decay_gamma: 7.0
+  capture_layer_ids: [1, 17, 33]
+  mask_token_id: 151669
+  attention_backend: flex_attention
+  spatial_rope_enabled: true
+  spatial_rope_mode: replace
+  spatial_rope_sections: [16, 24, 24]
+target:
+  model: /home/lyh/vlm-dflash/assets/models/Qwen2.5-VL-3B-Instruct
+  dtype: bfloat16
+  attn_implementation: sdpa
+  device: cuda:0
+  local_files_only: true
+  image_min_pixels: 200704
+  image_max_pixels: 1003520
+run:
+  name: r3r5_20k_shared
+  dir: runs/r3r5_20k/shared
