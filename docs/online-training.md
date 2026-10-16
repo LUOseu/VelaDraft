@@ -320,6 +320,11 @@ The freeze is logged once (`online cache: pinned plan frozen at epoch end
 `planned_bytes`, `sized_records`). All counters are host-side - no added GPU
 synchronization.
 
+The run summary also carries per-epoch wall seconds (`epoch_wall_seconds`), so
+the cold-epoch-then-warm structure of the gain is directly visible: epoch 1
+pays the same extractions under either policy, and the later epochs carry the
+reuse benefit.
+
 ```bash
 vlm-dflash train --config configs/dfly/qwen2_5_vl_3b_2k.yaml --mode online \
   --run-dir runs/dfly_online \
