@@ -80,7 +80,10 @@ def _stub_cfg(*, store_final_hidden: bool = False, seq_length: int = 64,
     }
 
 
-def _write_online_run_dir(tmp_path: Path, *, rows: int = 4, answer_len: int = 12) -> Path:
+def _write_online_run_dir(tmp_path: Path, *, rows: int = 4, answer_len: int = 12,
+                          answer_lens: list[int] | None = None) -> Path:
+    if answer_lens is not None and len(answer_lens) != rows:
+        raise ValueError("answer_lens must have one entry per row")
     run_dir = tmp_path / "run"
     (run_dir / "data").mkdir(parents=True)
     (run_dir / "regen").mkdir()
@@ -90,6 +93,7 @@ def _write_online_run_dir(tmp_path: Path, *, rows: int = 4, answer_len: int = 12
     )
     payload = []
     for index in range(rows):
+        row_answer_len = answer_len if answer_lens is None else int(answer_lens[index])
         # Real image bytes: the v2 content digest hashes what the loader would
         # actually read, so the files must exist.
         Image.new("RGB", (8, 8), (10 + index, 20, 30)).save(tmp_path / "images" / f"s{index}.png")
@@ -103,7 +107,7 @@ def _write_online_run_dir(tmp_path: Path, *, rows: int = 4, answer_len: int = 12
                 "images": [f"s{index}.png"],
                 "regen": {
                     "prompt_ids": [10 + index] * 6,
-                    "answer_ids": [100 + step for step in range(answer_len)],
+                    "answer_ids": [100 + step for step in range(row_answer_len)],
                 },
             }
         )
@@ -3107,7 +3111,227 @@ def test_online_cache_real_tiny_model_second_epoch_is_free(monkeypatch, tmp_path
 
 
 # --------------------------------------------------------------------------- #
-# 5b. adaptive budget on top of the fixed cache (train.online_feature_cache_adaptive)
+# 5b. static pinned cache policy (train.online_feature_cache_policy)
+# --------------------------------------------------------------------------- #
+
+# Normalized stub-record bytes with ``context_hidden=4`` (see _record_for_row):
+# per token input_ids int64 8B + loss_mask fp32 4B + hidden bf16 4*2B +
+# position3 int64 24B -> 44 bytes; _write_online_run_dir gives every row a
+# 6-token prompt, so a row with answer_len L carries 44 * (6 + L) bytes.
+_PINNED_BYTES_PER_TOKEN = 44
+_PINNED_PROMPT_TOKENS = 6
+
+
+def _pinned_row_bytes(answer_len: int) -> int:
+    return (_PINNED_PROMPT_TOKENS + answer_len) * _PINNED_BYTES_PER_TOKEN
+
+
+def _pinned_cfg(cache_bytes: int, *, policy: str = "pinned", **train_overrides) -> dict:
+    cfg = _stub_cfg()
+    cfg["train"]["online_feature_cache_gb"] = cache_bytes / (1 << 30)
+    cfg["train"]["online_feature_cache_policy"] = policy
+    cfg["train"].update(train_overrides)
+    return cfg
+
+
+def test_online_cache_policy_validates_and_defaults_to_lru(monkeypatch, tmp_path):
+    """Policy accepts lru/pinned only; the default stays the shipped LRU."""
+    run_dir = _write_online_run_dir(tmp_path, rows=1, answer_len=4)
+    source = _stub_source_with_cfg(monkeypatch, run_dir, _cache_cfg(1.0))
+    assert source.cache_policy == "lru"
+    summary = source.summary()["feature_cache"]
+    assert summary["policy"] == "lru" and "pinned" not in summary
+    assert summary["budget_bytes"] == source.cache_capacity_bytes
+    assert summary["saved_extractions"] == 0 and summary["hit_rate"] is None
+
+    for bad in ("fifo", "Pinned", 1, ["pinned"]):
+        cfg = _cache_cfg(1.0)
+        cfg["train"]["online_feature_cache_policy"] = bad
+        monkeypatch.setattr(online_module, "load_target", lambda cfg_, contract_: (_StubTarget(), object()))
+        with pytest.raises(ValueError, match="online_feature_cache_policy"):
+            online_module.OnlineFeatureSource(cfg, _stub_contract(), run_dir)
+
+
+def test_online_pinned_freezes_smallest_first_plan_and_purges(monkeypatch, tmp_path):
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    answer_lens = [4, 8, 12, 16, 20]
+    sizes = [_pinned_row_bytes(value) for value in answer_lens]
+    total = sum(sizes)
+    run_dir = _write_online_run_dir(tmp_path, rows=5, answer_lens=answer_lens)
+    source = _stub_source_with_cfg(monkeypatch, run_dir, _pinned_cfg(total))
+    dataset = source.dataset()
+
+    # Epoch 1 has no plan yet: reads extract and are retained under the cap.
+    epoch1 = [dataset[index] for index in range(5)]
+    assert source._pinned_plan is None
+    assert source.cache_stats["stores"] == 5
+    assert source.cache_current_bytes() == total
+
+    # A boundary outside the train phase must not freeze (the overfit-sanity
+    # slice replays through the same source before training).
+    source.set_phase("overfit")
+    dataset.note_epoch_boundary()
+    assert source._pinned_plan is None
+    source.set_phase("train")
+
+    dataset.note_epoch_boundary()
+    plan = source._pinned_plan
+    assert plan is not None
+    assert plan["budget_bytes"] == int(total * online_module.PINNED_PLAN_FILL_FRACTION)
+    # Smallest-first packing: 440 + 616 + 792 + 968 = 2816 fit inside the 95%
+    # budget; the 1144-byte record would overflow it and stays out.
+    assert plan["n_pinned"] == 4 and plan["planned_bytes"] == 2816
+    assert plan["sized_records"] == 5 and plan["frozen_at_epoch_boundary"] == 1
+    assert plan["purged_records"] == 1 and plan["purged_bytes"] == sizes[4]
+    assert source.cache_current_bytes() == 2816
+    assert source.cache_stats["admitted_records"] == 4
+
+    # Non-planned records re-extract; their store is refused and nothing is
+    # evicted to make room.
+    forwards = _forward_calls(calls)
+    dataset[4]
+    assert _forward_calls(calls) == forwards + 1
+    assert source.cache_stats["rejected_records"] == 1
+    assert source.cache_stats["stores"] == 5
+    assert source.cache_current_bytes() == 2816
+
+    # A planned record hits with no target work and matches a fresh extraction.
+    forwards = _forward_calls(calls)
+    hit = dataset[2]
+    assert _forward_calls(calls) == forwards
+    _assert_same_record(hit, epoch1[2])
+    fresh_calls: list = []
+    _install_batched_stub(monkeypatch, fresh_calls, context_hidden=4)
+    fresh = _stub_source_with_cfg(monkeypatch, run_dir, _stub_cfg())
+    _assert_same_record(hit, fresh.dataset()[2])
+
+
+def test_online_pinned_warm_epochs_hit_and_match_epoch1_bytes(monkeypatch, tmp_path):
+    """Epochs 2/3: planned rows are served from RAM with epoch-1-exact bytes."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    answer_lens = [4, 8, 12, 16, 20]
+    total = sum(_pinned_row_bytes(value) for value in answer_lens)
+    run_dir = _write_online_run_dir(tmp_path, rows=5, answer_lens=answer_lens)
+    source = _stub_source_with_cfg(monkeypatch, run_dir, _pinned_cfg(total))
+    dataset = source.dataset()
+
+    epoch1 = [dataset[index] for index in range(5)]
+    dataset.note_epoch_boundary()
+    assert source._pinned_plan["n_pinned"] == 4
+    forwards_after_epoch1 = _forward_calls(calls)
+
+    epoch2 = [dataset[index] for index in range(5)]
+    assert _forward_calls(calls) == forwards_after_epoch1 + 1  # only row 4 re-extracts
+    assert source.cache_stats["hits"] == 4
+    epoch3 = [dataset[index] for index in range(5)]
+    assert _forward_calls(calls) == forwards_after_epoch1 + 2
+    assert source.cache_stats["hits"] == 8
+    assert source.cache_stats["misses"] == 7
+    assert source.cache_stats["rejected_records"] == 2
+
+    for epoch_records in (epoch2, epoch3):
+        for index in range(5):
+            _assert_same_record(epoch_records[index], epoch1[index])
+
+    summary = source.summary()["feature_cache"]
+    assert summary["saved_extractions"] == 8
+    assert summary["hit_rate"] == pytest.approx(8 / 15)
+    pinned = summary["pinned"]
+    assert pinned["frozen"] is True
+    assert pinned["pinned_records"] == 4 and pinned["pinned_bytes"] == 2816
+
+
+def test_online_pinned_readmits_planned_records_evicted_in_epoch1(monkeypatch, tmp_path):
+    """LRU may evict a planned record before the freeze; its first later touch
+    is re-admitted (counted) and it hits from then on."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    answer_lens = [4, 8, 12, 16, 20]
+    sizes = [_pinned_row_bytes(value) for value in answer_lens]
+    total = sum(sizes)
+    run_dir = _write_online_run_dir(tmp_path, rows=5, answer_lens=answer_lens)
+    # 3000 bytes: epoch 1 evicts the two smallest records while storing the
+    # larger ones; the 95% plan still fits them (2816 <= 2850).
+    source = _stub_source_with_cfg(monkeypatch, run_dir, _pinned_cfg(3000))
+    dataset = source.dataset()
+
+    epoch1 = [dataset[index] for index in range(5)]
+    assert source.cache_current_bytes() == total - sizes[0] - sizes[1]
+    dataset.note_epoch_boundary()
+    plan = source._pinned_plan
+    assert plan["n_pinned"] == 4 and plan["planned_bytes"] == 2816
+    # Rows 0 and 1 were evicted during epoch 1; rows 2 and 3 survived the purge.
+    assert source.cache_current_bytes() == sizes[2] + sizes[3]
+    assert source.cache_stats["admitted_records"] == 2
+
+    # Epoch 2: the two evicted planned records re-extract once and are
+    # admitted; row 4 misses again and its store stays refused.
+    epoch2 = [dataset[index] for index in range(5)]
+    assert source.cache_stats["hits"] == 2 and source.cache_stats["misses"] == 8
+    assert source.cache_stats["admitted_records"] == 4
+    assert source.cache_stats["rejected_records"] == 1
+    assert source.cache_current_bytes() == 2816
+
+    # Epoch 3: all four planned records hit; the plan stays frozen.
+    dataset.note_epoch_boundary()
+    assert source._pinned_plan is plan
+    epoch3 = [dataset[index] for index in range(5)]
+    assert source.cache_stats["hits"] == 6 and source.cache_stats["rejected_records"] == 2
+    for epoch_records in (epoch2, epoch3):
+        for index in range(5):
+            _assert_same_record(epoch_records[index], epoch1[index])
+
+
+def test_online_pinned_policy_is_inert_without_a_later_epoch(monkeypatch, tmp_path):
+    """num_epochs=1 (and policy=lru) never freeze a plan; reads stay LRU."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    run_dir = _write_online_run_dir(tmp_path, rows=3, answer_len=8)
+
+    single = _stub_source_with_cfg(monkeypatch, run_dir, _pinned_cfg(1 << 20, num_epochs=1))
+    dataset = single.dataset()
+    dataset[0]
+    dataset.note_epoch_boundary()
+    assert single._pinned_plan is None
+    dataset[0]
+    assert single.cache_stats["hits"] == 1  # plain LRU reuse still works
+
+    lru = _stub_source_with_cfg(monkeypatch, run_dir, _pinned_cfg(1 << 20, policy="lru"))
+    dataset = lru.dataset()
+    dataset[0]
+    dataset.note_epoch_boundary()
+    assert lru._pinned_plan is None and lru.cache_policy == "lru"
+    assert "pinned" not in lru.summary()["feature_cache"]
+
+
+def test_online_pinned_plan_is_runtime_only_and_cold_restarts(monkeypatch, tmp_path):
+    """The cache/plan are never persisted: a new source starts cold and
+    re-freezes on its own first train-phase boundary (resume semantics)."""
+    calls: list = []
+    _install_batched_stub(monkeypatch, calls, context_hidden=4)
+    run_dir = _write_online_run_dir(tmp_path, rows=2, answer_len=8)
+    first = _stub_source_with_cfg(monkeypatch, run_dir, _pinned_cfg(1 << 20))
+    dataset = first.dataset()
+    dataset[0]
+    dataset[1]
+    dataset.note_epoch_boundary()
+    assert first._pinned_plan is not None
+    first.close()
+
+    second = _stub_source_with_cfg(monkeypatch, run_dir, _pinned_cfg(1 << 20))
+    resumed = second.dataset()
+    assert second._pinned_plan is None and second.cache_current_bytes() == 0
+    resumed[0]  # cold start: nothing retained yet, so the read re-extracts
+    resumed[1]
+    assert second.cache_stats["misses"] == 2
+    resumed.note_epoch_boundary()
+    assert second._pinned_plan is not None and second._pinned_plan["n_pinned"] == 2
+
+
+# --------------------------------------------------------------------------- #
+# 5c. adaptive budget on top of the fixed cache (train.online_feature_cache_adaptive)
 # --------------------------------------------------------------------------- #
 
 class _AdaptiveSensorStub:
@@ -3304,7 +3528,10 @@ def test_online_cache_adaptive_defaults_off_and_rejects_non_bool(monkeypatch, tm
         dataset[0]
         assert source.cache_stats["hits"] == 1 and source.cache_stats["stores"] == 1
         fc = source.summary()["feature_cache"]
-        assert "adaptive_budget" not in fc and "budget_bytes" not in fc
+        # Adaptive-off keeps the fixed budget; budget_bytes now always reports
+        # the effective payload budget (the configured cap here).
+        assert "adaptive_budget" not in fc
+        assert fc["budget_bytes"] == source.cache_capacity_bytes
     cfg = _cache_cfg(1.0)
     cfg["train"]["online_feature_cache_adaptive"] = "yes"
     with pytest.raises(ValueError, match="online_feature_cache_adaptive"):
