@@ -21,6 +21,11 @@ __all__ = ["DFlareTrainerModule"]
 class DFlareTrainerModule(DFlashTrainerModule):
     """DFlash training step + per-layer fusion diagnostics."""
 
+    # The scoring tail of DFlare/DFly is row-local (hidden-state correction and
+    # fusion diagnostics per position; logits pass through unchanged), so
+    # padding-block row compaction (``drafter.recipe_row_compaction``) is exact.
+    supports_recipe_row_compaction = True
+
     def fusion_metrics(self) -> dict | None:
         model = self.draft_model
         probabilities_fn = getattr(model, "fusion_probabilities", None)

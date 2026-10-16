@@ -183,6 +183,12 @@ class DFlashTrainerModule(nn.Module):
     # autoregressive order (its trainer subclass sets this to True).
     causal_in_block: bool = False
 
+    # Padding-block row compaction (``recipe_row_compaction``) is exact only for
+    # algorithms whose scoring tail is row-local. DFlare/DFly set this True;
+    # algorithms that score logits with block structure (DSpark's Markov bias,
+    # Domino's second scoring pass) must leave it False.
+    supports_recipe_row_compaction: bool = False
+
     def __init__(
         self,
         draft_model: Qwen3DFlashDraftModel,
@@ -197,6 +203,8 @@ class DFlashTrainerModule(nn.Module):
         prefix_weight_base: float = 0.9,
         sample_from_anchor: bool = False,
         train_recipe=None,
+        recipe_row_compaction: Optional[bool] = None,
+        recipe_compile_tv_kl: bool = False,
     ):
         super().__init__()
         if loss_type not in _DFLASH_LOSS_TYPES:
@@ -235,6 +243,26 @@ class DFlashTrainerModule(nn.Module):
         # a recipe swaps the objective (and its position weighting) per stage.
         self.train_recipe = train_recipe
         self._recipe_stage_index = 0 if train_recipe is not None else None
+        # Recipe runs may drop zero-masked padding blocks from the LM head and
+        # the scoring step: kept rows are bitwise equivalent and padding rows
+        # cannot contribute loss or gradient (their weight is exactly 0).
+        # ``None`` enables it wherever the algorithm declares a row-local
+        # scoring tail; an explicit True on an unsupported algorithm is
+        # rejected instead of silently ignored.
+        if recipe_row_compaction is None:
+            self.recipe_row_compaction = bool(self.supports_recipe_row_compaction)
+        else:
+            self.recipe_row_compaction = bool(recipe_row_compaction)
+            if self.recipe_row_compaction and not self.supports_recipe_row_compaction:
+                raise ValueError(
+                    "recipe_row_compaction=True is not supported by "
+                    f"{type(self).__name__}: its scoring tail is not row-local."
+                )
+        # Execution-optimization knob (default off): compile the fp32 TV/KL
+        # chunk arithmetic of recipe stages whose objective routes through it
+        # (``lk_coef`` > 0). Stages that do not call ``_tv_kl`` (e.g.
+        # ``e2e_tv``) are exempt by construction, so the flag is a no-op there.
+        self.recipe_compile_tv_kl = bool(recipe_compile_tv_kl)
         # Feature-store layout (configured by the training script once the
         # store/source manifest is known; see ``configure_feature_layout``).
         # ``None`` keeps the legacy behavior: the batch's ``hidden`` already is
@@ -856,9 +884,30 @@ class DFlashTrainerModule(nn.Module):
             n=n,
             bs=bs,
         )
-        # A tensor-parallel target's lm_head is column-parallel and returns
-        # vocab-sharded (DTensor) logits; gather to a full tensor for the loss.
-        logits = _to_full_tensor(self.lm_head(output_hidden))
+        # Recipe runs may compact zero-masked padding blocks out of the
+        # scoring tail: the frozen LM head and every loss chunk then see kept
+        # rows only. Blocks are independent units (each attends only its own
+        # context window) and padding rows carry weight exactly 0, so dropping
+        # them changes neither the loss nor the gradients; it only removes rows
+        # that cannot contribute. ``compact_rows`` holds the (batch, block)
+        # index of every kept block for the target/mask gathers below.
+        compact_rows = None
+        if self.recipe_row_compaction and self._recipe_active():
+            if self.loss_type == "variable_prefix":
+                raise ValueError(
+                    "recipe_row_compaction is not supported for loss_type='variable_prefix'."
+                )
+            compact_rows = block_keep_mask.nonzero(as_tuple=False)  # [U, 2] (batch, block)
+            kept_hidden = output_hidden.view(bsz * n, bs, -1)[
+                compact_rows[:, 0] * n + compact_rows[:, 1]
+            ].reshape(-1, output_hidden.size(-1))
+            # A tensor-parallel target's lm_head is column-parallel and returns
+            # vocab-sharded (DTensor) logits; gather to a full tensor for the loss.
+            logits = _to_full_tensor(self.lm_head(kept_hidden.reshape(-1, kept_hidden.size(-1))))
+        else:
+            # A tensor-parallel target's lm_head is column-parallel and returns
+            # vocab-sharded (DTensor) logits; gather to a full tensor for the loss.
+            logits = _to_full_tensor(self.lm_head(output_hidden))
 
         # Algorithm seam: logit correction (e.g. DSpark's Markov bias) plus any
         # auxiliary objective (e.g. the DSpark confidence BCE). The base DFlash
@@ -897,7 +946,22 @@ class DFlashTrainerModule(nn.Module):
         if self.train_recipe is not None:
             block_kwargs["teacher_hidden"] = teacher_hidden
             block_kwargs["label_indices"] = label_indices
+        if compact_rows is not None:
+            rows_b, rows_n = compact_rows[:, 0], compact_rows[:, 1]
+            block_kwargs["target_ids"] = target_ids[rows_b, rows_n].unsqueeze(1)  # [U, 1, bs]
+            block_kwargs["block_mask"] = block_mask[rows_b, rows_n].unsqueeze(1)
+            block_kwargs["label_indices"] = label_indices[rows_b, rows_n].unsqueeze(1)
+            # The teacher stream maps its flat rows back to (sample, position)
+            # through this index; the recipe's slot-major row order is unchanged.
+            block_kwargs["teacher_sample_index"] = rows_b
+            block_kwargs["bsz"] = int(compact_rows.shape[0])
+            block_kwargs["n"] = 1
         return self._block_loss_step(**block_kwargs)
+
+    def _recipe_active(self) -> bool:
+        """True when a train recipe replaces ``loss_fn``'s decay-CE total."""
+        recipe = self.train_recipe
+        return recipe is not None and recipe.name != "controlled_ce"
 
     @staticmethod
     def _public_extra_metrics(aux_metrics: dict | None) -> dict | None:
@@ -920,6 +984,7 @@ class DFlashTrainerModule(nn.Module):
         bs: int,
         teacher_hidden: torch.Tensor | None = None,
         label_indices: torch.Tensor | None = None,
+        teacher_sample_index: torch.Tensor | None = None,
     ) -> DFlashStepMetrics:
         """Decay-weighted block CE and standard metrics on (possibly corrected) logits.
 
@@ -940,7 +1005,23 @@ class DFlashTrainerModule(nn.Module):
 
         loss_fn = self.loss_fn
         assert loss_fn is not None, "loss_fn is always constructed for loss_type='dflash'"
-        loss_out = loss_fn(pred_logits, pred_targets, pred_mask, num_tokens=None, block_size=bs)
+        # A recipe run replaces ``loss_fn``'s decay-CE total with the recipe's
+        # own objective and consumes only the per-slot counts; the full-vocab
+        # cross-entropy behind that scalar would be dead work, so the counts are
+        # computed directly (same argmax, same reductions, same dtype for the
+        # final loss).
+        if self._recipe_active():
+            correct_per_pos, count_per_pos = loss_fn.accuracy_counts(
+                pred_logits, pred_targets, pred_mask, block_size=bs
+            )
+            total_loss_dtype = loss_fn.total_loss_dtype(pred_logits)
+            base_total_loss = None
+        else:
+            loss_out = loss_fn(pred_logits, pred_targets, pred_mask, num_tokens=None, block_size=bs)
+            count_per_pos = loss_out.draft_count_per_pos
+            correct_per_pos = loss_out.draft_correct_per_pos
+            total_loss_dtype = loss_out.total_loss.dtype
+            base_total_loss = loss_out.total_loss
 
         loss_weights = pred_mask.view(bsz, n, slots)
         if self.loss_decay_gamma is not None:
@@ -950,9 +1031,8 @@ class DFlashTrainerModule(nn.Module):
             loss_weights = loss_weights * depth_weights
         loss_weight = loss_weights.sum()
 
-        count_per_pos = loss_out.draft_count_per_pos
         valid_tokens = count_per_pos.sum()
-        correct_tokens = loss_out.draft_correct_per_pos.sum()
+        correct_tokens = correct_per_pos.sum()
         accuracy = correct_tokens / valid_tokens.clamp_min(1)
         accept_len, accept_len_sum, valid_blocks = compute_acceptance_stats(
             pred_logits.argmax(dim=-1).view(bsz, n, slots),
@@ -960,7 +1040,7 @@ class DFlashTrainerModule(nn.Module):
             pred_mask.view(bsz, n, slots).bool(),
         )
 
-        total_loss = loss_out.total_loss
+        total_loss = base_total_loss
         recipe_metrics: dict = {}
         recipe = self.train_recipe
         if recipe is not None and recipe.name != "controlled_ce":
@@ -977,7 +1057,11 @@ class DFlashTrainerModule(nn.Module):
                 # the full [B, n, S, V] tensor costs ~8.7 GB at the canonical
                 # 16-sample sanity batch and pushes a 48 GB card into OOM.
                 teacher_chunk_fn = TeacherLogitsStream(
-                    self.lm_head, teacher_hidden, label_indices, first_slot=first
+                    self.lm_head,
+                    teacher_hidden,
+                    label_indices,
+                    first_slot=first,
+                    sample_index=teacher_sample_index,
                 ).logits
             # A confidence-head stage receives its per-slot logits from the
             # algorithm seam (DSpark's ``_apply_algorithm_terms``); the analytic
@@ -995,9 +1079,10 @@ class DFlashTrainerModule(nn.Module):
                 teacher_chunk_fn=teacher_chunk_fn,
                 loss_decay_gamma=self.loss_decay_gamma,
                 confidence_logits=confidence_logits,
+                compile_tv_kl=self.recipe_compile_tv_kl,
             )
             recipe_metrics["recipe_stage"] = float(self._recipe_stage_index or 0)
-            total_loss = recipe_total.to(loss_out.total_loss.dtype)
+            total_loss = recipe_total.to(total_loss_dtype)
         if aux_loss is not None:
             total_loss = total_loss + aux_loss
         merged_extra = {**(self._public_extra_metrics(aux_metrics) or {}), **recipe_metrics}
@@ -1010,8 +1095,8 @@ class DFlashTrainerModule(nn.Module):
             accept_len=accept_len.detach(),
             accept_len_sum=accept_len_sum.detach(),
             valid_blocks=valid_blocks.detach(),
-            pos_correct=loss_out.draft_correct_per_pos,
-            pos_count=loss_out.draft_count_per_pos,
+            pos_correct=correct_per_pos,
+            pos_count=count_per_pos,
             extra_metrics=merged_extra or None,
         )
 

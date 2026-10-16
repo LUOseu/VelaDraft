@@ -401,6 +401,60 @@ startup visual-path check runs a fixed 3 capture forwards **outside** these
 counters; a resumed run does not re-extract fast-forwarded items and reuses
 the recorded visual-path check.
 
+## Recipe-run scoring cost (`drafter.recipe_row_compaction`)
+
+Two recipe-specific elisions trim the scoring tail of every training step
+without touching any loss definition; both are gradient-exact
+(`tests/test_recipe_row_compaction.py` asserts bitwise-identical parameter
+gradients):
+
+- **Counts-only CE.** When a `train_recipe` stage replaces the decay-weighted
+  block CE with the recipe's own objective, that CE scalar is never used -
+  only its per-slot counts feed the metrics. The step computes those counts
+  directly (same argmax, same `_draft_acc_per_pos` reductions, same dtype for
+  the reported loss) and skips the full-vocab cross-entropy behind the
+  discarded scalar. This is always on for recipe runs; nothing logged or
+  optimized changes.
+- **Padding-block row compaction** (`drafter.recipe_row_compaction`, default
+  auto): the anchor sampler pads every sample to the batch block budget
+  (`N = min(num_anchors, max_i v_i)`), so short samples carry padding blocks
+  whose loss weight is exactly 0 - yet their rows still flow through the
+  frozen LM head and every full-vocab loss chunk. With the flag on, padding
+  blocks are dropped before the LM head; kept rows are bitwise-equivalent
+  (their per-row values do not depend on which other rows exist) and
+  zero-weight rows carry zero gradient. On the 512-subset audit harness
+  about half of the sampled blocks are padding, so the head and the scoring
+  step see roughly 2x fewer rows.
+
+Values: absent/`null` = auto (enabled wherever the algorithm declares a
+row-local scoring tail - currently DFlare and DFly); `false` = always off;
+`true` on an algorithm whose scoring terms are not row-local (DSpark's
+Markov bias, Domino's second scoring pass) is a config error instead of a
+silent ignore. `TeacherLogitsStream` gained an optional `sample_index` so
+the teacher projection can follow a compacted block grid.
+
+### Execution optimization: compile the TV/KL chunk arithmetic
+(`drafter.recipe_compile_tv_kl`, opt-in)
+
+Recipe stages whose objective routes through the fp32 TV/KL chunk
+arithmetic (`objectives._tv_kl`: the two-stage recipe's cold-start stage,
+the DSpark KL stage) can compile that arithmetic in place with
+`drafter.recipe_compile_tv_kl: true` (default `false`). The gate is
+*objective-aware*: stages whose objective does not call `_tv_kl` (e.g.
+`e2e_tv`) are exempt by construction, so the knob can stay on across a full
+two-stage run without forcing anything onto the second stage. The compiled
+wrapper calls the same eager function and falls back to it permanently
+(one warning) if compilation or a compiled call fails, so the flag can
+never change the loss definition.
+
+Unlike row compaction this is an *execution* optimization: the gain is
+hardware- and workload-dependent, so re-measure it per deployment instead
+of assuming it transfers. Reference measurement (48 GB A6000, 512-subset
+audit harness, stage-1 leg): the `_tv_kl` region fell from 22.9% to 4.1%
+of GPU time, worth a paired marginal +15.6% end-to-end step time on top of
+row compaction; the stage-2 `e2e_tv` leg has no such region and is
+unaffected either way.
+
 ## Current validation status
 
 Short version, for users:

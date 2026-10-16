@@ -2,6 +2,23 @@
 
 ## v0.3.2 (in development)
 
+### Training: recipe-run scoring cost
+
+- Recipe runs no longer compute the decay-weighted block-CE scalar that the
+  recipe replaces (only its per-slot counts are consumed), and
+  `drafter.recipe_row_compaction` (default auto; DFlare/DFly) drops
+  zero-weight padding blocks before the frozen LM head and the scoring step.
+  Both elisions are gradient-exact (`tests/test_recipe_row_compaction.py`;
+  bitwise-equal parameter gradients on CPU). `TeacherLogitsStream` accepts
+  an optional `sample_index` for compacted block grids.
+- `drafter.recipe_compile_tv_kl` (opt-in, default off) compiles the fp32
+  TV/KL chunk arithmetic for recipe stages whose objective routes through
+  it (`lk_coef` > 0; the two-stage recipe's cold-start stage, the DSpark KL
+  stage). Stages that do not call it (e.g. `e2e_tv`) are exempt by
+  construction. This is an execution optimization: measured on the 48 GB
+  A6000 audit harness (paired arm: `_tv_kl` region 22.9% -> 4.1% of GPU
+  time); re-measure per hardware.
+
 - Repository renamed to `github.com/LUOseu/VelaDraft` (old `vlm-dflash` URLs
   redirect); the distribution name and CLI stay `vlm-dflash`.
 
