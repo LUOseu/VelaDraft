@@ -2645,6 +2645,26 @@ def _accum_cfg(**overrides) -> dict:
     return cfg
 
 
+def test_training_loop_records_epoch_wall_seconds():
+    """Per-epoch wall clock: one entry per dataset pass, exposed in the run
+    summary for cold-vs-warm cache comparisons (the first pass cannot hit a
+    cache that is only warmed later)."""
+    output = run_training_loop(
+        _tiny_dflash_module(),
+        _FastForwardDataset(_accum_items(4)),
+        _accum_cfg(micro_batch_size=2, grad_accumulation_steps=1),
+        {"tokens": {"image_token_id": 999999}},
+        torch.device("cpu"),
+        total_steps=4,
+        seed=0,
+        shuffle=False,
+        log_path=None,
+    )
+    epoch_wall = output["summary"]["epoch_wall_seconds"]
+    assert len(epoch_wall) == 2  # 2 batches per pass, 4 optimizer steps
+    assert all(value > 0.0 for value in epoch_wall)
+
+
 def test_pending_accumulation_across_epochs_is_not_a_stall():
     """One legal sample + accumulation=4: the first optimizer step spans four
     epochs; pending (gradient-bearing) micro-batches are progress, so the

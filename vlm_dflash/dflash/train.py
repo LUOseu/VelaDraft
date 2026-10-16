@@ -554,6 +554,7 @@ def run_training_loop(
     audit_fraction = float(getattr(module, "coverage_audit_fraction", 0.0) or 0.0)
     coverage_audit_step = max(0, min(total_steps - 1, int(total_steps * audit_fraction)))
     started = time.time()
+    epoch_wall_seconds: list[float] = []
     from .trainer_core import NoValidAnchorsError
 
     skippable_errors = tuple(getattr(module, "skippable_errors", ()) or ()) or (NoValidAnchorsError,)
@@ -590,6 +591,7 @@ def run_training_loop(
         # backward that deposited gradient), not optimizer steps — a pending
         # accumulation window is progress, not a stall.
         valid_micro = 0
+        epoch_started = time.time()
         for batch in iterator:
             batch_lengths = batch.get("lengths")
             batch = {key: value for key, value in batch.items() if key != "lengths"}
@@ -712,10 +714,14 @@ def run_training_loop(
                         )
                     )
                 if step >= total_steps:
+                    epoch_wall_seconds.append(time.time() - epoch_started)
                     break
         else:
             # Natural epoch end (the break above skips this): the cache
             # policy's planning point for the next epoch.
+            epoch_seconds = time.time() - epoch_started
+            epoch_wall_seconds.append(epoch_seconds)
+            log(f"train: epoch end at step {step}/{total_steps} in {epoch_seconds:.1f}s")
             if note_epoch_boundary is not None:
                 frozen_plan = note_epoch_boundary()
                 if frozen_plan:
@@ -772,6 +778,7 @@ def run_training_loop(
             resume_state is not None and skip_begin is not None and fast_forward_batches > 0
         ),
         "wall_seconds": time.time() - started,
+        "epoch_wall_seconds": epoch_wall_seconds,
         "peak_gpu_mem_gb": (
             torch.cuda.max_memory_allocated(device) / 1e9 if device.type == "cuda" else None
         ),
