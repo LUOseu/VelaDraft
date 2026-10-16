@@ -28,7 +28,7 @@ regen, checkpoints, logs and eval output - online only removes the multi-GiB
 | Online, per-sample | `--mode online` | offline (presets pin it) | extracts live features instead of reading a store | frozen target resident on GPU for the whole run | GPU smokes: train -> token-exact eval -> export (3B, 8B untied, split devices) |
 | Batched capture | `train.online_batch_size: N` | `1` (per-sample) | one padded target forward per N rows | may move the teacher batch composition (bf16 ulp scale) | 3-row smoke + a 16-row slice: 16 -> 4 forward calls, step losses bit-identical; extraction-wall re-measured under a unified boundary (pending, see below) |
 | RAM record cache | `train.online_feature_cache_gb: <GiB>` | `0` (off) | serves repeat epochs from a byte-bounded host-RAM store | up to the configured GiB of host RAM; never persisted | 129 rows / 6 epochs: 645 hits / 129 misses / 129 stores / 0 evictions, peak 830 MiB; trajectory caveat below |
-| Pinned retention | `train.online_feature_cache_policy: pinned` | `lru` | freezes a static smallest-size-first retention plan at the first train-phase epoch end and admits only planned records afterwards | requires the RAM cache | research-harness A/B (512-row subset, 3 epochs): -7.6% / -13.0% step time at 0.8 / 1.6 GiB caps; production-CLI re-validation in the pinned section below |
+| Pinned retention | `train.online_feature_cache_policy: pinned` | `lru` | freezes a static smallest-size-first retention plan at the first train-phase epoch end and admits only planned records afterwards | requires the RAM cache | production CLI A/B (512-row subset, 3 epochs, 2 pairs per cap): **-3.6% / -6.9%** paired wall at 0.8 / 1.6 GiB caps; harness replay (offline-plan upper bound) -7.6% / -13.0%; measured notes in the pinned section below |
 | Adaptive budget | `train.online_feature_cache_adaptive: true` | `false` | shrinks/grows the cache payload with the job's memory headroom | requires the RAM cache; eviction becomes dynamic | measured on the lane's slices; state under `feature_source.feature_cache.adaptive_budget` |
 
 Enabling them is one flag each, e.g.
@@ -279,6 +279,20 @@ While the plan is being learned (epoch 1) the cache behaves exactly like
 on planned rows are served from RAM and non-planned rows re-extract, so the
 policy only changes *recompute vs. reuse* - consumed rows, their order,
 preprocessing, supervision and the optimizer stay untouched.
+
+Measured (production CLI, 512-row subset, 3 epochs, 2 pairs per cap): pooled
+paired wall time **-3.62%** at the 0.8 GiB cap and **-6.88%** at 1.6 GiB
+(cold epoch ~0; warm-epoch deltas -7.7 / -17.1 s). All pinned invariants hold
+(`rejected == (rows - n_pinned) * warm_epochs`, plan within 95% of the cap,
+`frozen=True`), within-policy loss is bitwise identical between the two pairs
+(192/192 rows), and the two policies differ only at the documented bf16
+grouping scale (max |delta loss| 1.6e-2 on 15/192 rows). The research-harness
+replay (offline plan with perfect knowledge of record sizes - an upper bound)
+measured -7.6% / -13.0%; the deployable freeze keeps only the planned subset
+that survived epoch-1 LRU churn, re-admits the rest on their first warm read,
+and matches the bound in steady state (epoch >= 3, a `1 - 1/T` convergence
+over T epochs). Raw per-arm JSONs and the 30-check report are attached in the
+PR.
 
 Rules and edge cases:
 
