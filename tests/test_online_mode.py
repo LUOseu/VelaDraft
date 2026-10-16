@@ -3353,6 +3353,58 @@ def test_online_pinned_plan_is_runtime_only_and_cold_restarts(monkeypatch, tmp_p
 # --------------------------------------------------------------------------- #
 # 5c. adaptive budget on top of the fixed cache (train.online_feature_cache_adaptive)
 # --------------------------------------------------------------------------- #
+def test_online_pinned_lru_training_parity_on_real_tiny_path(monkeypatch, tmp_path):
+    """Fixed seed/data/init, two epochs, real tiny extraction path: lru and
+    pinned must give the same trajectory (losses, valid supervision, parameter
+    updates) - the policy only changes recompute vs. reuse. With the whole
+    working set inside the budget both retain it, so the pinned plan freezes
+    without changing which rows are served."""
+    model, processor = _tiny_qwen25_vl_model()
+    contract = _tiny_contract()
+    _patch_tiny_draft_build(monkeypatch)
+    _patch_drafter_visual_check(monkeypatch)
+    monkeypatch.setattr(online_module, "load_target", lambda cfg_, contract_: (model, processor))
+
+    runs: dict[str, dict] = {}
+    for policy in ("lru", "pinned"):
+        run_dir = _sync_online_run_dir(tmp_path / policy, model, processor, rows=2, answer_len=12)
+        cfg = _tiny_train_dflash_cfg()
+        cfg["train"]["num_epochs"] = 2
+        cfg["train"]["online_feature_cache_gb"] = 1.0
+        cfg["train"]["online_feature_cache_policy"] = policy
+        summary = train_dflash(cfg, run_dir, contract, steps=4, feature_mode="online")
+        log_rows = [
+            json.loads(line)
+            for line in (run_dir / "train" / "train_log.jsonl").read_text().splitlines()
+            if line.strip()
+        ]
+        final = torch.load(
+            run_dir / "train" / "ckpt_final.pt", map_location="cpu", weights_only=False
+        )
+        runs[policy] = {
+            "rows": log_rows,
+            "final": final,
+            "cache": summary["feature_source"]["feature_cache"],
+        }
+
+    lru, pinned = runs["lru"], runs["pinned"]
+    assert len(lru["rows"]) == len(pinned["rows"]) == 4
+    assert [row["loss"] for row in lru["rows"]] == [row["loss"] for row in pinned["rows"]]
+    assert [row["valid_tokens"] for row in lru["rows"]] == [
+        row["valid_tokens"] for row in pinned["rows"]
+    ]
+    assert sum(row["valid_tokens"] for row in lru["rows"]) > 0
+    for name, tensor in lru["final"]["model"].items():
+        assert torch.equal(tensor, pinned["final"]["model"][name]), name
+
+    # Warm-epoch reuse happened under both policies (2 records, epoch 2 fully
+    # cached), and the pinned plan froze over the records it sized in epoch 1.
+    assert lru["cache"]["hits"] == pinned["cache"]["hits"] == 2
+    assert lru["cache"]["evictions"] == pinned["cache"]["evictions"] == 0
+    assert pinned["cache"]["pinned"]["frozen"] is True
+    assert pinned["cache"]["pinned"]["pinned_records"] == 2
+    assert pinned["cache"]["pinned"]["known_sizes"] == 2
+
 
 class _AdaptiveSensorStub:
     """Headroom reading coupled to the cache's own occupancy (closed loop).
