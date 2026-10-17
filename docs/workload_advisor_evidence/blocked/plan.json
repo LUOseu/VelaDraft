@@ -1,0 +1,115 @@
+{
+  "blocked_candidates": [
+    "dflash-exact",
+    "dfly-fast-wrong"
+  ],
+  "budget_gpu_hours": 4.0,
+  "budget_note": "4 GPU-h is an execution cap, not a prediction; includes load, calibration, warmup, timing and failures.",
+  "calibration_required": [
+    "measure target-only AR e2e and peak memory on the actual device",
+    "measure each candidate's load time, memory and speculative acceptance",
+    "calibrate the 4 GPU-h cap against the first 8 requests before the holdout pass"
+  ],
+  "candidate_matrix": [
+    {
+      "algorithm": null,
+      "candidate_id": "ar",
+      "checkpoint": null,
+      "draft_identity": null,
+      "method": "ar",
+      "status": "blocked"
+    },
+    {
+      "algorithm": "dflash",
+      "candidate_id": "dflash-exact",
+      "checkpoint": "synthetic/dflash.pt",
+      "draft_identity": {
+        "recipe": "dflash",
+        "revision": "fixture",
+        "source": "synthetic"
+      },
+      "method": "sd",
+      "status": "blocked"
+    },
+    {
+      "algorithm": "dfly",
+      "candidate_id": "dfly-fast-wrong",
+      "checkpoint": "synthetic/dfly.pt",
+      "draft_identity": {
+        "recipe": "dfly",
+        "revision": "fixture",
+        "source": "synthetic"
+      },
+      "method": "sd",
+      "status": "blocked"
+    }
+  ],
+  "counts": {
+    "holdout_groups": 24,
+    "holdout_requests": 24,
+    "measured_runs": 216,
+    "sessions": 3,
+    "tuning_groups": 6,
+    "tuning_requests": 6,
+    "warmup_runs": 36,
+    "warmups_per_candidate_session": 4
+  },
+  "dry_run": true,
+  "include_in_paper": false,
+  "missing_dependencies": [
+    {
+      "code": "torch_missing",
+      "detail": "ModuleNotFoundError: No module named 'torch'"
+    },
+    {
+      "code": "no_gpu",
+      "detail": "nvidia-smi/torch found no GPU"
+    },
+    {
+      "code": "target_missing",
+      "detail": "target model_path not found: synthetic/not-a-real-checkpoint"
+    },
+    {
+      "candidate_id": "dflash-exact",
+      "code": "checkpoint_missing",
+      "detail": "checkpoint not found: synthetic/dflash.pt"
+    },
+    {
+      "candidate_id": "dfly-fast-wrong",
+      "code": "checkpoint_missing",
+      "detail": "checkpoint not found: synthetic/dfly.pt"
+    }
+  ],
+  "note": "No measured records exist yet; any ranking or budget estimate would be fabricated.",
+  "overall_status": "blocked",
+  "predicted_gpu_hours": null,
+  "predicted_speedup": null,
+  "project_scope": "platform_extension",
+  "protocol_scope_hash": "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3",
+  "ranking_allowed": false,
+  "required_gates": [
+    "properly licensed GPU allocation with UUID flock",
+    "protocol-matched AR token reference",
+    "per-request token-exact correctness gate",
+    "task quality scorer and threshold (or explicit not_evaluated condition)",
+    "paired group bootstrap with >= 20 holdout groups per bucket"
+  ],
+  "schema_version": "veladraft-platform-v1",
+  "timing_scope": {
+    "boundary": "request_ready_to_committed_output",
+    "cold_start_reported_separately": true,
+    "excludes": [
+      "model_load",
+      "media_disk_read"
+    ],
+    "includes": [
+      "preprocess",
+      "encode",
+      "h2d",
+      "generate"
+    ],
+    "scope": "local_client"
+  },
+  "warnings": [],
+  "workload_id": "mini-enterprise-v1"
+}

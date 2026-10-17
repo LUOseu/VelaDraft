@@ -1,0 +1,15 @@
+{
+  "devices": [],
+  "machine": "arm64",
+  "nvidia_smi": null,
+  "platform": "macOS-27.0-arm64-arm-64bit",
+  "python": "3.12.13",
+  "torch": {
+    "available": false,
+    "error": "ModuleNotFoundError: No module named 'torch'"
+  },
+  "transformers": {
+    "available": false,
+    "error": "ModuleNotFoundError: No module named 'transformers'"
+  }
+}
