@@ -1,0 +1,32 @@
+{
+  "counts": {
+    "groups": 30,
+    "groups_by_split": {
+      "holdout": 24,
+      "tuning": 6
+    },
+    "requests": 30,
+    "requests_by_split": {
+      "holdout": 24,
+      "tuning": 6
+    },
+    "requests_by_task": {
+      "chart_qa": 10,
+      "general_vqa": 10,
+      "invoice_fields": 10
+    }
+  },
+  "errors": [],
+  "include_in_paper": false,
+  "labels_present": 30,
+  "labels_sha256": "36031073f4b33ce24f530acaebfab8e501c723a59a4e3f69ecdf91be8edb11f8",
+  "manifest": "examples/workload_advisor/mini/manifest.json",
+  "overall_status": "ok",
+  "project_scope": "platform_extension",
+  "rows_sha256": "a7fcc26e271e50f274cac112a0ff002fb005a21e327d15689c5ac9035447bf77",
+  "schema_version": "veladraft-platform-v1",
+  "status": "ok",
+  "unsupported": [],
+  "warnings": [],
+  "workload_id": "mini-enterprise-v1"
+}

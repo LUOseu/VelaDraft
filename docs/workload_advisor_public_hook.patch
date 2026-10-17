@@ -1,0 +1,27 @@
+--- a/vlm_dflash/cli.py
++++ b/vlm_dflash/cli.py
+@@ -860,10 +860,24 @@
+     export.add_argument("--checkpoint", default="ckpt_final.pt")
+     export.add_argument("--out-dir", default=None)
+     export.set_defaults(func=cmd_export)
++
++    advisor = sub.add_parser(
++        "workload-advisor",
++        help="enterprise workload advisor (platform extension; optional hook)",
++    )
++    advisor.add_argument("advisor_args", nargs=argparse.REMAINDER)
++    advisor.set_defaults(func=cmd_workload_advisor)
+ 
+     return parser
+ 
+ 
++def cmd_workload_advisor(args) -> int:
++    """Optional public hook: delegate to the self-contained advisor CLI."""
++    from .workload_advisor.cli import main as advisor_main
++
++    return advisor_main(args.advisor_args)
++
++
+ def main(argv: list[str] | None = None) -> int:
+     parser = build_parser()
+     args = parser.parse_args(argv)

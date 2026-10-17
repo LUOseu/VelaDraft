@@ -1,0 +1,19 @@
+{
+  "decision_id": "3a07ff3577729a96e53ad3275426a0fce60283e84283888706186255477ee9eb",
+  "files": [
+    "records.share.jsonl",
+    "summary.share.json",
+    "decision.share.json",
+    "report.share.md"
+  ],
+  "records_sha256": "1172d887c55e1b42acb547e287daf7edf28bc0342a7d4d32e5958912307fa6d9",
+  "removed": [
+    "prompts",
+    "images",
+    "answers",
+    "absolute_paths",
+    "artifacts_local_paths"
+  ],
+  "schema_version": "veladraft-platform-v1",
+  "share_package": true
+}

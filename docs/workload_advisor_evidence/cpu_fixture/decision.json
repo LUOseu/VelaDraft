@@ -1,0 +1,98 @@
+{
+  "bootstrap_seed": 7,
+  "coverage": {
+    "buckets_insufficient": {
+      "dflash-exact:ar_R": [
+        "16-32",
+        "32-64",
+        "64-96",
+        "96-128"
+      ],
+      "dflash-exact:target_V": [
+        "1024-2048",
+        "256-512",
+        "512-1024"
+      ],
+      "dflash-exact:task": [
+        "chart_qa",
+        "general_vqa",
+        "invoice_fields"
+      ],
+      "dfly-fast-wrong:ar_R": [
+        "16-32",
+        "32-64",
+        "64-96",
+        "96-128"
+      ],
+      "dfly-fast-wrong:target_V": [
+        "1024-2048",
+        "256-512",
+        "512-1024"
+      ],
+      "dfly-fast-wrong:task": [
+        "chart_qa",
+        "general_vqa",
+        "invoice_fields"
+      ]
+    },
+    "min_groups": 20,
+    "n_groups": 24,
+    "n_sessions": 3,
+    "n_tasks": 3,
+    "task_group_counts": {
+      "chart_qa": 8,
+      "general_vqa": 8,
+      "invoice_fields": 8
+    }
+  },
+  "decision_id": "3a07ff3577729a96e53ad3275426a0fce60283e84283888706186255477ee9eb",
+  "excluded_candidates": [
+    {
+      "candidate_id": "dflash-exact",
+      "reasons": [
+        {
+          "code": "synthetic_fixture",
+          "detail": "synthetic fixtures never enter a real recommendation."
+        }
+      ]
+    },
+    {
+      "candidate_id": "dfly-fast-wrong",
+      "reasons": [
+        {
+          "code": "correctness_failed",
+          "detail": "24 record(s) failed."
+        },
+        {
+          "code": "quality_failed",
+          "detail": "task quality is below the frozen threshold."
+        },
+        {
+          "code": "synthetic_fixture",
+          "detail": "synthetic fixtures never enter a real recommendation."
+        }
+      ]
+    }
+  ],
+  "include_in_paper": false,
+  "project_scope": "platform_extension",
+  "protocol_hash": "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3",
+  "protocol_scope_hashes": [
+    "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3"
+  ],
+  "reasons": [
+    "Synthetic fixture evidence: no real recommendation is made."
+  ],
+  "recommended_action": "insufficient_evidence",
+  "recommended_method": null,
+  "records_sha256": "71ef80d87554d539dfbfb22913b8a9d92deb652232ae47e9eeb20aaa6ff1e55b",
+  "schema_version": "veladraft-platform-v1",
+  "scope": {
+    "measurement_scope": "local_client",
+    "min_groups": 20,
+    "threshold": 1.05
+  },
+  "summary_sha256": "9bac37347745118dc854d2d5f5bafc3d3dc662522c38a7f899c9b3464d3afdbb",
+  "synthetic": true,
+  "threshold": 1.05
+}

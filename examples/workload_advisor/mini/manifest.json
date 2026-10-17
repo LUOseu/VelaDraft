@@ -1,0 +1,137 @@
+{
+  "backend": {
+    "device_topology": [
+      "synthetic-GPU-0"
+    ],
+    "name": "hf-transformers",
+    "version": "synthetic"
+  },
+  "bucket_rules": {
+    "ar_R": [
+      16,
+      32,
+      64,
+      96,
+      128
+    ],
+    "per_bucket_min_groups": 20,
+    "target_V": [
+      256,
+      512,
+      1024,
+      2048
+    ]
+  },
+  "concurrency": 1,
+  "decode": {
+    "eos_policy": "natural_eos_first_stop",
+    "max_new_tokens": 128,
+    "stop_ids": [
+      151645,
+      151643
+    ],
+    "temperature": 0,
+    "verification": "sequential"
+  },
+  "description": "Synthetic fixture: invoice fields, chart QA and general VQA.",
+  "draft_candidates": [
+    {
+      "candidate_id": "ar",
+      "draft_identity": null,
+      "method": "ar"
+    },
+    {
+      "algorithm": "dflash",
+      "block_size": 8,
+      "candidate_id": "dflash-exact",
+      "checkpoint": "synthetic/dflash.pt",
+      "draft_identity": {
+        "recipe": "dflash",
+        "revision": "fixture",
+        "source": "synthetic"
+      },
+      "method": "sd"
+    },
+    {
+      "algorithm": "dfly",
+      "block_size": 8,
+      "candidate_id": "dfly-fast-wrong",
+      "checkpoint": "synthetic/dfly.pt",
+      "draft_identity": {
+        "recipe": "dfly",
+        "revision": "fixture",
+        "source": "synthetic"
+      },
+      "method": "sd"
+    }
+  ],
+  "hashes": {
+    "labels_sha256": "36031073f4b33ce24f530acaebfab8e501c723a59a4e3f69ecdf91be8edb11f8",
+    "rows_sha256": "a7fcc26e271e50f274cac112a0ff002fb005a21e327d15689c5ac9035447bf77"
+  },
+  "include_in_paper": false,
+  "kind": "workload_manifest",
+  "labels_path": "labels.jsonl",
+  "measurement_scope": "local_client",
+  "media_root": "media",
+  "processor": {
+    "chat_template": "qwen2_5_vl",
+    "revision": "synthetic-rev-1"
+  },
+  "project_scope": "platform_extension",
+  "quality_thresholds": {
+    "chart_qa": 1.0,
+    "general_vqa": 1.0,
+    "invoice_fields": 0.8
+  },
+  "resolution": {
+    "max_pixels": 12845056,
+    "min_pixels": 200704,
+    "rule": "processor_default"
+  },
+  "rows_path": "rows.jsonl",
+  "schema_version": "veladraft-platform-v1",
+  "scorers": {
+    "chart_qa": {
+      "name": "normalized_exact_match",
+      "threshold": 1.0,
+      "version": "1"
+    },
+    "general_vqa": {
+      "name": "normalized_exact_match",
+      "threshold": 1.0,
+      "version": "1"
+    },
+    "invoice_fields": {
+      "name": "field_f1",
+      "threshold": 0.8,
+      "version": "1"
+    }
+  },
+  "seed": 7,
+  "splits": {
+    "holdout": 24,
+    "tuning": 6
+  },
+  "synthetic": true,
+  "target": {
+    "chat_template": "qwen2_5_vl",
+    "dtype": "bfloat16",
+    "local_files_only": true,
+    "model_id": "Qwen/Qwen2.5-VL-3B-Instruct",
+    "model_path": "synthetic/not-a-real-checkpoint",
+    "processor": "Qwen/Qwen2.5-VL-3B-Instruct",
+    "revision": "synthetic-rev-1",
+    "structure": "qwen2_5_vl",
+    "tokenizer": "Qwen/Qwen2.5-VL-3B-Instruct",
+    "vision": {
+      "max_pixels": 12845056,
+      "min_pixels": 200704
+    },
+    "weights_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "timing": {
+    "boundary": "request_ready_to_committed_output"
+  },
+  "workload_id": "mini-enterprise-v1"
+}
