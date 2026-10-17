@@ -1,0 +1,631 @@
+{
+  "bootstrap_seed": 7,
+  "candidates": {
+    "ar": {
+      "acceptance_policies": [
+        "not_applicable"
+      ],
+      "candidate_id": "ar",
+      "correctness": {
+        "denominator": 72,
+        "denominator_records": 72,
+        "denominator_requests": 72,
+        "exact_records": 72,
+        "exact_requests": 72,
+        "failed_records": 0,
+        "failed_request_ids": [],
+        "failures": 0,
+        "note": "0/N failures retains N; no inference that the failure probability is zero.",
+        "status_counts": {
+          "verified_greedy_exact": 72
+        }
+      },
+      "gates": {
+        "correctness": true,
+        "coverage": true,
+        "memory": true,
+        "quality": true,
+        "quality_conditional": false,
+        "real_measurement": true,
+        "speed_ci_lower_above_threshold": false,
+        "threshold": 1.05
+      },
+      "latency": {
+        "e2e_s": {
+          "mean": 0.9994493574166534,
+          "n": 72,
+          "null": 0,
+          "p50": 0.9989055430845102,
+          "p95": 1.1492756694412611
+        },
+        "itl": "null_no_token_visibility",
+        "serial_output_tokens_per_second": 60.86684921242383,
+        "tpot_s": {
+          "mean": null,
+          "n": 0,
+          "null": 72,
+          "p50": null,
+          "p95": null
+        },
+        "ttft_s": {
+          "mean": null,
+          "n": 0,
+          "null": 72,
+          "p50": null,
+          "p95": null
+        }
+      },
+      "measurement_scopes": [
+        "local_client"
+      ],
+      "method": "ar",
+      "missing_pairs": [],
+      "n_groups": 24,
+      "n_records": 72,
+      "n_sessions": 3,
+      "quality": {
+        "evaluated": true,
+        "json_schema_n": 0,
+        "json_schema_valid_rate": null,
+        "n": 72,
+        "score_mean": 1.0,
+        "status": "pass",
+        "thresholds": {
+          "chart_qa": 1.0,
+          "general_vqa": 1.0,
+          "invoice_fields": 1.0
+        }
+      },
+      "resources": {
+        "all_allocated_gpu_hours_max_record": 0.002,
+        "measured_run_gpu_hours_max_record": 0.0015,
+        "memory_fit": true,
+        "peak_allocated_bytes": {
+          "synthetic-GPU-0": 20000000000
+        }
+      },
+      "scope_hashes": [
+        "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3"
+      ],
+      "speed": {
+        "bootstrap_seed": 7,
+        "ci95_high": 1.0,
+        "ci95_low": 1.0,
+        "mean_of_ratios": 1.0,
+        "mean_of_ratios_ci95_high": 1.0,
+        "mean_of_ratios_ci95_low": 1.0,
+        "method": "paired_total_ratio",
+        "n_boot": 2000,
+        "n_groups": 24,
+        "point_ratio": 1.0
+      },
+      "tasks": [
+        "chart_qa",
+        "general_vqa",
+        "invoice_fields"
+      ]
+    },
+    "dflash-exact": {
+      "acceptance_policies": [
+        "strict_greedy_token_exact"
+      ],
+      "buckets": {
+        "ar_R": {
+          "16-32": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 4,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "32-64": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 9,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "64-96": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 9,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "96-128": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 2,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        },
+        "target_V": {
+          "1024-2048": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 4,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "256-512": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 6,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "512-1024": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 14,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        },
+        "task": {
+          "chart_qa": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 8,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "general_vqa": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 8,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "invoice_fields": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 8,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        }
+      },
+      "candidate_id": "dflash-exact",
+      "correctness": {
+        "denominator": 72,
+        "denominator_records": 72,
+        "denominator_requests": 72,
+        "exact_records": 72,
+        "exact_requests": 72,
+        "failed_records": 0,
+        "failed_request_ids": [],
+        "failures": 0,
+        "note": "0/N failures retains N; no inference that the failure probability is zero.",
+        "status_counts": {
+          "verified_greedy_exact": 72
+        }
+      },
+      "gates": {
+        "correctness": true,
+        "coverage": true,
+        "memory": true,
+        "quality": true,
+        "quality_conditional": false,
+        "real_measurement": true,
+        "speed_ci_lower_above_threshold": true,
+        "threshold": 1.05
+      },
+      "latency": {
+        "e2e_s": {
+          "mean": 0.699104043507281,
+          "n": 72,
+          "null": 0,
+          "p50": 0.7014343984878522,
+          "p95": 0.787777224906858
+        },
+        "itl": "null_no_token_visibility",
+        "serial_output_tokens_per_second": 87.01613715197998,
+        "tpot_s": {
+          "mean": null,
+          "n": 0,
+          "null": 72,
+          "p50": null,
+          "p95": null
+        },
+        "ttft_s": {
+          "mean": null,
+          "n": 0,
+          "null": 72,
+          "p50": null,
+          "p95": null
+        }
+      },
+      "measurement_scopes": [
+        "local_client"
+      ],
+      "method": "sd",
+      "missing_pairs": [],
+      "n_groups": 24,
+      "n_records": 72,
+      "n_sessions": 3,
+      "quality": {
+        "evaluated": true,
+        "json_schema_n": 0,
+        "json_schema_valid_rate": null,
+        "n": 72,
+        "score_mean": 1.0,
+        "status": "pass",
+        "thresholds": {
+          "chart_qa": 1.0,
+          "general_vqa": 1.0,
+          "invoice_fields": 1.0
+        }
+      },
+      "resources": {
+        "all_allocated_gpu_hours_max_record": 0.002,
+        "measured_run_gpu_hours_max_record": 0.0015,
+        "memory_fit": true,
+        "peak_allocated_bytes": {
+          "synthetic-GPU-0": 20000000000
+        }
+      },
+      "scope_hashes": [
+        "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3"
+      ],
+      "speed": {
+        "bootstrap_seed": 7,
+        "ci95_high": 1.4377532067572414,
+        "ci95_low": 1.4209996878775226,
+        "mean_of_ratios": 1.4288240652527275,
+        "mean_of_ratios_ci95_high": 1.436760623473257,
+        "mean_of_ratios_ci95_low": 1.42057293983763,
+        "method": "paired_total_ratio",
+        "n_boot": 2000,
+        "n_groups": 24,
+        "point_ratio": 1.4296146141604236
+      },
+      "tasks": [
+        "chart_qa",
+        "general_vqa",
+        "invoice_fields"
+      ]
+    },
+    "dfly-fast-wrong": {
+      "acceptance_policies": [
+        "strict_greedy_token_exact"
+      ],
+      "buckets": {
+        "ar_R": {
+          "16-32": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 4,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "32-64": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 9,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "64-96": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 9,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "96-128": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 2,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        },
+        "target_V": {
+          "1024-2048": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 4,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "256-512": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 6,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "512-1024": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 14,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        },
+        "task": {
+          "chart_qa": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 8,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "general_vqa": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 8,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "invoice_fields": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 8,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        }
+      },
+      "candidate_id": "dfly-fast-wrong",
+      "correctness": {
+        "denominator": 48,
+        "denominator_records": 72,
+        "denominator_requests": 72,
+        "exact_records": 48,
+        "exact_requests": 48,
+        "failed_records": 24,
+        "failed_request_ids": [
+          "req-06",
+          "req-09",
+          "req-12",
+          "req-15",
+          "req-18",
+          "req-21",
+          "req-24",
+          "req-27"
+        ],
+        "failures": 8,
+        "note": "0/N failures retains N; no inference that the failure probability is zero.",
+        "status_counts": {
+          "failed": 24,
+          "verified_greedy_exact": 48
+        }
+      },
+      "gates": {
+        "correctness": false,
+        "coverage": true,
+        "memory": true,
+        "quality": false,
+        "quality_conditional": false,
+        "real_measurement": true,
+        "speed_ci_lower_above_threshold": true,
+        "threshold": 1.05
+      },
+      "latency": {
+        "e2e_s": {
+          "mean": 0.47961860843603493,
+          "n": 72,
+          "null": 0,
+          "p50": 0.4862398480787954,
+          "p95": 0.541441947246036
+        },
+        "itl": "null_no_token_visibility",
+        "serial_output_tokens_per_second": 126.83689136187148,
+        "tpot_s": {
+          "mean": null,
+          "n": 0,
+          "null": 72,
+          "p50": null,
+          "p95": null
+        },
+        "ttft_s": {
+          "mean": null,
+          "n": 0,
+          "null": 72,
+          "p50": null,
+          "p95": null
+        }
+      },
+      "measurement_scopes": [
+        "local_client"
+      ],
+      "method": "sd",
+      "missing_pairs": [],
+      "n_groups": 24,
+      "n_records": 72,
+      "n_sessions": 3,
+      "quality": {
+        "evaluated": true,
+        "json_schema_n": 0,
+        "json_schema_valid_rate": null,
+        "n": 72,
+        "score_mean": 0.6666666666666666,
+        "status": "fail",
+        "thresholds": {
+          "chart_qa": 1.0,
+          "general_vqa": 1.0,
+          "invoice_fields": 1.0
+        }
+      },
+      "resources": {
+        "all_allocated_gpu_hours_max_record": 0.002,
+        "measured_run_gpu_hours_max_record": 0.0015,
+        "memory_fit": true,
+        "peak_allocated_bytes": {
+          "synthetic-GPU-0": 20000000000
+        }
+      },
+      "scope_hashes": [
+        "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3"
+      ],
+      "speed": {
+        "bootstrap_seed": 7,
+        "ci95_high": 2.0954980580344595,
+        "ci95_low": 2.069660187778471,
+        "mean_of_ratios": 2.08311303974773,
+        "mean_of_ratios_ci95_high": 2.0944211687907637,
+        "mean_of_ratios_ci95_low": 2.069666385222788,
+        "method": "paired_total_ratio",
+        "n_boot": 2000,
+        "n_groups": 24,
+        "point_ratio": 2.083841910712575
+      },
+      "tasks": [
+        "chart_qa",
+        "general_vqa",
+        "invoice_fields"
+      ]
+    }
+  },
+  "concurrency": [
+    1
+  ],
+  "decision": {
+    "bootstrap_seed": 7,
+    "coverage": {
+      "buckets_insufficient": {
+        "dflash-exact:ar_R": [
+          "16-32",
+          "32-64",
+          "64-96",
+          "96-128"
+        ],
+        "dflash-exact:target_V": [
+          "1024-2048",
+          "256-512",
+          "512-1024"
+        ],
+        "dflash-exact:task": [
+          "chart_qa",
+          "general_vqa",
+          "invoice_fields"
+        ],
+        "dfly-fast-wrong:ar_R": [
+          "16-32",
+          "32-64",
+          "64-96",
+          "96-128"
+        ],
+        "dfly-fast-wrong:target_V": [
+          "1024-2048",
+          "256-512",
+          "512-1024"
+        ],
+        "dfly-fast-wrong:task": [
+          "chart_qa",
+          "general_vqa",
+          "invoice_fields"
+        ]
+      },
+      "min_groups": 20,
+      "n_groups": 24,
+      "n_sessions": 3,
+      "n_tasks": 3,
+      "task_group_counts": {
+        "chart_qa": 8,
+        "general_vqa": 8,
+        "invoice_fields": 8
+      }
+    },
+    "decision_id": "3a07ff3577729a96e53ad3275426a0fce60283e84283888706186255477ee9eb",
+    "excluded_candidates": [
+      {
+        "candidate_id": "dflash-exact",
+        "reasons": [
+          {
+            "code": "synthetic_fixture",
+            "detail": "synthetic fixtures never enter a real recommendation."
+          }
+        ]
+      },
+      {
+        "candidate_id": "dfly-fast-wrong",
+        "reasons": [
+          {
+            "code": "correctness_failed",
+            "detail": "24 record(s) failed."
+          },
+          {
+            "code": "quality_failed",
+            "detail": "task quality is below the frozen threshold."
+          },
+          {
+            "code": "synthetic_fixture",
+            "detail": "synthetic fixtures never enter a real recommendation."
+          }
+        ]
+      }
+    ],
+    "include_in_paper": false,
+    "project_scope": "platform_extension",
+    "protocol_hash": "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3",
+    "protocol_scope_hashes": [
+      "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3"
+    ],
+    "reasons": [
+      "Synthetic fixture evidence: no real recommendation is made."
+    ],
+    "recommended_action": "insufficient_evidence",
+    "recommended_method": null,
+    "records_sha256": "71ef80d87554d539dfbfb22913b8a9d92deb652232ae47e9eeb20aaa6ff1e55b",
+    "schema_version": "veladraft-platform-v1",
+    "scope": {
+      "measurement_scope": "local_client",
+      "min_groups": 20,
+      "threshold": 1.05
+    },
+    "summary_sha256": "9bac37347745118dc854d2d5f5bafc3d3dc662522c38a7f899c9b3464d3afdbb",
+    "synthetic": true,
+    "threshold": 1.05
+  },
+  "fallback_records": 0,
+  "include_in_paper": false,
+  "issues": [],
+  "min_groups": 20,
+  "n_boot": 2000,
+  "n_groups": 24,
+  "n_real_records": 0,
+  "n_records": 216,
+  "n_sessions": 3,
+  "n_synthetic_records": 216,
+  "n_tasks": 3,
+  "overall_status": "synthetic_fixture",
+  "project_scope": "platform_extension",
+  "protocol_mismatch": false,
+  "protocol_scope_hashes": [
+    "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3"
+  ],
+  "records_sha256": "71ef80d87554d539dfbfb22913b8a9d92deb652232ae47e9eeb20aaa6ff1e55b",
+  "schema_version": "veladraft-platform-v1",
+  "summary_sha256": "d2430e7968a4e977a33bf51491225bf7cc98b7f5716c4b41d4a205f1c83ea6c6",
+  "synthetic": true,
+  "task_group_counts": {
+    "chart_qa": 8,
+    "general_vqa": 8,
+    "invoice_fields": 8
+  },
+  "threshold": 1.05
+}
