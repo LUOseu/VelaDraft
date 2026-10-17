@@ -1,0 +1,1546 @@
+{
+  "budget": {
+    "ar_allocation_wall_s": 661.6144609451294,
+    "ar_gpu_hours": 0.183782,
+    "ngram_allocation_wall_s": 385.720906496048,
+    "ngram_gpu_hours": 0.107145
+  },
+  "cancel": {
+    "all_reclaimed_within_window": true,
+    "ar": [
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.012223593890666962,
+        "cancel_requested_s": 0.09395442716777325,
+        "cancelled": true,
+        "concurrency": 1,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ar",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ar-c1-s1-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ar_lifecycle_server.log"
+        },
+        "session": 1
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 1.0
+          },
+          {
+            "t_s": 0.26755343563854694,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.26755659841001034,
+        "cancel_requested_s": 0.09321539290249348,
+        "cancelled": true,
+        "concurrency": 1,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ar",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ar-c1-s2-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ar_lifecycle_server.log"
+        },
+        "session": 2
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 1.0
+          },
+          {
+            "t_s": 0.2700013890862465,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.27000562474131584,
+        "cancel_requested_s": 0.17866780050098896,
+        "cancelled": true,
+        "concurrency": 1,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ar",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ar-c1-s3-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ar_lifecycle_server.log"
+        },
+        "session": 3
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.01218382827937603,
+        "cancel_requested_s": 0.08993913792073727,
+        "cancelled": true,
+        "concurrency": 2,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ar",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ar-c2-s1-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ar_lifecycle_server.log"
+        },
+        "session": 1
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.010131807997822762,
+        "cancel_requested_s": 0.09223411232233047,
+        "cancelled": true,
+        "concurrency": 2,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ar",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ar-c2-s2-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ar_lifecycle_server.log"
+        },
+        "session": 2
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 1.0
+          },
+          {
+            "t_s": 0.2783095967024565,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.27831188030540943,
+        "cancel_requested_s": 0.18345065228641033,
+        "cancelled": true,
+        "concurrency": 2,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ar",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ar-c2-s3-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ar_lifecycle_server.log"
+        },
+        "session": 3
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.011502772569656372,
+        "cancel_requested_s": 0.09565621241927147,
+        "cancelled": true,
+        "concurrency": 4,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ar",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ar-c4-s1-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ar_lifecycle_server.log"
+        },
+        "session": 1
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.013939745724201202,
+        "cancel_requested_s": 0.10713366605341434,
+        "cancelled": true,
+        "concurrency": 4,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ar",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ar-c4-s2-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ar_lifecycle_server.log"
+        },
+        "session": 2
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 1.0
+          },
+          {
+            "t_s": 0.2742075826972723,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.2742101401090622,
+        "cancel_requested_s": 0.1844201572239399,
+        "cancelled": true,
+        "concurrency": 4,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ar",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ar-c4-s3-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ar_lifecycle_server.log"
+        },
+        "session": 3
+      }
+    ],
+    "ngram": [
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.011459456756711006,
+        "cancel_requested_s": 0.09638743847608566,
+        "cancelled": true,
+        "concurrency": 1,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ngram",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ngram-c1-s1-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ngram_lifecycle_server.log"
+        },
+        "session": 1
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 1.0
+          },
+          {
+            "t_s": 0.268280578777194,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.2682923786342144,
+        "cancel_requested_s": 0.08843004889786243,
+        "cancelled": true,
+        "concurrency": 1,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ngram",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ngram-c1-s2-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ngram_lifecycle_server.log"
+        },
+        "session": 2
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 1.0
+          },
+          {
+            "t_s": 0.26605948619544506,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.26606642082333565,
+        "cancel_requested_s": 0.18928612768650055,
+        "cancelled": true,
+        "concurrency": 1,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ngram",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ngram-c1-s3-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ngram_lifecycle_server.log"
+        },
+        "session": 3
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.011787554249167442,
+        "cancel_requested_s": 0.08573424257338047,
+        "cancelled": true,
+        "concurrency": 2,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ngram",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ngram-c2-s1-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ngram_lifecycle_server.log"
+        },
+        "session": 1
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 1.0
+          },
+          {
+            "t_s": 0.2724180053919554,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.272428173571825,
+        "cancel_requested_s": 0.09600695036351681,
+        "cancelled": true,
+        "concurrency": 2,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ngram",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ngram-c2-s2-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ngram_lifecycle_server.log"
+        },
+        "session": 2
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 1.0
+          },
+          {
+            "t_s": 0.268310958519578,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.26831319369375706,
+        "cancel_requested_s": 0.18075618147850037,
+        "cancelled": true,
+        "concurrency": 2,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ngram",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ngram-c2-s3-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ngram_lifecycle_server.log"
+        },
+        "session": 3
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 1.0
+          },
+          {
+            "t_s": 0.2761078476905823,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.2761129681020975,
+        "cancel_requested_s": 0.08848833851516247,
+        "cancelled": true,
+        "concurrency": 4,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ngram",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ngram-c4-s1-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ngram_lifecycle_server.log"
+        },
+        "session": 1
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 1.0
+          },
+          {
+            "t_s": 0.2725568637251854,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.2725593503564596,
+        "cancel_requested_s": 0.08943623304367065,
+        "cancelled": true,
+        "concurrency": 4,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ngram",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ngram-c4-s2-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ngram_lifecycle_server.log"
+        },
+        "session": 2
+      },
+      {
+        "active_after": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "active_immediately_after_close": {
+          "running": 1.0,
+          "total": 1.0,
+          "waiting": 0.0
+        },
+        "active_samples": [
+          {
+            "t_s": 0.0,
+            "total": 1.0
+          },
+          {
+            "t_s": 0.27052589133381844,
+            "total": 0.0
+          }
+        ],
+        "active_samples_during_request": [
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          },
+          {
+            "running": 0.0,
+            "total": 0.0,
+            "waiting": 0.0
+          }
+        ],
+        "baseline_active": {
+          "running": 0.0,
+          "total": 0.0,
+          "waiting": 0.0
+        },
+        "cancel_reclaimed_s": 0.270529268309474,
+        "cancel_requested_s": 0.18678509257733822,
+        "cancelled": true,
+        "concurrency": 4,
+        "error": null,
+        "ignore_eos": true,
+        "max_tokens": 512,
+        "mode": "ngram",
+        "observed_in_flight": true,
+        "observed_in_flight_after_close": true,
+        "observed_in_flight_before_close": false,
+        "request_id": "ngram-c4-s3-cancel",
+        "server_log": {
+          "abort_or_finish": [],
+          "available": true,
+          "matched_lines": [],
+          "path": "/tmp/veladraft_serving/logs/ngram_lifecycle_server.log"
+        },
+        "session": 3
+      }
+    ]
+  },
+  "completion_levels": {
+    "AR_API_PASS": true,
+    "AR_OFFLINE_PASS": true,
+    "SD_CORRECTNESS_PASS": false,
+    "SD_EXECUTED": true,
+    "SERVING_LIFECYCLE_PASS": true,
+    "ar_status": "verified_greedy_exact",
+    "sd_status": "failed"
+  },
+  "correctness": {
+    "ar_ar": {
+      "exact": 120,
+      "pairs": 120,
+      "rate": 1.0
+    },
+    "categories": {
+      "caption": {
+        "exact": 21,
+        "pairs": 24,
+        "rate": 0.875
+      },
+      "chart_doc": {
+        "exact": 24,
+        "pairs": 24,
+        "rate": 1.0
+      },
+      "diagnostic": {
+        "exact": 24,
+        "pairs": 24,
+        "rate": 1.0
+      },
+      "ocr": {
+        "exact": 9,
+        "pairs": 24,
+        "rate": 0.375
+      },
+      "vqa": {
+        "exact": 3,
+        "pairs": 24,
+        "rate": 0.125
+      }
+    },
+    "diagnostic": {
+      "accepted_tokens": 1320,
+      "proposed_positive": true,
+      "proposed_tokens": 1584,
+      "requests": 24,
+      "verification_entered": true,
+      "verify_rounds": 396
+    },
+    "natural": {
+      "proposed_tokens": 2562,
+      "verify_rounds": 642
+    },
+    "sd_ar": {
+      "exact": 81,
+      "exact_rate": 0.675,
+      "finish_reason_exact": 114,
+      "finish_reason_exact_rate": 0.95,
+      "pairs": 120,
+      "sequence_exact": 81,
+      "sequence_exact_rate": 0.675
+    }
+  },
+  "include_in_paper": false,
+  "latency": {
+    "ar": {
+      "e2e": {
+        "max_s": 3.091159975156188,
+        "mean_s": 1.2529217977426015,
+        "min_s": 0.09870419651269913,
+        "n": 288,
+        "p50_s": 1.1175764836370945,
+        "p95_s": 2.6659547071903944
+      },
+      "tpot": {
+        "max_s": 0.33488915488123894,
+        "mean_s": 0.02767578638748601,
+        "min_s": 0.005470922216773033,
+        "n": 288,
+        "p50_s": 0.0152100968783296,
+        "p95_s": 0.10483915731310844
+      },
+      "ttft": {
+        "max_s": 0.8069461323320866,
+        "mean_s": 0.18978313921252266,
+        "min_s": 0.08056958764791489,
+        "n": 288,
+        "p50_s": 0.13652505911886692,
+        "p95_s": 0.4429865963757038
+      }
+    },
+    "ngram": {
+      "e2e": {
+        "max_s": 4.506559323519468,
+        "mean_s": 1.427854701171681,
+        "min_s": 0.08681763708591461,
+        "n": 288,
+        "p50_s": 1.1773242484778166,
+        "p95_s": 3.5868850257247686
+      },
+      "tpot": {
+        "max_s": 0.10143791884183884,
+        "mean_s": 0.022637573308750266,
+        "min_s": 0.006586963310837746,
+        "n": 288,
+        "p50_s": 0.018325602430410273,
+        "p95_s": 0.04702913466220101
+      },
+      "ttft": {
+        "max_s": 0.3481600284576416,
+        "mean_s": 0.13233989932470852,
+        "min_s": 0.07334743440151215,
+        "n": 288,
+        "p50_s": 0.10644929856061935,
+        "p95_s": 0.276109317317605
+      }
+    }
+  },
+  "lifecycle_checks": {
+    "ar": {
+      "all_windows_present": true,
+      "boundary_ok": true,
+      "cancel_all_reclaimed": true,
+      "cancel_keys": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          3
+        ]
+      ],
+      "cancel_probes": 9,
+      "expected_windows": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          3
+        ]
+      ],
+      "nonstream_ok": true,
+      "nonstream_probes": 1,
+      "observed_windows": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          3
+        ]
+      ],
+      "ok": true,
+      "pair_checks": 9,
+      "pairs_ok": true,
+      "record_errors": 0,
+      "records": 315,
+      "stream_records": 315,
+      "window_errors": 0
+    },
+    "ngram": {
+      "all_windows_present": true,
+      "boundary_ok": true,
+      "cancel_all_reclaimed": true,
+      "cancel_keys": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          3
+        ]
+      ],
+      "cancel_probes": 9,
+      "expected_windows": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          3
+        ]
+      ],
+      "nonstream_ok": true,
+      "nonstream_probes": 1,
+      "observed_windows": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          3
+        ]
+      ],
+      "ok": true,
+      "pair_checks": 9,
+      "pairs_ok": true,
+      "record_errors": 0,
+      "records": 315,
+      "stream_records": 315,
+      "window_errors": 0
+    }
+  },
+  "project_scope": "platform_extension",
+  "schema_version": "veladraft-serving-summary-v1",
+  "speedup": {
+    "1": {
+      "ar_total_s": 107.2288507502526,
+      "pairs": 3,
+      "raw": [
+        {
+          "ar_wall_s": 35.65639126673341,
+          "concurrency": 1,
+          "sd_wall_s": 43.111006347462535,
+          "session": 1,
+          "speedup": 0.8270832506054943
+        },
+        {
+          "ar_wall_s": 35.52101102843881,
+          "concurrency": 1,
+          "sd_wall_s": 39.73372218757868,
+          "session": 2,
+          "speedup": 0.8939764279004089
+        },
+        {
+          "ar_wall_s": 36.05144845508039,
+          "concurrency": 1,
+          "sd_wall_s": 31.465378031134605,
+          "session": 3,
+          "speedup": 1.1457497322742451
+        }
+      ],
+      "sd_total_s": 114.31010656617582,
+      "speedup_paired_total": 0.9380522332745463
+    },
+    "2": {
+      "ar_total_s": 59.25531420856714,
+      "pairs": 3,
+      "raw": [
+        {
+          "ar_wall_s": 18.55027495138347,
+          "concurrency": 2,
+          "sd_wall_s": 21.419778591021895,
+          "session": 1,
+          "speedup": 0.8660348599102151
+        },
+        {
+          "ar_wall_s": 20.252973146736622,
+          "concurrency": 2,
+          "sd_wall_s": 22.92126513645053,
+          "session": 2,
+          "speedup": 0.8835887995784902
+        },
+        {
+          "ar_wall_s": 20.45206611044705,
+          "concurrency": 2,
+          "sd_wall_s": 23.307816553860903,
+          "session": 3,
+          "speedup": 0.8774767067170518
+        }
+      ],
+      "sd_total_s": 67.64886028133333,
+      "speedup_paired_total": 0.875924796990523
+    },
+    "4": {
+      "ar_total_s": 38.306185780093074,
+      "pairs": 3,
+      "raw": [
+        {
+          "ar_wall_s": 12.506053924560547,
+          "concurrency": 4,
+          "sd_wall_s": 15.185119116678834,
+          "session": 1,
+          "speedup": 0.8235729880330217
+        },
+        {
+          "ar_wall_s": 12.1127427816391,
+          "concurrency": 4,
+          "sd_wall_s": 14.904064912348986,
+          "session": 2,
+          "speedup": 0.8127140382757528
+        },
+        {
+          "ar_wall_s": 13.687389073893428,
+          "concurrency": 4,
+          "sd_wall_s": 14.545884201303124,
+          "session": 3,
+          "speedup": 0.9409802033668887
+        }
+      ],
+      "sd_total_s": 44.635068230330944,
+      "speedup_paired_total": 0.8582082944831886
+    }
+  }
+}

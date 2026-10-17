@@ -1,0 +1,565 @@
+{
+  "ar_ar": {
+    "exact": 120,
+    "pairs": 120,
+    "rate": 1.0
+  },
+  "ar_meta": [
+    {
+      "allocation_wall_s": 810.3166664391756,
+      "device": [
+        {
+          "compute_capability": "8.6",
+          "index": 3,
+          "name": "NVIDIA RTX A6000",
+          "uuid": "GPU-06d42c3b-89d2-20d5-8189-9b4564fec135"
+        }
+      ],
+      "dtype": "bfloat16",
+      "load_s": 609.3557392582297,
+      "manifest": "/home/lyh/VelaDraft-serving/tests/serving/fixtures/manifest.json",
+      "manifest_sha256": "0830ede336fbd5da7d61a9b6d74ee2460e6c3012beff379053dff64b792a6ca1",
+      "max_model_len": 8192,
+      "max_pixels": 1003520,
+      "min_pixels": 200704,
+      "mode": "ar",
+      "model": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+      "num_speculative_tokens": 4,
+      "prompt_lookup_max": 2,
+      "prompt_lookup_min": 2,
+      "repeats": 3,
+      "request_wall_s": 200.96092718094587,
+      "speculative_config": null
+    }
+  ],
+  "categories": {
+    "caption": {
+      "exact": 21,
+      "pairs": 24,
+      "rate": 0.875
+    },
+    "chart_doc": {
+      "exact": 24,
+      "pairs": 24,
+      "rate": 1.0
+    },
+    "diagnostic": {
+      "exact": 24,
+      "pairs": 24,
+      "rate": 1.0
+    },
+    "ocr": {
+      "exact": 9,
+      "pairs": 24,
+      "rate": 0.375
+    },
+    "vqa": {
+      "exact": 3,
+      "pairs": 24,
+      "rate": 0.125
+    }
+  },
+  "completion_levels": {
+    "AR_API_PASS": false,
+    "AR_OFFLINE_PASS": true,
+    "SD_CORRECTNESS_PASS": false,
+    "SD_EXECUTED": true,
+    "SERVING_LIFECYCLE_PASS": false,
+    "ar_status": "verified_greedy_exact",
+    "sd_status": "failed"
+  },
+  "diagnostic": {
+    "accepted_tokens": 1320,
+    "proposed_positive": true,
+    "proposed_tokens": 1584,
+    "requests": 24,
+    "verification_entered": true,
+    "verify_rounds": 396
+  },
+  "divergences": [
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": false,
+      "first_divergence": 64,
+      "ref_len": 71,
+      "repeat": 0,
+      "request_id": "nat-ocr-00",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 22,
+      "ref_len": 128,
+      "repeat": 0,
+      "request_id": "nat-ocr-02",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 86,
+      "ref_len": 128,
+      "repeat": 0,
+      "request_id": "nat-ocr-03",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 124,
+      "ref_len": 128,
+      "repeat": 0,
+      "request_id": "nat-ocr-05",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 124,
+      "ref_len": 128,
+      "repeat": 0,
+      "request_id": "nat-ocr-06",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 28,
+      "ref_len": 128,
+      "repeat": 0,
+      "request_id": "nat-vqa-00",
+      "text_exact": false
+    },
+    {
+      "cand_len": 126,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 55,
+      "ref_len": 126,
+      "repeat": 0,
+      "request_id": "nat-vqa-01",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 65,
+      "ref_len": 128,
+      "repeat": 0,
+      "request_id": "nat-vqa-02",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 121,
+      "ref_len": 128,
+      "repeat": 0,
+      "request_id": "nat-vqa-03",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": false,
+      "first_divergence": 62,
+      "ref_len": 117,
+      "repeat": 0,
+      "request_id": "nat-vqa-04",
+      "text_exact": false
+    },
+    {
+      "cand_len": 120,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 20,
+      "ref_len": 124,
+      "repeat": 0,
+      "request_id": "nat-vqa-05",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 75,
+      "ref_len": 128,
+      "repeat": 0,
+      "request_id": "nat-vqa-06",
+      "text_exact": false
+    },
+    {
+      "cand_len": 13,
+      "category": "caption",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 9,
+      "ref_len": 16,
+      "repeat": 0,
+      "request_id": "nat-caption-03",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": false,
+      "first_divergence": 64,
+      "ref_len": 71,
+      "repeat": 1,
+      "request_id": "nat-ocr-00",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 22,
+      "ref_len": 128,
+      "repeat": 1,
+      "request_id": "nat-ocr-02",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 86,
+      "ref_len": 128,
+      "repeat": 1,
+      "request_id": "nat-ocr-03",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 124,
+      "ref_len": 128,
+      "repeat": 1,
+      "request_id": "nat-ocr-05",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 124,
+      "ref_len": 128,
+      "repeat": 1,
+      "request_id": "nat-ocr-06",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 28,
+      "ref_len": 128,
+      "repeat": 1,
+      "request_id": "nat-vqa-00",
+      "text_exact": false
+    },
+    {
+      "cand_len": 126,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 55,
+      "ref_len": 126,
+      "repeat": 1,
+      "request_id": "nat-vqa-01",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 65,
+      "ref_len": 128,
+      "repeat": 1,
+      "request_id": "nat-vqa-02",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 121,
+      "ref_len": 128,
+      "repeat": 1,
+      "request_id": "nat-vqa-03",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": false,
+      "first_divergence": 62,
+      "ref_len": 117,
+      "repeat": 1,
+      "request_id": "nat-vqa-04",
+      "text_exact": false
+    },
+    {
+      "cand_len": 120,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 20,
+      "ref_len": 124,
+      "repeat": 1,
+      "request_id": "nat-vqa-05",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 75,
+      "ref_len": 128,
+      "repeat": 1,
+      "request_id": "nat-vqa-06",
+      "text_exact": false
+    },
+    {
+      "cand_len": 13,
+      "category": "caption",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 9,
+      "ref_len": 16,
+      "repeat": 1,
+      "request_id": "nat-caption-03",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": false,
+      "first_divergence": 64,
+      "ref_len": 71,
+      "repeat": 2,
+      "request_id": "nat-ocr-00",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 22,
+      "ref_len": 128,
+      "repeat": 2,
+      "request_id": "nat-ocr-02",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 86,
+      "ref_len": 128,
+      "repeat": 2,
+      "request_id": "nat-ocr-03",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 124,
+      "ref_len": 128,
+      "repeat": 2,
+      "request_id": "nat-ocr-05",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "ocr",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 124,
+      "ref_len": 128,
+      "repeat": 2,
+      "request_id": "nat-ocr-06",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 28,
+      "ref_len": 128,
+      "repeat": 2,
+      "request_id": "nat-vqa-00",
+      "text_exact": false
+    },
+    {
+      "cand_len": 126,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 55,
+      "ref_len": 126,
+      "repeat": 2,
+      "request_id": "nat-vqa-01",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 65,
+      "ref_len": 128,
+      "repeat": 2,
+      "request_id": "nat-vqa-02",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 121,
+      "ref_len": 128,
+      "repeat": 2,
+      "request_id": "nat-vqa-03",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": false,
+      "first_divergence": 62,
+      "ref_len": 117,
+      "repeat": 2,
+      "request_id": "nat-vqa-04",
+      "text_exact": false
+    },
+    {
+      "cand_len": 120,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 20,
+      "ref_len": 124,
+      "repeat": 2,
+      "request_id": "nat-vqa-05",
+      "text_exact": false
+    },
+    {
+      "cand_len": 128,
+      "category": "vqa",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 75,
+      "ref_len": 128,
+      "repeat": 2,
+      "request_id": "nat-vqa-06",
+      "text_exact": false
+    },
+    {
+      "cand_len": 13,
+      "category": "caption",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 9,
+      "ref_len": 16,
+      "repeat": 2,
+      "request_id": "nat-caption-03",
+      "text_exact": false
+    }
+  ],
+  "inputs": {
+    "ar": [
+      "/tmp/veladraft_serving/evidence/ar_full.json"
+    ],
+    "ngram": [
+      "/tmp/veladraft_serving/evidence/ngram_full.json"
+    ]
+  },
+  "natural": {
+    "proposed_tokens": 2562,
+    "verify_rounds": 642
+  },
+  "ngram_meta": [
+    {
+      "allocation_wall_s": 289.8051326572895,
+      "device": [
+        {
+          "compute_capability": "8.6",
+          "index": 3,
+          "name": "NVIDIA RTX A6000",
+          "uuid": "GPU-06d42c3b-89d2-20d5-8189-9b4564fec135"
+        }
+      ],
+      "dtype": "bfloat16",
+      "load_s": 152.17656600102782,
+      "manifest": "/home/lyh/VelaDraft-serving/tests/serving/fixtures/manifest.json",
+      "manifest_sha256": "0830ede336fbd5da7d61a9b6d74ee2460e6c3012beff379053dff64b792a6ca1",
+      "max_model_len": 8192,
+      "max_pixels": 1003520,
+      "min_pixels": 200704,
+      "mode": "ngram",
+      "model": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+      "num_speculative_tokens": 4,
+      "prompt_lookup_max": 2,
+      "prompt_lookup_min": 2,
+      "repeats": 3,
+      "request_wall_s": 137.62856665626168,
+      "speculative_config": {
+        "method": "ngram",
+        "num_speculative_tokens": 4,
+        "prompt_lookup_max": 2,
+        "prompt_lookup_min": 2
+      }
+    }
+  ],
+  "num_divergences": 39,
+  "sd_ar": {
+    "exact": 81,
+    "exact_rate": 0.675,
+    "finish_reason_exact": 114,
+    "finish_reason_exact_rate": 0.95,
+    "pairs": 120,
+    "sequence_exact": 81,
+    "sequence_exact_rate": 0.675
+  }
+}
