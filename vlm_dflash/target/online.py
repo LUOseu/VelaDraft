@@ -60,6 +60,13 @@ from .sample_capture import (
 #: two different schemes.
 ONLINE_DIGEST_VERSION = "vlm-dflash-online-source-digest-v2"
 
+#: Fraction of the configured cap the static pinned plan packs into
+#: (``train.online_feature_cache_policy: pinned``). The greedy smallest-first
+#: pack stops here, leaving headroom so a byte-cap eviction never has to drop
+#: a pinned record. Same 0.95 fill as the validated research plan
+#: (research/training_systems/scripts/s4_pinned_plan.py).
+PINNED_PLAN_FILL_FRACTION = 0.95
+
 
 def _record_nbytes(record: dict) -> int:
     """Bytes of the tensor payload of one extracted record (cache accounting)."""
@@ -233,6 +240,14 @@ class OnlineFeatureDataset(Dataset):
     def end_fast_forward(self) -> None:
         self._placeholder_remaining = 0
 
+    def note_epoch_boundary(self) -> dict | None:
+        """Forward the training loop's natural epoch-end signal to the source.
+
+        The cache policy uses it to freeze the static pinned plan at the first
+        train-phase epoch end; for every other configuration it is a no-op.
+        """
+        return self.source.note_epoch_boundary()
+
     # -- extraction ----------------------------------------------------------
     def __getitem__(self, index: int) -> dict:
         if torch.utils.data.get_worker_info() is not None:
@@ -350,8 +365,14 @@ class OnlineFeatureSource:
         # constructor's failure path calls close(), which must be safe even
         # when the cache was never built.
         self.cache_capacity_bytes = 0
+        self.cache_policy = "lru"
         self._record_cache: "OrderedDict[int, dict]" = OrderedDict()
         self._record_cache_bytes = 0
+        self._record_sizes: dict[int, int] = {}
+        self._pinned_plan: dict | None = None
+        self._pinned_set: set[int] = set()
+        self._epoch_boundaries = 0
+        self._num_epochs_planned = 0
         self.cache_stats: dict = {
             "capacity_bytes": 0,
             "hits": 0,
@@ -360,6 +381,10 @@ class OnlineFeatureSource:
             "evictions": 0,
             "skipped_too_large": 0,
             "peak_bytes": 0,
+            "admitted_records": 0,
+            "rejected_records": 0,
+            "purged_records": 0,
+            "purged_bytes": 0,
         }
         try:
             self._init(cfg, contract, run_dir, limit=limit)
@@ -412,8 +437,27 @@ class OnlineFeatureSource:
         if cache_gb < 0:
             raise ValueError("train.online_feature_cache_gb must be >= 0 (0 disables the cache).")
         self.cache_capacity_bytes = int(cache_gb * (1 << 30))
+        # Retention policy inside the byte budget: ``lru`` (default, byte-for-
+        # byte the shipped behavior) or ``pinned`` (static smallest-first
+        # retention frozen at the first train-phase epoch end; see
+        # note_epoch_boundary). Only meaningful when the cache is enabled.
+        policy = (cfg.get("train") or {}).get("online_feature_cache_policy", "lru")
+        if policy is None or policy == "":
+            policy = "lru"
+        if not isinstance(policy, str) or policy not in ("lru", "pinned"):
+            raise ValueError(
+                "train.online_feature_cache_policy must be 'lru' or 'pinned', "
+                f"got {policy!r}."
+            )
+        self.cache_policy = policy
+        planned_epochs = (cfg.get("train") or {}).get("num_epochs", 6)
+        self._num_epochs_planned = int(planned_epochs) if planned_epochs is not None else 6
         self._record_cache: "OrderedDict[int, dict]" = OrderedDict()
         self._record_cache_bytes = 0
+        self._record_sizes = {}
+        self._pinned_plan = None
+        self._pinned_set = set()
+        self._epoch_boundaries = 0
         self.cache_stats: dict = {
             "capacity_bytes": self.cache_capacity_bytes,
             "hits": 0,
@@ -422,6 +466,10 @@ class OnlineFeatureSource:
             "evictions": 0,
             "skipped_too_large": 0,
             "peak_bytes": 0,
+            "admitted_records": 0,
+            "rejected_records": 0,
+            "purged_records": 0,
+            "purged_bytes": 0,
         }
         # Optional adaptive budget on top of the fixed cap
         # (``train.online_feature_cache_adaptive``): when enabled, the
@@ -624,11 +672,19 @@ class OnlineFeatureSource:
         """
         if not self.cache_capacity_bytes:
             return
+        index = int(index)
+        if self.cache_policy == "pinned":
+            # Frozen plan: only planned records are admitted; every other
+            # record keeps re-extracting through the reference path.
+            if self._pinned_plan is not None and index not in self._pinned_set:
+                self.cache_stats["rejected_records"] += 1
+                return
         budget = self.cache_budget_bytes()
         if budget < self._record_cache_bytes:
             self._trim_record_cache(budget)
-        index = int(index)
         size = _record_nbytes(record)
+        if self.cache_policy == "pinned":
+            self._record_sizes[index] = size
         if size > budget:
             self.cache_stats["skipped_too_large"] += 1
             return
@@ -638,6 +694,8 @@ class OnlineFeatureSource:
         self._record_cache[index] = record
         self._record_cache_bytes += size
         self.cache_stats["stores"] += 1
+        if self.cache_policy == "pinned" and self._pinned_plan is not None:
+            self.cache_stats["admitted_records"] += 1
         self._trim_record_cache(budget)
         if self._record_cache_bytes > self.cache_stats["peak_bytes"]:
             self.cache_stats["peak_bytes"] = self._record_cache_bytes
@@ -662,6 +720,67 @@ class OnlineFeatureSource:
             _evicted_index, evicted = self._record_cache.popitem(last=False)
             self._record_cache_bytes -= _record_nbytes(evicted)
             self.cache_stats["evictions"] += 1
+
+    def note_epoch_boundary(self) -> dict | None:
+        """Freeze the static pinned plan at the first train-phase epoch end.
+
+        Called by the training loop when the loader iterator exhausts (a
+        natural epoch end -- the end-of-run break does not fire it). The
+        record sizes observed so far (one epoch's extractions, i.e. the whole
+        working set under a full pass) are ranked and packed smallest-first
+        into ``PINNED_PLAN_FILL_FRACTION`` of the configured cap; the rest of
+        the cache is purged once, and from then on only planned records are
+        admitted (``rejected_records`` counts the refusals). Nothing is
+        planned when the policy is not ``pinned``, when the boundary happens
+        in another phase (overfit-sanity / calibration slices), when
+        ``train.num_epochs < 2`` (no later epoch could reuse the plan) or
+        before any record size is known; the cache then keeps its LRU
+        behavior unchanged.
+
+        Returns the plan on the call that froze it (the trainer logs the
+        freeze event), ``None`` on every other call.
+        """
+        if self.cache_policy != "pinned" or self._pinned_plan is not None:
+            return None
+        if self.phase != "train":
+            return None
+        if self._num_epochs_planned < 2:
+            return None
+        self._epoch_boundaries += 1
+        if not self.cache_capacity_bytes or not self._record_sizes:
+            return None
+        budget = int(self.cache_capacity_bytes * PINNED_PLAN_FILL_FRACTION)
+        pinned: list[int] = []
+        used = 0
+        for index, size in sorted(self._record_sizes.items(), key=lambda item: (item[1], item[0])):
+            if used + size > budget:
+                continue
+            pinned.append(index)
+            used += size
+        self._pinned_set = set(pinned)
+        purged_records = 0
+        purged_bytes = 0
+        for cached_index in [key for key in self._record_cache if key not in self._pinned_set]:
+            record = self._record_cache.pop(cached_index)
+            purged_bytes += _record_nbytes(record)
+            purged_records += 1
+        self._record_cache_bytes -= purged_bytes
+        self.cache_stats["purged_records"] += purged_records
+        self.cache_stats["purged_bytes"] += purged_bytes
+        # Records that survive the freeze count as the plan's initial
+        # admissions; later admitted stores keep incrementing the same counter.
+        self.cache_stats["admitted_records"] += len(self._record_cache)
+        self._pinned_plan = {
+            "frozen_at_epoch_boundary": self._epoch_boundaries,
+            "fill_fraction": PINNED_PLAN_FILL_FRACTION,
+            "budget_bytes": budget,
+            "n_pinned": len(pinned),
+            "planned_bytes": used,
+            "sized_records": len(self._record_sizes),
+            "purged_records": purged_records,
+            "purged_bytes": purged_bytes,
+        }
+        return self._pinned_plan
 
     # -- trainer-facing surface ----------------------------------------------
     def dataset(self) -> OnlineFeatureDataset:
@@ -708,6 +827,52 @@ class OnlineFeatureSource:
         total_prepare = sum(float(entry.get("prepare_seconds", 0.0)) for entry in self.stats.values())
         total_forward = sum(float(entry.get("forward_seconds", 0.0)) for entry in self.stats.values())
         total_fast_forward = sum(int(entry.get("fast_forward_items", 0)) for entry in self.stats.values())
+        lookups = self.cache_stats["hits"] + self.cache_stats["misses"]
+        cache_block = {
+            **dict(self.cache_stats),
+            "enabled": self.cache_enabled(),
+            "policy": self.cache_policy,
+            "budget_bytes": self.cache_budget_bytes(),
+            "current_bytes": self._record_cache_bytes,
+            "hit_rate": (self.cache_stats["hits"] / lookups) if lookups else None,
+            # One hit replaces exactly one reference extraction of one row.
+            "saved_extractions": self.cache_stats["hits"],
+            "note": (
+                "opt-in bounded host-RAM retention of extracted records across epochs "
+                "(train.online_feature_cache_gb; 0 = disabled). A cache hit replaces the "
+                "target forward for that row; hits/misses are per lookup, evictions are "
+                "byte-cap evictions, and the cache is runtime-only."
+                + (
+                    " With train.online_feature_cache_adaptive the byte budget additionally "
+                    "tracks the job's memory headroom (see adaptive_budget); capacity_bytes "
+                    "stays the configured hard cap."
+                    if self._cache_budget_controller is not None
+                    else ""
+                )
+                + (
+                    " With train.online_feature_cache_policy=pinned the first train-phase "
+                    "epoch end freezes a static smallest-first plan over the record sizes "
+                    "observed in that epoch (see pinned/plan): planned records are admitted "
+                    "thereafter and counted in admitted_records, non-planned stores are "
+                    "refused (rejected_records), records outside the plan are purged once at "
+                    "freeze (purged_records/purged_bytes), and pinned_records/pinned_bytes "
+                    "track the planned records resident now. Misses still re-extract through "
+                    "the reference path; saved_extractions equals hits."
+                    if self.cache_policy == "pinned"
+                    else ""
+                )
+            ),
+        }
+        if self._cache_budget_controller is not None:
+            cache_block["adaptive_budget"] = self._cache_budget_controller.stats()
+        if self.cache_policy == "pinned":
+            cache_block["pinned"] = {
+                "frozen": self._pinned_plan is not None,
+                "pinned_records": len(self._record_cache) if self._pinned_plan is not None else 0,
+                "pinned_bytes": self._record_cache_bytes if self._pinned_plan is not None else 0,
+                "known_sizes": len(self._record_sizes),
+                "plan": self._pinned_plan,
+            }
         return {
             **self.manifest(),
             "target_resident_params": self.target_resident_params,
@@ -719,32 +884,7 @@ class OnlineFeatureSource:
             "extraction_prepare_seconds_total": total_prepare,
             "extraction_forward_seconds_total": total_forward,
             "fast_forward_items_total": total_fast_forward,
-            "feature_cache": {
-                **dict(self.cache_stats),
-                "enabled": self.cache_enabled(),
-                "current_bytes": self._record_cache_bytes,
-                "note": (
-                    "opt-in bounded host-RAM retention of extracted records across epochs "
-                    "(train.online_feature_cache_gb; 0 = disabled). A cache hit replaces the "
-                    "target forward for that row; hits/misses are per lookup, evictions are "
-                    "LRU byte-cap evictions, and the cache is runtime-only."
-                    + (
-                        " With train.online_feature_cache_adaptive the byte budget additionally "
-                        "tracks the job's memory headroom (see adaptive_budget); capacity_bytes "
-                        "stays the configured hard cap."
-                        if self._cache_budget_controller is not None
-                        else ""
-                    )
-                ),
-                **(
-                    {
-                        "budget_bytes": self.cache_budget_bytes(),
-                        "adaptive_budget": self._cache_budget_controller.stats(),
-                    }
-                    if self._cache_budget_controller is not None
-                    else {}
-                ),
-            },
+            "feature_cache": cache_block,
             "target_forwards_note": (
                 "target_forwards counts model forward calls; target_samples counts extracted rows. "
                 "They differ when train.online_batch_size > 1 (one forward per capture group)."

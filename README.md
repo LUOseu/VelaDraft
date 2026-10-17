@@ -212,6 +212,16 @@ tensors bitwise; the cache stays outside the feature and plan digests, and its
 training-time caveats are documented in
 [docs/online-training.md](docs/online-training.md).
 
+A multi-epoch run whose working set exceeds the cache budget can pin a static
+retention plan instead of thrashing under plain LRU:
+`--set train.online_feature_cache_policy=pinned` freezes a smallest-first plan
+after the first training epoch and reuses those records across the remaining
+epochs (details and counters in the pinned section of
+[docs/online-training.md](docs/online-training.md)). Production CLI A/B
+(512-row subset, 3 epochs, 2 pairs per cap): paired wall **-3.6% / -6.9%** at
+0.8 / 1.6 GiB caps; the harness replay upper bound is -7.6% / -13.0% and
+steady state converges to it.
+
 ## Results and evidence
 
 Everything measured &mdash; acceptance length, per-slot acceptance, token-exact

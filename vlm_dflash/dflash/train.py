@@ -554,6 +554,7 @@ def run_training_loop(
     audit_fraction = float(getattr(module, "coverage_audit_fraction", 0.0) or 0.0)
     coverage_audit_step = max(0, min(total_steps - 1, int(total_steps * audit_fraction)))
     started = time.time()
+    epoch_wall_seconds: list[float] = []
     from .trainer_core import NoValidAnchorsError
 
     skippable_errors = tuple(getattr(module, "skippable_errors", ()) or ()) or (NoValidAnchorsError,)
@@ -567,6 +568,9 @@ def run_training_loop(
     # does not pay the target forward cost again.
     fast_forward_batches = consumed
     skip_begin = getattr(base_dataset, "start_fast_forward", None)
+    # Online cache planning hook: a natural epoch end (never the end-of-run
+    # break below) lets the pinned cache policy freeze its static plan.
+    note_epoch_boundary = getattr(base_dataset, "note_epoch_boundary", None)
     if consumed > 0 and skip_begin is not None:
         skip_begin(consumed * micro_batch)
     try:
@@ -587,6 +591,7 @@ def run_training_loop(
         # backward that deposited gradient), not optimizer steps — a pending
         # accumulation window is progress, not a stall.
         valid_micro = 0
+        epoch_started = time.time()
         for batch in iterator:
             batch_lengths = batch.get("lengths")
             batch = {key: value for key, value in batch.items() if key != "lengths"}
@@ -709,7 +714,23 @@ def run_training_loop(
                         )
                     )
                 if step >= total_steps:
+                    epoch_wall_seconds.append(time.time() - epoch_started)
                     break
+        else:
+            # Natural epoch end (the break above skips this): the cache
+            # policy's planning point for the next epoch.
+            epoch_seconds = time.time() - epoch_started
+            epoch_wall_seconds.append(epoch_seconds)
+            log(f"train: epoch end at step {step}/{total_steps} in {epoch_seconds:.1f}s")
+            if note_epoch_boundary is not None:
+                frozen_plan = note_epoch_boundary()
+                if frozen_plan:
+                    log(
+                        "online cache: pinned plan frozen at epoch end "
+                        f"({frozen_plan['n_pinned']} records, "
+                        f"{frozen_plan['planned_bytes'] / (1 << 20):.1f} MiB planned of "
+                        f"{frozen_plan['budget_bytes'] / (1 << 20):.1f} MiB budget)"
+                    )
         iterator = iter(loader)
         if valid_micro == 0:
             stall_epochs += 1
@@ -757,6 +778,7 @@ def run_training_loop(
             resume_state is not None and skip_begin is not None and fast_forward_batches > 0
         ),
         "wall_seconds": time.time() - started,
+        "epoch_wall_seconds": epoch_wall_seconds,
         "peak_gpu_mem_gb": (
             torch.cuda.max_memory_allocated(device) / 1e9 if device.type == "cuda" else None
         ),
@@ -1427,6 +1449,21 @@ def train_dflash(
             }
         )
         write_json(train_dir / "train_summary.json", summary)
+        if online_source is not None:
+            cache = summary.get("feature_source", {}).get("feature_cache") or {}
+            if cache.get("enabled"):
+                pinned = cache.get("pinned") or {}
+                log(
+                    f"online cache: policy={cache.get('policy')} hits={cache.get('hits')} "
+                    f"misses={cache.get('misses')} hit_rate={cache.get('hit_rate')} "
+                    f"evictions={cache.get('evictions')} saved_extractions={cache.get('saved_extractions')}"
+                    + (
+                        f" admitted={cache.get('admitted_records')} rejected={cache.get('rejected_records')} "
+                        f"pinned_records={pinned.get('pinned_records')} pinned_bytes={pinned.get('pinned_bytes')}"
+                        if pinned
+                        else ""
+                    )
+                )
         record_stage(
             run_dir,
             "train",
