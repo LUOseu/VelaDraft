@@ -1,0 +1,46 @@
+{
+  "backend": {
+    "code_commit": null,
+    "name": "hf-transformers",
+    "version": "local"
+  },
+  "capabilities": {
+    "generation": {
+      "ar": true,
+      "cancel": false,
+      "sd_parallel": false,
+      "sd_sequential": true,
+      "streaming": false
+    },
+    "inputs": {
+      "audio": false,
+      "image": true,
+      "multi_turn_state": false,
+      "text": true,
+      "tool_calls": false,
+      "video": false,
+      "vla_action": false
+    },
+    "metrics": {
+      "client_e2e": true,
+      "gpu_hours": true,
+      "gpu_peak_memory": true,
+      "itl": false,
+      "target_visual_tokens": true,
+      "ttft": false
+    },
+    "visibility": {
+      "chunk_callbacks": false,
+      "per_token_timestamps": false,
+      "proposal_commit_events": false
+    }
+  },
+  "evidence": {
+    "note": "streaming, cancel, per-token timestamps and proposal/commit traces are not exposed by the HF eval path.",
+    "path": "docs/workload_advisor_evidence/blocked/blocker.json",
+    "state": "blocked"
+  },
+  "include_in_paper": false,
+  "project_scope": "platform_extension",
+  "schema_version": "veladraft-platform-v1"
+}
