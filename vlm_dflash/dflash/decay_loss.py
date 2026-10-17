@@ -463,6 +463,32 @@ class DFlashDecayLoss(nn.Module):
             draft_count_per_pos=draft_count_per_pos,
         )
 
+    def total_loss_dtype(self, logits: torch.Tensor) -> torch.dtype:
+        """The dtype :meth:`forward`'s ``total_loss`` has for ``logits``.
+
+        Mirrors ``_reduce``: the ``weight_dtype='fp32'`` mode upcasts the NLL and
+        mask, so the loss is fp32 there; otherwise it keeps the logits dtype.
+        """
+        return torch.float32 if self.weight_dtype == "fp32" else logits.dtype
+
+    def accuracy_counts(
+        self,
+        logits: torch.Tensor,
+        target_ids: torch.Tensor,
+        block_mask: torch.Tensor,
+        block_size: Optional[int] = None,
+    ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
+        """Per-offset ``(correct, count)`` sums without the cross-entropy scalar.
+
+        Recipe runs replace this loss's decay-CE total with the recipe's own
+        objective and consume only the per-slot counts, so the full-vocab
+        cross-entropy behind that scalar is dead work. This computes exactly the
+        counts of :meth:`forward` (same argmax, same ``_draft_acc_per_pos``
+        reductions) and skips it.
+        """
+        correct = logits.argmax(dim=-1) == target_ids
+        return self._draft_acc_per_pos(correct, block_mask, block_size)
+
     def _draft_acc_per_pos(
         self,
         correct: torch.Tensor,

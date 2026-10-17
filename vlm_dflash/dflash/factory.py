@@ -109,6 +109,15 @@ def build_trainer_module(
     # weights every position uniformly); algorithms that need decay keep a float.
     gamma_raw = drafter.get("loss_decay_gamma", 7.0)
     loss_decay_gamma = None if gamma_raw is None else float(gamma_raw)
+    # Recipe stages whose objective routes through the fp32 TV/KL chunk
+    # arithmetic (``objectives._tv_kl``) can compile that arithmetic as an
+    # opt-in execution optimization (``drafter.recipe_compile_tv_kl``, default
+    # off). The gate is objective-aware inside ``recipe_loss``: stages that do
+    # not call ``_tv_kl`` (e.g. ``e2e_tv``) are exempt by construction, so the
+    # knob can stay on across a full two-stage run. The win is
+    # hardware/workload dependent -- measured on the 48 GB A6000 audit
+    # harness; re-measure per hardware rather than assume it transfers.
+    recipe_compile_tv_kl = bool(drafter.get("recipe_compile_tv_kl", False))
     module = module_class(
         draft_model=draft,
         target_lm_head=lm_head,
@@ -119,6 +128,10 @@ def build_trainer_module(
         num_anchors=int(drafter.get("num_anchors", 256)),
         loss_decay_gamma=loss_decay_gamma,
         loss_type="dflash",
+        # ``None`` (absent) = auto: enable wherever the algorithm declares a
+        # row-local scoring tail; an explicit false always disables.
+        recipe_row_compaction=drafter.get("recipe_row_compaction"),
+        recipe_compile_tv_kl=recipe_compile_tv_kl,
         **(module_kwargs or {}),
     )
     return module

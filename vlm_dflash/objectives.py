@@ -385,6 +385,65 @@ def _tv_kl(student_chunk: torch.Tensor, teacher_chunk: torch.Tensor):
     return tv, kl
 
 
+_COMPILED_TV_KL: dict = {"impl": None, "attempted": False}
+
+
+def _compiled_tv_kl():
+    """The compiled variant of :func:`_tv_kl`, built lazily at most once.
+
+    ``_tv_kl`` is the fp32 TV/KL chunk arithmetic behind every recipe stage
+    whose ``lk_coef`` is non-zero (the two-stage recipe's cold-start stage, the
+    DSpark KL objective). It runs once per loss chunk over ``[rows, vocab]``
+    fp32 tensors and dominates the stage-1 loss tail (48 GB A6000 audit
+    harness: 22.9% of GPU time; 403 ms/step elementwise + 159 ms/step fp32
+    softmax). ``torch.compile`` fuses that elementwise chain; the math is
+    untouched -- the wrapper calls the same eager function and returns its
+    result unchanged.
+
+    This is an *execution* optimization, reached only through the objective's
+    own opt-in (``recipe_loss(compile_tv_kl=...)``, which gates on
+    ``stage.lk_coef``); it is never installed as a process-wide switch, and the
+    win is expected to be re-measured per hardware rather than assumed
+    portable. If compiling (or a later compiled call) raises, the eager
+    function is used from then on, with one warning: a toolchain problem costs
+    throughput, never correctness.
+    """
+    impl = _COMPILED_TV_KL["impl"]
+    if impl is not None:
+        return impl
+    if _COMPILED_TV_KL["attempted"]:
+        return _tv_kl
+    _COMPILED_TV_KL["attempted"] = True
+    eager = _tv_kl
+
+    def tv_kl_compiled(student_chunk, teacher_chunk):
+        current = tv_kl_compiled._compiled
+        if current is not None:
+            try:
+                return current(student_chunk, teacher_chunk)
+            except Exception as exc:  # pragma: no cover - toolchain dependent
+                tv_kl_compiled._compiled = None
+                if not tv_kl_compiled._warned:
+                    tv_kl_compiled._warned = True
+                    import warnings
+
+                    warnings.warn(
+                        f"compiled _tv_kl failed ({exc!r}); falling back to the eager path",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+        return eager(student_chunk, teacher_chunk)
+
+    try:
+        tv_kl_compiled._compiled = torch.compile(eager, dynamic=True)
+    except Exception:  # pragma: no cover - depends on the local toolchain
+        return eager
+    tv_kl_compiled._warned = False
+    tv_kl_compiled.__name__ = getattr(eager, "__name__", "_tv_kl")
+    _COMPILED_TV_KL["impl"] = tv_kl_compiled
+    return tv_kl_compiled
+
+
 def lk_per_position(
     student_logits: torch.Tensor,
     teacher_logits: torch.Tensor,
@@ -392,6 +451,7 @@ def lk_per_position(
     loss_type: str,
     eta: float,
     return_accept: bool = False,
+    tv_kl_impl=None,
 ):
     """Per-position acceptance-family loss ``[rows]`` (chunked; fp32 arithmetic).
 
@@ -409,11 +469,12 @@ def lk_per_position(
     objective).
     """
     rows = student_logits.shape[0]
+    impl = tv_kl_impl if tv_kl_impl is not None else _tv_kl
     out = []
     accepts = [] if return_accept else None
     for start in range(0, rows, LK_CHUNK_ROWS):
         stop = min(rows, start + LK_CHUNK_ROWS)
-        tv, kl = _tv_kl(student_logits[start:stop], teacher_logits[start:stop])
+        tv, kl = impl(student_logits[start:stop], teacher_logits[start:stop])
         if loss_type == "alpha":
             ell = -torch.log((1.0 - tv).clamp_min(1e-10))
         elif loss_type == "hybrid":
@@ -446,6 +507,7 @@ def lk_term(
     eta: float,
     teacher_chunk_fn=None,
     accept_out: dict | None = None,
+    tv_kl_impl=None,
 ) -> torch.Tensor:
     """Weighted-mean LK term over the flat supervised slots.
 
@@ -466,6 +528,10 @@ def lk_term(
     idempotent under the activation-checkpoint recompute in the backward (the
     recomputed chunk overwrites its own key with identical values), and rows
     come out in ascending flat-slot order via ``sorted(accept_out)``.
+
+    ``tv_kl_impl`` overrides the fp32 TV/KL chunk arithmetic (default: the
+    eager ``_tv_kl``); the trainer passes the compiled variant for stages that
+    opted in (see :func:`_compiled_tv_kl`).
     """
     if (teacher_logits is None) == (teacher_chunk_fn is None):
         raise ValueError("pass exactly one of teacher_logits / teacher_chunk_fn.")
@@ -482,10 +548,17 @@ def lk_term(
                 else teacher_logits[start:stop]
             )
             if accept_out is None:
-                ell = lk_per_position(student_chunk, teacher_chunk, loss_type=loss_type, eta=eta)
+                ell = lk_per_position(
+                    student_chunk, teacher_chunk, loss_type=loss_type, eta=eta, tv_kl_impl=tv_kl_impl
+                )
             else:
                 ell, accept = lk_per_position(
-                    student_chunk, teacher_chunk, loss_type=loss_type, eta=eta, return_accept=True
+                    student_chunk,
+                    teacher_chunk,
+                    loss_type=loss_type,
+                    eta=eta,
+                    return_accept=True,
+                    tv_kl_impl=tv_kl_impl,
                 )
                 accept_out[start] = accept
             return (ell * weight_chunk).sum()
@@ -599,6 +672,7 @@ def recipe_loss(
     teacher_chunk_fn=None,
     loss_decay_gamma: float | None,
     confidence_logits: torch.Tensor | None = None,
+    compile_tv_kl: bool = False,
 ) -> tuple[torch.Tensor, dict]:
     """Loss for one recipe stage + logging components.
 
@@ -617,6 +691,10 @@ def recipe_loss(
     (detached) — exactly the upstream DSpark confidence objective, which is why
     it must be computed here, per step, next to the distribution term, and
     never cached as a fixed feature.
+
+    ``compile_tv_kl`` (opt-in, default off) routes stages that need
+    ``_tv_kl`` through its compiled variant; stages whose objective does not
+    use it are unaffected by construction.
     """
     if (
         stage.ce_coef <= 0.0
@@ -680,6 +758,11 @@ def recipe_loss(
 
     if stage.lk_coef > 0.0:
         accept_out: dict | None = {} if stage.confidence_coef > 0.0 else None
+        # Execution-optimization gate: compile the fp32 TV/KL chunk arithmetic
+        # only when this stage's objective actually routes through it
+        # (``lk_coef`` > 0) *and* the run opted in. Stages whose objective does
+        # not call ``_tv_kl`` (e.g. ``e2e_tv``) never reach the compiled path.
+        tv_kl_impl = _compiled_tv_kl() if compile_tv_kl else None
         lk = lk_term(
             student_logits.reshape(-1, student_logits.size(-1)),
             None if teacher_chunk_fn is not None else teacher_logits.reshape(-1, teacher_logits.size(-1)),
@@ -688,6 +771,7 @@ def recipe_loss(
             eta=stage.lk_eta,
             teacher_chunk_fn=teacher_chunk_fn,
             accept_out=accept_out,
+            tv_kl_impl=tv_kl_impl,
         )
         total = total + float(stage.lk_coef) * lk
         components["lk_loss"] = float(lk.detach())
@@ -743,6 +827,10 @@ class TeacherLogitsStream:
     :meth:`logits` projects a bounded slab on demand, so the full
     ``[B, n, S, V]`` teacher tensor never materializes (it is 8.7 GB at the
     canonical 16-sample sanity batch).
+
+    ``sample_index`` names the batch sample of every block when the caller's
+    blocks are not the dense ``[B, n]`` grid (row compaction keeps an arbitrary
+    subset of blocks); the dense path passes ``None``.
     """
 
     def __init__(
@@ -752,6 +840,7 @@ class TeacherLogitsStream:
         label_indices: torch.Tensor,
         *,
         first_slot: int,
+        sample_index: torch.Tensor | None = None,
     ) -> None:
         bsz, nblocks, block_size = label_indices.shape
         slots = int(block_size) - int(first_slot)
@@ -771,9 +860,23 @@ class TeacherLogitsStream:
         self._lm_head = lm_head
         self._hidden = teacher_hidden.reshape(-1, self.hidden_size)
         self._positions = positions
-        self._batch = (
-            torch.arange(self.num_rows, device=positions.device) // (int(nblocks) * slots)
-        )
+        if sample_index is None:
+            self._batch = (
+                torch.arange(self.num_rows, device=positions.device) // (int(nblocks) * slots)
+            )
+        else:
+            sample_index = sample_index.to(device=positions.device, dtype=torch.long)
+            if int(sample_index.numel()) != int(bsz) * int(nblocks):
+                raise ValueError(
+                    "sample_index must name one sample per block "
+                    f"({int(bsz) * int(nblocks)} values), got {int(sample_index.numel())}."
+                )
+            if bool((sample_index < 0).any()) or bool((sample_index >= int(teacher_hidden.size(0))).any()):
+                raise ValueError(
+                    f"sample_index entries must be in [0, {int(teacher_hidden.size(0))}) for the "
+                    "teacher hidden states of this call."
+                )
+            self._batch = sample_index.repeat_interleave(slots)
 
     def logits(self, row_start: int, row_stop: int) -> torch.Tensor:
         """Teacher logits for flat rows ``[row_start, row_stop)``, shape ``[k, V]``."""
