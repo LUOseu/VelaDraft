@@ -6,7 +6,7 @@
 - branch: `platform/workload-advisor`
 - baseline: `7711eda504f4f28653a11cbb164b2ea673b4d682`
 - PR 1 commit: `72e1796` — CPU contract, statistics, decision, reports
-- PR 2 commit: `88c8318` — HF backend, GPU lease/ledger, blocker evidence
+- PR 2 backend commit: `88c8318` — HF backend, GPU lease/ledger, blocker evidence (plus documentation commits on the PR branch)
 
 ## Pull requests
 
@@ -35,6 +35,10 @@ PR 2:
 - `vlm_dflash/workload_advisor/backend_hf.py`;
 - `docs/workload_advisor.md`;
 - blocked-run evidence in `docs/workload_advisor_evidence/`.
+
+## CI status
+
+GitHub Actions CPU tests (Python 3.10/3.12) and package build + fresh wheel install are green on PR 14 and PR 15.
 
 ## Test commands and results
 
