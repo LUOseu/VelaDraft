@@ -241,7 +241,8 @@ real GPU timings.
 A real pilot writes: `validation.json`, `plan.json`, `records.jsonl`,
 `summary.json`, `decision.json`, `report.md`. The share subdirectory adds
 `records.share.jsonl`, `summary.share.json`, `decision.share.json`,
-`report.share.md` and `SHARE_MANIFEST.json`.
+`report.share.md` and the share manifest at
+`docs/workload_advisor_evidence/cpu_fixture/share/SHARE_MANIFEST.json`.
 Synthetic reports additionally write `records.synthetic.jsonl` and never place
 those rows in a real `records.jsonl`.
 
