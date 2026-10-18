@@ -913,7 +913,8 @@ def summarize(
         expected_requests=expected_requests,
         expected_groups=expected_groups,
         expected_tasks=expected_tasks,
-        paired_pairs=[],
+        paired_pairs=[{"ar": record, "candidate": record} for record in ar_records],
+        pairing_complete=True,
     )
     ar_paired_requests = {str(record.get("request_id")) for record in ar_records}
     ar_correctness["gate"] = bool(

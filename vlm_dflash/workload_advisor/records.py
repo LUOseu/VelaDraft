@@ -779,6 +779,7 @@ def normalize_external_profile(record: dict, *, profile: str = "auto") -> dict:
             "source_measurement_scope": {
                 "concurrency": scope_source.get("concurrency"),
                 "queue": scope_source.get("queue"),
+                "queue_depth": scope_source.get("queue_depth"),
                 "session_index": scope_source.get("session_index"),
                 "window": scope_source.get("window"),
                 "requests": scope_source.get("requests"),

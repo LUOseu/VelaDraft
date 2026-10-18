@@ -142,6 +142,10 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual(ar["latency"]["ttft_s"]["n"], 0)
         self.assertIsNone(ar["latency"]["ttft_s"]["mean"])
         self.assertEqual(ar["latency"]["itl"], "null_no_token_visibility")
+        self.assertEqual(
+            ar["correctness"]["paired_coverage"]["requests"],
+            ar["correctness"]["n_requests"],
+        )
         decision = decide(summary)
         report = render_markdown(summary, decision, manifest=_manifest())
         self.assertIn("null", report)
