@@ -84,6 +84,14 @@ q/k tensors against the installed transformers implementation.
   `Qwen3VLTextRotaryEmbedding.apply_interleaved_mrope`. The draft selects this
   layout with `drafter.spatial_rope_interleaved: true`, which the contract
   validates against the target (`rope.interleaved` in `contract.json`).
+- Partial rotary + interleaved (Qwen3.5/3.6-MoE, `partial_rotary_factor: 0.25`,
+  `mrope_section: [11, 11, 10]`): only the leading `rotary_dim = head_dim *
+  partial_rotary_factor` (64 of 256) channels rotate. The contract checks the
+  sections against that rotary dim, the draft builds its tables at that width
+  and `apply_rotary_pos_emb` passes the remaining channels through, as the
+  target's attention does. The interleave bound follows HF's slice semantics
+  (axis `a` writes `slice(a, 3 * s_a, 3)` of the half table), so `[11, 11, 10]`
+  fits 32 half channels although `3 * 11 > 32`.
 - Qwen3-VL also requires `mm_token_type_ids` in multimodal forwards (it raises
   otherwise), and the capture stage now feeds it the processor map extended with
   text (`0`) rows for the regenerated answer; Qwen2.5-VL uses the same path so

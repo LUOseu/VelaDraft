@@ -10,6 +10,41 @@
   capture/online and eval always render the same protocol. When set they are
   part of the target identity and stage digests; unset, existing identities
   and digests are unchanged.
+# Changelog
+
+## v0.3.2 (in development)
+
+### Targets: sharded target loading (`target.device_map`)
+
+- `target.device_map` (and optional `target.max_memory`) is forwarded to
+  `from_pretrained`, so a target that does not fit next to the drafter on
+  one GPU can be split across devices; the single-device `.to()` is skipped
+  then (`max_memory` without `device_map` is rejected). Capture moves each
+  routed layer to one device before fusing, and the online source
+  synchronizes and reports peak memory over every device that holds target
+  weights (`target_devices` in the manifest, `target_device_peaks_gb` per
+  device). Spec-decode eval/benchmark/`spec_generate` refuse a device-mapped
+  target: verification keeps logits and the output buffer on one device.
+
+### Targets: Qwen3.5/3.6-MoE adapter (implemented, CPU-tested)
+
+- New `qwen3_5_moe` adapter (`Qwen3_5MoeForConditionalGeneration`). The
+  contract and the draft honor `partial_rotary_factor` (64 of 256 head
+  channels rotate; the rest pass through), and the interleaved-MRoPE bound
+  follows HF's slice semantics so `[11, 11, 10]` is accepted. The draft is
+  always dense: `drafter.intermediate_size` sets its MLP width, and a MoE
+  target without a dense width is rejected at contract validation (before
+  any stage runs) instead of silently taking the Qwen3Config default.
+  Spec-decode eval/benchmark refuse this hybrid Gated DeltaNet target
+  (`AdapterInfo.cache_crop_rollback=False`): its recurrent states cannot be
+  cropped after a partial acceptance.
+
+### Data: linear duplicate-id check in prepare
+
+- `build_dataset` counted every selected id with `list.count`, which is
+  quadratic in the number of selected rows (the check alone measured 89 s
+  for 100K ids, versus 8 ms now). The check now uses a `Counter`; the
+  warning text and which ids it reports are unchanged.
 
 ### Training: recipe-run scoring cost
 

@@ -94,6 +94,7 @@ Notes:
 | Qwen2.5-VL-3B-Instruct | qwen25_vl | validated | validated | validated | validated | validated |
 | Qwen3-VL-8B-Instruct | qwen3_vl | validated | validated | validated | validated | validated |
 | SmolVLM2-2.2B-Instruct | smolvlm | gpu_smoke | gpu_smoke | gpu_smoke | gpu_smoke | - |
+| Qwen3.6-35B-A3B | qwen3_5_moe | implemented | implemented | implemented | blocked | - |
 
 Qwen2.5-VL and Qwen3-VL are validated on single-image + text with greedy
 decoding. Qwen3-VL was validated for the four zoo algorithms at reduced scale
@@ -102,6 +103,12 @@ see `RELEASE_VALIDATION.md`); DFlash has the full 2K-protocol run there.
 SmolVLM2 has one recorded engineering smoke (`R-20261014-17`: single-image,
 16 train + 4 val synthetic rows, token-exact 4/4; multi-image and online mode
 untested for this family; no quality claim) - see the evidence records.
+Qwen3.5/3.6-MoE (`qwen3_5_moe`) is implemented and CPU-tested only: the
+contract, the partial-rotary draft (64 of 256 head channels, interleaved
+MRoPE `[11, 11, 10]`) and the dense draft width are checked against the
+transformers implementation (`tests/test_qwen35_moe_target.py`). Spec-decode
+eval is blocked: the hybrid Gated DeltaNet layers keep recurrent/conv states
+that `DynamicCache.crop` cannot roll back after a partial acceptance.
 Video and further target families remain roadmap items, not support claims.
 
 ## Verification modes

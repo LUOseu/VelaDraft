@@ -9,11 +9,11 @@ from pathlib import Path
 import torch
 from PIL import Image
 
-from ..adapters import adapter_for_model
+from ..adapters import adapter_for_contract, adapter_for_model, require_cache_crop_rollback
 from ..algorithms import get_algorithm
 from ..data.sharegpt import load_sharegpt, row_image_path, row_image_paths, row_is_multi_turn, row_question
 from ..provenance import assert_identity, identity_from_contract, record_stage
-from ..target.load import load_target
+from ..target.load import load_target, require_single_device_target
 from ..target.prompts import encode_prompt, messages_from_row, render_conversation
 from ..utils import ensure_dir, log, write_json, write_jsonl
 from .accept import summarize_samples
@@ -364,6 +364,8 @@ def evaluate(
     prompt_source: dict | None = None,
     workload: str | None = None,
 ) -> dict:
+    require_single_device_target(cfg, "eval")
+    require_cache_crop_rollback(adapter_for_contract(contract), "eval")
     run_dir = Path(run_dir)
     eval_cfg = cfg.get("eval", {})
     num_prompts = int(num_prompts if num_prompts is not None else eval_cfg.get("num_prompts", 64))

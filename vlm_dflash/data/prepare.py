@@ -24,6 +24,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+from collections import Counter
 from pathlib import Path
 
 from ..utils import (
@@ -446,8 +447,8 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
             )
         return rows_out
 
-    selected_ids = [pool[index]["sample_id"] for index in train_idx + val_idx + test_idx]
-    duplicates = sorted({sample_id for sample_id in selected_ids if selected_ids.count(sample_id) > 1})
+    id_counts = Counter(pool[index]["sample_id"] for index in train_idx + val_idx + test_idx)
+    duplicates = sorted(sample_id for sample_id, count in id_counts.items() if count > 1)
     if duplicates:
         log(
             "prepare_data: warning: duplicate sample id(s) in the selected rows "
