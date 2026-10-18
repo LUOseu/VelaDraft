@@ -64,6 +64,8 @@ class MultimodalExample:
     image_paths: list[Path] | None = None
     #: Conversation index each image belongs to, same order as ``image_paths``.
     image_turns: list[int] | None = None
+    #: Raw value of the row's ``dataset.split_field`` (predefined splits), if requested.
+    split: str | None = None
 
     @property
     def is_conversation(self) -> bool:
@@ -352,14 +354,22 @@ def normalize_row(row: dict, *, index: int, row_dir: Path, images_dir: Path | No
     return MultimodalExample(id=sample_id, question=question, answer=answer, image_path=image, src_index=index)
 
 
-def iter_jsonl(path: str | Path, images_dir: str | Path | None = None) -> list[MultimodalExample]:
-    """Read a JSONL file of multimodal samples in any supported row shape."""
+def iter_jsonl(
+    path: str | Path, images_dir: str | Path | None = None, split_field: str | None = None
+) -> list[MultimodalExample]:
+    """Read a JSONL file of multimodal samples in any supported row shape.
+
+    ``split_field`` copies that raw row field onto ``MultimodalExample.split``.
+    """
     path = Path(path)
     base = Path(images_dir).resolve() if images_dir is not None else None
     examples = []
     for index, row in enumerate(read_jsonl(path)):
         try:
-            examples.append(normalize_row(row, index=index, row_dir=path.parent, images_dir=base))
+            example = normalize_row(row, index=index, row_dir=path.parent, images_dir=base)
+            if split_field:
+                example.split = row.get(split_field)
+            examples.append(example)
         except (ValueError, FileNotFoundError) as error:
             raise type(error)(f"{path} row {index}: {error}") from error
     return examples
