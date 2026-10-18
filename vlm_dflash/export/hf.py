@@ -83,6 +83,9 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
     drafter_cfg = config.get("drafter", {})
     rope_cfg = {
         "sections": contract["rope"]["sections"],
+        "interleaved": bool(contract["rope"].get("interleaved", False)),
+        # Rotated channels = head_dim * factor; the rest pass through (1.0 = full head).
+        "partial_rotary_factor": float(contract["rope"].get("partial_rotary_factor") or 1.0),
         "mode": drafter_cfg.get("spatial_rope_mode", "replace"),
         "enabled": bool(drafter_cfg.get("spatial_rope_enabled", True)),
     }

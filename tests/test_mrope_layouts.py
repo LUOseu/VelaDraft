@@ -69,7 +69,8 @@ def test_chunked_layout_matches_reference(sections, head_dim):
 
 @pytest.mark.parametrize(
     ("sections", "head_dim"),
-    [((24, 20, 20), 128)],
+    # (11, 11, 10) over 64: Qwen3.5/3.6 partial rotary (64 of 256 channels).
+    [((24, 20, 20), 128), ((11, 11, 10), 64)],
 )
 def test_interleaved_layout_matches_reference(sections, head_dim):
     rotary = _FakeRotary(head_dim // 2)

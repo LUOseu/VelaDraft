@@ -89,6 +89,9 @@ def test_export_roundtrip(tmp_path):
 
     assert exported["drafter"]["block_size"] == 8
     assert exported["drafter"]["spatial_rope"]["sections"] == [16, 24, 24]
+    # Full-head rotary when the contract records no partial factor (pre-field contracts too).
+    assert exported["drafter"]["spatial_rope"]["partial_rotary_factor"] == 1.0
+    assert exported["drafter"]["spatial_rope"]["interleaved"] is False
     assert exported["target"]["model_fingerprint"] == "f" * 64
     assert exported["data"]["num_train"] == 4
     # Checkpoints written before the feature-mode tag export as offline.
