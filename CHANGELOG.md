@@ -2,6 +2,14 @@
 
 ## v0.3.2 (in development)
 
+### Data: predefined splits (`dataset.split_field`)
+
+- A jsonl pool can carry its own train/val/test membership
+  (`dataset.split_field`, values `train` / `val` / `dev` / `validation` /
+  `test`). Prepare keeps it in file order and verifies the splits are
+  image-content disjoint (a shared image fails the stage). `slice` / `--limit`
+  still cap the train split.
+
 ### Training: recipe-run scoring cost
 
 - Recipe runs no longer compute the decay-weighted block-CE scalar that the

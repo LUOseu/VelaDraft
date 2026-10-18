@@ -84,6 +84,18 @@ default 128-token recipes will drop nearly all of them.
   training are protocol-reproducible, not bitwise deterministic (see
   `docs/measured-runs.md`).
 
+### Predefined splits (`dataset.split_field`)
+
+A curated pool can freeze its own membership instead of the seeded random
+split: with `dataset.split_field: split` (jsonl source) every row must carry
+`train`, `val` (`dev` / `validation`) or `test` in that field, and prepare keeps
+those memberships in file order (shuffle the pool beforehand: the evaluator's
+periodic subset is a fixed prefix of `val.jsonl`). The image-content groups still apply as a
+check: rows sharing image bytes across two splits fail the stage instead of
+being moved (only the rows actually kept are checked). `dataset.slice` /
+`--limit` cap the train split and the log reports the cap; the packaged presets
+set `slice`, so set it to the train size to keep every train row.
+
 ## Running the stages
 
 The `train` command runs prepare -> regen -> capture -> train for you; the

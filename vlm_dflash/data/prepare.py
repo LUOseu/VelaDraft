@@ -38,6 +38,31 @@ from ..utils import (
 )
 
 
+#: Accepted ``dataset.split_field`` values (and their aliases).
+_SPLIT_ALIASES = {"train": "train", "val": "val", "dev": "val", "validation": "val", "test": "test"}
+
+
+def _predefined_split_labels(dataset_cfg: dict, pool: list[dict]) -> list[str] | None:
+    """Per-pool-row split (``train``/``val``/``test``) from ``dataset.split_field``, or ``None``.
+
+    Lets a curated pool freeze its own membership (e.g. stratified dev/test
+    frozen before the training corpus) instead of the seeded random split.
+    """
+    field = dataset_cfg.get("split_field")
+    if not field:
+        return None
+    labels = []
+    for sample in pool:
+        name = _SPLIT_ALIASES.get(str(sample.get("split")).strip().lower())
+        if name is None:
+            raise ValueError(
+                f"dataset.split_field={field!r}: {dataset_cfg['path']} row {sample['src_index']} has split "
+                f"{sample.get('split')!r}; expected one of {sorted(_SPLIT_ALIASES)}."
+            )
+        labels.append(name)
+    return labels
+
+
 def _iter_llava_instruct(cfg: dict) -> list[dict]:
     from .schema import check_v1_question_layout
 
@@ -115,7 +140,7 @@ def _iter_jsonl(cfg: dict) -> list[dict]:
 
     dataset = cfg["dataset"]
     images_dir = dataset.get("jsonl_images_dir") or dataset.get("images_dir")
-    examples = iter_jsonl(dataset["path"], images_dir=images_dir)
+    examples = iter_jsonl(dataset["path"], images_dir=images_dir, split_field=dataset.get("split_field"))
     pool = []
     for example in examples:
         entry = {
@@ -125,6 +150,8 @@ def _iter_jsonl(cfg: dict) -> list[dict]:
             "answer": example.answer,
             "image_path": example.image_path,
         }
+        if dataset.get("split_field"):
+            entry["split"] = example.split
         if example.is_conversation:
             entry["conversations"] = example.conversations
             entry["image_paths"] = example.image_paths
@@ -270,34 +297,89 @@ def _materialise_media(
     return dst_name, content_sha256
 
 
-def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> dict:
-    """Materialise ``data.jsonl``/``val.jsonl``/images/manifest under ``data_dir``."""
+def _random_group_split(
+    groups: dict[int, list[int]], seed: int, train_size: int, val_size: int, test_size: int
+) -> tuple[list[int], list[int], list[int]]:
+    """Seeded image-grouped split: whole groups fill test, then val, then train."""
     import random
 
+    rng = random.Random(seed)
+    group_order = sorted(groups)
+    rng.shuffle(group_order)
+    train_idx: list[int] = []
+    val_idx: list[int] = []
+    test_idx: list[int] = []
+    for root in group_order:
+        members = groups[root]
+        if len(test_idx) < test_size:
+            test_idx.extend(members)
+        elif len(val_idx) < val_size:
+            val_idx.extend(members)
+        else:
+            train_idx.extend(members)
+            if len(train_idx) >= train_size:
+                break
+    # Shuffle each split once more so file order is a seeded random order (the
+    # evaluator's periodic subset is a fixed prefix of val.jsonl and must not
+    # inherit the source annotation's block structure).
+    rng.shuffle(train_idx)
+    rng.shuffle(val_idx)
+    rng.shuffle(test_idx)
+    return train_idx, val_idx, test_idx
+
+
+def _predefined_split(
+    groups: dict[int, list[int]], labels: list[str], cap: int | None
+) -> tuple[list[int], list[int], list[int]]:
+    """Rows' own splits (file order); ``cap`` limits train; the kept rows must be media-disjoint."""
+    train_idx = [index for index, name in enumerate(labels) if name == "train"]
+    if cap is not None and len(train_idx) > int(cap):
+        log(f"prepare_data: train split capped to {int(cap)} of {len(train_idx)} rows by dataset.slice/--limit")
+        train_idx = train_idx[: int(cap)]
+    val_idx = [index for index, name in enumerate(labels) if name == "val"]
+    test_idx = [index for index, name in enumerate(labels) if name == "test"]
+    if not val_idx:
+        log("prepare_data: warning: the predefined split has no val rows; eval reads val.jsonl.")
+    kept = set(train_idx) | set(val_idx) | set(test_idx)
+    spanning = [
+        root for root, members in groups.items() if len({labels[m] for m in members if m in kept}) > 1
+    ]
+    if spanning:
+        raise ValueError(
+            f"dataset.split_field: {len(spanning)} image-content group(s) span more than one split "
+            f"(first pool rows: {[groups[root][0] for root in spanning[:5]]}); splits must be media-disjoint."
+        )
+    return train_idx, val_idx, test_idx
+
+
+def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> dict:
+    """Materialise ``data.jsonl``/``val.jsonl``/images/manifest under ``data_dir``."""
     dataset_cfg = cfg["dataset"]
     source = dataset_cfg["source"]
     if source not in _SOURCES:
         raise ValueError(f"Unknown dataset source {source!r}; expected one of {sorted(_SOURCES)}.")
+    if dataset_cfg.get("split_field") and source != "jsonl":
+        raise ValueError("dataset.split_field is only supported for dataset.source=jsonl.")
     data_dir = ensure_dir(data_dir)
     images_out = ensure_dir(data_dir / "images")
 
     pool = _SOURCES[source](cfg)
     log(f"prepare_data: source={source} pool={len(pool)}")
     seed = int(dataset_cfg.get("seed", 42))
-    train_size = int(limit if limit is not None else dataset_cfg["slice"])
-    val_size = int(dataset_cfg.get("val_size", 64))
-    test_size = int(dataset_cfg.get("test_size", 0))
+    labels = _predefined_split_labels(dataset_cfg, pool)
+    if labels is None:
+        train_size = int(limit if limit is not None else dataset_cfg["slice"])
+        val_size = int(dataset_cfg.get("val_size", 64))
+        test_size = int(dataset_cfg.get("test_size", 0))
     link_mode = str(dataset_cfg.get("image_link_mode", "copy")).lower()
     if link_mode not in LINK_MODES:
         raise ValueError(f"dataset.image_link_mode must be one of {LINK_MODES}, got {link_mode!r}.")
 
     # ---- image-content grouping -------------------------------------------
     # Rows that reference the same image bytes (across different questions or
-    # layouts) form one group; whole groups are assigned to exactly one split,
-    # so train/val/test are disjoint by image *content*, not by row index.
-    # (The previous split sampled row indices, sorted them and truncated
-    # front/back -- unrelated to image identity, which let the same picture
-    # leak across splits via different questions.)
+    # layouts) form one group; whole groups are assigned to exactly one split
+    # (or, with ``dataset.split_field``, verified to sit in one), so
+    # train/val/test are disjoint by image *content*, not by row index.
     media_signatures: list[tuple[str, ...]] = []
     hash_cache: dict[Path, str] = {}
 
@@ -347,31 +429,17 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
     for index in range(len(pool)):
         groups.setdefault(find(index), []).append(index)
 
-    rng = random.Random(seed)
-    group_order = sorted(groups)
-    rng.shuffle(group_order)
-    train_idx: list[int] = []
-    val_idx: list[int] = []
-    test_idx: list[int] = []
-    for root in group_order:
-        members = groups[root]
-        if len(test_idx) < test_size:
-            test_idx.extend(members)
-        elif len(val_idx) < val_size:
-            val_idx.extend(members)
-        else:
-            train_idx.extend(members)
-            if len(train_idx) >= train_size:
-                break
-    # Shuffle each split once more so file order is a seeded random order (the
-    # evaluator's periodic subset is a fixed prefix of val.jsonl and must not
-    # inherit the source annotation's block structure).
-    rng.shuffle(train_idx)
-    rng.shuffle(val_idx)
-    rng.shuffle(test_idx)
+    if labels is None:
+        train_idx, val_idx, test_idx = _random_group_split(groups, seed, train_size, val_size, test_size)
+        split_mode = f"image-grouped split, seed={seed}"
+    else:
+        cap = limit if limit is not None else dataset_cfg.get("slice")
+        train_idx, val_idx, test_idx = _predefined_split(groups, labels, cap)
+        train_size, val_size, test_size = len(train_idx), len(val_idx), len(test_idx)
+        split_mode = f"predefined by '{dataset_cfg['split_field']}', file order kept"
     log(
         f"prepare_data: groups={len(groups)} train={len(train_idx)} val={len(val_idx)} "
-        f"test={len(test_idx)} (image-grouped split, seed={seed})"
+        f"test={len(test_idx)} ({split_mode})"
     )
 
     manifest_rows = []
@@ -485,6 +553,7 @@ def build_dataset(cfg: dict, data_dir: str | Path, limit: int | None = None) -> 
         "source": source,
         "source_config": {k: v for k, v in dataset_cfg.items() if k not in {"hf"}},
         "seed": seed,
+        "split_mode": split_mode,
         "slice": train_size,
         "val_size": val_size,
         "test_size": test_size,
