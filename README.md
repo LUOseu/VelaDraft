@@ -41,9 +41,7 @@
 - **[2026-10-18]** 🔥 Added the **Qwen3.6-35B-A3B target adapter** with partial
   rotary support for regeneration, feature capture and dense drafter training
   ([#18](https://github.com/LUOseu/VelaDraft/pull/18), thanks to
-  [@khazic](https://github.com/khazic)). Implemented and CPU-tested; end-to-end
-  training validation is pending, and speculative decoding is blocked on
-  hybrid-cache rollback. See the [support matrix](SUPPORT_MATRIX.md#targets).
+  [@khazic](https://github.com/khazic)). See the [support matrix](SUPPORT_MATRIX.md#targets).
 
 ## Why VelaDraft
 
