@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
-from .records import redact_record
+from .records import _safe_correctness, _safe_latency, _safe_quality, _safe_reason, _safe_resource_usage, _safe_token, redact_record
 from .schema import SCHEMA_VERSION, canonical_json, sha256_json
 
 
@@ -208,6 +208,427 @@ def write_text(path: str | Path, text: str) -> None:
         handle.write(text)
 
 
+def _redact_issue(issue: Any) -> dict:
+    if not isinstance(issue, dict):
+        return {"code": "redacted_issue"}
+    result = {"code": _safe_reason(issue.get("code"))}
+    if isinstance(issue.get("line"), int):
+        result["line"] = issue["line"]
+    if isinstance(issue.get("count"), int):
+        result["count"] = issue["count"]
+    return result
+
+
+def _redact_readiness(value: Any) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+    result = {}
+    status = _safe_token(value.get("status"))
+    if status:
+        result["status"] = status
+    checks = value.get("checks")
+    if isinstance(checks, dict):
+        clean_checks = {}
+        for key, check in checks.items():
+            safe_key = _safe_reason(key)
+            if safe_key == "redacted":
+                continue
+            if isinstance(check, dict):
+                clean = {
+                    item: check[item]
+                    for item in ("ok", "status", "available", "required")
+                    if item in check and (check[item] is None or isinstance(check[item], (bool, int, float)))
+                }
+                if clean:
+                    clean_checks[safe_key] = clean
+            elif isinstance(check, (bool, int, float)) or check is None:
+                clean_checks[safe_key] = check
+        if clean_checks:
+            result["checks"] = clean_checks
+    for key in ("blockers", "reasons"):
+        if isinstance(value.get(key), list):
+            codes = [
+                _safe_reason(item.get("code") if isinstance(item, dict) else item)
+                for item in value[key]
+            ]
+            codes = [code for code in codes if code != "redacted"]
+            if codes:
+                result[key] = codes
+    return result
+
+
+def _redact_run(value: Any) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+    result = {}
+    scalar_keys = {
+        "schema_version",
+        "project_scope",
+        "include_in_paper",
+        "status",
+        "run_id",
+        "budget_gpu_hours",
+        "budget_used_gpu_hours",
+        "budget_remaining_gpu_hours",
+        "records_total",
+        "records_written",
+        "requests_total",
+        "requests_succeeded",
+        "requests_failed",
+        "error_count",
+        "elapsed_s",
+        "session_count",
+        "warmup_count",
+    }
+    for key in scalar_keys:
+        if key in value and (value[key] is None or isinstance(value[key], (bool, int, float))):
+            result[key] = value[key]
+        elif key in {"status", "run_id", "schema_version", "project_scope"}:
+            token = _safe_token(value.get(key))
+            if token:
+                result[key] = token
+    readiness = _redact_readiness(value.get("readiness"))
+    if readiness is not None:
+        result["readiness"] = readiness
+    error = value.get("error")
+    if isinstance(error, dict):
+        result["error"] = {
+            key: _safe_reason(error.get(key))
+            for key in ("code", "type", "stage")
+            if error.get(key)
+        }
+    if value.get("status") == "blocked":
+        reason = _safe_reason(value.get("reason"))
+        if reason != "redacted":
+            result["reason"] = reason
+    return result
+
+
+def _redact_candidate(candidate: dict) -> dict:
+    result = {}
+    for key in ("candidate_id", "method"):
+        token = _safe_token(candidate.get(key))
+        if token:
+            result[key] = token
+    for key in (
+        "n_records",
+        "n_requests",
+        "n_groups",
+        "n_pairs",
+        "n_sessions",
+    ):
+        if isinstance(candidate.get(key), int):
+            result[key] = candidate[key]
+    gates = candidate.get("gates") or {}
+    result["gates"] = {
+        key: value
+        for key, value in gates.items()
+        if isinstance(value, (bool, int, float)) and key not in {"threshold"}
+    }
+    if isinstance(gates.get("threshold"), (int, float)):
+        result["gates"]["threshold"] = gates["threshold"]
+    speed = candidate.get("speed") or {}
+    result["speed"] = {
+        key: speed[key]
+        for key in (
+            "point_ratio",
+            "ci95_low",
+            "ci95_high",
+            "n_groups",
+            "n_pairs",
+            "n_boot",
+            "bootstrap_seed",
+        )
+        if speed.get(key) is None or isinstance(speed.get(key), (int, float))
+    }
+    method = _safe_token(speed.get("method"))
+    if method:
+        result["speed"]["method"] = method
+    correctness = _safe_correctness(candidate.get("correctness"))
+    if correctness is not None:
+        result["correctness"] = correctness
+    quality = _safe_quality(candidate.get("quality"))
+    if quality is not None:
+        result["quality"] = quality
+    result["latency"] = _safe_latency(candidate.get("latency"))
+    result["resources"] = _safe_resource_usage(candidate.get("resources"))
+    pairing = candidate.get("pairing") or {}
+    result["pairing_counts"] = {
+        key: len(value) if isinstance(value, list) else value
+        for key, value in pairing.items()
+        if isinstance(value, int) or isinstance(value, list)
+    }
+    result["tasks"] = [
+        token for token in (_safe_token(task) for task in candidate.get("tasks") or []) if token
+    ]
+    result["measurement_scopes"] = [
+        token for token in (_safe_token(scope) for scope in candidate.get("measurement_scopes") or []) if token
+    ]
+    result["acceptance_policies"] = [
+        token
+        for token in (_safe_token(policy) for policy in candidate.get("acceptance_policies") or [])
+        if token
+    ]
+    buckets = {}
+    for axis, values in (candidate.get("buckets") or {}).items():
+        safe_axis = _safe_token(axis)
+        if not safe_axis or not isinstance(values, dict):
+            continue
+        clean_buckets = {}
+        for label, stats in values.items():
+            safe_label = _safe_reason(label)
+            if safe_label == "redacted" or not isinstance(stats, dict):
+                continue
+            clean_buckets[safe_label] = {
+                key: stats[key]
+                for key in ("point_ratio", "ci95_low", "ci95_high", "n_groups", "min_groups")
+                if stats.get(key) is None or isinstance(stats.get(key), (int, float))
+            }
+            status = _safe_token(stats.get("status"))
+            if status:
+                clean_buckets[safe_label]["status"] = status
+        buckets[safe_axis] = clean_buckets
+    if buckets:
+        result["buckets"] = buckets
+    tuning = candidate.get("tuning") or {}
+    result["tuning"] = {
+        key: tuning[key]
+        for key in ("n_records", "n_pairs", "n_groups", "point_ratio")
+        if tuning.get(key) is None or isinstance(tuning.get(key), (int, float))
+    }
+    return result
+
+
+def redact_summary(summary: dict) -> dict:
+    """Allowlisted summary for sharing; unknown/free-text fields are dropped."""
+    result = {}
+    for key in (
+        "schema_version",
+        "project_scope",
+        "include_in_paper",
+        "evidence_split",
+        "assignment_verified",
+        "assignment_sha256",
+        "protocol_mismatch",
+        "overall_status",
+        "threshold",
+        "bootstrap_seed",
+        "n_boot",
+        "min_groups",
+        "n_records",
+        "n_real_records",
+        "n_synthetic_records",
+        "n_holdout_records",
+        "n_tuning_records",
+        "n_groups",
+        "n_expected_requests",
+        "n_tasks",
+        "n_sessions",
+        "fallback_records",
+        "duplicate_records",
+        "frozen_candidates_sha256",
+        "records_sha256",
+        "summary_sha256",
+        "synthetic",
+    ):
+        if key in summary:
+            result[key] = summary[key]
+    result["protocol_scope_hashes"] = [
+        value for value in summary.get("protocol_scope_hashes") or [] if isinstance(value, str)
+    ]
+    result["task_group_counts"] = {
+        _safe_token(task) or "unknown": count
+        for task, count in (summary.get("task_group_counts") or {}).items()
+        if isinstance(count, int)
+    }
+    result["concurrency"] = [
+        value for value in summary.get("concurrency") or [] if isinstance(value, int)
+    ]
+    integrity = summary.get("input_integrity") or {}
+    result["input_integrity"] = {
+        "status": _safe_token(integrity.get("status")) or "unknown",
+        "issues": [_redact_issue(issue) for issue in integrity.get("issues") or []],
+    }
+    pairing = summary.get("pairing") or {}
+    result["pairing_counts"] = {
+        key: value for key, value in pairing.items() if isinstance(value, int)
+    }
+    for key in ("duplicate_ids", "missing_ar", "missing_candidate", "failed_ar", "failed_candidate",
+                "fallback_ar", "fallback_candidate", "protocol_mismatch"):
+        if isinstance(pairing.get(key), list):
+            result["pairing_counts"][key] = len(pairing[key])
+    result["candidate_ids"] = [
+        token for token in (_safe_token(candidate) for candidate in summary.get("candidate_ids") or []) if token
+    ]
+    result["candidates"] = {
+        _safe_token(candidate_id) or "unknown": _redact_candidate(candidate)
+        for candidate_id, candidate in (summary.get("candidates") or {}).items()
+        if isinstance(candidate, dict)
+    }
+    run = _redact_run(summary.get("run"))
+    if run is not None:
+        result["run"] = run
+    readiness = _redact_readiness(summary.get("readiness"))
+    if readiness is not None:
+        result["readiness"] = readiness
+    result["issues"] = [_redact_issue(issue) for issue in summary.get("issues") or []]
+    return result
+
+
+def redact_decision(decision: dict) -> dict:
+    """Allowlisted decision for sharing; free-text reasons stay local."""
+    result = {}
+    for key in (
+        "schema_version",
+        "project_scope",
+        "include_in_paper",
+        "recommended_action",
+        "recommended_method",
+        "threshold",
+        "bootstrap_seed",
+        "assignment_verified",
+        "assignment_sha256",
+        "input_integrity_status",
+        "protocol_hash",
+        "records_sha256",
+        "frozen_candidates_sha256",
+        "summary_sha256",
+        "synthetic",
+        "decision_id",
+    ):
+        if key in decision:
+            result[key] = decision[key]
+    result["protocol_scope_hashes"] = [
+        value for value in decision.get("protocol_scope_hashes") or [] if isinstance(value, str)
+    ]
+    scope = decision.get("scope") or {}
+    clean_scope = {
+        key: scope[key]
+        for key in ("threshold", "min_groups", "n_groups", "n_sessions")
+        if isinstance(scope.get(key), (int, float))
+    }
+    measurement_scope = _safe_token(scope.get("measurement_scope"))
+    if measurement_scope:
+        clean_scope["measurement_scope"] = measurement_scope
+    for key in ("tasks", "target_V_buckets", "ar_R_buckets"):
+        values = scope.get(key)
+        if isinstance(values, list):
+            clean_scope[key] = [
+                token for token in (_safe_token(value) for value in values) if token
+            ]
+    conditional = []
+    for item in scope.get("conditional_buckets") or []:
+        if not isinstance(item, dict):
+            continue
+        clean_item = {"candidate_id": _safe_token(item.get("candidate_id"))}
+        clean_buckets = []
+        for bucket in item.get("buckets") or []:
+            if not isinstance(bucket, dict):
+                continue
+            clean_bucket = {"axis": _safe_token(bucket.get("axis"))}
+            label = _safe_reason(bucket.get("bucket"))
+            if label != "redacted":
+                clean_bucket["bucket"] = label
+            for key in ("n_groups", "ci95_low", "ci95_high"):
+                if isinstance(bucket.get(key), (int, float)):
+                    clean_bucket[key] = bucket[key]
+            clean_buckets.append(clean_bucket)
+        clean_item["buckets"] = clean_buckets
+        conditional.append(clean_item)
+    if conditional:
+        clean_scope["conditional_buckets"] = conditional
+    result["scope"] = clean_scope
+    coverage = decision.get("coverage") or {}
+    clean_coverage = {
+        key: coverage[key]
+        for key in ("n_groups", "n_expected_requests", "n_sessions", "n_tasks", "min_groups")
+        if isinstance(coverage.get(key), (int, float))
+    }
+    clean_coverage["task_group_counts"] = {
+        _safe_token(task) or "unknown": count
+        for task, count in (coverage.get("task_group_counts") or {}).items()
+        if isinstance(count, int)
+    }
+    clean_coverage["buckets_insufficient"] = {
+        _safe_token(key) or "unknown": [
+            label for label in (_safe_reason(value) for value in values) if label != "redacted"
+        ]
+        for key, values in (coverage.get("buckets_insufficient") or {}).items()
+        if isinstance(values, list)
+    }
+    result["coverage"] = clean_coverage
+    result["reason_count"] = len(decision.get("reasons") or [])
+    result["reasons"] = ["details_available_in_local_decision"]
+    excluded = []
+    for item in decision.get("excluded_candidates") or []:
+        if not isinstance(item, dict):
+            continue
+        excluded.append(
+            {
+                "candidate_id": _safe_token(item.get("candidate_id")) or "unknown",
+                "reason_codes": [
+                    _safe_reason(reason.get("code"))
+                    for reason in item.get("reasons") or []
+                    if isinstance(reason, dict)
+                ],
+            }
+        )
+    result["excluded_candidates"] = excluded
+    return result
+
+
+def render_share_markdown(summary: dict, decision: dict) -> str:
+    lines = [
+        "# VelaDraft workload advisory report (share package)",
+        "",
+        "- schema: `veladraft-platform-v1`",
+        "- project scope: `platform_extension`; include_in_paper: `false`",
+        "- This package contains public IDs, hashes, aggregate scores and reason codes only.",
+        "- Prompts, media, answers, predictions, raw error text and local paths stay private.",
+        "",
+        "## Recommendation",
+        "",
+        f"- action: **{decision.get('recommended_action')}**",
+        f"- method: `{decision.get('recommended_method')}`",
+        f"- threshold: `{decision.get('threshold')}`",
+        f"- assignment verified: `{decision.get('assignment_verified')}`",
+        f"- input integrity: `{decision.get('input_integrity_status')}`",
+        f"- coverage: `{json.dumps(decision.get('coverage'), sort_keys=True)}`",
+        "",
+        "## Candidates",
+        "",
+        "| candidate | groups | pairs | correctness | quality | speed ratio [95% CI] |",
+        "| --- | ---: | ---: | --- | --- | --- |",
+    ]
+    for candidate_id, candidate in sorted((summary.get("candidates") or {}).items()):
+        if candidate_id == "ar":
+            continue
+        speed = candidate.get("speed") or {}
+        lines.append(
+            "| `{}` | {} | {} | `{}` | `{}` | {} |".format(
+                candidate_id,
+                candidate.get("n_groups", 0),
+                candidate.get("n_pairs", 0),
+                (candidate.get("correctness") or {}).get("gate"),
+                (candidate.get("quality") or {}).get("status"),
+                _ci(speed),
+            )
+        )
+    if decision.get("excluded_candidates"):
+        lines += ["", "Excluded candidates:", ""]
+        for item in decision["excluded_candidates"]:
+            codes = ", ".join(item.get("reason_codes") or [])
+            lines.append(f"- `{item.get('candidate_id')}` — {codes}")
+    lines += [
+        "",
+        "## Replay",
+        "",
+        "Replay the local records and manifest under the documented protocol; no private sample text is included here.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def write_deliverables(
     out_dir: str | Path,
     *,
@@ -263,13 +684,26 @@ def write_share_package(
     with open(records_path, "w", encoding="utf-8") as handle:
         for record in share_records:
             handle.write(canonical_json(record) + "\n")
-    write_json(out_dir / "summary.share.json", summary)
-    write_json(out_dir / "decision.share.json", decision)
-    write_text(out_dir / "report.share.md", report_md)
+    share_summary = redact_summary(summary)
+    share_decision = redact_decision(decision)
+    write_json(out_dir / "summary.share.json", share_summary)
+    write_json(out_dir / "decision.share.json", share_decision)
+    write_text(out_dir / "report.share.md", render_share_markdown(share_summary, share_decision))
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "share_package": True,
-        "removed": ["prompts", "images", "answers", "absolute_paths", "artifacts_local_paths"],
+        "redaction_policy": "structural_allowlist_v1",
+        "removed": [
+            "prompts",
+            "images",
+            "answers",
+            "predictions",
+            "quality_references",
+            "raw_error_messages",
+            "free_text_reasons",
+            "absolute_and_local_paths",
+            "artifacts_local_paths",
+        ],
         "files": ["records.share.jsonl", "summary.share.json", "decision.share.json", "report.share.md"],
         "records_sha256": sha256_json(share_records),
         "decision_id": decision.get("decision_id"),

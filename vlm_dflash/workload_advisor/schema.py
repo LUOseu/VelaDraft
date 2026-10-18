@@ -58,6 +58,12 @@ REQUIRED_RECORD_KEYS = (
     "run_id",
     "request_id",
     "group_id",
+    "task",
+    "split",
+    "session_id",
+    "repeat_index",
+    "method",
+    "candidate_id",
     "target_identity",
     "draft_identity",
     "backend_identity",
@@ -179,6 +185,25 @@ def validate_record(record: Any, *, expect_request_hash: bool = False) -> list[d
     for key in ("run_id", "request_id", "group_id"):
         if not isinstance(record[key], str) or not record[key]:
             errors.append(_issue("invalid_id", f"{key} must be a non-empty string.", key))
+
+    if not isinstance(record.get("session_id"), str) or not record.get("session_id"):
+        errors.append(_issue("invalid_session", "session_id must be a non-empty string.", "session_id"))
+    if not _is_int(record.get("repeat_index")) or record.get("repeat_index") < 0:
+        errors.append(_issue("invalid_repeat", "repeat_index must be a non-negative integer.", "repeat_index"))
+    split = record.get("split")
+    if split is not None and split not in ("tuning", "holdout"):
+        errors.append(_issue("invalid_split", "split must be 'tuning', 'holdout' or null.", "split"))
+    elif split is None and not _has_reason(record, "split", "holdout_assignment"):
+        errors.append(
+            _issue(
+                "missing_reason",
+                "split=null needs missing_reasons['split'] (for example, missing_holdout_assignment).",
+                "missing_reasons.split",
+            )
+        )
+    for key in ("method", "candidate_id"):
+        if not isinstance(record.get(key), str) or not record.get(key):
+            errors.append(_issue("invalid_method", f"{key} must be a non-empty string.", key))
 
     method = record.get("method") or record.get("candidate_id")
     if method is not None and not isinstance(method, str):
@@ -313,17 +338,46 @@ def validate_record(record: Any, *, expect_request_hash: bool = False) -> list[d
         if "e2e_s" not in latency:
             errors.append(_issue("missing_e2e", "latency.e2e_s must be present (null + reason if unknown).", "latency.e2e_s"))
         for key, value in latency.items():
-            if key.endswith("_s") or key.endswith("_seconds"):
+            if key in {"itl_s", "chunk_gap_s"}:
+                if value is None:
+                    continue
+                if isinstance(value, dict):
+                    unknown = set(value) - {"mean", "p50", "p95", "n"}
+                    if unknown:
+                        errors.append(
+                            _issue(
+                                "invalid_latency_distribution",
+                                f"latency.{key} has unsupported keys {sorted(unknown)}.",
+                                f"latency.{key}",
+                            )
+                        )
+                    if not any(part in value and value[part] is not None for part in ("mean", "p50", "p95")):
+                        errors.append(
+                            _issue(
+                                "invalid_latency_distribution",
+                                f"latency.{key} needs at least one of mean/p50/p95.",
+                                f"latency.{key}",
+                            )
+                        )
+                    for part in ("mean", "p50", "p95"):
+                        if part in value:
+                            _check_seconds(value[part], f"latency.{key}.{part}", errors)
+                    if "n" in value and (not _is_int(value["n"]) or value["n"] < 0):
+                        errors.append(
+                            _issue(
+                                "invalid_latency_distribution",
+                                f"latency.{key}.n must be a non-negative integer.",
+                                f"latency.{key}.n",
+                            )
+                        )
+                else:
+                    _check_seconds(value, f"latency.{key}", errors)
+            elif key.endswith("_s") or key.endswith("_seconds"):
                 if key.endswith("_seconds"):
                     errors.append(
                         _issue("seconds_suffix", f"latency key {key!r} must use the '_s' suffix.", f"latency.{key}")
                     )
                 _check_seconds(value, f"latency.{key}", errors)
-            elif key in {"itl_s", "chunk_gap_s"}:
-                if isinstance(value, dict):
-                    for sub, sub_value in value.items():
-                        if sub in {"mean", "p50", "p95"}:
-                            _check_seconds(sub_value, f"latency.{key}.{sub}", errors)
         if latency.get("ttft_s") is None and not _has_reason(
             record, "latency.ttft_s", "ttft_s", "ttft_unavailable"
         ):

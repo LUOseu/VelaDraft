@@ -59,9 +59,38 @@ def cmd_dry_run(args) -> int:
     return 0
 
 
-def _summary_and_decision(records, manifest, workload, *, threshold, seed, min_groups):
+def _assignment_from_workload(workload) -> dict[str, dict] | None:
+    if workload is None:
+        return None
+    return {
+        row["request_id"]: {
+            "group_id": row["group_id"],
+            "task": row["task"],
+            "split": row["split"],
+        }
+        for row in workload.rows
+    }
+
+
+def _summary_and_decision(
+    records,
+    manifest,
+    workload,
+    *,
+    threshold,
+    seed,
+    min_groups,
+    hard_issues=None,
+):
     bucket_rules = (manifest or {}).get("bucket_rules") or {}
     min_groups = int(bucket_rules.get("per_bucket_min_groups", min_groups))
+    assignment = _assignment_from_workload(workload)
+    expected_labels = set(workload.labels) if workload is not None else None
+    manifest_scope_hash = None
+    if workload is not None:
+        manifest_scope_hash = protocol_scope_hash(
+            protocol_payload(manifest, workload.rows_digest, workload.labels_digest)
+        )
     summary = summarize(
         records,
         bucket_rules=bucket_rules,
@@ -69,6 +98,11 @@ def _summary_and_decision(records, manifest, workload, *, threshold, seed, min_g
         bootstrap_seed=seed,
         min_groups=min_groups,
         include_synthetic=bool(args_include_synthetic(records)),
+        assignment=assignment,
+        expected_labels=expected_labels,
+        manifest_scope_hash=manifest_scope_hash,
+        manifest=manifest,
+        hard_issues=hard_issues,
     )
     decision = decide(summary, threshold=threshold, bootstrap_seed=seed, min_groups=min_groups)
     payload = summary_payload(summary, decision)
@@ -95,15 +129,6 @@ def cmd_report(args, *, recommend_only: bool = False) -> int:
             _print(validation)
             return 2
         manifest = workload.manifest
-        expected = protocol_scope_hash(protocol_payload(manifest, workload.rows_digest, workload.labels_digest))
-        observed = {record.get("protocol_scope_hash") for record in records if record.get("protocol_scope_hash")}
-        if observed and observed != {expected}:
-            issues.append(
-                {
-                    "code": "protocol_mismatch",
-                    "message": f"records protocol_scope_hash {sorted(observed)} != manifest {expected}",
-                }
-            )
     synthetic = all(record.get("synthetic") for record in records)
     summary, decision = _summary_and_decision(
         records,
@@ -112,6 +137,7 @@ def cmd_report(args, *, recommend_only: bool = False) -> int:
         threshold=args.threshold,
         seed=args.bootstrap_seed,
         min_groups=args.min_groups,
+        hard_issues=issues,
     )
     if synthetic:
         summary["synthetic"] = True
@@ -139,7 +165,7 @@ def cmd_report(args, *, recommend_only: bool = False) -> int:
             report_md=render_markdown(summary, decision, manifest=manifest, validation=validation, share=True),
         )
     _print({"summary": summary, "decision": decision, "written": written})
-    return 0
+    return 2 if (summary.get("input_integrity") or {}).get("status") == "failed" else 0
 
 
 def cmd_run(args) -> int:
@@ -217,6 +243,8 @@ def cmd_run(args) -> int:
             report_md=render_markdown(summary, decision, manifest=workload.manifest, validation=validation, share=True),
         )
     _print({"status": result["status"], "summary": summary, "decision": decision, "written": written})
+    if (summary.get("input_integrity") or {}).get("status") == "failed" or result.get("status") == "failed":
+        return 2
     return 0
 
 

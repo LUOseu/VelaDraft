@@ -19,6 +19,24 @@ def _run(*args: str, timeout: int = 180) -> subprocess.CompletedProcess:
     )
 
 
+def _write_records(path: Path, records: list[dict]) -> None:
+    path.write_text(
+        "\n".join(json.dumps(record, sort_keys=True) for record in records) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _real_records() -> list[dict]:
+    records = [
+        json.loads(line)
+        for line in (FIXTURES / "records.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    for record in records:
+        record["synthetic"] = False
+    return records
+
+
 class CliTests(unittest.TestCase):
     def test_validate_exit_codes(self) -> None:
         good = _run("validate", "--manifest", str(MINI / "manifest.json"))
@@ -84,6 +102,58 @@ class CliTests(unittest.TestCase):
                 text = path.read_text(encoding="utf-8")
                 self.assertNotIn("Extract the invoice total", text)
                 self.assertNotIn("/Users/Admin", text)
+
+    def test_manifest_protocol_mismatch_is_a_hard_nonzero_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            records = _real_records()
+            records[0]["protocol_scope_hash"] = "f" * 64
+            path = Path(tmp) / "records.jsonl"
+            _write_records(path, records)
+            out = Path(tmp) / "out"
+            result = _run(
+                "recommend",
+                "--records",
+                str(path),
+                "--manifest",
+                str(MINI / "manifest.json"),
+                "--out-dir",
+                str(out),
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+            decision = json.loads((out / "decision.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["input_integrity"]["status"], "failed")
+            self.assertTrue(any(issue["code"] == "protocol_mismatch" for issue in summary["input_integrity"]["issues"]))
+            self.assertEqual(decision["recommended_action"], "insufficient_evidence")
+            self.assertNotEqual(decision["recommended_action"], "accelerate")
+
+    def test_invalid_failed_row_is_hard_failure_not_silently_dropped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            records = _real_records()
+            failed_index = next(
+                index
+                for index, record in enumerate(records)
+                if record["correctness_status"] == "failed"
+            )
+            records[failed_index].pop("error")
+            path = Path(tmp) / "records.jsonl"
+            _write_records(path, records)
+            out = Path(tmp) / "out"
+            result = _run(
+                "recommend",
+                "--records",
+                str(path),
+                "--manifest",
+                str(MINI / "manifest.json"),
+                "--out-dir",
+                str(out),
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+            decision = json.loads((out / "decision.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["input_integrity"]["status"], "failed")
+            self.assertTrue(any(issue["code"] == "missing_error" for issue in summary["input_integrity"]["issues"]))
+            self.assertEqual(decision["recommended_action"], "insufficient_evidence")
 
 
 if __name__ == "__main__":

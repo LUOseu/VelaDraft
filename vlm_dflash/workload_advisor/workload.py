@@ -518,10 +518,16 @@ def convert_sharegpt(
     out_dir.mkdir(parents=True, exist_ok=True)
     rows, errors = _read_jsonl(source)
     converted: list[dict] = []
+    label_rows: list[dict] = []
     notes: list[str] = []
+    seen_ids: set[str] = set()
     for row in rows:
         line = row.pop("__line__", None)
         sample_id = str(row.get("id") or (f"row-{line:05d}" if line else f"row-{len(converted):05d}"))
+        if sample_id in seen_ids:
+            errors.append(_error("duplicate_sample_id", f"{sample_id}: duplicate source id.", line=line))
+            continue
+        seen_ids.add(sample_id)
         conversations = row.get("conversations")
         if not isinstance(conversations, list) or not conversations:
             errors.append(_error("missing_conversations", f"{sample_id}: conversations missing.", line=line))
@@ -533,13 +539,48 @@ def convert_sharegpt(
             role = str(turn.get("from", "")).lower()
             role = {"human": "user", "gpt": "assistant", "system": "system"}.get(role, role)
             turns.append({"role": role, "content": str(turn.get("value", ""))})
+        full_cleaned, message_error = _validate_messages(turns)
+        if message_error:
+            errors.append(_error("legacy_unsupported", f"{sample_id}: {message_error}", line=line))
+            continue
+        last_user = max((i for i, turn in enumerate(full_cleaned) if turn["role"] == "user"), default=None)
+        if last_user is None:
+            errors.append(_error("no_user_turn", f"{sample_id}: no user turn.", line=line))
+            continue
+        trailing = full_cleaned[last_user + 1 :]
+        if any(turn["role"] != "assistant" for turn in trailing):
+            errors.append(
+                _error(
+                    "unsupported_state_transition",
+                    f"{sample_id}: non-assistant turn after the last user turn would require state advancement.",
+                    line=line,
+                )
+            )
+            continue
+        if len(trailing) > 1:
+            errors.append(
+                _error(
+                    "multiple_terminal_answers",
+                    f"{sample_id}: multiple assistant turns follow the last user turn; refusing to flatten them.",
+                    line=line,
+                )
+            )
+            continue
+        terminal_answer = trailing[0]["content"] if trailing else None
+        prompt_turns = [full_cleaned[last_user]] if last_turn_only else full_cleaned[: last_user + 1]
         if last_turn_only:
-            last_user = max((i for i, turn in enumerate(turns) if turn["role"] == "user"), default=None)
-            if last_user is None:
-                errors.append(_error("no_user_turn", f"{sample_id}: no user turn.", line=line))
-                continue
-            turns = turns[last_user : last_user + 1]
             notes.append(f"{sample_id}: converted with legacy_last_turn_only=true")
+        if terminal_answer is None:
+            notes.append(f"{sample_id}: no terminal assistant answer; no label sidecar row")
+        else:
+            label_rows.append(
+                {
+                    "request_id": sample_id,
+                    "task": task,
+                    "reference": terminal_answer,
+                    "source": "sharegpt_terminal_assistant_turn",
+                }
+            )
         media = []
         images = row.get("images") or []
         if not isinstance(images, list):
@@ -547,7 +588,7 @@ def convert_sharegpt(
             continue
         for image in images:
             media.append({"type": "image", "path": str(image)})
-        cleaned, message_error = _validate_messages(turns)
+        cleaned, message_error = _validate_messages(prompt_turns)
         if message_error:
             errors.append(_error("legacy_unsupported", f"{sample_id}: {message_error}", line=line))
             continue
@@ -565,18 +606,29 @@ def convert_sharegpt(
     with open(rows_path, "w", encoding="utf-8") as handle:
         for row in converted:
             handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+    labels_path = out_dir / "labels.jsonl"
+    with open(labels_path, "w", encoding="utf-8") as handle:
+        for row in label_rows:
+            handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
     report = {
         "schema_version": SCHEMA_VERSION,
         "source": str(source),
         "output": str(rows_path),
         "source_sha256": sha256_file(source),
         "rows_sha256": sha256_file(rows_path) if rows_path.exists() else None,
+        "labels_path": str(labels_path),
+        "labels_sha256": sha256_file(labels_path),
         "converted": len(converted),
+        "labels": len(label_rows),
         "errors": errors,
         "semantics": {
             "answers_included": False,
+            "answer_location": "private_labels_sidecar" if label_rows else "no_terminal_answers_found",
+            "prompt_ends_at_last_user_turn": True,
             "media_root": media_root,
             "legacy_last_turn_only": bool(last_turn_only),
+            "history_preserved": not bool(last_turn_only),
+            "terminal_answer_removed": True,
             "notes": notes,
         },
     }
