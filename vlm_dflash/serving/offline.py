@@ -16,6 +16,7 @@ from .fixtures import build_messages, diagnostic_fixtures, load_manifest, natura
 from .metrics import diff_metrics, spec_counts
 from .records import (
     backend_identity,
+    exposure_usage,
     iso_now,
     make_run_record,
     model_identity,
@@ -92,6 +93,29 @@ def _spec_config(mode: str, args) -> Optional[dict[str, Any]]:
     raise ValueError(f"unknown mode {mode!r}")
 
 
+def _engine_applied_evidence(llm: Any, backend: dict[str, Any]) -> None:
+    """Mark backend labels as applied only when the engine exposes its config."""
+
+    engine = getattr(llm, "llm_engine", None)
+    vllm_config = getattr(engine, "vllm_config", None)
+    if vllm_config is None:
+        return
+    observed: dict[str, Any] = {}
+    model_config = getattr(vllm_config, "model_config", None)
+    speculative_config = getattr(vllm_config, "speculative_config", None)
+    if model_config is not None:
+        for field in ("dtype", "max_model_len"):
+            value = getattr(model_config, field, None)
+            if value is not None:
+                observed[field] = str(value)
+    if speculative_config is not None:
+        observed["speculative_method"] = getattr(speculative_config, "method", None)
+        observed["num_speculative_tokens"] = getattr(speculative_config, "num_spec_tokens", None)
+    backend["labels_source"] = "engine_object"
+    backend["applied_evidence"] = True
+    backend["applied_config"] = observed
+
+
 def run_offline(args) -> dict[str, Any]:
     from vllm import LLM, SamplingParams
     from .measure import GpuSampler
@@ -148,6 +172,7 @@ def run_offline(args) -> dict[str, Any]:
     sampler = GpuSampler(args.gpu_index, interval_s=0.5).start()
     started_load = time.perf_counter()
     llm = LLM(**llm_kwargs)
+    _engine_applied_evidence(llm, backend)
     load_s = time.perf_counter() - started_load
     sampling = SamplingParams(temperature=0.0, max_tokens=int(args.max_new_tokens))
     records = []
@@ -208,11 +233,14 @@ def run_offline(args) -> dict[str, Any]:
                 missing["raw_counts.target_forward_calls"] = raw_counts["unavailable"]["target_forward_calls"]
             if draft is None:
                 missing["draft_identity"] = "AR baseline has no draft model or proposal path"
-            usage = resource_usage(
+            usage = exposure_usage(
                 wall_s=wall_s,
-                gpu_count=1,
                 devices=devices,
-                peak_memory_mib={"device": sampler.peak().get("memory_mib", 0)},
+                peak_memory_mib={"process_sampler": sampler.peak().get("memory_mib", 0)},
+                reason=(
+                    "offline request wall-time is retained as exposure; the additive "
+                    "GPU-hours source is the document allocation ledger"
+                ),
             )
             record = make_run_record(
                 run_id=args.run_id,
@@ -232,6 +260,7 @@ def run_offline(args) -> dict[str, Any]:
                     "prefix_caching": False,
                     "max_new_tokens": int(args.max_new_tokens),
                     "fixture_category": fixture.category,
+                    "request_budget_verified": True,
                 },
                 raw_counts=raw_counts,
                 latency={"total_s": wall_s, "ttft_s": None},
@@ -248,6 +277,13 @@ def run_offline(args) -> dict[str, Any]:
                 repeat_index=repeat,
                 error=error,
                 spec_counts=spec_delta,
+                request_control={
+                    "source": "offline_sampling_params",
+                    "max_tokens": int(args.max_new_tokens),
+                    "temperature": 0.0,
+                    "ignore_eos": False,
+                    "stream": False,
+                },
             )
             records.append(record)
             raw_requests.append({"request_id": record["request_id"], "category": fixture.category})
@@ -300,8 +336,25 @@ def run_offline(args) -> dict[str, Any]:
             "allocation_wall_s": allocation_wall_s,
             "device": devices,
             "speculative_config": spec,
+            "stream": False,
+            "run_plan": {
+                "requests": [
+                    {
+                        "request_id": fixture.request_id,
+                        "category": fixture.category,
+                        "prompt_sha256": fixture.prompt_sha256(),
+                        "image_sha256": fixture.image_sha256,
+                    }
+                    for fixture in fixtures
+                ],
+                "repeats": int(args.repeats),
+            },
         },
         "resource_usage": allocation_usage,
+        "resource_semantics": {
+            "allocation_gpu_hours_additive": True,
+            "request_gpu_hours_additive": False,
+        },
         "summary": summary,
         "records": records,
     }

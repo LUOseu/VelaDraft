@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 import json
 import os
 import platform
@@ -18,6 +19,7 @@ from .contracts import (
     sha256_file,
     write_json_atomic,
 )
+from .profile import describe_profile
 
 VLLM_PIN = "0.22.1"
 
@@ -318,17 +320,31 @@ def collect_audit(
             "evidence": evidence_list(source_evidence["metrics"]),
             "limits": ["counters are global to the engine/session window; no request tag on aggregate counters"],
         },
+        "wire_profile": {
+            "status": "supported",
+            "maturity": "cpu_tested",
+            "version": "1.0",
+            "evidence": evidence_list(
+                {"path": "vlm_dflash/serving/profile.py", "note": "explicit serving wire profile and normalizer"},
+                {"path": "tests/serving/fixtures/wire_profile_record.json", "note": "real-shaped CPU fixture"},
+            ),
+            "limits": [
+                "profile id veladraft-serving-wire is not interchangeable with the advisor profile despite the shared schema name",
+                "request/window/global counters keep their recorded scope; unavailable counters remain null",
+            ],
+        },
     }
     capabilities_doc = {
         "schema_version": SCHEMA_VERSION,
         "project_scope": PROJECT_SCOPE,
         "include_in_paper": INCLUDE_IN_PAPER,
-        "generated_at": "2026-10-17",
+        "generated_at": _dt.datetime.now(_dt.timezone.utc).date().isoformat(),
         "vllm_pin": VLLM_PIN,
         "environment": env,
         "source_evidence": source_evidence,
         "correctness_evidence": correctness,
         "capabilities": capabilities,
+        "serving_profile": describe_profile(),
     }
     return env, capabilities_doc
 

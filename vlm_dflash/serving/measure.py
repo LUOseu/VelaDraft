@@ -18,6 +18,7 @@ from .metrics import active_requests, diff_metrics, parse_prometheus, summarize_
 from .openai_api import ChatResult, ServingClient, result_timing_fields
 from .records import (
     backend_identity,
+    exposure_usage,
     iso_now,
     make_run_record,
     model_identity,
@@ -116,6 +117,66 @@ def _server_log_matches(path: Optional[str], request_id: str) -> dict[str, Any]:
     }
 
 
+def _server_log_config_evidence(
+    path: Optional[str],
+    *,
+    vllm_version: str,
+    attention_backend: Optional[str],
+    cudagraph_mode: Optional[str],
+    mode: str,
+    spec_config: Optional[dict[str, Any]],
+    async_scheduling: Optional[bool],
+) -> dict[str, Any]:
+    """Derive applied backend labels from the engine's own startup log."""
+
+    if not path or not Path(path).is_file():
+        return {
+            "available": False,
+            "applied_evidence": False,
+            "labels_source": "cli_declared_unverified",
+            "checks": {},
+            "missing_reasons": ["server log unavailable; CLI backend labels are not applied evidence"],
+        }
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return {
+            "available": False,
+            "applied_evidence": False,
+            "labels_source": "cli_declared_unverified",
+            "checks": {},
+            "missing_reasons": [f"server log unreadable: {type(exc).__name__}: {exc}"],
+        }
+
+    checks: dict[str, bool] = {"vllm_version": f"v{vllm_version}" in text}
+    if attention_backend:
+        checks["attention_backend"] = bool(
+            f"Using {attention_backend} attention backend" in text
+            or f"AttentionBackendEnum.{attention_backend}" in text
+        )
+    if cudagraph_mode:
+        checks["cudagraph_mode"] = f"CUDAGraphMode.{cudagraph_mode}" in text
+    if mode == "ngram" and spec_config:
+        checks["speculative_method"] = "SpeculativeConfig(method='ngram'" in text
+        checks["num_speculative_tokens"] = f"num_spec_tokens={int(spec_config['num_speculative_tokens'])}" in text
+    elif mode == "ar":
+        checks["speculative_config"] = "speculative_config=None" in text
+    if async_scheduling is False:
+        checks["async_scheduling"] = "Asynchronous scheduling is disabled." in text
+    elif async_scheduling is True:
+        checks["async_scheduling"] = "Asynchronous scheduling is enabled." in text
+
+    missing = [f"server log does not evidence {name}" for name, found in checks.items() if not found]
+    applied = bool(checks) and not missing
+    return {
+        "available": True,
+        "applied_evidence": applied,
+        "labels_source": "server_log_config_echo" if applied else "cli_declared_unverified",
+        "checks": checks,
+        "missing_reasons": missing,
+    }
+
+
 def _sampled_resource(wall_s: float, sampler: GpuSampler, devices: list[dict[str, Any]]) -> dict[str, Any]:
     peak = sampler.peak()
     return resource_usage(
@@ -126,14 +187,25 @@ def _sampled_resource(wall_s: float, sampler: GpuSampler, devices: list[dict[str
     )
 
 
-def _make_fixture_request(fixture: Fixture, model: str, *, stream: bool = True, request_id: Optional[str] = None) -> dict[str, Any]:
+def _make_fixture_request(
+    fixture: Fixture,
+    model: str,
+    *,
+    stream: bool = True,
+    request_id: Optional[str] = None,
+    max_tokens: Optional[int] = None,
+    ignore_eos: bool = False,
+) -> dict[str, Any]:
     body = request_body(
         fixture,
         model=model,
+        max_tokens=max_tokens,
         stream=stream,
         return_token_ids=True,
         request_id=request_id or fixture.request_id,
     )
+    if ignore_eos:
+        body["ignore_eos"] = True
     if stream:
         body["stream_options"] = {"include_usage": True}
     return body
@@ -150,12 +222,34 @@ def _run_one(
     max_tokens: Optional[int] = None,
     ignore_eos: bool = False,
 ) -> ChatResult:
-    body = _make_fixture_request(fixture, model, stream=True, request_id=request_id)
-    if max_tokens is not None:
-        body["max_tokens"] = int(max_tokens)
-    if ignore_eos:
-        body["ignore_eos"] = True
+    body = _make_fixture_request(
+        fixture,
+        model,
+        stream=True,
+        request_id=request_id,
+        max_tokens=max_tokens,
+        ignore_eos=ignore_eos,
+    )
     return client.collect_stream(body, mode=mode, request_id=request_id, cancel_after_first_content=cancel_after_first)
+
+
+def _request_control(
+    fixture: Fixture,
+    *,
+    model: str,
+    max_tokens: Optional[int],
+    ignore_eos: bool = False,
+) -> dict[str, Any]:
+    return {
+        "source": "actual_request_body",
+        "model": model,
+        "max_tokens": int(max_tokens if max_tokens is not None else fixture.max_tokens),
+        "fixture_max_tokens": int(fixture.max_tokens),
+        "ignore_eos": bool(ignore_eos),
+        "temperature": 0.0,
+        "stream": True,
+        "return_token_ids": True,
+    }
 
 
 def _run_cancel_probe(
@@ -213,6 +307,8 @@ def _run_cancel_probe(
     observed_before_close = any(float(sample.get("total", 0.0)) > baseline_total for sample in during_samples)
     observed_after_close = float(immediate.get("total", 0.0)) > baseline_total
     observed_in_flight = bool(result.cancelled and not result.error and (observed_before_close or observed_after_close))
+    log_match = _server_log_matches(server_log, request_id)
+    internal_abort_evidence = bool(log_match.get("abort_or_finish"))
     return {
         "mode": mode,
         "concurrency": concurrency,
@@ -223,6 +319,16 @@ def _run_cancel_probe(
         "cancel_requested_s": result.cancel_requested_s,
         "cancel_reclaimed_s": reclaimed_s,
         "ignore_eos": True,
+        "request_control": {
+            "source": "actual_request_body",
+            "max_tokens": int(max_tokens),
+            "ignore_eos": True,
+            "stream": True,
+            "return_token_ids": True,
+            "probe_kind": "cancel",
+        },
+        "probe_context": "idle_after_window_drain",
+        "concurrent_with_healthy_request": False,
         "observed_in_flight_before_close": observed_before_close,
         "observed_in_flight_after_close": observed_after_close,
         "observed_in_flight": observed_in_flight,
@@ -231,7 +337,9 @@ def _run_cancel_probe(
         "active_after": after,
         "active_samples_during_request": during_samples,
         "active_samples": samples,
-        "server_log": _server_log_matches(server_log, request_id),
+        "server_log": log_match,
+        "internal_abort_evidence": internal_abort_evidence,
+        "cancel_claim_scope": "client_socket_close_and_global_gauge_only",
         "error": result.error,
     }
 
@@ -251,6 +359,7 @@ def _record_from_result(
     session_index: int,
     raw_spec: Optional[dict[str, Any]],
     spec_attribution: str,
+    request_control: dict[str, Any],
     extra_scope: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     timings = result_timing_fields(result)
@@ -305,7 +414,8 @@ def _record_from_result(
         "session_index": session_index,
         "stream": True,
         "prefix_caching": False,
-        "max_new_tokens": int(fixture.max_tokens),
+        "max_new_tokens": int(request_control["max_tokens"]),
+        "fixture_max_tokens": int(fixture.max_tokens),
         "fixture_category": fixture.category,
         "timing_boundary": "client_request_start_to_last_nonempty_sse_content_chunk",
         "spec_counter_attribution": spec_attribution,
@@ -316,9 +426,14 @@ def _record_from_result(
         "ttft_s": timings["ttft_s"],
         "e2e_s": timings["e2e_s"],
         "tpot_s": timings["tpot_s"],
-        "client_chunk_tpot_proxy_s": timings["client_chunk_tpot_proxy_s"],
+        "tpot_unavailable_reason": timings["tpot_unavailable_reason"],
+        "client_visible_token_tpot_proxy_s": timings["client_visible_token_tpot_proxy_s"],
+        "client_chunk_gap_mean_s": timings["client_chunk_gap_mean_s"],
         "cancel_requested_s": timings["cancel_requested_s"],
     }
+    if timings.get("tpot_unavailable_reason"):
+        missing["latency.tpot_s"] = timings["tpot_unavailable_reason"]
+    success = result.is_successful()
     return make_run_record(
         run_id=args.run_id,
         request_id=result.request_id,
@@ -327,11 +442,19 @@ def _record_from_result(
         draft_identity=draft,
         backend_identity=backend,
         protocol_payload=protocol,
-        correctness_status="not_checked",
+        correctness_status="not_checked" if success else "failed",
         measurement_scope=scope,
         raw_counts=raw_counts,
         latency=latency,
-        resource_usage_value=_sampled_resource(result.e2e_s or 0.0, sampler, devices),
+        resource_usage_value=exposure_usage(
+            wall_s=result.e2e_s or 0.0,
+            devices=devices,
+            peak_memory_mib={"process_sampler": sampler.peak().get("memory_mib", 0)},
+            reason=(
+                "request wall-time exposure is not an additive GPU allocation; "
+                "concurrent requests share the same device interval; use the document allocation ledger"
+            ),
+        ),
         missing_reasons=missing,
         category=fixture.category,
         prompt=fixture.prompt,
@@ -342,10 +465,19 @@ def _record_from_result(
         finish_reason=result.finish_reason,
         response_id=result.response_id,
         num_content_chunks=result.num_content_chunks,
+        chunk_token_counts=result.chunk_token_counts,
+        chunk_gap_count=len(result.chunk_gaps_s),
         chunk_gaps_s=result.chunk_gaps_s,
         cancelled=result.cancelled,
         error=result.error,
         http_status=result.http_status,
+        terminal_status=result.terminal_status,
+        done_seen=result.done_seen,
+        finish_seen=result.finish_seen,
+        truncated=result.truncated,
+        protocol_error=result.protocol_error,
+        token_ids_complete=result.token_ids_complete,
+        request_control=request_control,
     )
 
 
@@ -366,7 +498,11 @@ def _window_record(
     extra_scope: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     spec = diff["spec"]
-    emitted = sum(len(result.token_ids) for result in results)
+    successful = [result for result in results if result.is_successful()]
+    emitted = sum(len(result.token_ids) for result in successful)
+    emitted_including_failed = sum(len(result.token_ids) for result in results)
+    num_failed = sum(1 for result in results if not result.is_successful() and not result.cancelled)
+    num_cancelled = sum(1 for result in results if result.cancelled)
     if args.mode == "ngram":
         raw_counts = {
             "emitted": emitted,
@@ -401,6 +537,7 @@ def _window_record(
         "stream": True,
         "prefix_caching": False,
         "requests": len(results),
+        "successful_requests": len(successful),
         "window": True,
         "spec_counter_attribution": "global_window",
         "timing_boundary": "session_start_to_last_request_completion",
@@ -420,7 +557,7 @@ def _window_record(
         draft_identity=draft,
         backend_identity=backend,
         protocol_payload=protocol,
-        correctness_status="not_checked",
+        correctness_status="failed" if num_failed else "not_checked",
         measurement_scope=scope,
         raw_counts=raw_counts,
         latency={
@@ -430,13 +567,28 @@ def _window_record(
             "e2e_p50_s": summarize_latencies(e2e)["p50_s"],
             "e2e_p95_s": summarize_latencies(e2e)["p95_s"],
         },
-        resource_usage_value=_sampled_resource(wall_s, sampler, devices),
+        resource_usage_value=exposure_usage(
+            wall_s=wall_s,
+            devices=devices,
+            peak_memory_mib={"process_sampler": sampler.peak().get("memory_mib", 0)},
+            reason=(
+                "window wall-time exposure is not an additive allocation interval; "
+                "the document allocation ledger is the only additive GPU-hours source"
+            ),
+            scope="window_exposure",
+        ),
         missing_reasons=missing,
         num_requests=len(results),
-        num_errors=sum(1 for result in results if result.error),
-        num_cancelled=sum(1 for result in results if result.cancelled),
+        num_success=len(successful),
+        num_successful=len(successful),
+        num_errors=num_failed,
+        num_failed=num_failed,
+        num_cancelled=num_cancelled,
+        completion_rate=(len(successful) / len(results)) if results else None,
         output_tokens=emitted,
+        output_tokens_including_failed=emitted_including_failed,
         throughput_tokens_s=(emitted / wall_s) if wall_s > 0 else None,
+        throughput_scope="successful_output_tokens_per_window_wall_s",
         active_after=diff.get("active_after"),
         gauges_after=diff.get("gauges_after"),
     )
@@ -457,13 +609,26 @@ def run_measure(args) -> dict[str, Any]:
     }
     draft = ngram_draft_identity(args.vllm_version, target, spec) if spec else None
     devices = json.loads(args.devices_json)
+    backend_evidence = _server_log_config_evidence(
+        args.server_log,
+        vllm_version=args.vllm_version,
+        attention_backend=args.attention_backend,
+        cudagraph_mode=args.cudagraph_mode,
+        mode=args.mode,
+        spec_config=spec,
+        async_scheduling=args.async_scheduling,
+    )
     backend = backend_identity(
         vllm_version=args.vllm_version,
         code_commit=args.code_commit,
         devices=devices,
         attention_backend=args.attention_backend,
         cudagraph_mode=args.cudagraph_mode,
+        labels_source=backend_evidence["labels_source"],
+        applied_evidence=backend_evidence["applied_evidence"],
     )
+    backend["applied_config"] = backend_evidence["checks"]
+    backend["applied_evidence_source"] = args.server_log
     protocol = protocol_payload(
         model_path=args.model_path,
         mode=args.mode,
@@ -493,7 +658,14 @@ def run_measure(args) -> dict[str, Any]:
         # Warmup (4 requests, as registered in the measurement protocol).
         warm_started = time.perf_counter()
         for fixture in (natural + diagnostic)[:4]:
-            _run_one(client, fixture, model=model, mode=args.mode, request_id=f"warmup-{fixture.request_id}")
+            _run_one(
+                client,
+                fixture,
+                model=model,
+                mode=args.mode,
+                request_id=f"warmup-{fixture.request_id}",
+                max_tokens=int(args.max_new_tokens),
+            )
         warmup_s = time.perf_counter() - warm_started
 
         # The same request is exercised through both API modes.  The streamed
@@ -507,6 +679,7 @@ def run_measure(args) -> dict[str, Any]:
             model=model,
             mode=args.mode,
             request_id=f"api-probe-stream-{args.mode}",
+            max_tokens=int(args.max_new_tokens),
         )
         nonstream_probe = client.chat(
             _make_fixture_request(
@@ -514,6 +687,7 @@ def run_measure(args) -> dict[str, Any]:
                 model,
                 stream=False,
                 request_id=f"api-probe-nonstream-{args.mode}",
+                max_tokens=int(args.max_new_tokens),
             ),
             mode=args.mode,
             request_id=f"api-probe-nonstream-{args.mode}",
@@ -542,7 +716,14 @@ def run_measure(args) -> dict[str, Any]:
 
         # Boundary probes are API validation, not part of the 32-natural stats.
         for fixture in boundary:
-            result = _run_one(client, fixture, model=model, mode=args.mode, request_id=f"boundary-{fixture.request_id}")
+            result = _run_one(
+                client,
+                fixture,
+                model=model,
+                mode=args.mode,
+                request_id=f"boundary-{fixture.request_id}",
+                max_tokens=int(args.max_new_tokens),
+            )
             boundary_results.append(
                 {
                     "request_id": fixture.request_id,
@@ -578,6 +759,7 @@ def run_measure(args) -> dict[str, Any]:
                         model=model,
                         mode=args.mode,
                         request_id=f"{args.mode}-c{concurrency}-s{session}-{fixture.request_id}",
+                        max_tokens=int(args.max_new_tokens),
                     )
 
                 if concurrency == 1:
@@ -600,6 +782,11 @@ def run_measure(args) -> dict[str, Any]:
                             session_index=session,
                             raw_spec=spec_delta,
                             spec_attribution="per_request_c1",
+                            request_control=_request_control(
+                                fixture,
+                                model=model,
+                                max_tokens=int(args.max_new_tokens),
+                            ),
                             extra_scope={"cancelled_probe": fixture is cancel_fixture},
                         )
                         records.append(record)
@@ -625,6 +812,11 @@ def run_measure(args) -> dict[str, Any]:
                                 session_index=session,
                                 raw_spec=None,
                                 spec_attribution="global_window_only",
+                                request_control=_request_control(
+                                    fixture,
+                                    model=model,
+                                    max_tokens=int(args.max_new_tokens),
+                                ),
                             )
                             records.append(record)
                             results.append(result)
@@ -684,14 +876,23 @@ def run_measure(args) -> dict[str, Any]:
                         "distinct_request_ids": len({record["request_id"] for record in matching}) == len(matching),
                         "same_text": len({record.get("prompt") for record in matching}) == 1 if matching else False,
                         "different_images": len({record.get("image_sha256") for record in matching}) == 2 if matching else False,
+                        "responses_distinct": len(
+                            {(tuple(record.get("token_ids") or []), record.get("text")) for record in matching}
+                        )
+                        == 2
+                        if matching
+                        else False,
                         "errors": [record.get("error") for record in matching if record.get("error")],
-                        "ok": bool(
+                        "input_submission_ok": bool(
                             len(matching) == 2
                             and len({record["request_id"] for record in matching}) == 2
                             and len({record.get("prompt") for record in matching}) == 1
                             and len({record.get("image_sha256") for record in matching}) == 2
                             and not any(record.get("error") for record in matching)
                         ),
+                        "output_attribution_verified": False,
+                        "cross_session_checked": False,
+                        "claim_scope": "submitted prompt/image identity only",
                     }
                 )
     finally:
@@ -719,6 +920,19 @@ def run_measure(args) -> dict[str, Any]:
         "allocation_end_epoch": ended_epoch,
         "allocation_wall_s": allocation_wall_s,
         "gpu_hours": allocation_usage["gpu_hours"],
+        "gpu_hours_source": "allocation_ledger",
+        "resource_semantics": {
+            "allocation_gpu_hours_additive": True,
+            "request_gpu_hours_additive": False,
+            "request_gpu_hours_scope": "request_exposure",
+            "window_gpu_hours_scope": "window_exposure",
+            "peak_memory_scope": "process_sampler_shared_across_requests",
+        },
+        "timing_semantics": {
+            "tpot_definition": "visible token_ids only: (last_content-first_content)/(visible_tokens-1)",
+            "client_chunk_gap_mean_definition": "mean gap between non-empty content chunks; not ITL/TPOT",
+            "tpot_null_when_token_ids_incomplete": True,
+        },
         "records": len(records),
         "windows": len(windows),
         "boundary_results": boundary_results,
@@ -738,6 +952,15 @@ def run_measure(args) -> dict[str, Any]:
             "proposed_tokens": sum(int(window["raw_counts"].get("proposed") or 0) for window in window_metrics),
             "accepted_tokens": sum(int(window["raw_counts"].get("accepted") or 0) for window in window_metrics),
         },
+        "window_success": {
+            f"c{window['measurement_scope']['concurrency']}-s{window['measurement_scope']['session_index']}": {
+                "num_success": window.get("num_success"),
+                "num_failed": window.get("num_failed"),
+                "num_cancelled": window.get("num_cancelled"),
+                "completion_rate": window.get("completion_rate"),
+            }
+            for window in window_metrics
+        },
         "peak_gpu": sampler.peak(),
     }
     document = {
@@ -753,6 +976,7 @@ def run_measure(args) -> dict[str, Any]:
             "concurrency": args.concurrency,
             "sessions": args.sessions,
             "warmup": 4,
+            "stream": True,
             "max_new_tokens": args.max_new_tokens,
             "speculative_config": spec,
             "server_log": args.server_log,
@@ -760,6 +984,15 @@ def run_measure(args) -> dict[str, Any]:
             "allocation_start_epoch": allocation_start_epoch,
             "allocation_end_epoch": ended_epoch,
             "allocation_wall_s": allocation_wall_s,
+            "request_budget": {
+                "max_new_tokens": int(args.max_new_tokens),
+                "source": "cli_override_applied_to_actual_request_body",
+                "fixture_max_tokens_retained_in_record": True,
+                "cancel_probe_exception": {
+                    "max_tokens": int(args.cancel_max_tokens),
+                    "ignore_eos": True,
+                },
+            },
         },
         "resource_usage": allocation_usage,
         "summary": summary,

@@ -30,6 +30,7 @@ from vlm_dflash.serving import fixtures as fixtures_mod
 from vlm_dflash.serving import launch as launch_mod
 from vlm_dflash.serving import measure as measure_mod
 from vlm_dflash.serving import offline as offline_mod
+from vlm_dflash.serving import summary as summary_mod
 from vlm_dflash.serving.contracts import read_json, write_json_atomic
 
 
@@ -103,9 +104,26 @@ def cmd_offline(args) -> int:
 
 
 def cmd_compare(args) -> int:
-    summary = compare_mod.run_compare(args.ar, args.ngram, out=args.out)
-    print(json.dumps({k: summary[k] for k in ("ar_ar", "sd_ar", "diagnostic", "natural", "completion_levels")}, indent=2))
-    return 0 if summary["completion_levels"]["SD_EXECUTED"] else 2
+    summary = compare_mod.run_compare(
+        args.ar,
+        args.ngram,
+        out=args.out,
+        manifest_path=args.manifest,
+    )
+    print(
+        json.dumps(
+            {
+                "ar_ar": summary["ar_ar"],
+                "sd_ar": summary["sd_ar"],
+                "diagnostic": summary["diagnostic"],
+                "natural": summary["natural"],
+                "coverage": summary["coverage"],
+                "completion_levels": summary["completion_levels"],
+            },
+            indent=2,
+        )
+    )
+    return 0 if summary["completion_levels"]["SD_CORRECTNESS_PASS"] else 2
 
 
 def cmd_measure(args) -> int:
@@ -122,172 +140,31 @@ def _load_windows(path: str) -> list[dict]:
 
 
 def _measure_lifecycle_checks(doc: dict) -> dict:
-    """Validate the actual C=1/2/4 stream, cancel and pairing evidence."""
+    """Expose the evidence-bounded lifecycle checks from the summary module."""
 
     if not doc:
-        return {"ok": False, "reason": "measurement document missing"}
-    meta = doc.get("meta", {})
-    try:
-        concurrency_values = [int(value) for value in str(meta.get("concurrency", "1,2,4")).split(",")]
-        sessions = int(meta.get("sessions", 3))
-    except (TypeError, ValueError):
-        return {"ok": False, "reason": "invalid concurrency/session metadata"}
-    expected = {(c, s) for c in concurrency_values for s in range(1, sessions + 1)}
-    windows = doc.get("windows", [])
-    observed = {
-        (window.get("measurement_scope", {}).get("concurrency"), window.get("measurement_scope", {}).get("session_index"))
-        for window in windows
-    }
-    records = doc.get("records", [])
-    summary = doc.get("summary", {})
-    boundaries = summary.get("boundary_results", [])
-    cancels = summary.get("cancel_probes", [])
-    nonstream = summary.get("nonstream_probes", [])
-    pairs = summary.get("pair_checks", [])
-    cancel_keys = {
-        (item.get("concurrency"), item.get("session"))
-        for item in cancels
-        if isinstance(item, dict)
-    }
-    checks = {
-        "expected_windows": sorted(expected),
-        "observed_windows": sorted(observed),
-        "all_windows_present": expected.issubset(observed),
-        "window_errors": sum(int(window.get("num_errors") or 0) for window in windows),
-        "record_errors": sum(1 for record in records if record.get("error")),
-        "records": len(records),
-        "stream_records": sum(1 for record in records if record.get("token_ids")),
-        "boundary_ok": len(boundaries) == 8 and all(item.get("ok") for item in boundaries),
-        "cancel_probes": len(cancels),
-        "cancel_keys": sorted(cancel_keys),
-        "cancel_all_reclaimed": len(cancels) == len(expected) and cancel_keys == expected and all(
-            item.get("cancelled") is True
-            and item.get("observed_in_flight") is True
-            and item.get("cancel_reclaimed_s") is not None
-            and not item.get("error")
-            for item in cancels
-        ),
-        "nonstream_probes": len(nonstream),
-        "nonstream_ok": len(nonstream) >= 1 and all(item.get("ok") for item in nonstream),
-        "pair_checks": len(pairs),
-        "pairs_ok": len(pairs) == len(expected) and all(item.get("ok") for item in pairs),
-    }
-    checks["ok"] = bool(
-        checks["all_windows_present"]
-        and checks["window_errors"] == 0
-        and checks["record_errors"] == 0
-        and checks["records"] > 0
-        and checks["stream_records"] > 0
-        and checks["boundary_ok"]
-        and checks["cancel_all_reclaimed"]
-        and checks["nonstream_ok"]
-        and checks["pairs_ok"]
-    )
-    return checks
+        return {"ok": False, "reason": "measurement document missing", "api_ok": False}
+    return summary_mod.measurement_lifecycle_checks(doc)
 
 
 def cmd_summary(args) -> int:
     correctness = read_json(args.correctness) if args.correctness else {}
     ar_doc = read_json(args.ar_measure) if args.ar_measure else {}
     sd_doc = read_json(args.ngram_measure) if args.ngram_measure else {}
-
-    def by_key(doc, key):
-        out = {}
-        for window in doc.get("windows", []):
-            scope = window.get("measurement_scope", {})
-            out[(scope.get("concurrency"), scope.get("session_index"))] = window
-        return out
-
-    ar_windows = by_key(ar_doc, "ar")
-    sd_windows = by_key(sd_doc, "sd")
-    speedups = []
-    for (concurrency, session), ar_window in sorted(ar_windows.items()):
-        sd_window = sd_windows.get((concurrency, session))
-        if sd_window is None:
-            continue
-        ar_wall = ar_window.get("latency", {}).get("total_s")
-        sd_wall = sd_window.get("latency", {}).get("total_s")
-        if ar_wall and sd_wall:
-            speedups.append(
-                {
-                    "concurrency": concurrency,
-                    "session": session,
-                    "ar_wall_s": ar_wall,
-                    "sd_wall_s": sd_wall,
-                    "speedup": ar_wall / sd_wall,
-                }
-            )
-    speedup_by_c = {}
-    for concurrency in sorted({item["concurrency"] for item in speedups}):
-        items = [item for item in speedups if item["concurrency"] == concurrency]
-        ar_total = sum(item["ar_wall_s"] for item in items)
-        sd_total = sum(item["sd_wall_s"] for item in items)
-        speedup_by_c[str(concurrency)] = {
-            "pairs": len(items),
-            "ar_total_s": ar_total,
-            "sd_total_s": sd_total,
-            "speedup_paired_total": (ar_total / sd_total) if sd_total else None,
-            "raw": items,
-        }
-
-    def latency_summary(doc):
-        records = doc.get("records", [])
-        # Exclude the cancellation and same-text/different-image probes from
-        # the natural-request latency summary; they remain in raw records and
-        # in the lifecycle checks below.
-        records = [
-            record
-            for record in records
-            if not record.get("cancelled")
-            and record.get("category") in {"ocr", "chart_doc", "vqa", "caption"}
-            and "-nat-" in str(record.get("request_id", ""))
-        ]
-        ttft = [r["latency"].get("ttft_s") for r in records if r["latency"].get("ttft_s") is not None]
-        e2e = [r["latency"].get("e2e_s") for r in records if r["latency"].get("e2e_s") is not None]
-        tpot = [r["latency"].get("tpot_s") for r in records if r["latency"].get("tpot_s") is not None]
-        from vlm_dflash.serving.metrics import summarize_latencies
-
-        return {"ttft": summarize_latencies(ttft), "e2e": summarize_latencies(e2e), "tpot": summarize_latencies(tpot)}
-
-    ar_checks = _measure_lifecycle_checks(ar_doc)
-    sd_checks = _measure_lifecycle_checks(sd_doc)
-    cancel_ok = bool(
-        ar_checks.get("cancel_all_reclaimed") is True
-        and sd_checks.get("cancel_all_reclaimed") is True
-    )
-    lifecycle_ok = bool(ar_checks.get("ok") and sd_checks.get("ok"))
-    levels = dict(correctness.get("completion_levels", {}))
-    levels["AR_API_PASS"] = bool(ar_checks.get("ok"))
-    levels["SERVING_LIFECYCLE_PASS"] = bool(lifecycle_ok)
-    summary = {
-        "schema_version": "veladraft-serving-summary-v1",
-        "project_scope": "platform_extension",
-        "include_in_paper": False,
-        "completion_levels": levels,
-        "correctness": {
-            "ar_ar": correctness.get("ar_ar"),
-            "sd_ar": correctness.get("sd_ar"),
-            "categories": correctness.get("categories"),
-            "diagnostic": correctness.get("diagnostic"),
-            "natural": correctness.get("natural"),
-        },
-        "latency": {
-            "ar": latency_summary(ar_doc) if ar_doc else None,
-            "ngram": latency_summary(sd_doc) if sd_doc else None,
-        },
-        "speedup": speedup_by_c,
-        "cancel": {
-            "ar": ar_doc.get("summary", {}).get("cancel_probes") if ar_doc else None,
-            "ngram": sd_doc.get("summary", {}).get("cancel_probes") if sd_doc else None,
-            "all_reclaimed_within_window": cancel_ok,
-        },
-        "budget": {
-            "ar_gpu_hours": ar_doc.get("summary", {}).get("gpu_hours") if ar_doc else None,
-            "ngram_gpu_hours": sd_doc.get("summary", {}).get("gpu_hours") if sd_doc else None,
-            "ar_allocation_wall_s": ar_doc.get("summary", {}).get("allocation_wall_s") if ar_doc else None,
-            "ngram_allocation_wall_s": sd_doc.get("summary", {}).get("allocation_wall_s") if sd_doc else None,
-        },
-        "lifecycle_checks": {"ar": ar_checks, "ngram": sd_checks},
+    if not correctness or not ar_doc or not sd_doc:
+        print("summary needs --correctness, --ar-measure and --ngram-measure", file=sys.stderr)
+        return 2
+    manifest = read_json(args.manifest) if args.manifest else None
+    summary = summary_mod.build_summary(correctness, ar_doc, sd_doc, manifest=manifest)
+    summary["inputs"] = {
+        "correctness": args.correctness,
+        "ar_measure": args.ar_measure,
+        "ngram_measure": args.ngram_measure,
+        "manifest": args.manifest,
+    }
+    summary["correction_provenance"] = {
+        "summary": "protocol-aware-v2",
+        "source": "raw evidence replay; no unimplemented engine counters are fabricated",
     }
     if args.out:
         write_json_atomic(args.out, summary)
@@ -350,6 +227,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("compare", help="compare AR repeats and N-Gram transcripts")
     p.add_argument("--ar", nargs="+", required=True)
     p.add_argument("--ngram", nargs="+", required=True)
+    p.add_argument(
+        "--manifest",
+        required=True,
+        help="frozen fixture manifest used to define expected request x repeat pairs",
+    )
     p.add_argument("--out", default=None)
     p.set_defaults(func=cmd_compare)
 
@@ -396,6 +278,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--correctness", default=None)
     p.add_argument("--ar-measure", default=None)
     p.add_argument("--ngram-measure", default=None)
+    p.add_argument("--manifest", default=None)
     p.add_argument("--out", default=None)
     p.set_defaults(func=cmd_summary)
     return parser

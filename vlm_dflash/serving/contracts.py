@@ -221,13 +221,25 @@ def _validate_resource_usage(record: dict[str, Any]) -> None:
     _require_mapping(usage, "resource_usage")
     for key in ("gpu_hours", "gpu_count", "devices", "peak_memory_mib", "wall_s"):
         _require(key in usage, f"resource_usage.{key} is required")
-    _require(isinstance(usage["gpu_hours"], (int, float)) and not isinstance(usage["gpu_hours"], bool), "resource_usage.gpu_hours must be numeric")
-    _require(float(usage["gpu_hours"]) >= 0.0, "resource_usage.gpu_hours must be >= 0")
+    gpu_hours = usage["gpu_hours"]
+    _require(
+        gpu_hours is None or (isinstance(gpu_hours, (int, float)) and not isinstance(gpu_hours, bool)),
+        "resource_usage.gpu_hours must be numeric or null",
+    )
+    if gpu_hours is None:
+        reason = usage.get("gpu_hours_reason")
+        _require(isinstance(reason, str) and bool(reason.strip()), "null resource_usage.gpu_hours needs gpu_hours_reason")
+    else:
+        _require(float(gpu_hours) >= 0.0, "resource_usage.gpu_hours must be >= 0")
     _require(isinstance(usage["gpu_count"], int) and usage["gpu_count"] >= 1, "resource_usage.gpu_count must be >= 1")
     _require(isinstance(usage["devices"], list), "resource_usage.devices must be a list")
     _require_mapping(usage["peak_memory_mib"], "resource_usage.peak_memory_mib")
     _require(isinstance(usage["wall_s"], (int, float)) and not isinstance(usage["wall_s"], bool), "resource_usage.wall_s must be numeric")
     _require(float(usage["wall_s"]) >= 0.0, "resource_usage.wall_s must be >= 0")
+    if "additive" in usage:
+        _require(isinstance(usage["additive"], bool), "resource_usage.additive must be boolean")
+    if usage.get("gpu_hours_scope") in {"request_exposure", "window_exposure"}:
+        _require(usage.get("additive") is False, "request/window exposure must set additive=false")
 
 
 def validate_run_record(record: dict[str, Any]) -> dict[str, Any]:

@@ -20,10 +20,11 @@ def _document(observed_in_flight: bool) -> dict:
         "windows": [
             {
                 "measurement_scope": {"concurrency": 1, "session_index": 1},
+                "num_requests": 1,
                 "num_errors": 0,
             }
         ],
-        "records": [{"token_ids": [1], "error": None}],
+        "records": [{"token_ids": [1], "error": None, "finish_reason": "stop", "terminal_status": "completed"}],
         "summary": {
             "boundary_results": [{"ok": True}] * 8,
             "cancel_probes": [
@@ -34,10 +35,19 @@ def _document(observed_in_flight: bool) -> dict:
                     "observed_in_flight": observed_in_flight,
                     "cancel_reclaimed_s": 0.1,
                     "error": None,
+                    "concurrent_with_healthy_request": False,
+                    "internal_abort_evidence": False,
                 }
             ],
             "nonstream_probes": [{"ok": True}],
-            "pair_checks": [{"ok": True}],
+            "pair_checks": [
+                {
+                    "concurrency": 1,
+                    "session": 1,
+                    "input_submission_ok": True,
+                    "output_attribution_verified": False,
+                }
+            ],
         },
     }
 
@@ -45,12 +55,61 @@ def _document(observed_in_flight: bool) -> dict:
 def test_lifecycle_gate_rejects_unobserved_cancel():
     checks = _gate_module()._measure_lifecycle_checks(_document(False))
 
-    assert checks["cancel_all_reclaimed"] is False
-    assert checks["ok"] is False
+    assert checks["socket_close_reclaimed"] is False
+    assert checks["full_lifecycle_ok"] is False
 
 
 def test_lifecycle_gate_accepts_observed_cancel():
     checks = _gate_module()._measure_lifecycle_checks(_document(True))
 
-    assert checks["cancel_all_reclaimed"] is True
-    assert checks["ok"] is True
+    assert checks["socket_close_reclaimed"] is True
+    assert checks["cancel_claim_scope"] == "client_socket_close_and_global_gauge_only"
+    assert checks["full_lifecycle_ok"] is False
+
+
+def test_lifecycle_gate_requires_concurrent_abort_and_output_attribution():
+    document = _document(True)
+    document["summary"]["cancel_probes"][0]["concurrent_with_healthy_request"] = True
+    document["summary"]["cancel_probes"][0]["internal_abort_evidence"] = True
+    document["summary"]["pair_checks"][0]["output_attribution_verified"] = True
+
+    checks = _gate_module()._measure_lifecycle_checks(document)
+
+    assert checks["api_ok"] is True
+    assert checks["full_lifecycle_ok"] is True
+
+
+def test_lifecycle_gate_rejects_window_errors_and_unexpected_cancellation():
+    document = _document(True)
+    document["windows"][0]["num_errors"] = 1
+    document["records"][0]["cancelled"] = True
+
+    checks = _gate_module()._measure_lifecycle_checks(document)
+
+    assert checks["api_ok"] is False
+    assert checks["window_errors_total"] == 1
+    assert checks["unexpected_cancelled_records"]
+    assert checks["full_lifecycle_ok"] is False
+
+
+def test_lifecycle_gate_rejects_record_count_mismatch():
+    document = _document(True)
+    document["windows"][0]["num_requests"] = 2
+
+    checks = _gate_module()._measure_lifecycle_checks(document)
+
+    assert checks["record_count_ok"] is False
+    assert checks["api_ok"] is False
+
+
+def test_lifecycle_gate_requires_pair_input_evidence():
+    document = _document(True)
+    document["summary"]["cancel_probes"][0]["concurrent_with_healthy_request"] = True
+    document["summary"]["cancel_probes"][0]["internal_abort_evidence"] = True
+    document["summary"]["pair_checks"][0]["input_submission_ok"] = False
+    document["summary"]["pair_checks"][0]["output_attribution_verified"] = True
+
+    checks = _gate_module()._measure_lifecycle_checks(document)
+
+    assert checks["pair_input_ok"] is False
+    assert checks["full_lifecycle_ok"] is False

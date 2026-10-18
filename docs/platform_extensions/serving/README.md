@@ -4,9 +4,10 @@ Scope: `project_scope=platform_extension`, `include_in_paper=false`.
 This directory contains the independent Agent 03 serving integration for
 vLLM 0.22.1 and Qwen2.5-VL-3B.
 
-This guide covers the implementation and CPU-side review path. The executed GPU
+This guide covers the implementation and CPU-side review path. Executed GPU
 correctness and lifecycle evidence, completion levels and measured limitations
-are delivered in `serving.md`, `RESULTS.md` and `evidence/`.
+are delivered by the stacked evidence follow-up PR; this PR does not claim
+those results.
 
 ## Entry points
 
