@@ -16,6 +16,17 @@ from __future__ import annotations
 _HUMAN_ROLES = ("human", "user")
 _GPT_ROLES = ("gpt", "assistant", "model")
 
+#: Processor attribute with the contract's chat-template kwargs (set by
+#: ``VLMAdapter.finalize_processor``; see docs/REFERENCE.md).
+CHAT_TEMPLATE_KWARGS_ATTR = "vlm_dflash_chat_template_kwargs"
+
+
+def _apply_chat_template(processor, messages: list[dict], *, add_generation_prompt: bool) -> str:
+    kwargs = getattr(processor, CHAT_TEMPLATE_KWARGS_ATTR, {})
+    return processor.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=add_generation_prompt, **kwargs
+    )
+
 
 def strip_image_placeholder(question: str) -> str:
     return question.replace("<image>", "").strip()
@@ -32,7 +43,7 @@ def render_prompt(processor, question: str) -> str:
             ],
         }
     ]
-    return processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    return _apply_chat_template(processor, messages, add_generation_prompt=True)
 
 
 def encode_prompt(processor, question: str, image) -> dict:
@@ -123,7 +134,7 @@ def messages_from_row(
 
 def render_conversation(processor, messages: list[dict], *, add_generation_prompt: bool = False) -> str:
     """Chat-template text for a (possibly truncated) conversation."""
-    return processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=add_generation_prompt)
+    return _apply_chat_template(processor, messages, add_generation_prompt=add_generation_prompt)
 
 
 def encode_conversation(processor, messages: list[dict], images: list, *, add_generation_prompt: bool = False) -> dict:

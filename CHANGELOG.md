@@ -2,6 +2,14 @@
 
 ## v0.3.2 (in development)
 
+### Prompts: `target.chat_template_kwargs`
+
+- Extra `apply_chat_template` kwargs (e.g. `enable_thinking: false` for
+  Qwen3.5/3.6, whose template otherwise opens a thinking block) are recorded
+  in the contract and applied by the one prompt render path, so regen,
+  capture/online and eval always render the same protocol. When set they are
+  part of the target identity and stage digests; unset, existing identities
+  and digests are unchanged.
 # Changelog
 
 ## v0.3.2 (in development)

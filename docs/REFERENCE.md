@@ -97,6 +97,19 @@ q/k tensors against the installed transformers implementation.
   text (`0`) rows for the regenerated answer; Qwen2.5-VL uses the same path so
   capture and eval build identical MRoPE positions.
 
+## Chat-template kwargs (render protocol)
+
+`target.chat_template_kwargs` (default `{}`) is passed to every
+`apply_chat_template` call in `vlm_dflash/target/prompts.py`, the single render
+path that regen, capture/online extraction and eval share. Some templates change
+the assistant turn on a template variable: Qwen3.5/3.6 open a thinking block
+(`<think>\n`) unless `enable_thinking: false` is passed, in which case the
+generation prompt ends with an empty `<think>\n\n</think>\n\n` block. The
+value is recorded in `contract.json` (`prompt.chat_template_kwargs`) and, when
+set, in the target identity, so a config, feature store or checkpoint rendered
+under different kwargs fails the contract/identity gates instead of silently
+mixing render protocols.
+
 ## Verification modes and token-exactness (important)
 
 `eval.verification` selects how the target verifies drafted blocks

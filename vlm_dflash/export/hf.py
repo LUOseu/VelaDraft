@@ -14,6 +14,7 @@ from pathlib import Path
 
 import torch
 
+from ..contract import contract_chat_template_kwargs
 from ..utils import ensure_dir, log, now_iso, read_json, sha256_file, write_json
 
 EXPORT_FORMAT = "vlm-dflash-export-v1"
@@ -176,6 +177,9 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
             "processor_fingerprint": contract["target"]["processor_fingerprint"],
             "image_min_pixels": contract["image"]["min_pixels"],
             "image_max_pixels": contract["image"]["max_pixels"],
+            # Render protocol the draft was trained under; serving must pass the
+            # same kwargs to the chat template (e.g. enable_thinking=false).
+            "chat_template_kwargs": contract_chat_template_kwargs(contract),
             # Which frozen output head the draft logits were trained against: the
             # embedding matrix (tied) or the target's own lm_head (untied). Serving
             # must sample through the same head or acceptance collapses.

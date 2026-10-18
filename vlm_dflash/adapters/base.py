@@ -14,6 +14,8 @@ from dataclasses import dataclass
 
 import torch
 
+from ..contract import ContractError, contract_chat_template_kwargs
+from ..target.prompts import CHAT_TEMPLATE_KWARGS_ATTR
 from ..contract import ContractError
 from ..rope_layout import mrope_section_error, partial_rotary_dim
 
@@ -185,10 +187,15 @@ class VLMAdapter:
         )
 
     def finalize_processor(self, processor, contract: dict) -> None:
-        """Post-construction processor tweaks shared by the encoder-decoder path."""
+        """Post-construction processor tweaks shared by the encoder-decoder path.
+
+        Overrides must call ``super()``: this also attaches the contract's
+        chat-template kwargs that every prompt render reads.
+        """
         tokenizer = getattr(processor, "tokenizer", None)
         if tokenizer is not None:
             tokenizer.padding_side = "left"
+        setattr(processor, CHAT_TEMPLATE_KWARGS_ATTR, contract_chat_template_kwargs(contract))
 
     # ---- special tokens / mask policy ----------------------------------
     def resolve_tokens(self, tokenizer, config, text_config) -> dict[str, int | None]:
