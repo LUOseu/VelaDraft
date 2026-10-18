@@ -185,6 +185,7 @@
         "proposal_commit_events": false
       }
     },
+    "contract_blockers": [],
     "environment": {
       "devices": [],
       "machine": "arm64",

@@ -15,51 +15,56 @@ to run this module.
 
 ## Status at this checkout
 
-- branch: `platform/workload-advisor`
+- PR #14: `platform/workload-advisor-cpu` (CPU contract, statistics, decisions)
+- PR #15: `platform/workload-advisor-backend` (stacked HF backend, lease/ledger)
 - baseline: `7711eda504f4f28653a11cbb164b2ea673b4d682`
-- CPU contract/report/decision: `cpu_tested` (44 tests, see below)
+- CPU contract/report/decision: `cpu_tested` (85 tests on the stacked backend
+  branch; 63 tests on the CPU-only branch, see below)
 - HF GPU backend: `blocked` on this host (macOS/arm64, no `nvidia-smi`, no
-  `torch`, no local target weights). No GPU work was started and no timing was
-  fabricated. The 4 GPU-h first-round cap is unused; the 8 GPU-h extension was
-  not requested.
+  `torch`, no local target weights). A3-A6 execution-path fixes are exercised
+  with fake loaders, clocks and leases only. No real GPU smoke, timing or
+  speedup exists. The 4 GPU-h first-round cap is unused; the 8 GPU-h extension
+  was not requested.
 - synthetic fixtures: `docs/workload_advisor_evidence/cpu_fixture/` (always marked
   `synthetic=true`; never part of real result tables)
 - blocker evidence: `docs/workload_advisor_evidence/blocked/` and
   `docs/workload_advisor_evidence/environment.json`
 - capabilities: `docs/workload_advisor_evidence/capabilities.json` (`state=blocked`)
+- rework closure: A1-A9 are closed only to their stated CPU-testable scope in
+  `docs/workload_advisor_delivery.md`; real asset/GPU parity remains unverified.
 
 ## Commands
 
 ```bash
 # 1. Read-only validation: no weights, no GPU, no downloads.
-python scripts/workload_advisor.py validate \
+.venv-workload/bin/python scripts/workload_advisor.py validate \
   --manifest examples/workload_advisor/mini/manifest.json \
   --json-out out/validation.json
 
 # 2. Capability matrix, request count, timing scope and budget; no ranking.
-python scripts/workload_advisor.py dry-run \
+.venv-workload/bin/python scripts/workload_advisor.py dry-run \
   --manifest examples/workload_advisor/mini/manifest.json \
   --out-dir out/dry-run --budget-gpu-hours 4
 
 # 3. Real run (requires a ready CUDA/HF backend and local weights).
-python scripts/workload_advisor.py run \
+.venv-workload/bin/python scripts/workload_advisor.py run \
   --manifest examples/workload_advisor/mini/manifest.json \
   --out-dir out/pilot --budget-gpu-hours 4 --sessions 3 --warmups 4
 
 # 4. Offline report / recommendation: no torch or CUDA needed.
-python scripts/workload_advisor.py report \
+.venv-workload/bin/python scripts/workload_advisor.py report \
   --records out/pilot/records.jsonl \
   --manifest examples/workload_advisor/mini/manifest.json \
   --out-dir out/report --share
 
-python scripts/workload_advisor.py recommend \
+.venv-workload/bin/python scripts/workload_advisor.py recommend \
   --records out/pilot/records.jsonl \
   --manifest examples/workload_advisor/mini/manifest.json \
   --out-dir out/recommend --bootstrap-seed 7
 
 # Optional legacy paths.
-python scripts/workload_advisor.py convert-sharegpt --input legacy.jsonl --out-dir out/converted
-python scripts/workload_advisor.py import-legacy --report old_benchmark.json --out out/legacy_records.jsonl
+.venv-workload/bin/python scripts/workload_advisor.py convert-sharegpt --input legacy.jsonl --out-dir out/converted
+.venv-workload/bin/python scripts/workload_advisor.py import-legacy --report old_benchmark.json --out out/legacy_records.jsonl
 ```
 
 Exit codes: `0` success; `2` malformed input or a failed schema/correctness
@@ -157,7 +162,14 @@ Additional recorded semantics:
 
 - tuning uses only the frozen tuning groups; holdout is never used to choose a
   checkpoint or threshold;
-- pairing is by `group_id`; each group keeps all sessions/repeats;
+- records are joined by candidate x request x session/repeat only after shared
+  input/reference/backend/device/scope protocol checks; missing, duplicate,
+  failed, fallback and mismatched rows stay in explicit exclusion counts and
+  never enter the successful denominator. A group bootstrap keeps all valid
+  sessions for a sampled group;
+- tuning rows are descriptive only. Speed CI, coverage and recommendation gates
+  use the frozen group-disjoint holdout, and repeated sessions do not increase
+  the number of independent groups;
 - the primary speed ratio is `sum(AR e2e) / sum(candidate e2e)` over paired
   groups; mean-of-ratios is reported separately and never mixed to pick the
   larger number;
@@ -188,18 +200,31 @@ coverage, reasons, excluded candidates, threshold and bootstrap seed.
 
 ## GPU protocol
 
-- The HF backend acquires advisory `flock` locks for every allocated GPU UUID,
-  sorted by UUID, under `/tmp/veladraft_gpu_locks/<UUID>.lock`; all devices stay
-  locked for the allocation, so concurrent timed jobs do not share a card.
+- The HF backend resolves the requested logical device and
+  `CUDA_VISIBLE_DEVICES` to the one physical UUID it will actually use. It
+  acquires an advisory `flock` under
+  `/tmp/veladraft_gpu_locks/<UUID>.lock` for that UUID only; unused visible
+  GPUs are not locked or charged.
 - If a lock is busy, the CLI returns a `gpu_busy` blocker and does CPU work;
   it never stops or cleans another job. The lock does not replace occupancy
-  checks or authorization.
+  checks or authorization. External occupancy is checked before and after lease
+  acquisition.
 - The 4 GPU-h first-round cap includes load, calibration, warmup, timing and
-  failures. `GpuLedger` records allocation intervals per device. A run stops
-  at the cap. The optional extension to 8 GPU-h requires recorded evidence of
-  progress and is not automatic.
+  failures. Zero, negative, NaN or infinite budgets are rejected before any
+  lease or load. Remaining budget is checked before load, references, warmup
+  and every request. `GpuLedger` records allocation intervals, per-device
+  peaks and phase intervals. The optional extension to 8 GPU-h requires
+  recorded evidence of progress and is not automatic.
+- Unsupported parallel verification, server endpoint, streaming, concurrency,
+  EOS/runtime combinations are rejected by readiness before GPU work. Local
+  execution is sequential HF verification, not a parallel-serving speed claim.
 - Warm sessions interleave method order; each candidate/session gets 4
   unrecorded warmups. Three sessions retain request pairing.
+- E2E starts only after media is resident and the device is idle. It includes
+  chat template, processor, generation, H2D copy, `torch.cuda.synchronize` on
+  the actual device and token `tolist()` commit; generate-only time remains a
+  separate field. Completed and failed records are appended and flushed, with
+  a ledger checkpoint written throughout the run.
 - Streaming, cancellation, per-token timestamps and proposal/commit events are
   declared unsupported rather than fabricated. `sequential` speculative
   verification is used as a correctness reference and is labeled as such, not
@@ -219,7 +244,7 @@ Commands executed on this checkout (macOS/arm64, Python 3.12.13):
 
 Observed:
 
-- 44 unit tests pass;
+- 85 unit tests pass on the stacked backend branch (63 on CPU-only PR #14);
 - `validate`: 30 requests, 30 groups (6 tuning / 24 holdout), 3 tasks, no errors;
 - `dry-run`: 216 measured runs, 36 warmups, 4 GPU-h cap, `predicted_speedup=null`,
   `ranking_allowed=false`, backend `blocked`;
@@ -231,9 +256,14 @@ Observed:
 - identical input replay produces byte-identical `decision.json` and
   `summary.json`.
 
+The rework document also requests the pytest entry point. It was attempted with
+the same interpreter and did not run: `.venv-workload/bin/python` has no
+`pytest` module (exit 1). The unittest command above is the executed full-suite
+evidence; CI runs `pytest tests/ -q` in its own dependency environment.
+
 Host blockers recorded in `docs/workload_advisor_evidence/blocked/blocker.json`:
 `torch_missing`, `no_gpu`, `target_missing`, `checkpoint_missing` (fixture
-paths). This is why PR 2 contains a backend implementation and a blocker, not
+paths). This is why PR #15 contains a backend implementation and a blocker, not
 real GPU timings.
 
 ## Deliverables
@@ -254,7 +284,10 @@ no remote media is fetched.
 
 ## Known gaps
 
-- no real GPU measurement on this host; PR 2 is `blocked`, not validated;
+- no real GPU measurement on this host; PR #15 is `blocked`, not validated.
+  Loader revision/processor/template application, checkpoint artifact identity,
+  device synchronization and lease/budget behavior are covered only by CPU
+  spies/fakes, not by a real HF parity smoke;
 - TTFT/ITL/distribution and streaming are unsupported by the current HF eval
   path; a serving backend must expose token/commit callbacks before those
   metrics can be claimed;
