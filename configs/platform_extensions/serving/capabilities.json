@@ -52,9 +52,11 @@
         }
       ],
       "limits": [
-        "client disconnect is the cancellation signal; per-request engine abort logs depend on server log level"
+        "the recorded cancel probes close an idle-baseline request and observe global gauge reclamation; they are not concurrent with healthy requests",
+        "no request-correlated engine abort/end record was observed at the captured log level",
+        "client socket close plus global gauge reclamation is not a validated full lifecycle claim"
       ],
-      "maturity": "validated",
+      "maturity": "gpu_smoke",
       "status": "supported",
       "version": "0.22.1"
     },
@@ -172,7 +174,7 @@
       "limits": [
         "vLLM extension; standard OpenAI clients ignore the extra field"
       ],
-      "maturity": "validated",
+      "maturity": "gpu_smoke",
       "status": "supported",
       "version": "0.22.1"
     },
@@ -218,11 +220,32 @@
         ]
       ],
       "limits": [
+        "SSE stream protocol and timing fields are implemented and CPU-tested",
+        "full lifecycle is pending request-correlated abort and same-text/different-image output-attribution evidence",
         "SSE chunk timing is a client-side boundary; engine token timestamps are not exposed"
       ],
-      "maturity": "validated",
+      "maturity": "gpu_smoke",
       "status": "supported",
       "version": "0.22.1"
+    },
+    "wire_profile": {
+      "status": "supported",
+      "maturity": "cpu_tested",
+      "version": "1.0",
+      "evidence": [
+        {
+          "path": "vlm_dflash/serving/profile.py",
+          "note": "explicit serving wire profile and normalizer"
+        },
+        {
+          "path": "tests/serving/fixtures/wire_profile_record.json",
+          "note": "real-shaped CPU fixture"
+        }
+      ],
+      "limits": [
+        "profile id veladraft-serving-wire is not interchangeable with the advisor profile despite the shared schema name",
+        "request/window/global counters keep their recorded scope; unavailable counters remain null"
+      ]
     }
   },
   "correctness_evidence": {
@@ -314,7 +337,7 @@
     "vllm_file": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/__init__.py",
     "vllm_version": "0.22.1"
   },
-  "generated_at": "2026-10-17",
+  "generated_at": "2026-10-18",
   "include_in_paper": false,
   "project_scope": "platform_extension",
   "schema_version": "veladraft-platform-v1",
@@ -416,5 +439,71 @@
       }
     ]
   },
-  "vllm_pin": "0.22.1"
+  "vllm_pin": "0.22.1",
+  "serving_profile": {
+    "profile": {
+      "id": "veladraft-serving-wire",
+      "version": "1.0"
+    },
+    "schema_version": "veladraft-platform-v1",
+    "project_scope": "platform_extension",
+    "include_in_paper": false,
+    "scope": {
+      "request": "one HTTP/offline completion request",
+      "window": "one measured concurrency x session window",
+      "global": "process/engine totals across a server lifetime"
+    },
+    "counters": {
+      "emitted": {
+        "scope": "request_or_window",
+        "definition": "visible output tokens emitted by the completion",
+        "missing": "null with raw_counts.unavailable.emitted"
+      },
+      "proposed": {
+        "scope": "request_or_window",
+        "definition": "draft tokens proposed by the speculative path",
+        "missing": "null when the engine does not expose request/window attribution"
+      },
+      "accepted": {
+        "scope": "request_or_window",
+        "definition": "draft tokens accepted after target verification",
+        "missing": "null when the engine does not expose request/window attribution"
+      },
+      "verify_rounds": {
+        "scope": "request_or_window",
+        "definition": "target verification rounds entered by speculative decoding",
+        "missing": "null when the engine does not expose request/window attribution"
+      },
+      "target_forward_calls": {
+        "scope": "global",
+        "definition": "target model forward calls; vLLM 0.22.1 does not expose this counter",
+        "missing": "null with a mandatory reason"
+      },
+      "draft_forward_calls": {
+        "scope": "request_or_window",
+        "definition": "draft model forward calls; native N-Gram has no draft model forward",
+        "missing": "null with a mandatory reason"
+      }
+    },
+    "latency": {
+      "ttft_s": "client request start to first non-empty content/token chunk",
+      "e2e_s": "client request start to terminal SSE completion or stream close",
+      "tpot_s": "null unless per-token timestamps exist; SSE chunks are not per-token timestamps",
+      "client_visible_token_tpot_proxy_s": "clearly labelled proxy using visible token IDs and content chunk endpoints",
+      "client_chunk_gap_mean_s": "mean gap between non-empty content chunks; not ITL/TPOT",
+      "cancel_requested_s": "client wall time when a cancellation probe closes the stream"
+    },
+    "resource": {
+      "allocation": "additive GPU-hours from the unique allocation ledger",
+      "request_exposure": "non-additive request wall-time exposure; concurrent requests overlap",
+      "window_exposure": "non-additive window wall-time exposure",
+      "peak_memory": "process/session sampler peak, not a per-request exclusive maximum"
+    },
+    "normalization": {
+      "unknown_counter": "null plus reason; never silently 0",
+      "request_counters_require_attribution": true,
+      "window_counters_are_not_request_counters": true,
+      "global_counters_are_not_allocated_to_requests": true
+    }
+  }
 }

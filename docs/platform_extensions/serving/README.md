@@ -4,10 +4,10 @@ Scope: `project_scope=platform_extension`, `include_in_paper=false`.
 This directory contains the independent Agent 03 serving integration for
 vLLM 0.22.1 and Qwen2.5-VL-3B.
 
-This guide covers the implementation and CPU-side review path. Executed GPU
+This guide covers the implementation and CPU-side review path. The executed GPU
 correctness and lifecycle evidence, completion levels and measured limitations
-are delivered by the stacked evidence follow-up PR; this PR does not claim
-those results.
+are delivered in [the execution guide](../serving.md), [RESULTS.md](RESULTS.md)
+and [evidence](evidence/).
 
 ## Entry points
 
@@ -38,6 +38,14 @@ identity; AR records explain the null draft identity in `missing_reasons`.
 Unknown counters remain null with a reason. `round_trace` is not fabricated
 because vLLM 0.22.1 exposes only aggregate speculative counters.
 
+`vlm_dflash/serving/profile.py` fixes the downstream consumable profile as
+`veladraft-serving-wire` version `1.0`. It defines request/window/global counter
+scope, latency names, resource attribution and missing-value rules. The
+real-shaped CPU fixture is `tests/serving/fixtures/wire_profile_record.json`.
+The serving profile shares the package schema name with the advisor but is not
+field-compatible with the advisor validator; a downstream adapter must map it
+explicitly.
+
 Session/Proposal/Commit types keep `based_on_prefix_version` explicit. A Commit
 is valid only after a verified proposal; the live engine does not expose this
 internal event stream as a public hook.
@@ -52,3 +60,6 @@ windows are included.
 
 Do not promote a run to `verified_greedy_exact` based on HTTP status or
 `SD_EXECUTED` alone. The correctness gate and the lifecycle gate are separate.
+The current replay has `SD_CORRECTNESS_PASS=false` and
+`SERVING_LIFECYCLE_PASS=false`; see [RESULTS.md](RESULTS.md) for the exact
+pending evidence.

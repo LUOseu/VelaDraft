@@ -1,6 +1,11 @@
 {
   "ar_ar": {
+    "complete": true,
     "exact": 120,
+    "exact_rate": 1.0,
+    "expected_pairs": 120,
+    "finish_reason_exact": 120,
+    "finish_reason_exact_rate": 1.0,
     "pairs": 120,
     "rate": 1.0
   },
@@ -66,18 +71,103 @@
     "SD_EXECUTED": true,
     "SERVING_LIFECYCLE_PASS": false,
     "ar_status": "verified_greedy_exact",
-    "sd_status": "failed"
+    "sd_status": "experimental_numeric_divergence"
+  },
+  "correction_provenance": {
+    "gate": "strict_coverage_v2",
+    "source": "raw offline documents; no token timestamps or engine traces invented"
+  },
+  "coverage": {
+    "ar_complete": true,
+    "ar_pairs": 120,
+    "duplicate_ar": [],
+    "duplicate_sd": [],
+    "errors": [],
+    "expected_pairs": 120,
+    "expected_repeats": [
+      0,
+      1,
+      2
+    ],
+    "expected_requests": 40,
+    "expected_source": "manifest",
+    "extra_ar": [],
+    "extra_sd": [],
+    "failed_ids": [
+      "nat-caption-03-r0",
+      "nat-ocr-00-r0",
+      "nat-ocr-02-r0",
+      "nat-ocr-03-r0",
+      "nat-ocr-05-r0",
+      "nat-ocr-06-r0",
+      "nat-vqa-00-r0",
+      "nat-vqa-01-r0",
+      "nat-vqa-02-r0",
+      "nat-vqa-03-r0",
+      "nat-vqa-04-r0",
+      "nat-vqa-05-r0",
+      "nat-vqa-06-r0",
+      "nat-caption-03-r1",
+      "nat-ocr-00-r1",
+      "nat-ocr-02-r1",
+      "nat-ocr-03-r1",
+      "nat-ocr-05-r1",
+      "nat-ocr-06-r1",
+      "nat-vqa-00-r1",
+      "nat-vqa-01-r1",
+      "nat-vqa-02-r1",
+      "nat-vqa-03-r1",
+      "nat-vqa-04-r1",
+      "nat-vqa-05-r1",
+      "nat-vqa-06-r1",
+      "nat-caption-03-r2",
+      "nat-ocr-00-r2",
+      "nat-ocr-02-r2",
+      "nat-ocr-03-r2",
+      "nat-ocr-05-r2",
+      "nat-ocr-06-r2",
+      "nat-vqa-00-r2",
+      "nat-vqa-01-r2",
+      "nat-vqa-02-r2",
+      "nat-vqa-03-r2",
+      "nat-vqa-04-r2",
+      "nat-vqa-05-r2",
+      "nat-vqa-06-r2"
+    ],
+    "identity_mismatches": [],
+    "invalid_ar_ids": [],
+    "invalid_sd_ids": [],
+    "manifest_verified": true,
+    "missing_ar": [],
+    "missing_sd": [],
+    "num_errors": 0,
+    "sd_complete": true,
+    "sd_pairs": 120,
+    "unexpected_repeats": []
   },
   "diagnostic": {
     "accepted_tokens": 1320,
+    "expected_requests": 24,
     "proposed_positive": true,
     "proposed_tokens": 1584,
     "requests": 24,
+    "unexecuted_ids": [],
     "verification_entered": true,
     "verify_rounds": 396
   },
   "divergences": [
     {
+      "cand_len": 13,
+      "category": "caption",
+      "exact": false,
+      "finish_reason_match": true,
+      "first_divergence": 9,
+      "ref_len": 16,
+      "repeat": 0,
+      "request_id": "nat-caption-03",
+      "text_exact": false
+    },
+    {
       "cand_len": 128,
       "category": "ocr",
       "exact": false,
@@ -216,7 +306,7 @@
       "finish_reason_match": true,
       "first_divergence": 9,
       "ref_len": 16,
-      "repeat": 0,
+      "repeat": 1,
       "request_id": "nat-caption-03",
       "text_exact": false
     },
@@ -359,7 +449,7 @@
       "finish_reason_match": true,
       "first_divergence": 9,
       "ref_len": 16,
-      "repeat": 1,
+      "repeat": 2,
       "request_id": "nat-caption-03",
       "text_exact": false
     },
@@ -493,30 +583,62 @@
       "ref_len": 128,
       "repeat": 2,
       "request_id": "nat-vqa-06",
-      "text_exact": false
-    },
-    {
-      "cand_len": 13,
-      "category": "caption",
-      "exact": false,
-      "finish_reason_match": true,
-      "first_divergence": 9,
-      "ref_len": 16,
-      "repeat": 2,
-      "request_id": "nat-caption-03",
       "text_exact": false
     }
   ],
+  "failed_ids": [
+    "nat-caption-03-r0",
+    "nat-ocr-00-r0",
+    "nat-ocr-02-r0",
+    "nat-ocr-03-r0",
+    "nat-ocr-05-r0",
+    "nat-ocr-06-r0",
+    "nat-vqa-00-r0",
+    "nat-vqa-01-r0",
+    "nat-vqa-02-r0",
+    "nat-vqa-03-r0",
+    "nat-vqa-04-r0",
+    "nat-vqa-05-r0",
+    "nat-vqa-06-r0",
+    "nat-caption-03-r1",
+    "nat-ocr-00-r1",
+    "nat-ocr-02-r1",
+    "nat-ocr-03-r1",
+    "nat-ocr-05-r1",
+    "nat-ocr-06-r1",
+    "nat-vqa-00-r1",
+    "nat-vqa-01-r1",
+    "nat-vqa-02-r1",
+    "nat-vqa-03-r1",
+    "nat-vqa-04-r1",
+    "nat-vqa-05-r1",
+    "nat-vqa-06-r1",
+    "nat-caption-03-r2",
+    "nat-ocr-00-r2",
+    "nat-ocr-02-r2",
+    "nat-ocr-03-r2",
+    "nat-ocr-05-r2",
+    "nat-ocr-06-r2",
+    "nat-vqa-00-r2",
+    "nat-vqa-01-r2",
+    "nat-vqa-02-r2",
+    "nat-vqa-03-r2",
+    "nat-vqa-04-r2",
+    "nat-vqa-05-r2",
+    "nat-vqa-06-r2"
+  ],
   "inputs": {
     "ar": [
-      "/tmp/veladraft_serving/evidence/ar_full.json"
+      "docs/platform_extensions/serving/evidence/ar_full.json"
     ],
+    "manifest": "tests/serving/fixtures/manifest.json",
     "ngram": [
-      "/tmp/veladraft_serving/evidence/ngram_full.json"
+      "docs/platform_extensions/serving/evidence/ngram_full.json"
     ]
   },
   "natural": {
     "proposed_tokens": 2562,
+    "requests": 96,
     "verify_rounds": 642
   },
   "ngram_meta": [
@@ -554,11 +676,14 @@
   ],
   "num_divergences": 39,
   "sd_ar": {
+    "complete": true,
     "exact": 81,
     "exact_rate": 0.675,
+    "expected_pairs": 120,
     "finish_reason_exact": 114,
     "finish_reason_exact_rate": 0.95,
     "pairs": 120,
+    "rate": 0.675,
     "sequence_exact": 81,
     "sequence_exact_rate": 0.675
   }
