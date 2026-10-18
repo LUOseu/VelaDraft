@@ -361,6 +361,7 @@ class OnlineFeatureSource:
         self.lm_head_weight = None
         self.stats: dict[str, dict] = {}
         self._peak_open = False
+        self.target_devices: list[torch.device] = []
         # Bounded record-cache defaults (replaced by _init when it runs); the
         # constructor's failure path calls close(), which must be safe even
         # when the cache was never built.
@@ -497,6 +498,11 @@ class OnlineFeatureSource:
 
         self.model, self.processor = load_target(cfg, contract)
         self.target_device = next(self.model.parameters()).device
+        # Every CUDA device holding target weights (several with target.device_map).
+        self.target_devices = sorted(
+            {parameter.device for parameter in self.model.parameters() if parameter.device.type == "cuda"},
+            key=lambda device: device.index,
+        )
         offenders = [name for name, parameter in self.model.named_parameters() if parameter.requires_grad]
         if offenders or self.model.training:
             raise RuntimeError(
@@ -529,23 +535,26 @@ class OnlineFeatureSource:
 
     # -- extraction bookkeeping ---------------------------------------------
     def _reset_target_peak(self) -> None:
-        if self.target_device.type == "cuda":
-            torch.cuda.reset_peak_memory_stats(self.target_device)
+        for device in self.target_devices:
+            torch.cuda.reset_peak_memory_stats(device)
 
     def _close_peak_window(self) -> None:
         # Tolerates partially-constructed instances (no target loaded yet).
         if not getattr(self, "_peak_open", False):
             return
         self._peak_open = False
-        target_device = getattr(self, "target_device", None)
-        if target_device is None or target_device.type != "cuda":
+        if not self.target_devices:
             return
         entry = self.stats.setdefault(self.phase, {"target_forwards": 0, "wall_seconds": 0.0})
-        peak = torch.cuda.max_memory_allocated(target_device) / 1e9
-        entry["target_device_peak_gb"] = max(float(entry.get("target_device_peak_gb", 0.0)), float(peak))
+        peaks = {str(device): torch.cuda.max_memory_allocated(device) / 1e9 for device in self.target_devices}
+        entry["target_device_peak_gb"] = max(float(entry.get("target_device_peak_gb", 0.0)), max(peaks.values()))
+        if len(peaks) > 1:
+            recorded = entry.setdefault("target_device_peaks_gb", {})
+            for name, peak in peaks.items():
+                recorded[name] = max(float(recorded.get(name, 0.0)), peak)
 
     def _open_peak_window(self) -> None:
-        if self.target_device.type == "cuda":
+        if self.target_devices:
             self._reset_target_peak()
             self._peak_open = True
 
@@ -555,15 +564,14 @@ class OnlineFeatureSource:
         self._open_peak_window()
 
     def _sync_target(self) -> None:
-        """Synchronize the target device so wall-clock attribution is honest.
+        """Synchronize every target device so wall-clock attribution is honest.
 
         Timed regions bracket their own CUDA work with a synchronize on both
         sides: without it ``perf_counter`` deltas only measure kernel launch
         time and the reported preparation/forward split (and total) would
         depend on queue depth instead of actual work.
         """
-        device = getattr(self, "target_device", None)
-        if device is not None and device.type == "cuda":
+        for device in self.target_devices:
             torch.cuda.synchronize(device)
 
     def _stats_entry(self) -> dict:
@@ -813,6 +821,7 @@ class OnlineFeatureSource:
             "target_dtype": self.target_dtype,
             "attn_implementation": self.attn_implementation,
             "target_device": str(self.target_device),
+            "target_devices": [str(device) for device in self.target_devices],
             "target_train_device": self.train_device,
             "digest": self.digest(),
         }
@@ -902,7 +911,8 @@ class OnlineFeatureSource:
             ),
             "target_device_peak_note": (
                 "target_device_peak_gb is the CUDA peak on the target's device during that phase "
-                "(reset per phase). When target.device == train.device the phase peak includes the "
+                "(reset per phase; the largest per-device peak when target.device_map shards the target "
+                "over several devices). When target.device == train.device the phase peak includes the "
                 "trainer's own allocations; on split devices it isolates the target, which "
                 "target_resident_bytes (weights only) cannot show."
             ),

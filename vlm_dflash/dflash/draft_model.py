@@ -1374,6 +1374,11 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                     "strict_parallel_margin guards argmax decisions and is only defined for greedy "
                     f"decoding (temperature={temperature!r})."
                 )
+        if len(set((getattr(target, "hf_device_map", None) or {}).values())) > 1:
+            raise RuntimeError(
+                "spec_generate: the target is device-mapped over several devices; verification keeps "
+                "logits and the output buffer on one device, so a sharded target is not supported yet."
+            )
         num_input_tokens = input_ids.shape[1]
         max_length = num_input_tokens + max_new_tokens
         block_size = self.block_size
