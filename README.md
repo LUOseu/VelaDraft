@@ -36,6 +36,15 @@
 
 ---
 
+## 🎉 News
+
+- **[2026-10-18]** 🔥 Added the **Qwen3.6-35B-A3B target adapter** with partial
+  rotary support for regeneration, feature capture and dense drafter training
+  ([#18](https://github.com/LUOseu/VelaDraft/pull/18), thanks to
+  [@khazic](https://github.com/khazic)). Implemented and CPU-tested; end-to-end
+  training validation is pending, and speculative decoding is blocked on
+  hybrid-cache rollback. See the [support matrix](SUPPORT_MATRIX.md#targets).
+
 ## Why VelaDraft
 
 `VelaDraft` is the project; the package and CLI are still called `vlm-dflash`.
@@ -88,6 +97,14 @@ Scope and limits:
 - **Training modes:** offline staged features (default), online live
   extraction from a frozen target, and `--features` store reuse. There is no
   DDP / multi-node launch path. "Online" is not on-policy rollout training.
+- **Qwen3.6-35B-A3B:** the `qwen3_5_moe` adapter is implemented and CPU-tested;
+  the method validation statuses above do not establish validation on this
+  target. Set `drafter.intermediate_size` explicitly for the dense drafter.
+  [Sharded target loading](docs/online-training.md#devices-what-is-supported-today) and
+  [chat-template kwargs](docs/REFERENCE.md#chat-template-kwargs-render-protocol)
+  are also available, including `enable_thinking: false`. End-to-end training
+  remains unvalidated; speculative `eval` / `benchmark` / `spec_generate`
+  are explicitly blocked until hybrid recurrent-cache rollback is implemented.
 - **Serving:** production vLLM/SGLang integration is future work;
   [serving-bridge.md](docs/serving-bridge.md) is an experimental export/load
   tool whose correctness and performance gates are not closed.
