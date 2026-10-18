@@ -158,7 +158,7 @@ def test_rerun_prepare_is_idempotent_and_refuses_tampered_output(tmp_path):
         build_dataset(cfg, tmp_path / "out")
 
 
-def test_duplicate_sample_ids_do_not_collide(tmp_path):
+def test_duplicate_sample_ids_do_not_collide(tmp_path, capsys):
     """Duplicate ids with different pixels get distinct, deterministic files."""
     _save(tmp_path / "a" / "one.png", (200, 0, 0))
     _save(tmp_path / "b" / "two.png", (0, 200, 0))
@@ -182,6 +182,8 @@ def test_duplicate_sample_ids_do_not_collide(tmp_path):
     ]
     # Duplicate ids are distinguishable by src_index in the manifest.
     assert [entry["src_index"] for entry in manifest["rows"]] == [0, 1]
+    # ...and reported once in the duplicate-id warning.
+    assert "duplicate sample id(s) in the selected rows ['dup-id']" in capsys.readouterr().out
 
 
 def test_v1_manifest_traces_its_media_reference(tmp_path):
@@ -248,3 +250,16 @@ def test_audit_script_flags_legacy_manifest_hash_conflict(tmp_path):
     report = json.loads(result.stdout)
     kinds = {issue["kind"] for issue in report["issues"]}
     assert "reference_hash_conflict" in kinds or "manifest_hash_mismatch" in kinds
+
+
+def test_duplicate_id_warning_lists_at_most_five_ids(tmp_path, capsys):
+    rows = []
+    for index in range(6):
+        _save(tmp_path / f"d{index}" / "a.png", (index * 30, 0, 0))
+        _save(tmp_path / f"d{index}" / "b.png", (0, index * 30, 0))
+        rows += [_multi_image_row(f"id-{index}", [f"d{index}/a.png"], [0]),
+                 _multi_image_row(f"id-{index}", [f"d{index}/b.png"], [0])]
+    build_dataset(_jsonl_cfg(_write_rows(tmp_path / "rows.jsonl", rows), tmp_path, slice_size=12), tmp_path / "out")
+    out = capsys.readouterr().out
+    assert "['id-0', 'id-1', 'id-2', 'id-3', 'id-4']..." in out
+    assert "id-5" not in out.split("selected rows", 1)[1].split("; rows stay", 1)[0]

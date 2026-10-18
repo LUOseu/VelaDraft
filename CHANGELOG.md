@@ -2,6 +2,13 @@
 
 ## v0.3.2 (in development)
 
+### Data: linear duplicate-id check in prepare
+
+- `build_dataset` counted every selected id with `list.count`, which is
+  quadratic in the number of selected rows (the check alone measured 89 s
+  for 100K ids, versus 8 ms now). The check now uses a `Counter`; the
+  warning text and which ids it reports are unchanged.
+
 ### Training: recipe-run scoring cost
 
 - Recipe runs no longer compute the decay-weighted block-CE scalar that the
