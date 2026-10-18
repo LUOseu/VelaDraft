@@ -89,6 +89,8 @@ def test_export_roundtrip(tmp_path):
 
     assert exported["drafter"]["block_size"] == 8
     assert exported["drafter"]["spatial_rope"]["sections"] == [16, 24, 24]
+    # The render protocol travels with the export (template defaults here).
+    assert exported["target"]["chat_template_kwargs"] == {}
     assert exported["target"]["model_fingerprint"] == "f" * 64
     assert exported["data"]["num_train"] == 4
     # Checkpoints written before the feature-mode tag export as offline.

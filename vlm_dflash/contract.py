@@ -45,7 +45,29 @@ def contract_defaults_from_config(cfg: dict) -> dict:
         "block_size": drafter.get("block_size"),
         "image_min_pixels": target.get("image_min_pixels"),
         "image_max_pixels": target.get("image_max_pixels"),
+        "chat_template_kwargs": target.get("chat_template_kwargs"),
     }
+
+
+#: ``apply_chat_template`` arguments the render path sets itself.
+_RESERVED_TEMPLATE_KWARGS = frozenset({"conversation", "messages", "tokenize", "add_generation_prompt"})
+
+
+def _checked_template_kwargs(value) -> dict:
+    """``target.chat_template_kwargs`` as a dict; rejects non-mappings and reserved names."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ContractError(f"target.chat_template_kwargs must be a mapping, got {value!r}.")
+    reserved = sorted(_RESERVED_TEMPLATE_KWARGS & set(value))
+    if reserved:
+        raise ContractError(f"target.chat_template_kwargs cannot set {reserved}; the prompt renderer sets them.")
+    return dict(value)
+
+
+def contract_chat_template_kwargs(contract: dict) -> dict:
+    """Extra ``apply_chat_template`` kwargs every prompt render uses (``{}`` when absent)."""
+    return dict((contract.get("prompt") or {}).get("chat_template_kwargs") or {})
 
 
 def ensure_contract(cfg: dict, run_dir):
@@ -361,6 +383,10 @@ def resolve_contract(
             "source": "config override validated against processor; processor defaults recorded",
         },
         "tokens": {**tokens, "source": "tokenizer, cross-checked against target config"},
+        "prompt": {
+            "chat_template_kwargs": _checked_template_kwargs(defaults.get("chat_template_kwargs")),
+            "source": "config target.chat_template_kwargs (absent = {})",
+        },
         "head": {
             "tie_word_embeddings": bool(getattr(config, "tie_word_embeddings", True)),
             "source": "target config.json (tie_word_embeddings; absent = True)",
@@ -430,3 +456,9 @@ def validate_yaml_against_contract(cfg: dict, contract: dict, where: str = "conf
         expected = contract["image"]["min_pixels" if key.endswith("min_pixels") else "max_pixels"]
         if value is not None and int(value) != int(expected):
             raise ContractError(f"{where}: target.{key}={value} disagrees with contract {expected}.")
+    template_kwargs = dict(dotted_get(cfg, "target.chat_template_kwargs") or {})
+    expected_kwargs = contract_chat_template_kwargs(contract)
+    if template_kwargs != expected_kwargs:
+        raise ContractError(
+            f"{where}: target.chat_template_kwargs {template_kwargs} disagree with contract {expected_kwargs}."
+        )
