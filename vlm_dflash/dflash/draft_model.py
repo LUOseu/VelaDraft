@@ -51,6 +51,8 @@ from transformers.models.qwen3.modeling_qwen3 import (
     rotate_half,
 )
 
+from ..rope_layout import mrope_section_error, partial_rotary_dim
+
 
 # --- vlm-dflash local modification -------------------------------------
 # Verification-time SDPA-backend switch (reference behavior). The reference
@@ -200,14 +202,45 @@ def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
 
     The keys span ``[context | noise-block]`` while the queries are only the
     noise block, so ``q`` is rotated with the trailing ``q_len`` slice of the
-    rotary tables and ``k`` with the full table.
+    rotary tables and ``k`` with the full table. Tables narrower than the head
+    (partial rotary) rotate only the leading channels and pass the rest through,
+    as the target's own attention does.
     """
     cos = cos.unsqueeze(unsqueeze_dim)
     sin = sin.unsqueeze(unsqueeze_dim)
+    rotary_dim = cos.shape[-1]
+    q_rot, k_rot = q[..., :rotary_dim], k[..., :rotary_dim]
     q_len = q.size(-2)
-    q_embed = (q * cos[..., -q_len:, :]) + (rotate_half(q) * sin[..., -q_len:, :])
-    k_embed = (k * cos) + (rotate_half(k) * sin)
+    q_embed = (q_rot * cos[..., -q_len:, :]) + (rotate_half(q_rot) * sin[..., -q_len:, :])
+    k_embed = (k_rot * cos) + (rotate_half(k_rot) * sin)
+    if rotary_dim < q.shape[-1]:
+        q_embed = torch.cat((q_embed, q[..., rotary_dim:]), dim=-1)
+        k_embed = torch.cat((k_embed, k[..., rotary_dim:]), dim=-1)
     return q_embed, k_embed
+
+
+class _PartialRotaryEmbedding(Qwen3RotaryEmbedding):
+    """``Qwen3RotaryEmbedding`` whose default init honors ``rope_parameters.partial_rotary_factor``.
+
+    Delegates to transformers' Qwen3.5 text rotary init, so the tables match a
+    partial-rotary target's own embedding (leading ``head_dim * factor`` channels).
+    """
+
+    @staticmethod
+    def compute_default_rope_parameters(config=None, device=None, seq_len=None):
+        from transformers.models.qwen3_5_moe.modeling_qwen3_5_moe import Qwen3_5MoeTextRotaryEmbedding
+
+        return Qwen3_5MoeTextRotaryEmbedding.compute_default_rope_parameters(config, device, seq_len)
+
+
+def _draft_rotary_embedding(config) -> tuple[nn.Module, int]:
+    """Draft rotary module plus the number of head channels it rotates."""
+    head_dim = int(getattr(config, "head_dim", None) or config.hidden_size // config.num_attention_heads)
+    rope = getattr(config, "rope_parameters", None) or {}
+    rotary_dim = partial_rotary_dim(head_dim, rope.get("partial_rotary_factor", 1.0))
+    if rotary_dim == head_dim:
+        return Qwen3RotaryEmbedding(config), head_dim
+    return _PartialRotaryEmbedding(config), rotary_dim
 
 
 def _merge_multiaxis_rotary_embeddings(
@@ -255,18 +288,10 @@ def _merge_multiaxis_rotary_embeddings(
     axis_sin = axis_sin.reshape(axes, batch_size, sequence_length, -1)
     head_dim = axis_cos.shape[-1]
     half = head_dim // 2
+    error = mrope_section_error(sections, head_dim, interleaved)
+    if error is not None:
+        raise ValueError(error)
     if interleaved:
-        if 2 * sum(sections) != head_dim:
-            raise ValueError(
-                "Twice the sum of spatial_rope_sections must equal the attention head dimension, "
-                f"got sections={sections} and head_dim={head_dim}."
-            )
-        for axis in (1, 2):
-            if 3 * sections[axis] > half:
-                raise ValueError(
-                    f"Interleaved MRoPE needs 3*sections[axis] <= head_dim/2; axis {axis} has "
-                    f"3*{sections[axis]} > {half}."
-                )
         cos = axis_cos[0].clone()
         sin = axis_sin[0].clone()
         for axis, offset in ((1, 1), (2, 2)):
@@ -277,12 +302,7 @@ def _merge_multiaxis_rotary_embeddings(
             sin[..., indices] = axis_sin[axis][..., indices]
             sin[..., duplicated] = axis_sin[axis][..., duplicated]
         return cos, sin
-    split_sizes = sections * 2
-    if sum(split_sizes) != head_dim:
-        raise ValueError(
-            "Twice the sum of spatial_rope_sections must equal the attention head dimension, "
-            f"got sections={sections} and head_dim={head_dim}."
-        )
+    split_sizes = tuple(sections) * 2
     cos = torch.cat([chunk[index % 3] for index, chunk in enumerate(axis_cos.split(split_sizes, dim=-1))], dim=-1)
     sin = torch.cat([chunk[index % 3] for index, chunk in enumerate(axis_sin.split(split_sizes, dim=-1))], dim=-1)
     return cos, sin
@@ -834,7 +854,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             build_target_layer_ids(config.num_target_layers, config.num_hidden_layers),
         )
         self.norm = Qwen3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.rotary_emb = Qwen3RotaryEmbedding(config)
+        self.rotary_emb, self.rotary_dim = _draft_rotary_embedding(config)
         self.fc = nn.Linear(len(self.target_layer_ids) * config.hidden_size, config.hidden_size, bias=False)
         self.hidden_norm = Qwen3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.spatial_rope_enabled = bool(dflash_config.get("spatial_rope_enabled", False))
@@ -854,19 +874,9 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         if self.spatial_rope_enabled:
             if self.spatial_rope_mode not in {"gated", "replace"}:
                 raise ValueError(f"spatial_rope_mode must be 'gated' or 'replace', got {self.spatial_rope_mode!r}.")
-            head_dim = int(getattr(config, "head_dim", config.hidden_size // config.num_attention_heads))
-            if len(self.spatial_rope_sections) != 3 or 2 * sum(self.spatial_rope_sections) != head_dim:
-                raise ValueError(
-                    "Spatial-rope DFlash requires three spatial_rope_sections whose doubled sum equals head_dim, "
-                    f"got sections={self.spatial_rope_sections} and head_dim={head_dim}."
-                )
-            if self.spatial_rope_interleaved:
-                for axis in (1, 2):
-                    if 3 * self.spatial_rope_sections[axis] > head_dim // 2:
-                        raise ValueError(
-                            "Interleaved spatial rope needs 3*sections[axis] <= head_dim/2; "
-                            f"axis {axis} has 3*{self.spatial_rope_sections[axis]} > {head_dim // 2}."
-                        )
+            error = mrope_section_error(self.spatial_rope_sections, self.rotary_dim, self.spatial_rope_interleaved)
+            if error is not None:
+                raise ValueError(f"Spatial-rope DFlash: {error}")
             if self.spatial_rope_mode == "gated":
                 self.spatial_rope_gates = nn.Parameter(torch.zeros(len(self.layers)))
             else:
@@ -1391,9 +1401,10 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         # silently disable multimodal RoPE, so let the VLM compute positions.
         target_is_vlm = callable(getattr(getattr(target, "model", None), "compute_3d_position_ids", None))
         if target_is_vlm:
-            from ..adapters import adapter_for_model
+            from ..adapters import adapter_for_model, require_cache_crop_rollback
 
             adapter = adapter_for_model(target)
+            require_cache_crop_rollback(adapter, "spec_generate")
         else:
             adapter = None
         target_forward_params = inspect.signature(target.forward).parameters

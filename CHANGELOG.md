@@ -2,6 +2,20 @@
 
 ## v0.3.2 (in development)
 
+
+### Targets: Qwen3.5/3.6-MoE adapter (implemented, CPU-tested)
+
+- New `qwen3_5_moe` adapter (`Qwen3_5MoeForConditionalGeneration`). The
+  contract and the draft honor `partial_rotary_factor` (64 of 256 head
+  channels rotate; the rest pass through), and the interleaved-MRoPE bound
+  follows HF's slice semantics so `[11, 11, 10]` is accepted. The draft is
+  always dense: `drafter.intermediate_size` sets its MLP width, and a MoE
+  target without a dense width is rejected at contract validation (before
+  any stage runs) instead of silently taking the Qwen3Config default.
+  Spec-decode eval/benchmark refuse this hybrid Gated DeltaNet target
+  (`AdapterInfo.cache_crop_rollback=False`): its recurrent states cannot be
+  cropped after a partial acceptance.
+
 ### Data: linear duplicate-id check in prepare
 
 - `build_dataset` counted every selected id with `list.count`, which is
