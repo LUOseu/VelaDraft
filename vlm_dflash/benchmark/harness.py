@@ -23,6 +23,7 @@ from pathlib import Path
 
 import torch
 
+from ..adapters import adapter_for_contract, require_cache_crop_rollback
 from ..algorithms import get_algorithm
 from ..config import expand_env_text
 from ..eval.run import (
@@ -158,6 +159,7 @@ def run_benchmark(
 ) -> dict:
     """Measure every runnable workload with one target load; write JSON + MD."""
     require_single_device_target(cfg, "benchmark")
+    require_cache_crop_rollback(adapter_for_contract(contract), "benchmark")
     run_dir = Path(run_dir)
     out_dir = ensure_dir(Path(out_dir))
     algorithm = get_algorithm(cfg.get("algorithm"))

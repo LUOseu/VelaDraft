@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .utils import now_iso, sha256_file, sha256_json, write_json
+from .utils import log, now_iso, sha256_file, sha256_json, write_json
 
 
 class ContractError(RuntimeError):
@@ -221,6 +221,11 @@ def resolve_contract(
     # sections=None. transformers >=5 moved rope settings onto the text
     # sub-config; adapters search all known locations.
     rope_info = adapter.resolve_rope(config, text_config, head_dim, defaults)
+    if not adapter.info.cache_crop_rollback:
+        log(
+            f"contract: warning: target family {adapter.info.name!r} keeps recurrent cache state; "
+            "training is supported but in-repo spec-decode eval/benchmark is not (no cache rollback)."
+        )
     sections = rope_info["sections"]
 
     # ---- draft layer routing -------------------------------------------
@@ -317,6 +322,8 @@ def resolve_contract(
             "hidden_size": hidden_size,
             "head_dim": head_dim,
             "vocab_size": vocab_size,
+            # None for MoE targets: the dense draft then needs drafter.intermediate_size.
+            "intermediate_size": getattr(text_config, "intermediate_size", None),
             "source": "target config.text_config",
         },
         "mask": {
@@ -331,6 +338,8 @@ def resolve_contract(
             "mode": rope_info["mode"],
             "sections": sections,
             "interleaved": rope_info["interleaved"],
+            # Absent (None) for 1-D families; MRoPE families record it.
+            "partial_rotary_factor": rope_info.get("partial_rotary_factor"),
             "source": rope_info["source"],
         },
         "layers": {
@@ -393,6 +402,14 @@ def validate_yaml_against_contract(cfg: dict, contract: dict, where: str = "conf
         value = dotted_get(cfg, dotted)
         if value != expected:
             raise ContractError(f"{where}: {dotted}={value!r} disagrees with frozen contract value {expected!r}.")
+    text = contract.get("text") or {}
+    if "intermediate_size" in text and text["intermediate_size"] is None and not (cfg.get("drafter") or {}).get(
+        "intermediate_size"
+    ):
+        raise ContractError(
+            f"{where}: the target has no dense intermediate_size (MoE text config); set drafter.intermediate_size "
+            "for the dense draft MLP."
+        )
     capture_cfg = (cfg.get("drafter", {}) or {}).get("capture_layer_ids")
     if capture_cfg is not None:
         expected_capture = contract_capture_layer_ids(contract)

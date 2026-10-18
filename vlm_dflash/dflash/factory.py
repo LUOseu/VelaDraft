@@ -25,6 +25,16 @@ def build_draft_config(contract: dict, cfg: dict):
     draft["num_hidden_layers"] = num_layers
     draft["layer_types"] = ["full_attention"] * num_layers
     draft["max_window_layers"] = num_layers
+    # The draft is always a dense Qwen3 stack. MoE targets (Qwen3.5/3.6-MoE)
+    # carry no dense ``intermediate_size`` in their text config, so the draft
+    # MLP width must come from the drafter block instead of a Qwen3Config
+    # default; an explicit value also overrides a dense target's width.
+    if drafter.get("intermediate_size") is not None:
+        draft["intermediate_size"] = int(drafter["intermediate_size"])
+    elif draft.get("intermediate_size") is None:
+        raise ValueError(
+            "Target text config has no dense intermediate_size (MoE target); set drafter.intermediate_size."
+        )
     draft["num_target_layers"] = int(contract["layers"]["num_target_layers"])
     # Per-layer width of the captured target features (the fusion models need it
     # to validate their stacked context; equal to the draft width in this stack).
@@ -53,6 +63,11 @@ def build_draft_config(contract: dict, cfg: dict):
         draft.pop("rope_scaling", None)
         draft.pop("rope_parameters", None)
         draft["rope_parameters"] = {"rope_type": "default", "rope_theta": rope_theta}
+        # Keep the target's partial rotary as resolved by the contract: the
+        # draft rotates the same leading channels and passes the rest through.
+        partial_rotary_factor = float(contract["rope"].get("partial_rotary_factor") or 1.0)
+        if partial_rotary_factor != 1.0:
+            draft["rope_parameters"]["partial_rotary_factor"] = partial_rotary_factor
     config = Qwen3Config.from_dict(draft)
     config._attn_implementation = str(drafter.get("attention_backend", "flex_attention"))
     return config
