@@ -2,6 +2,7 @@
 
 ## v0.3.2 (in development)
 
+
 ### Targets: Qwen3.5/3.6-MoE adapter (implemented, CPU-tested)
 
 - New `qwen3_5_moe` adapter (`Qwen3_5MoeForConditionalGeneration`). The
@@ -14,6 +15,13 @@
   Spec-decode eval/benchmark refuse this hybrid Gated DeltaNet target
   (`AdapterInfo.cache_crop_rollback=False`): its recurrent states cannot be
   cropped after a partial acceptance.
+
+### Data: linear duplicate-id check in prepare
+
+- `build_dataset` counted every selected id with `list.count`, which is
+  quadratic in the number of selected rows (the check alone measured 89 s
+  for 100K ids, versus 8 ms now). The check now uses a `Counter`; the
+  warning text and which ids it reports are unchanged.
 
 ### Training: recipe-run scoring cost
 
