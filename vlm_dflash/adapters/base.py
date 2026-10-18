@@ -107,7 +107,10 @@ class VLMAdapter:
     info: AdapterInfo
 
     # ---- model / processor loading -------------------------------------
-    def load_model(self, model_path: str, *, dtype, attn_implementation: str, local_files_only: bool):
+    def load_model(
+        self, model_path: str, *, dtype, attn_implementation: str, local_files_only: bool, **load_kwargs
+    ):
+        """Load the target; ``load_kwargs`` (e.g. ``device_map``/``max_memory``) go to ``from_pretrained``."""
         import transformers
 
         model_class = getattr(transformers, self.info.model_class, None)
@@ -121,6 +124,7 @@ class VLMAdapter:
             dtype=dtype,
             attn_implementation=attn_implementation,
             local_files_only=local_files_only,
+            **load_kwargs,
         )
 
     def processor_kwargs(self, contract: dict) -> dict:

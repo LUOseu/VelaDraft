@@ -178,11 +178,13 @@ def forward_and_capture_batch(
             forward_kwargs["mm_token_type_ids"] = stacked
     output = model(**forward_kwargs)
     hidden_states = output.hidden_states
+    # A device-mapped target leaves each layer's output on its own GPU.
+    fuse_device = hidden_states[layer_ids[0] + 1].device
     records = []
     for row_index, item in enumerate(prepared_list):
         length = lengths[row_index]
         fused = torch.cat(
-            [hidden_states[layer_id + 1][row_index, :length] for layer_id in layer_ids], dim=-1
+            [hidden_states[layer_id + 1][row_index, :length].to(fuse_device) for layer_id in layer_ids], dim=-1
         )
         # hidden_states[-1] is the post-final-norm tensor; ``lm_head`` applied to it
         # reproduces the target's own output logits (verified by the capture-time

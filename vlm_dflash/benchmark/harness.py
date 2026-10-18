@@ -34,7 +34,7 @@ from ..eval.run import (
     prepare_prompts,
     run_checkpoints,
 )
-from ..target.load import load_target
+from ..target.load import load_target, require_single_device_target
 from ..utils import ensure_dir, log, now_iso, write_json
 
 BENCHMARK_FORMAT = "vlm-dflash-benchmark-v1"
@@ -158,6 +158,7 @@ def run_benchmark(
     name: str | None = None,
 ) -> dict:
     """Measure every runnable workload with one target load; write JSON + MD."""
+    require_single_device_target(cfg, "benchmark")
     require_cache_crop_rollback(adapter_for_contract(contract), "benchmark")
     run_dir = Path(run_dir)
     out_dir = ensure_dir(Path(out_dir))
