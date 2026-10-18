@@ -84,10 +84,31 @@ q/k tensors against the installed transformers implementation.
   `Qwen3VLTextRotaryEmbedding.apply_interleaved_mrope`. The draft selects this
   layout with `drafter.spatial_rope_interleaved: true`, which the contract
   validates against the target (`rope.interleaved` in `contract.json`).
+- Partial rotary + interleaved (Qwen3.5/3.6-MoE, `partial_rotary_factor: 0.25`,
+  `mrope_section: [11, 11, 10]`): only the leading `rotary_dim = head_dim *
+  partial_rotary_factor` (64 of 256) channels rotate. The contract checks the
+  sections against that rotary dim, the draft builds its tables at that width
+  and `apply_rotary_pos_emb` passes the remaining channels through, as the
+  target's attention does. The interleave bound follows HF's slice semantics
+  (axis `a` writes `slice(a, 3 * s_a, 3)` of the half table), so `[11, 11, 10]`
+  fits 32 half channels although `3 * 11 > 32`.
 - Qwen3-VL also requires `mm_token_type_ids` in multimodal forwards (it raises
   otherwise), and the capture stage now feeds it the processor map extended with
   text (`0`) rows for the regenerated answer; Qwen2.5-VL uses the same path so
   capture and eval build identical MRoPE positions.
+
+## Chat-template kwargs (render protocol)
+
+`target.chat_template_kwargs` (default `{}`) is passed to every
+`apply_chat_template` call in `vlm_dflash/target/prompts.py`, the single render
+path that regen, capture/online extraction and eval share. Some templates change
+the assistant turn on a template variable: Qwen3.5/3.6 open a thinking block
+(`<think>\n`) unless `enable_thinking: false` is passed, in which case the
+generation prompt ends with an empty `<think>\n\n</think>\n\n` block. The
+value is recorded in `contract.json` (`prompt.chat_template_kwargs`) and, when
+set, in the target identity, so a config, feature store or checkpoint rendered
+under different kwargs fails the contract/identity gates instead of silently
+mixing render protocols.
 
 ## Verification modes and token-exactness (important)
 

@@ -37,6 +37,7 @@ SOURCE_IDENTITY_KEYS = frozenset(
         "capture_layer_ids",
         "image_min_pixels",
         "image_max_pixels",
+        "chat_template_kwargs",
     }
 )
 
@@ -47,6 +48,10 @@ SOURCE_IDENTITY_KEYS = frozenset(
 #: validation, not in the source gate. Exact resume of the *same* run keeps
 #: comparing the full identity.
 CONSUMER_IDENTITY_KEYS = frozenset({"draft_layer_ids"})
+
+#: Identity keys recorded only when set (absent = the default behavior), so
+#: artifacts written before they existed keep their identity unchanged.
+OPTIONAL_IDENTITY_KEYS = frozenset({"chat_template_kwargs"})
 
 
 def provenance_path(run_dir: str | Path) -> Path:
@@ -124,7 +129,11 @@ def source_identity(identity: dict) -> dict:
     for stores written before ``capture_layer_ids`` existed.
     """
     identity = _with_legacy_capture_layers(identity)
-    return {key: identity.get(key) for key in SOURCE_IDENTITY_KEYS}
+    return {
+        key: identity.get(key)
+        for key in SOURCE_IDENTITY_KEYS
+        if key in identity or key not in OPTIONAL_IDENTITY_KEYS
+    }
 
 
 def source_identity_from_contract(contract: dict) -> dict:
@@ -171,9 +180,9 @@ def identity_from_contract(contract: dict) -> dict:
     gate (see :data:`AUDIT_ONLY_IDENTITY_KEYS`); moving the same checkpoint to
     a new directory must not invalidate a run.
     """
-    from .contract import contract_capture_layer_ids
+    from .contract import contract_capture_layer_ids, contract_chat_template_kwargs
 
-    return {
+    identity = {
         "target_model_path": contract["target"]["model_path"],
         "model_fingerprint": contract["target"]["model_fingerprint"],
         "processor_fingerprint": contract["target"]["processor_fingerprint"],
@@ -184,3 +193,9 @@ def identity_from_contract(contract: dict) -> dict:
         "image_min_pixels": contract["image"]["min_pixels"],
         "image_max_pixels": contract["image"]["max_pixels"],
     }
+    # Only recorded when set, so identities (and stage digests) of runs that
+    # render with the template defaults stay unchanged.
+    template_kwargs = contract_chat_template_kwargs(contract)
+    if template_kwargs:
+        identity["chat_template_kwargs"] = template_kwargs
+    return identity

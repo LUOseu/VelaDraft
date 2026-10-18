@@ -14,7 +14,10 @@ from dataclasses import dataclass
 
 import torch
 
+from ..contract import ContractError, contract_chat_template_kwargs
+from ..target.prompts import CHAT_TEMPLATE_KWARGS_ATTR
 from ..contract import ContractError
+from ..rope_layout import mrope_section_error, partial_rotary_dim
 
 def _mapping_value(source, key):
     """Read ``key`` from a dict-like or attribute-like source (SizeDict etc.)."""
@@ -47,6 +50,10 @@ class AdapterInfo:
     # Processor-output tensors forwarded to the target forward / generation
     # calls (plus attention_mask, which is always forwarded when present).
     forward_input_keys: tuple[str, ...] = ("pixel_values", "image_grid_thw", "mm_token_type_ids")
+    # Spec-decode verification rolls a rejected suffix back with
+    # ``DynamicCache.crop``. Families whose cache also holds recurrent state
+    # (hybrid Gated DeltaNet layers) cannot be cropped, so eval refuses them.
+    cache_crop_rollback: bool = True
 
 
 
@@ -86,13 +93,26 @@ def locate_image_token_spans(input_ids, image_token_id: int, *, bridge_ids=(), i
     spans.append((start, previous))
     return spans
 
+def require_cache_crop_rollback(adapter: "VLMAdapter", context: str) -> None:
+    """Refuse spec-decode verification for a family whose target cache cannot be cropped."""
+    if not adapter.info.cache_crop_rollback:
+        raise RuntimeError(
+            f"{context}: target family {adapter.info.name!r} keeps recurrent cache state that "
+            "DynamicCache.crop cannot roll back after a partial acceptance, so speculative "
+            "verification would not be token-exact. Spec-decode eval is not supported for it yet."
+        )
+
+
 class VLMAdapter:
     """Base adapter; subclasses set :attr:`info` (and may override hooks)."""
 
     info: AdapterInfo
 
     # ---- model / processor loading -------------------------------------
-    def load_model(self, model_path: str, *, dtype, attn_implementation: str, local_files_only: bool):
+    def load_model(
+        self, model_path: str, *, dtype, attn_implementation: str, local_files_only: bool, **load_kwargs
+    ):
+        """Load the target; ``load_kwargs`` (e.g. ``device_map``/``max_memory``) go to ``from_pretrained``."""
         import transformers
 
         model_class = getattr(transformers, self.info.model_class, None)
@@ -106,6 +126,7 @@ class VLMAdapter:
             dtype=dtype,
             attn_implementation=attn_implementation,
             local_files_only=local_files_only,
+            **load_kwargs,
         )
 
     def processor_kwargs(self, contract: dict) -> dict:
@@ -166,10 +187,15 @@ class VLMAdapter:
         )
 
     def finalize_processor(self, processor, contract: dict) -> None:
-        """Post-construction processor tweaks shared by the encoder-decoder path."""
+        """Post-construction processor tweaks shared by the encoder-decoder path.
+
+        Overrides must call ``super()``: this also attaches the contract's
+        chat-template kwargs that every prompt render reads.
+        """
         tokenizer = getattr(processor, "tokenizer", None)
         if tokenizer is not None:
             tokenizer.padding_side = "left"
+        setattr(processor, CHAT_TEMPLATE_KWARGS_ATTR, contract_chat_template_kwargs(contract))
 
     # ---- special tokens / mask policy ----------------------------------
     def resolve_tokens(self, tokenizer, config, text_config) -> dict[str, int | None]:
@@ -251,10 +277,10 @@ class VLMAdapter:
             raise ContractError(
                 f"YAML spatial_rope_sections {default_sections} disagree with target mrope_section {sections}."
             )
-        if 2 * sum(sections) != head_dim:
-            raise ContractError(
-                f"mrope_section {sections} doubled sum must equal head_dim {head_dim} for spatial-rope DFlash."
-            )
+        # Partial-rotary families rotate only the leading channels of each head.
+        partial_rotary_factor = float(
+            rope.get("partial_rotary_factor") or getattr(text_config, "partial_rotary_factor", None) or 1.0
+        )
         interleaved = bool(rope.get("mrope_interleaved", False))
         default_interleaved = defaults.get("spatial_rope_interleaved")
         if default_interleaved is not None and bool(default_interleaved) != interleaved:
@@ -262,20 +288,23 @@ class VLMAdapter:
                 f"YAML spatial_rope_interleaved {bool(default_interleaved)} disagrees with target "
                 f"mrope_interleaved {interleaved}."
             )
-        if interleaved:
-            half = head_dim // 2
-            for axis in (1, 2):
-                if 3 * sections[axis] > half:
-                    raise ContractError(
-                        f"Interleaved MRoPE needs 3*mrope_section[axis] <= head_dim/2; axis {axis} has "
-                        f"3*{sections[axis]} > {half}."
-                    )
+        try:
+            rotary_dim = partial_rotary_dim(head_dim, partial_rotary_factor)
+        except ValueError as error:
+            raise ContractError(str(error)) from error
+        error = mrope_section_error(sections, rotary_dim, interleaved)
+        if error is not None:
+            raise ContractError(f"{error} (head_dim {head_dim}, partial_rotary_factor {partial_rotary_factor})")
         return {
             "type": rope.get("type") or rope.get("rope_type"),
             "mode": "mrope",
             "sections": sections,
             "interleaved": interleaved,
-            "source": f"target {rope_source}.mrope_section + mrope_interleaved (absent = False)",
+            "partial_rotary_factor": partial_rotary_factor,
+            "source": (
+                f"target {rope_source}.mrope_section + mrope_interleaved (absent = False) + "
+                "partial_rotary_factor (absent = 1.0)"
+            ),
         }
 
     # ---- multimodal position ids ---------------------------------------
