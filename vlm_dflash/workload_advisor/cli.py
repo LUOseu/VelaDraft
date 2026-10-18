@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 from .backend import readiness
@@ -176,6 +177,31 @@ def cmd_run(args) -> int:
             write_deliverables(args.out_dir, validation=validation)
         _print(validation)
         return 2
+    config_errors = []
+    if not math.isfinite(float(args.budget_gpu_hours)) or float(args.budget_gpu_hours) <= 0:
+        config_errors.append("--budget-gpu-hours must be a positive finite number")
+    if args.sessions < 1:
+        config_errors.append("--sessions must be >= 1")
+    if args.warmups < 0:
+        config_errors.append("--warmups must be >= 0")
+    if args.max_requests is not None and args.max_requests < 1:
+        config_errors.append("--max-requests must be >= 1 when set")
+    if config_errors:
+        error = {
+            "schema_version": "veladraft-platform-v1",
+            "project_scope": "platform_extension",
+            "include_in_paper": False,
+            "status": "failed",
+            "reason": "invalid_run_configuration",
+            "errors": config_errors,
+            "note": "No GPU was allocated and no model or checkpoint was loaded.",
+        }
+        if args.out_dir:
+            write_deliverables(args.out_dir, validation=validation)
+            with open(Path(args.out_dir) / "run_error.json", "w", encoding="utf-8") as handle:
+                json.dump(error, handle, ensure_ascii=False, indent=2, sort_keys=True)
+        _print(error)
+        return 2
     ready = readiness(workload.manifest)
     plan = build_plan(workload.manifest, validation=validation, readiness=ready, budget_gpu_hours=args.budget_gpu_hours)
     if ready["status"] == "blocked":
@@ -197,14 +223,30 @@ def cmd_run(args) -> int:
         return 3
     from .backend_hf import HFWorkloadBackend  # lazy: imports torch only when GPU is ready
 
-    backend = HFWorkloadBackend(
-        workload,
-        out_dir=args.out_dir,
-        budget_gpu_hours=args.budget_gpu_hours,
-        sessions=args.sessions,
-        warmups=args.warmups,
-        device=args.device,
-    )
+    try:
+        backend = HFWorkloadBackend(
+            workload,
+            out_dir=args.out_dir,
+            budget_gpu_hours=args.budget_gpu_hours,
+            sessions=args.sessions,
+            warmups=args.warmups,
+            device=args.device,
+        )
+    except ValueError as exc:
+        error = {
+            "schema_version": "veladraft-platform-v1",
+            "project_scope": "platform_extension",
+            "include_in_paper": False,
+            "status": "failed",
+            "reason": "invalid_run_configuration",
+            "errors": [str(exc)],
+            "note": "No GPU was allocated and no model or checkpoint was loaded.",
+        }
+        write_deliverables(args.out_dir, validation=validation, plan=plan)
+        with open(Path(args.out_dir) / "run_error.json", "w", encoding="utf-8") as handle:
+            json.dump(error, handle, ensure_ascii=False, indent=2, sort_keys=True)
+        _print(error)
+        return 2
     result = backend.run(max_requests=args.max_requests)
     if result["status"] == "blocked":
         if args.out_dir:
