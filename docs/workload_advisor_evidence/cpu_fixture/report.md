@@ -17,19 +17,19 @@
 - action: **insufficient_evidence**
 - method: `None`
 - threshold: paired speed-ratio CI lower > 1.05
-- coverage: {"buckets_insufficient": {"dflash-exact:ar_R": ["16-32", "32-64", "64-96", "96-128"], "dflash-exact:target_V": ["1024-2048", "256-512", "512-1024"], "dflash-exact:task": ["chart_qa", "general_vqa", "invoice_fields"], "dfly-fast-wrong:ar_R": ["16-32", "32-64", "64-96", "96-128"], "dfly-fast-wrong:target_V": ["1024-2048", "256-512", "512-1024"], "dfly-fast-wrong:task": ["chart_qa", "general_vqa", "invoice_fields"]}, "min_groups": 20, "n_groups": 24, "n_sessions": 3, "n_tasks": 3, "task_group_counts": {"chart_qa": 8, "general_vqa": 8, "invoice_fields": 8}}
+- coverage: {"buckets_insufficient": {"dflash-exact:ar_R": ["16-32", "32-64", "64-96", "96-128"], "dflash-exact:target_V": ["1024-2048", "256-512", "512-1024"], "dflash-exact:task": ["chart_qa", "general_vqa", "invoice_fields"], "dfly-fast-wrong:ar_R": ["16-32", "32-64", "64-96", "96-128"], "dfly-fast-wrong:target_V": ["1024-2048", "256-512", "512-1024"], "dfly-fast-wrong:task": ["chart_qa", "general_vqa"]}, "min_groups": 20, "n_expected_requests": 24, "n_groups": 24, "n_sessions": 3, "n_tasks": 3, "task_group_counts": {"chart_qa": 8, "general_vqa": 8, "invoice_fields": 8}}
 - Synthetic fixture evidence: no real recommendation is made.
 
 Excluded candidates:
-- `dflash-exact` — synthetic_fixture: synthetic fixtures never enter a real recommendation.
-- `dfly-fast-wrong` — correctness_failed: 24 record(s) failed.; quality_failed: task quality is below the frozen threshold.; synthetic_fixture: synthetic fixtures never enter a real recommendation.
+- `dflash-exact` — synthetic_fixture: Synthetic fixtures never enter a real recommendation.
+- `dfly-fast-wrong` — synthetic_fixture: Synthetic fixtures never enter a real recommendation.; correctness_failed: 8 holdout request(s) failed exactness.; run_errors: 8 request(s) have recorded run errors.; quality_failed: Task quality is below the frozen threshold.; insufficient_coverage: 16 complete holdout group(s) < required 20.
 
 ## Candidates
 
 | candidate | records | groups | correctness | quality | speed ratio [95% CI] | memory fit | latency mean AR -> candidate (s) |
 | --- | ---: | ---: | --- | --- | --- | --- | --- |
-| `dflash-exact` | 72 | 24 | verified_greedy_exact=72 (failures 0/72) | pass | 1.430 [1.421, 1.438] | True | 0.999 -> 0.699 |
-| `dfly-fast-wrong` | 72 | 24 | failed=24, verified_greedy_exact=48 (failures 24/72) | fail | 2.084 [2.070, 2.095] | True | 0.999 -> 0.480 |
+| `dflash-exact` | 72 | 24 | verified_greedy_exact=72 (failures None/None) | pass | 1.430 [1.421, 1.438] | True | 0.999 -> 0.699 |
+| `dfly-fast-wrong` | 72 | 16 | failed=24, verified_greedy_exact=48 (failures None/None) | fail | 2.098 [2.087, 2.108] | True | 0.999 -> 0.480 |
 
 ## Latency and resources
 
@@ -77,23 +77,22 @@ Frozen tuning boundaries; buckets with fewer than the required independent group
 | --- | ---: | --- | --- |
 | chart_qa | 8 | insufficient_evidence | point=null; CI=null |
 | general_vqa | 8 | insufficient_evidence | point=null; CI=null |
-| invoice_fields | 8 | insufficient_evidence | point=null; CI=null |
 
 ### `dfly-fast-wrong` by target_V
 
 | bucket | n groups | status | ratio [95% CI] |
 | --- | ---: | --- | --- |
-| 1024-2048 | 4 | insufficient_evidence | point=null; CI=null |
-| 256-512 | 6 | insufficient_evidence | point=null; CI=null |
-| 512-1024 | 14 | insufficient_evidence | point=null; CI=null |
+| 1024-2048 | 3 | insufficient_evidence | point=null; CI=null |
+| 256-512 | 4 | insufficient_evidence | point=null; CI=null |
+| 512-1024 | 9 | insufficient_evidence | point=null; CI=null |
 
 ### `dfly-fast-wrong` by ar_R
 
 | bucket | n groups | status | ratio [95% CI] |
 | --- | ---: | --- | --- |
-| 16-32 | 4 | insufficient_evidence | point=null; CI=null |
-| 32-64 | 9 | insufficient_evidence | point=null; CI=null |
-| 64-96 | 9 | insufficient_evidence | point=null; CI=null |
+| 16-32 | 2 | insufficient_evidence | point=null; CI=null |
+| 32-64 | 7 | insufficient_evidence | point=null; CI=null |
+| 64-96 | 5 | insufficient_evidence | point=null; CI=null |
 | 96-128 | 2 | insufficient_evidence | point=null; CI=null |
 
 ## Correctness and quality
@@ -106,7 +105,7 @@ Frozen tuning boundaries; buckets with fewer than the required independent group
 ## Gaps and next steps
 
 - Replace synthetic fixture timings with a real HF backend run on an allocated GPU (4 GPU-h first-round cap).
-- Buckets still below the minimum group count: `{"dflash-exact:ar_R": ["16-32", "32-64", "64-96", "96-128"], "dflash-exact:target_V": ["1024-2048", "256-512", "512-1024"], "dflash-exact:task": ["chart_qa", "general_vqa", "invoice_fields"], "dfly-fast-wrong:ar_R": ["16-32", "32-64", "64-96", "96-128"], "dfly-fast-wrong:target_V": ["1024-2048", "256-512", "512-1024"], "dfly-fast-wrong:task": ["chart_qa", "general_vqa", "invoice_fields"]}`.
+- Buckets still below the minimum group count: `{"dflash-exact:ar_R": ["16-32", "32-64", "64-96", "96-128"], "dflash-exact:target_V": ["1024-2048", "256-512", "512-1024"], "dflash-exact:task": ["chart_qa", "general_vqa", "invoice_fields"], "dfly-fast-wrong:ar_R": ["16-32", "32-64", "64-96", "96-128"], "dfly-fast-wrong:target_V": ["1024-2048", "256-512", "512-1024"], "dfly-fast-wrong:task": ["chart_qa", "general_vqa"]}`.
 - No cross-hardware, cross-engine or cross-customer generalization is claimed.
 
 ## Replay

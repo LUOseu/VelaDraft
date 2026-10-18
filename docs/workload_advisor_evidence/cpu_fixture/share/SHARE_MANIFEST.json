@@ -1,17 +1,22 @@
 {
-  "decision_id": "3a07ff3577729a96e53ad3275426a0fce60283e84283888706186255477ee9eb",
+  "decision_id": "4a8b5de61c88d1fbe25a3f2e3a3077a3c53a3e50f573517f84b498c8dc3cb959",
   "files": [
     "records.share.jsonl",
     "summary.share.json",
     "decision.share.json",
     "report.share.md"
   ],
-  "records_sha256": "1172d887c55e1b42acb547e287daf7edf28bc0342a7d4d32e5958912307fa6d9",
+  "records_sha256": "8868a11826d45a13c2edd5ac861b0bafa1b5ec54d1da0ba3ca65508bf38dd498",
+  "redaction_policy": "structural_allowlist_v1",
   "removed": [
     "prompts",
     "images",
     "answers",
-    "absolute_paths",
+    "predictions",
+    "quality_references",
+    "raw_error_messages",
+    "free_text_reasons",
+    "absolute_and_local_paths",
     "artifacts_local_paths"
   ],
   "schema_version": "veladraft-platform-v1",
