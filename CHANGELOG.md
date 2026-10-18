@@ -32,6 +32,10 @@
   weights (`target_devices` in the manifest, `target_device_peaks_gb` per
   device). Spec-decode eval/benchmark/`spec_generate` refuse a device-mapped
   target: verification keeps logits and the output buffer on one device.
+- `load_target` refuses a GPU-mapped target that accelerate partly offloaded
+  to cpu or disk (parameters left on `cpu`/`meta`) because the GPUs or
+  `max_memory` were too small, and names the offloaded modules; it used to load
+  silently and only fail later on a meta tensor. An all-cpu map is unaffected.
 
 ### Targets: Qwen3.5/3.6-MoE adapter (implemented, CPU-tested)
 
