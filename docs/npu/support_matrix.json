@@ -1,0 +1,135 @@
+{
+  "format": "vlm-dflash-npu-support-matrix-v1",
+  "updated": "2026-10-19",
+  "baseline_sha": "832edea25dd88ecbda03de96496d140e9fcca0a4",
+  "overall": {
+    "implementation": "COMPLETE",
+    "cpu_evidence": "CPU_VERIFIED",
+    "npu_evidence": "NPU_UNVERIFIED",
+    "conclusion": "CODE_READY + NPU_UNVERIFIED"
+  },
+  "legend": {
+    "implementation": ["COMPLETE", "PARTIAL", "BLOCKED"],
+    "evidence": ["CPU_VERIFIED", "NPU_UNVERIFIED", "NPU_SMOKE_PASSED", "NPU_TRAINING_VALIDATED", "NOT_RUN"],
+    "CPU_CONTROL_FLOW_ONLY": "A fake backend exercised argument routing/fallback only; no real Ascend operator ran."
+  },
+  "methods": [
+    {
+      "name": "dflash",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_UNVERIFIED",
+      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "specific_modules": ["fixed anchors", "decay loss", "KV injection", "block mask"]
+    },
+    {
+      "name": "dspark",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_UNVERIFIED",
+      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "specific_modules": ["markov_head", "confidence_head", "recipe targets"]
+    },
+    {
+      "name": "domino",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_UNVERIFIED",
+      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "specific_modules": ["prefix_gru", "embed_proj", "label shift", "correction head"]
+    },
+    {
+      "name": "jetspec",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_UNVERIFIED",
+      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "specific_modules": ["in-block causal mask", "forward KL", "teacher hidden stream"]
+    },
+    {
+      "name": "dflash2",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_UNVERIFIED",
+      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "specific_modules": ["dynamic causal conv", "candidate_selector", "selector objective"]
+    },
+    {
+      "name": "dflare",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_UNVERIFIED",
+      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "specific_modules": ["layer_fusion_weights", "separate context K/V projection"]
+    },
+    {
+      "name": "dfly",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_UNVERIFIED",
+      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
+      "specific_modules": ["layer_fusion_weights", "hidden_correction", "recipe stage switch"]
+    }
+  ],
+  "adapters": [
+    {
+      "name": "qwen25_vl",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_UNVERIFIED",
+      "notes": "First real bring-up target; Qwen2.5-VL-3B."
+    },
+    {
+      "name": "qwen3_vl",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_UNVERIFIED",
+      "notes": "Untied head and MRoPE layouts preserved."
+    },
+    {
+      "name": "qwen3_5_moe",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_UNVERIFIED",
+      "notes": "Forces upstream PyTorch Gated DeltaNet reference on NPU; functional candidate, full-weight memory."
+    },
+    {
+      "name": "smolvlm",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_UNVERIFIED",
+      "notes": "1-D positions and tile image path retained."
+    }
+  ],
+  "stages": [
+    {"name": "prepare", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
+    {"name": "regen", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
+    {"name": "capture", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
+    {"name": "offline_training", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
+    {"name": "online_training", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
+    {"name": "resume", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
+    {"name": "export", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
+    {"name": "target_device_map", "implementation": "PARTIAL", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED", "notes": "Candidate; offload refusal implemented, Accelerate/NPU sharding unverified."},
+    {"name": "npu_fusion_attention", "implementation": "COMPLETE", "cpu_evidence": "CPU_CONTROL_FLOW_ONLY", "npu_evidence": "NPU_UNVERIFIED", "notes": "Opt-in only; forward/backward and mask semantics need real NPU evidence."},
+    {"name": "ddp", "implementation": "BLOCKED", "cpu_evidence": "NOT_RUN", "npu_evidence": "NOT_RUN", "notes": "NOT_IMPLEMENTED in this branch; teacher/drafter split is not DDP."}
+  ],
+  "phases": [
+    {"name": "H0", "status": "NPU_UNVERIFIED", "reason": "No Ascend device in this checkout."},
+    {"name": "H1", "status": "NPU_UNVERIFIED", "reason": "CPU parity exists; NPU operator and fused-attention parity not run."},
+    {"name": "H2", "status": "NPU_UNVERIFIED", "reason": "Seven-method CPU synthetic training passed; real-image NPU short run not run."},
+    {"name": "H3", "status": "NOT_RUN", "reason": "Requires an NPU and an opt-in long continuity run."},
+    {"name": "H4", "status": "NOT_RUN", "reason": "Requires real extended-model checkpoints, image data and multiple NPUs for routing/HCCL."}
+  ],
+  "backends": [
+    {"name": "cpu", "status": "CPU_VERIFIED"},
+    {"name": "cuda", "status": "NOT_RUN", "reason": "No CUDA device in this checkout; existing CUDA paths retained."},
+    {"name": "npu", "status": "NPU_UNVERIFIED", "reason": "torch_npu/CANN unavailable in this checkout."}
+  ]
+}

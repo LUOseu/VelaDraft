@@ -74,6 +74,10 @@ VelaDraft 是项目名；当前包名与命令名仍是 vlm-dflash。
   最后一个回答会被重新生成并监督（见 [data.md](docs/data.md)）。
 - 硬件： 实测参考为单张 48 GB GPU；24 GB preset 仍是建议配置，尚未在真实
   24 GB 卡上记录运行。训练无 DDP / 多节点启动路径。
+- 昇腾 NPU： 设备解析、分块 attention、七种 trainer、恢复与可移植导出均已
+  接线并通过 CPU 验证，但本 checkout 没有真实 NPU 运行记录（NPU_UNVERIFIED）。
+  fused attention 为 opt-in，NPU device_map 仍是候选，DDP 未实现。见
+  [docs/npu/README.md](docs/npu/README.md)。
 - 训练模式： 默认 offline（读 staged feature store）；online 让冻结目标模型
   驻留并实时提取特征；--features 复用已有 store。“online”不是 on-policy
   rollout 训练。
@@ -186,7 +190,8 @@ benchmarks/results/zoo_canonical.json。
   记录的 run id。
 文档
 [README.md](docs/README.md) 是任务索引：安装与首跑、自有数据、方法与配方
-选择、长训、online、评测与排障。常用直达：
+选择、长训、online、评测与排障；NPU 适配见
+[docs/npu/README.md](docs/npu/README.md)。常用直达：
 [model-zoo.md](docs/model-zoo.md) · [data.md](docs/data.md) ·
 [training.md](docs/training.md) · [online-training.md](docs/online-training.md) ·
 [troubleshooting.md](docs/troubleshooting.md) · [algorithms/](docs/algorithms/) ·

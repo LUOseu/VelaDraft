@@ -92,6 +92,11 @@ Scope and limits:
   and supervised ([docs/data.md](docs/data.md)).
 - **Hardware:** the validated reference is a single 48 GB GPU; the 24 GB preset
   remains a *suggested* configuration (no recorded run on a real 24 GB card).
+- **Ascend NPU:** device resolution, chunked attention, all seven trainers,
+  resume and portable export are implemented and CPU-verified, but no real NPU
+  run is recorded in this checkout (`NPU_UNVERIFIED`). Fused attention is
+  opt-in, NPU `device_map` is a candidate, and DDP is not implemented. See
+  [docs/npu/README.md](docs/npu/README.md).
 - **Training modes:** offline staged features (default), online live
   extraction from a frozen target, and `--features` store reuse. There is no
   DDP / multi-node launch path. "Online" is not on-policy rollout training.
@@ -267,6 +272,7 @@ troubleshooting. Direct links: [model-zoo.md](docs/model-zoo.md) ·
 [data.md](docs/data.md) · [training.md](docs/training.md) ·
 [online-training.md](docs/online-training.md) ·
 [troubleshooting.md](docs/troubleshooting.md) ·
+[npu/](docs/npu/README.md) ·
 [algorithms/](docs/algorithms/) · [benchmark.md](docs/benchmark.md) ·
 [env-preflight.md](docs/env-preflight.md) (historical host notes) ·
 [REFERENCE.md](docs/REFERENCE.md) (implementation and numerical semantics).
