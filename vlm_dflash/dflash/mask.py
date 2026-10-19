@@ -41,8 +41,13 @@ branch follows the target model's autoregressive order (paper §2.2). Offset 0
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
 import torch
-from torch.nn.attention.flex_attention import BlockMask, create_block_mask
+
+if TYPE_CHECKING:
+    from torch.nn.attention.flex_attention import BlockMask
 
 # Singleton-cached torch.compile of ``create_block_mask``. The mask_mod closure
 # changes per step (new anchor positions), but the create_block_mask machinery
@@ -59,6 +64,8 @@ def _get_compiled_create_block_mask():
     """Lazy-initialise a compiled ``create_block_mask`` and cache it."""
     global _compiled_create_block_mask
     if _compiled_create_block_mask is None:
+        from torch.nn.attention.flex_attention import create_block_mask
+
         _compiled_create_block_mask = torch.compile(create_block_mask, dynamic=True)
     return _compiled_create_block_mask
 
@@ -249,7 +256,12 @@ def create_dflash_block_mask(
     # it equal to our draft block_size (16) would in theory give finer-grained
     # sparsity but triggers Inductor's "Q and KV block size must be divisible
     # by BLOCK_M and BLOCK_N" lowering error at runtime.
-    builder = _get_compiled_create_block_mask() if use_compile else create_block_mask
+    if use_compile:
+        builder = _get_compiled_create_block_mask()
+    else:
+        from torch.nn.attention.flex_attention import create_block_mask
+
+        builder = create_block_mask
     return builder(
         dflash_mask_mod,
         B=B,
@@ -258,3 +270,193 @@ def create_dflash_block_mask(
         KV_LEN=KV_LEN,
         device=device,
     )
+
+
+@dataclass(frozen=True)
+class DFlashMaskSpec:
+    """Lazily materialisable DFlash block mask for query-chunked attention.
+
+    The normal SDPA backend builds the complete ``[B, 1, A*L, S+A*L]`` additive
+    mask before the attention call. At realistic context/anchor counts that
+    tensor dominates memory, and a backward pass would retain one softmax
+    matrix per query too. This spec keeps only the compact anchor/keep/document
+    metadata; :meth:`materialize_additive` / :meth:`materialize_bool` build one
+    query slice at a time, and the attention path checkpoints each slice so
+    backward recomputes it instead of retaining every slice at once.
+
+    The mask semantics are exactly those of :func:`create_dflash_sdpa_mask` and
+    :func:`build_dflash_mask_mod`: the concatenation of all query slices is the
+    dense reference mask. ``backend`` records the requested execution path
+    (``sdpa_chunked`` or ``npu_fusion``) for diagnostics; it does not alter the
+    mask itself.
+    """
+
+    anchor_positions: torch.Tensor
+    block_keep_mask: torch.Tensor
+    ctx_len: int
+    block_size: int
+    causal: bool = False
+    ctx_doc_id: torch.Tensor | None = None
+    anchor_doc_id: torch.Tensor | None = None
+    query_chunk_size: int = 128
+    backend: str = "sdpa_chunked"
+    npu_fusion_fallback: bool = False
+
+    def __post_init__(self) -> None:
+        if self.anchor_positions.ndim != 2 or self.block_keep_mask.shape != self.anchor_positions.shape:
+            raise ValueError(
+                "DFlashMaskSpec expects anchor_positions [B, N] and block_keep_mask with the same shape; "
+                f"got {tuple(self.anchor_positions.shape)} and {tuple(self.block_keep_mask.shape)}."
+            )
+        if self.ctx_len < 0 or self.block_size <= 0:
+            raise ValueError("DFlashMaskSpec requires ctx_len >= 0 and block_size > 0.")
+        if self.query_chunk_size <= 0:
+            raise ValueError("DFlashMaskSpec.query_chunk_size must be a positive integer.")
+        if (self.ctx_doc_id is None) != (self.anchor_doc_id is None):
+            raise ValueError("ctx_doc_id and anchor_doc_id must be supplied together.")
+        if self.ctx_doc_id is not None and self.ctx_doc_id.shape != (self.anchor_positions.shape[0], self.ctx_len):
+            raise ValueError(
+                f"ctx_doc_id must have shape {(self.anchor_positions.shape[0], self.ctx_len)}, "
+                f"got {tuple(self.ctx_doc_id.shape)}."
+            )
+
+    @property
+    def batch_size(self) -> int:
+        return int(self.anchor_positions.shape[0])
+
+    @property
+    def num_blocks(self) -> int:
+        return int(self.anchor_positions.shape[1])
+
+    @property
+    def query_len(self) -> int:
+        return self.num_blocks * self.block_size
+
+    @property
+    def kv_len(self) -> int:
+        return self.ctx_len + self.query_len
+
+    def _visible(self, query_start: int, query_stop: int) -> torch.Tensor:
+        if query_start < 0 or query_stop > self.query_len or query_stop <= query_start:
+            raise ValueError(
+                f"Invalid query chunk [{query_start}, {query_stop}) for query_len={self.query_len}."
+            )
+        device = self.anchor_positions.device
+        q_idx = torch.arange(query_start, query_stop, device=device).view(1, 1, -1, 1)
+        kv_idx = torch.arange(self.kv_len, device=device).view(1, 1, 1, -1)
+        q_block = q_idx // self.block_size
+        safe_q_block = q_block.clamp(max=self.num_blocks - 1)
+        anchor = torch.gather(
+            self.anchor_positions.view(self.batch_size, 1, self.num_blocks, 1).expand(-1, 1, -1, -1),
+            2,
+            safe_q_block.expand(self.batch_size, -1, -1, -1),
+        )
+
+        is_ctx = kv_idx < self.ctx_len
+        ctx_visible = is_ctx & (kv_idx < anchor)
+        if self.ctx_doc_id is not None:
+            assert self.anchor_doc_id is not None
+            kv_doc = torch.gather(
+                self.ctx_doc_id.view(self.batch_size, 1, 1, self.ctx_len).expand(-1, 1, query_stop - query_start, -1),
+                3,
+                kv_idx.clamp(max=max(self.ctx_len - 1, 0)).expand(self.batch_size, 1, query_stop - query_start, -1),
+            )
+            anchor_doc = torch.gather(
+                self.anchor_doc_id.view(self.batch_size, 1, self.num_blocks, 1).expand(-1, 1, -1, -1),
+                2,
+                safe_q_block.expand(self.batch_size, -1, -1, -1),
+            )
+            ctx_visible = ctx_visible & (kv_doc == anchor_doc)
+
+        is_noise = kv_idx >= self.ctx_len
+        kv_block = (kv_idx - self.ctx_len) // self.block_size
+        noise_visible = is_noise & (q_block == kv_block)
+        if self.causal:
+            q_in_block = q_idx - q_block * self.block_size
+            kv_in_block = (kv_idx - self.ctx_len) - kv_block * self.block_size
+            noise_visible = noise_visible & (kv_in_block <= q_in_block)
+        keep = torch.gather(
+            self.block_keep_mask.view(self.batch_size, 1, self.num_blocks, 1).expand(-1, 1, -1, -1),
+            2,
+            safe_q_block.expand(self.batch_size, -1, -1, -1),
+        )
+        return (ctx_visible & keep) | noise_visible
+
+    def materialize_additive(
+        self,
+        query_start: int,
+        query_stop: int,
+        *,
+        dtype: torch.dtype | None = None,
+    ) -> torch.Tensor:
+        """Additive mask chunk ``[B, 1, query_stop-query_start, S+A*L]``."""
+        dtype = dtype or torch.float32
+        visible = self._visible(query_start, query_stop)
+        neg_inf = torch.tensor(float("-inf"), device=visible.device, dtype=dtype)
+        zero = torch.tensor(0.0, device=visible.device, dtype=dtype)
+        return torch.where(visible, zero, neg_inf)
+
+    def materialize_bool(self, query_start: int, query_stop: int, *, inverted: bool = False) -> torch.Tensor:
+        """Boolean mask chunk.
+
+        ``inverted=False`` follows the PyTorch SDPA convention (True = attend).
+        ``inverted=True`` follows the Ascend fused-attention convention
+        (True = mask out); callers must opt in explicitly through this flag.
+        """
+        visible = self._visible(query_start, query_stop)
+        return ~visible if inverted else visible
+
+    def full_additive(self, *, dtype: torch.dtype | None = None) -> torch.Tensor:
+        """Materialize the complete reference mask (tests / small inputs only)."""
+        return self.materialize_additive(0, self.query_len, dtype=dtype)
+
+
+def estimate_dflash_attention_memory(
+    *,
+    batch_size: int,
+    num_blocks: int,
+    block_size: int,
+    context_len: int,
+    num_heads: int,
+    head_dim: int,
+    dtype: torch.dtype,
+    query_chunk_size: int | None = None,
+) -> dict:
+    """Estimate the dominant mask/score tensors for dense and chunked paths.
+
+    Scores/softmax storage is counted in fp32 (the training/backward working
+    dtype); masks use ``dtype`` element size. The estimate is intentionally an
+    order-of-magnitude allocator guard, not a promise about a fused kernel's
+    internal workspace.
+    """
+    query_len = int(num_blocks) * int(block_size)
+    kv_len = int(context_len) + query_len
+    mask_bytes = int(batch_size) * query_len * kv_len * torch.empty((), dtype=dtype).element_size()
+    score_bytes = int(batch_size) * int(num_heads) * query_len * kv_len * 4
+    dense = {"mask_bytes": mask_bytes, "score_bytes": score_bytes, "total_bytes": mask_bytes + score_bytes}
+    result = {
+        "batch_size": int(batch_size),
+        "num_blocks": int(num_blocks),
+        "block_size": int(block_size),
+        "context_len": int(context_len),
+        "query_len": query_len,
+        "kv_len": kv_len,
+        "num_heads": int(num_heads),
+        "head_dim": int(head_dim),
+        "dense": {key: value for key, value in dense.items()},
+        "dense_total_gb": round(dense["total_bytes"] / 1e9, 4),
+        "chunked": None,
+    }
+    if query_chunk_size is not None:
+        chunk = min(query_len, max(1, int(query_chunk_size)))
+        chunk_mask = int(batch_size) * chunk * kv_len * torch.empty((), dtype=dtype).element_size()
+        chunk_scores = int(batch_size) * int(num_heads) * chunk * kv_len * 4
+        result["chunked"] = {
+            "query_chunk_size": chunk,
+            "mask_bytes": chunk_mask,
+            "score_bytes": chunk_scores,
+            "total_bytes": chunk_mask + chunk_scores,
+        }
+        result["chunked_total_gb"] = round((chunk_mask + chunk_scores) / 1e9, 4)
+        result["chunks"] = (query_len + chunk - 1) // chunk
+    return result

@@ -5,29 +5,17 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import random
 import sys
 import time
 from pathlib import Path
 from typing import Any, Iterable
 
 
-def set_seed(seed: int) -> None:
-    random.seed(seed)
-    try:
-        import numpy as np
+def set_seed(seed: int, device=None) -> None:
+    """Seed Python, NumPy, torch and an explicitly selected accelerator."""
+    from .runtime import seed_all
 
-        np.random.seed(seed)
-    except Exception:
-        pass
-    try:
-        import torch
-
-        torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
-    except Exception:
-        pass
+    seed_all(int(seed), device=device)
 
 
 def ensure_dir(path: os.PathLike | str) -> Path:

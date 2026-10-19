@@ -66,6 +66,64 @@ def set_dotted(cfg: dict, dotted: str, value: Any) -> None:
     node[keys[-1]] = value
 
 
+def validate_runtime_config(cfg: dict, *, require_devices: bool = False) -> None:
+    """Validate device/backend knobs shared by every training entry point.
+
+    Config parsing stays probe-free for unit tests; the real ``train`` command
+    calls this again with ``require_devices=True`` before creating a run dir.
+    An explicit NPU request is always checked because silently substituting CPU
+    or CUDA would invalidate the run's evidence.
+    """
+    from .dflash.factory import model_attention_implementation
+    from .runtime import device_type, ensure_runtime_device, npu_available
+
+    train = cfg.get("train") or {}
+    target = cfg.get("target") or {}
+    drafter = cfg.get("drafter") or {}
+    train_device = train.get("device", "cuda:0")
+    target_device = target.get("device")
+    for label, value in (("train.device", train_device), ("target.device", target_device)):
+        if value is None:
+            continue
+        kind = device_type(value)
+        if kind not in ("cpu", "cuda", "npu"):
+            raise ValueError(
+                f"{label}={value!r} uses unsupported device type {kind!r}; supported types are cpu, cuda and npu."
+            )
+        if kind == "npu" and not npu_available():
+            raise ValueError(
+                f"{label}={value!r} requests an Ascend NPU, but torch_npu/CANN is unavailable. "
+                "Install the matching TorchNPU wheel and source the CANN environment; no silent "
+                "CPU/CUDA fallback is performed."
+            )
+        if require_devices:
+            ensure_runtime_device(value, context=label)
+
+    # Raises for an unknown backend before any expensive stage starts.
+    model_attention_implementation(drafter.get("attention_backend", "flex_attention"))
+    requested = str(drafter.get("attention_backend", "flex_attention"))
+    if requested == "flex_attention" and device_type(train_device) == "npu":
+        raise ValueError(
+            "drafter.attention_backend=flex_attention is not enabled on Ascend NPU; "
+            "use sdpa_chunked (the reference NPU path) or opt into npu_fusion explicitly."
+        )
+    if requested == "npu_fusion" and device_type(train_device) != "npu":
+        raise ValueError(
+            "drafter.attention_backend=npu_fusion requires train.device to be an NPU; "
+            "use sdpa_chunked on CPU/CUDA."
+        )
+    if requested in ("sdpa_chunked", "npu_fusion"):
+        chunk = int(drafter.get("attention_chunk_size", 128))
+        if chunk <= 0:
+            raise ValueError("drafter.attention_chunk_size must be a positive integer.")
+    if bool(train.get("optimizer_fused", False)) and device_type(train_device) != "cuda":
+        raise ValueError("train.optimizer_fused=true is supported only on CUDA.")
+    if bool(train.get("pin_memory", False)) and device_type(train_device) != "cuda":
+        raise ValueError("train.pin_memory=true requires a CUDA training device.")
+    if bool(train.get("non_blocking", False)) and device_type(train_device) not in ("cuda", "npu"):
+        raise ValueError("train.non_blocking=true requires a CUDA or NPU training device.")
+
+
 def parse_scalar(text: str) -> Any:
     """Parse a ``--set key=value`` value as YAML scalar (falls back to string)."""
     try:
