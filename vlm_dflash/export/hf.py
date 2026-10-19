@@ -15,6 +15,7 @@ from pathlib import Path
 import torch
 
 from ..contract import contract_chat_template_kwargs
+from ..dflash.factory import model_attention_implementation
 from ..utils import ensure_dir, log, now_iso, read_json, sha256_file, write_json
 
 EXPORT_FORMAT = "vlm-dflash-export-v1"
@@ -196,7 +197,11 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
             "loss_decay_gamma": (
                 None if checkpoint.get("loss_decay_gamma") is None else float(checkpoint["loss_decay_gamma"])
             ),
-            "attention_backend": checkpoint["attention_backend"],
+            # Serving always uses the portable transformers backend. The NPU
+            # training-only chunk/fusion path is recorded separately so the
+            # exported artifact loads without torch_npu.
+            "attention_backend": model_attention_implementation(checkpoint["attention_backend"]),
+            "training_attention_backend": checkpoint["attention_backend"],
             "mask_token_id": int(checkpoint["mask_token_id"]),
             "target_layer_ids": [int(x) for x in checkpoint["target_layer_ids"]],
             # Ordered layer list the training features were captured with; a
@@ -225,6 +230,11 @@ def build_export_config(run_dir: Path, checkpoint: dict, checkpoint_name: str) -
                 "wall_seconds",
                 "peak_gpu_mem_gb",
                 "gpu_name",
+                "peak_accelerator_mem_gb",
+                "device",
+                "device_type",
+                "backend",
+                "attention",
                 "feature_mode",
             )
         },
@@ -442,7 +452,7 @@ def load_export(export_dir: str | Path):
     algorithm = get_algorithm(method)
     model = algorithm.build_inference_module(
         export_config["drafter"]["draft_config"],
-        export_config["drafter"].get("attention_backend", "flex_attention"),
+        model_attention_implementation(export_config["drafter"].get("attention_backend", "flex_attention")),
     )
     model.load_state_dict(load_file(export_dir / "model.safetensors"))
     model.eval()

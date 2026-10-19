@@ -22,6 +22,7 @@ import torch
 from torch.utils.data import DataLoader, Subset
 
 from ..algorithms import get_algorithm
+from .. import runtime
 from ..provenance import (
     assert_identity,
     assert_source_identity,
@@ -40,12 +41,22 @@ from .features import FeatureDataset, collate_features, offline_feature_digest
 from .regroup import COST_ANCHOR_WEIGHT, SampleStat, plan_groups, row_weights, sample_z_rows
 
 
-def _make_optimizer_and_scheduler(parameters, train_cfg: dict, total_steps: int):
+def _make_optimizer_and_scheduler(parameters, train_cfg: dict, total_steps: int, device=None):
+    optimizer_kwargs = {}
+    foreach = train_cfg.get("optimizer_foreach")
+    if foreach is not None:
+        optimizer_kwargs["foreach"] = bool(foreach)
+    fused = bool(train_cfg.get("optimizer_fused", False))
+    if fused:
+        if device is None or runtime.device_type(device) != "cuda":
+            raise ValueError("train.optimizer_fused=true is supported only on CUDA; use eager AdamW on CPU/NPU.")
+        optimizer_kwargs["fused"] = True
     optimizer = torch.optim.AdamW(
         parameters,
         lr=float(train_cfg.get("lr", 6e-4)),
         betas=tuple(train_cfg.get("betas", (0.9, 0.95))),
         weight_decay=float(train_cfg.get("weight_decay", 0.0)),
+        **optimizer_kwargs,
     )
     warmup_ratio = float(train_cfg.get("warmup_ratio", 0.04))
     min_lr_ratio = float(train_cfg.get("min_lr_ratio", 0.1))
@@ -145,6 +156,7 @@ def gather_train_state(module, master_parameters, optimizer, scheduler, *, step,
     All tensors are cloned (``.cpu()`` alone does not copy on CPU devices), so
     the returned payload stays valid while training continues past the save.
     """
+    rng_state = runtime.capture_rng_state()
     state = {
         "format": "vlm-dflash-train-state-v1",
         "step": int(step),
@@ -159,8 +171,12 @@ def gather_train_state(module, master_parameters, optimizer, scheduler, *, step,
         # RNG states: anchor sampling consumes the torch RNG, so an exact
         # resume must restore it (otherwise resumed steps diverge from the
         # uninterrupted run even with identical weights).
-        "torch_rng_state": torch.get_rng_state(),
-        "cuda_rng_states": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
+        # Versioned, portable RNG payload plus the legacy keys. Old checkpoints
+        # remain loadable; new ones also restore Python/NumPy and NPU state.
+        "rng_state": rng_state,
+        "torch_rng_state": rng_state["torch"],
+        "cuda_rng_states": rng_state["cuda"],
+        "npu_rng_states": rng_state["npu"],
     }
     # Recipe runs record their schedule position so a resume cannot silently
     # cross a stage boundary. The stage is computed from the *committed* step
@@ -464,6 +480,14 @@ def run_training_loop(
             fetch_batch=fetch_batch,
         )
     else:
+        pin_memory = bool(train_cfg.get("pin_memory", False))
+        if pin_memory and not runtime.pin_memory_supported(device):
+            raise ValueError(
+                "train.pin_memory=true requires a CUDA device; CPU/NPU runs must leave it false."
+            )
+        non_blocking = bool(train_cfg.get("non_blocking", False))
+        if non_blocking and device.type not in ("cuda", "npu"):
+            raise ValueError("train.non_blocking=true requires a CUDA or NPU training device.")
         loader = DataLoader(
             dataset,
             batch_size=micro_batch,
@@ -472,6 +496,7 @@ def run_training_loop(
             collate_fn=lambda batch: collate_features(batch, image_token_id),
             drop_last=False,
             num_workers=num_workers,
+            pin_memory=pin_memory,
         )
     steps_per_epoch = max(1, math.ceil(len(loader) / accumulation))
     if total_steps is None:
@@ -514,7 +539,10 @@ def run_training_loop(
         name: parameter.detach().float().clone().requires_grad_(True)
         for name, parameter in module.draft_model.named_parameters()
     }
-    optimizer, scheduler = _make_optimizer_and_scheduler(list(master_parameters.values()), train_cfg, total_steps)
+    optimizer, scheduler = _make_optimizer_and_scheduler(
+        list(master_parameters.values()), train_cfg, total_steps, device=device
+    )
+    runtime.reset_peak_memory_stats(device)
     module.train()
     history, nan_seen, skipped_batches = [], False, 0
     step = 0
@@ -533,10 +561,7 @@ def run_training_loop(
         skipped_batches = int(resume_state.get("skipped_no_anchor_batches", 0))
         consumed = micro_step + skipped_batches
         history = list(resume_state.get("history", []))
-        if resume_state.get("torch_rng_state") is not None:
-            torch.set_rng_state(resume_state["torch_rng_state"])
-        if torch.cuda.is_available() and resume_state.get("cuda_rng_states"):
-            torch.cuda.set_rng_state_all(resume_state["cuda_rng_states"])
+        runtime.restore_rng_state(resume_state.get("rng_state") or resume_state)
         log(
             f"train: resumed from step {step} "
             f"(micro_step={micro_step}, skipped={skipped_batches}, history_rows={len(history)})"
@@ -553,6 +578,7 @@ def run_training_loop(
     # "head created but never updated" stays detectable.
     audit_fraction = float(getattr(module, "coverage_audit_fraction", 0.0) or 0.0)
     coverage_audit_step = max(0, min(total_steps - 1, int(total_steps * audit_fraction)))
+    runtime.synchronize(device)
     started = time.time()
     epoch_wall_seconds: list[float] = []
     from .trainer_core import NoValidAnchorsError
@@ -595,7 +621,12 @@ def run_training_loop(
         for batch in iterator:
             batch_lengths = batch.get("lengths")
             batch = {key: value for key, value in batch.items() if key != "lengths"}
-            batch = {key: value.to(device) if torch.is_tensor(value) else value for key, value in batch.items()}
+            batch = {
+                key: value.to(device, non_blocking=bool(train_cfg.get("non_blocking", False)))
+                if torch.is_tensor(value)
+                else value
+                for key, value in batch.items()
+            }
             # Algorithm progress hook: curricula (e.g. Domino's lambda_base)
             # need the optimizer-step counter before the forward runs. Modules
             # that do not define it (DFlash, DSpark) are unaffected.
@@ -762,6 +793,7 @@ def run_training_loop(
             )
         )
 
+    runtime.synchronize(device)
     losses = [row["loss"] for row in history]
     window = max(1, len(losses) // 10)
     summary = {
@@ -779,11 +811,25 @@ def run_training_loop(
         ),
         "wall_seconds": time.time() - started,
         "epoch_wall_seconds": epoch_wall_seconds,
+        # ``peak_gpu_mem_gb`` is retained for readers of older summaries; the
+        # backend-neutral fields are authoritative for CPU/CUDA/NPU.
         "peak_gpu_mem_gb": (
-            torch.cuda.max_memory_allocated(device) / 1e9 if device.type == "cuda" else None
+            runtime.max_memory_allocated(device) / 1e9 if device.type == "cuda" else None
         ),
-        "gpu_name": (
-            torch.cuda.get_device_name(device) if device.type == "cuda" else None
+        "peak_accelerator_mem_gb": (
+            None
+            if runtime.max_memory_allocated(device) is None
+            else runtime.max_memory_allocated(device) / 1e9
+        ),
+        "gpu_name": runtime.device_name(device) if device.type == "cuda" else None,
+        "device_name": runtime.device_name(device),
+        "device": str(device),
+        "device_type": device.type,
+        "backend": device.type,
+        "attention": (
+            module.attention_runtime_report()
+            if hasattr(module, "attention_runtime_report")
+            else {"requested_backend": getattr(module, "attention_backend", None)}
         ),
     }
     if regroup is not None:
@@ -795,6 +841,17 @@ def run_training_loop(
             "batches": regroup["stats"]["batches"],
             "identity_batches": regroup["stats"]["identity_batches"],
         }
+    final_state = gather_train_state(
+        module,
+        master_parameters,
+        optimizer,
+        scheduler,
+        step=step,
+        micro_step=micro_step,
+        skipped_batches=skipped_batches,
+        history=history,
+        steps_total_planned=total_steps,
+    )
     return {
         "summary": summary,
         "history": history,
@@ -803,6 +860,10 @@ def run_training_loop(
         # caller (a later exact resume then has nothing left to replay).
         "micro_step": micro_step,
         "skipped_batches": skipped_batches,
+        # Complete portable state at the committed step. Callers that only
+        # train (tests, embedding workflows) can resume without re-deriving the
+        # fp32 masters / optimizer / scheduler from private loop state.
+        "final_state": final_state,
     }
 
 
@@ -875,6 +936,8 @@ def validate_resume_state(
     plan_version: str,
     plan_digest: str,
     recipe_stage: int | None = None,
+    backend: str | None = None,
+    allow_cross_backend: bool = False,
 ) -> None:
     """Refuse resuming across algorithm / feature-mode / data / plan changes.
 
@@ -970,6 +1033,15 @@ def validate_resume_state(
         )
     if resume_state.get("identity") is not None:
         assert_identity(identity_from_contract(contract), resume_state["identity"], "resume vs contract")
+    recorded_backend = resume_state.get("draft_backend")
+    if backend is not None and recorded_backend is not None and str(recorded_backend) != str(backend):
+        if not allow_cross_backend:
+            raise ValueError(
+                "Resume backend mismatch: the checkpoint was trained on "
+                f"draft_backend={recorded_backend!r}, this run targets {backend!r}. Exact resume is only "
+                "defined within one backend. Start a new run directory, or set "
+                "train.allow_cross_backend_resume=true for an explicitly documented continuation."
+            )
 
 
 def preflight_resume(
@@ -1037,6 +1109,8 @@ def preflight_resume(
         recipe_stage=_expected_recipe_stage(
             cfg, algorithm.name, step=int(resume_state.get("step", 0)), total_steps=total_steps
         ),
+        backend=runtime.device_type((cfg.get("train", {}) or {}).get("device", "cuda:0")),
+        allow_cross_backend=bool((cfg.get("train", {}) or {}).get("allow_cross_backend_resume", False)),
     )
     return {
         "mode": mode,
@@ -1088,8 +1162,8 @@ def train_dflash(
 
     train_cfg = cfg.get("train", {})
     seed = int(train_cfg.get("seed", 42))
-    device = torch.device(train_cfg.get("device", "cuda:0"))
-    set_seed(seed)
+    device = runtime.resolve_device(train_cfg.get("device", "cuda:0"), context="train.device")
+    set_seed(seed, device=device)
 
     online_source = None
     online_pair_path = None
@@ -1264,6 +1338,7 @@ def train_dflash(
             "feature_source_digest": feature_source_digest,
             "feature_backend": "huggingface" if online_source is not None else "feature_store",
             "draft_device": str(device),
+            "draft_backend": device.type,
             # Versioned training-plan identity (seed / batch geometry / optimizer /
             # schedule / dtype / drafter / loss / dataset length): exact resume
             # refuses checkpoints written under a different plan, or before this
@@ -1275,6 +1350,7 @@ def train_dflash(
             checkpoint_common["target_device"] = str(online_source.target_device)
 
         resume_state = None
+        cross_backend_resume = False
         if resume:
             # Read-only gate before any write: a refused resume must leave
             # config / ckpt_init / logs / provenance byte-identical, and a legal
@@ -1285,6 +1361,8 @@ def train_dflash(
             if not resume_path.exists():
                 raise FileNotFoundError(f"--resume requested but no resume checkpoint at {resume_path}.")
             resume_state = torch.load(resume_path, map_location="cpu", weights_only=False)
+            recorded_backend = resume_state.get("draft_backend")
+            cross_backend_resume = recorded_backend is not None and str(recorded_backend) != device.type
             validate_resume_state(
                 resume_state,
                 algorithm_name=algorithm.name,
@@ -1297,6 +1375,8 @@ def train_dflash(
                 recipe_stage=_expected_recipe_stage(
                     cfg, algorithm.name, step=int(resume_state.get("step", 0)), total_steps=total_steps
                 ),
+                backend=device.type,
+                allow_cross_backend=bool(train_cfg.get("allow_cross_backend_resume", False)),
             )
             overfit = {"enabled": True, "resumed": True}
         else:
@@ -1428,6 +1508,9 @@ def train_dflash(
             # Which objective recipe (if any) trained these weights — the same
             # block the checkpoints record, echoed into train_summary.json.
             "train_recipe": checkpoint_common.get("train_recipe"),
+            "draft_device": str(device),
+            "draft_backend": device.type,
+            "cross_backend_resume": cross_backend_resume,
         }
         if online_source is not None:
             summary["feature_source"] = online_source.summary()

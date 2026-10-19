@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 from types import SimpleNamespace
 
 import pytest
@@ -62,6 +63,46 @@ def test_adapter_is_registered():
     adapter = get_adapter("qwen3_5_moe")
     assert "qwen3_5_moe" in supported_model_types()
     assert adapter.info.model_class == "Qwen3_5MoeForConditionalGeneration"
+
+
+def test_adapter_forces_the_tracked_torch_reference_for_npu(monkeypatch):
+    from vlm_dflash.adapters.base import VLMAdapter
+
+    modeling = importlib.import_module("transformers.models.qwen3_5_moe.modeling_qwen3_5_moe")
+    names = (
+        "causal_conv1d_fn",
+        "causal_conv1d_update",
+        "chunk_gated_delta_rule",
+        "fused_recurrent_gated_delta_rule",
+        "FusedRMSNormGated",
+    )
+    sentinels = {name: object() for name in names}
+    for name, sentinel in sentinels.items():
+        monkeypatch.setattr(modeling, name, sentinel)
+    monkeypatch.setattr(modeling, "is_fast_path_available", True)
+    observed = {}
+
+    def fake_load_model(self, *args, **kwargs):
+        observed["kwargs"] = kwargs
+        observed["functions"] = {name: getattr(modeling, name) for name in names}
+        observed["fast_path"] = modeling.is_fast_path_available
+        return SimpleNamespace()
+
+    monkeypatch.setattr(VLMAdapter, "load_model", fake_load_model)
+    model = get_adapter("qwen3_5_moe").load_model(
+        "/models/qwen3.5",
+        dtype=torch.bfloat16,
+        attn_implementation="sdpa",
+        local_files_only=True,
+        backend_hint="npu",
+    )
+    assert model._vlm_dflash_gated_delta_backend == "torch_reference"
+    assert observed["fast_path"] is False
+    assert all(value is None for value in observed["functions"].values())
+    assert observed["kwargs"]["backend_hint"] == "npu"
+    for name, sentinel in sentinels.items():
+        assert getattr(modeling, name) is sentinel
+    assert modeling.is_fast_path_available is True
 
 
 def _text_config(rope: dict, partial: float | None = None) -> SimpleNamespace:

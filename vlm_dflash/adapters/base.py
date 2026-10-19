@@ -110,9 +110,20 @@ class VLMAdapter:
 
     # ---- model / processor loading -------------------------------------
     def load_model(
-        self, model_path: str, *, dtype, attn_implementation: str, local_files_only: bool, **load_kwargs
+        self,
+        model_path: str,
+        *,
+        dtype,
+        attn_implementation: str,
+        local_files_only: bool,
+        backend_hint: str | None = None,
+        **load_kwargs,
     ):
-        """Load the target; ``load_kwargs`` (e.g. ``device_map``/``max_memory``) go to ``from_pretrained``."""
+        """Load the target; ``load_kwargs`` (e.g. ``device_map``/``max_memory``) go to ``from_pretrained``.
+
+        ``backend_hint`` is consumed by family adapters for backend-specific
+        kernel selection and is not forwarded to transformers.
+        """
         import transformers
 
         model_class = getattr(transformers, self.info.model_class, None)

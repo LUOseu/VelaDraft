@@ -186,9 +186,10 @@ class DFlashAlgorithm(DrafterAlgorithm):
         from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
 
         from ..dflash.draft_model import Qwen3DFlashDraftModel
+        from ..dflash.factory import model_attention_implementation
 
         config = Qwen3Config.from_dict(draft_config_dict)
-        config._attn_implementation = attention_backend or "flex_attention"
+        config._attn_implementation = model_attention_implementation(attention_backend)
         return Qwen3DFlashDraftModel(config)
 
 register(DFlashAlgorithm())
