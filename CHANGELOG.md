@@ -2,6 +2,21 @@
 
 ## v0.3.2 (in development)
 
+### Capture: multi-turn turn spans for trailing-assistant templates
+
+- Qwen3.5/3.6 chat templates give a conversation's trailing assistant turn an
+  empty thinking block that historical assistant turns lack, so the per-turn
+  prefix render ending at an earlier assistant turn is not a token prefix of
+  the (verified) full render and `last_turn_only` capture refused every
+  multi-turn row with `Prefix render drift`. A historical assistant turn now
+  ends where the next turn starts (its `<|im_start|>` marker in the full
+  render), so those prefixes are no longer rendered; prefixes ending in a user
+  turn are still render-checked and must end on a marker, and a sequence
+  without exactly one marker per turn keeps the old prefix renders and their
+  drift error. Turn spans are bookkeeping only (the loss mask comes from the
+  answer spans). `all_turns` regen on these templates is not covered: it
+  re-renders each generated answer as history and still refuses such rows.
+
 ### Data: predefined splits (`dataset.split_field`)
 
 - A jsonl pool can carry its own train/val/test membership
