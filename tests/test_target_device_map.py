@@ -21,6 +21,10 @@ class _FakeModel:
     def __init__(self):
         self.moved_to = None
         self.frozen = None
+        self.devices = ("cuda:0", "cuda:1")
+
+    def parameters(self):
+        return [SimpleNamespace(device=torch.device(name)) for name in self.devices]
 
     def to(self, device):
         self.moved_to = device
@@ -70,6 +74,36 @@ def test_without_device_map_the_target_moves_to_one_device(captured_load):
     assert model.moved_to == "cuda:1"
     load_module.load_target({"target": {}}, CONTRACT, device="cuda:2")
     assert model.moved_to == "cuda:2"
+
+
+@pytest.mark.parametrize("offload_device", ["cpu", "meta"])
+def test_device_map_refuses_an_offloaded_target(captured_load, offload_device):
+    _, model = captured_load
+    model.devices = ("cuda:0", offload_device)
+    with pytest.raises(ValueError, match=rf"parameters on \['{offload_device}'\] \(offloaded modules: unknown\)"):
+        load_module.load_target({"target": {"device_map": "auto", "max_memory": {0: "1GiB"}}}, CONTRACT)
+
+
+def test_offload_error_names_the_offloaded_modules(captured_load):
+    _, model = captured_load
+    model.devices = ("cuda:0", "meta")
+    model.hf_device_map = {"model.embed_tokens": 0, **{f"model.layers.{i}": "disk" for i in range(5)}, "lm_head": "cpu"}
+    with pytest.raises(ValueError, match=r"offloaded modules: model\.layers\.0, .*, model\.layers\.3 \.\.\.\)"):
+        load_module.load_target({"target": {"device_map": "auto"}}, CONTRACT)
+
+
+def test_an_all_cpu_device_map_is_not_an_offload(captured_load):
+    _, model = captured_load
+    model.devices = ("cpu", "cpu")
+    loaded, _ = load_module.load_target({"target": {"device_map": "cpu"}}, CONTRACT)
+    assert loaded is model and model.moved_to is None
+
+
+def test_single_device_target_skips_the_offload_check(captured_load):
+    _, model = captured_load
+    model.devices = ("cpu",)  # not yet moved: the single-device path calls .to() afterwards
+    load_module.load_target({"target": {"device": "cuda:1"}}, CONTRACT)
+    assert model.moved_to == "cuda:1"
 
 
 def test_device_map_and_explicit_device_conflict(captured_load):

@@ -63,6 +63,20 @@ def load_target(cfg: dict, contract: dict, device: str | None = None):
         local_files_only=local_only,
         **load_kwargs,
     )
+    if device_map is not None:
+        # accelerate silently offloads what does not fit on the GPUs (or under
+        # max_memory) to cpu or disk (meta tensors); a frozen teacher that is
+        # mapped onto GPUs must sit there whole. An all-cpu map is left alone.
+        devices = {str(param.device) for param in model.parameters()}
+        offloaded = sorted(name for name in devices if name == "meta" or (name == "cpu" and devices != {"cpu"}))
+        if offloaded:
+            mapped = getattr(model, "hf_device_map", None) or {}
+            modules = [name for name, where in mapped.items() if where in ("cpu", "disk")]
+            shown = (", ".join(modules[:4]) + (" ..." if len(modules) > 4 else "")) if modules else "unknown"
+            raise ValueError(
+                f"target.device_map left target parameters on {offloaded} (offloaded modules: {shown}); give the "
+                "mapped GPUs room for the whole target (raise target.max_memory or map more devices)."
+            )
     processor = AutoProcessor.from_pretrained(
         model_path,
         **adapter.processor_kwargs(contract),
