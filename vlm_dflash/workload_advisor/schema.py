@@ -429,6 +429,12 @@ def validate_record(record: Any, *, expect_request_hash: bool = False) -> list[d
         devices = resources.get("devices")
         if devices is not None and not isinstance(devices, list):
             errors.append(_issue("invalid_devices", "resource_usage.devices must be a list.", "resource_usage.devices"))
+        memory_fit = resources.get("gpu_memory_fit")
+        if memory_fit is not None and not isinstance(memory_fit, bool):
+            errors.append(
+                _issue("invalid_memory_fit", "resource_usage.gpu_memory_fit must be boolean or null.",
+                       "resource_usage.gpu_memory_fit")
+            )
 
     correctness = record.get("correctness")
     if status == "verified_greedy_exact":
@@ -462,6 +468,8 @@ def validate_record(record: Any, *, expect_request_hash: bool = False) -> list[d
                     )
 
     quality = record.get("quality")
+    if isinstance(quality, dict) and "evaluated" in quality and not isinstance(quality["evaluated"], bool):
+        errors.append(_issue("invalid_quality_evaluated", "quality.evaluated must be boolean.", "quality.evaluated"))
     if isinstance(quality, dict) and quality.get("evaluated") is False:
         if not _has_reason(record, "quality", "quality_not_evaluated"):
             errors.append(

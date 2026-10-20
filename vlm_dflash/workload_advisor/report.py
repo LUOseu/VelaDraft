@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
-from .records import _safe_correctness, _safe_latency, _safe_quality, _safe_reason, _safe_resource_usage, _safe_token, redact_record
+from .records import _safe_correctness, _safe_hash, _safe_latency, _safe_quality, _safe_reason, _safe_resource_usage, _safe_token, _share_id, redact_record
 from .schema import SCHEMA_VERSION, canonical_json, sha256_json
 
 
@@ -284,7 +284,7 @@ def _redact_run(value: Any) -> dict | None:
         if key in value and (value[key] is None or isinstance(value[key], (bool, int, float))):
             result[key] = value[key]
         elif key in {"status", "run_id", "schema_version", "project_scope"}:
-            token = _safe_token(value.get(key))
+            token = _share_id(value.get(key)) if key == "run_id" else _safe_token(value.get(key))
             if token:
                 result[key] = token
     readiness = _redact_readiness(value.get("readiness"))
@@ -307,7 +307,7 @@ def _redact_run(value: Any) -> dict | None:
 def _redact_candidate(candidate: dict) -> dict:
     result = {}
     for key in ("candidate_id", "method"):
-        token = _safe_token(candidate.get(key))
+        token = _share_id(candidate.get(key)) if key == "candidate_id" else _safe_token(candidate.get(key))
         if token:
             result[key] = token
     for key in (
@@ -359,7 +359,7 @@ def _redact_candidate(candidate: dict) -> dict:
         if isinstance(value, int) or isinstance(value, list)
     }
     result["tasks"] = [
-        token for token in (_safe_token(task) for task in candidate.get("tasks") or []) if token
+        token for token in (_share_id(task) for task in candidate.get("tasks") or []) if token
     ]
     result["measurement_scopes"] = [
         token for token in (_safe_token(scope) for scope in candidate.get("measurement_scopes") or []) if token
@@ -376,8 +376,8 @@ def _redact_candidate(candidate: dict) -> dict:
             continue
         clean_buckets = {}
         for label, stats in values.items():
-            safe_label = _safe_reason(label)
-            if safe_label == "redacted" or not isinstance(stats, dict):
+            safe_label = _share_id(label) if axis == "task" else _safe_reason(label)
+            if not safe_label or safe_label == "redacted" or not isinstance(stats, dict):
                 continue
             clean_buckets[safe_label] = {
                 key: stats[key]
@@ -432,12 +432,18 @@ def redact_summary(summary: dict) -> dict:
         "synthetic",
     ):
         if key in summary:
-            result[key] = summary[key]
+            value = summary[key]
+            if key.endswith("_sha256"):
+                result[key] = _safe_hash(value)
+            elif isinstance(value, str):
+                result[key] = _safe_token(value)
+            elif value is None or isinstance(value, (bool, int, float)):
+                result[key] = value
     result["protocol_scope_hashes"] = [
-        value for value in summary.get("protocol_scope_hashes") or [] if isinstance(value, str)
+        value for value in (_safe_hash(value) for value in summary.get("protocol_scope_hashes") or []) if value
     ]
     result["task_group_counts"] = {
-        _safe_token(task) or "unknown": count
+        _share_id(task) or "unknown": count
         for task, count in (summary.get("task_group_counts") or {}).items()
         if isinstance(count, int)
     }
@@ -458,10 +464,10 @@ def redact_summary(summary: dict) -> dict:
         if isinstance(pairing.get(key), list):
             result["pairing_counts"][key] = len(pairing[key])
     result["candidate_ids"] = [
-        token for token in (_safe_token(candidate) for candidate in summary.get("candidate_ids") or []) if token
+        token for token in (_share_id(candidate) for candidate in summary.get("candidate_ids") or []) if token
     ]
     result["candidates"] = {
-        _safe_token(candidate_id) or "unknown": _redact_candidate(candidate)
+        _share_id(candidate_id) or "unknown": _redact_candidate(candidate)
         for candidate_id, candidate in (summary.get("candidates") or {}).items()
         if isinstance(candidate, dict)
     }
@@ -497,9 +503,17 @@ def redact_decision(decision: dict) -> dict:
         "decision_id",
     ):
         if key in decision:
-            result[key] = decision[key]
+            value = decision[key]
+            if key.endswith("_sha256") or key in {"protocol_hash", "decision_id"}:
+                result[key] = _safe_hash(value)
+            elif key == "recommended_method":
+                result[key] = _share_id(value)
+            elif isinstance(value, str):
+                result[key] = _safe_token(value)
+            elif value is None or isinstance(value, (bool, int, float)):
+                result[key] = value
     result["protocol_scope_hashes"] = [
-        value for value in decision.get("protocol_scope_hashes") or [] if isinstance(value, str)
+        value for value in (_safe_hash(value) for value in decision.get("protocol_scope_hashes") or []) if value
     ]
     scope = decision.get("scope") or {}
     clean_scope = {
@@ -514,20 +528,20 @@ def redact_decision(decision: dict) -> dict:
         values = scope.get(key)
         if isinstance(values, list):
             clean_scope[key] = [
-                token for token in (_safe_token(value) for value in values) if token
+                token for token in ((_share_id(value) if key == "tasks" else _safe_token(value)) for value in values) if token
             ]
     conditional = []
     for item in scope.get("conditional_buckets") or []:
         if not isinstance(item, dict):
             continue
-        clean_item = {"candidate_id": _safe_token(item.get("candidate_id"))}
+        clean_item = {"candidate_id": _share_id(item.get("candidate_id"))}
         clean_buckets = []
         for bucket in item.get("buckets") or []:
             if not isinstance(bucket, dict):
                 continue
             clean_bucket = {"axis": _safe_token(bucket.get("axis"))}
-            label = _safe_reason(bucket.get("bucket"))
-            if label != "redacted":
+            label = _share_id(bucket.get("bucket")) if bucket.get("axis") == "task" else _safe_reason(bucket.get("bucket"))
+            if label and label != "redacted":
                 clean_bucket["bucket"] = label
             for key in ("n_groups", "ci95_low", "ci95_high"):
                 if isinstance(bucket.get(key), (int, float)):
@@ -545,17 +559,23 @@ def redact_decision(decision: dict) -> dict:
         if isinstance(coverage.get(key), (int, float))
     }
     clean_coverage["task_group_counts"] = {
-        _safe_token(task) or "unknown": count
+        _share_id(task) or "unknown": count
         for task, count in (coverage.get("task_group_counts") or {}).items()
         if isinstance(count, int)
     }
-    clean_coverage["buckets_insufficient"] = {
-        _safe_token(key) or "unknown": [
-            label for label in (_safe_reason(value) for value in values) if label != "redacted"
+    clean_coverage["buckets_insufficient"] = {}
+    for key, values in (coverage.get("buckets_insufficient") or {}).items():
+        if not isinstance(key, str) or not isinstance(values, list):
+            continue
+        candidate_id, separator, axis = key.rpartition(":")
+        if not separator or not _safe_token(axis):
+            continue
+        clean_key = f"{_share_id(candidate_id) or 'unknown'}:{axis}"
+        clean_coverage["buckets_insufficient"][clean_key] = [
+            label
+            for label in ((_share_id(value) if axis == "task" else _safe_reason(value)) for value in values)
+            if label and label != "redacted"
         ]
-        for key, values in (coverage.get("buckets_insufficient") or {}).items()
-        if isinstance(values, list)
-    }
     result["coverage"] = clean_coverage
     result["reason_count"] = len(decision.get("reasons") or [])
     result["reasons"] = ["details_available_in_local_decision"]
@@ -565,7 +585,7 @@ def redact_decision(decision: dict) -> dict:
             continue
         excluded.append(
             {
-                "candidate_id": _safe_token(item.get("candidate_id")) or "unknown",
+                "candidate_id": _share_id(item.get("candidate_id")) or "unknown",
                 "reason_codes": [
                     _safe_reason(reason.get("code"))
                     for reason in item.get("reasons") or []
@@ -706,7 +726,7 @@ def write_share_package(
         ],
         "files": ["records.share.jsonl", "summary.share.json", "decision.share.json", "report.share.md"],
         "records_sha256": sha256_json(share_records),
-        "decision_id": decision.get("decision_id"),
+        "decision_id": _safe_hash(decision.get("decision_id")),
     }
     write_json(out_dir / "SHARE_MANIFEST.json", manifest)
     return manifest
