@@ -5,14 +5,15 @@ from __future__ import annotations
 import copy
 import gc
 import json
-import os
-import subprocess
+import sys
 import time
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any, Optional
 
 from .contracts import sha256_file, write_json_atomic
 from .fixtures import build_messages, diagnostic_fixtures, load_manifest, natural_fixtures
+from .launch import gpu_guard, require_single_gpu
 from .metrics import diff_metrics, spec_counts
 from .records import (
     backend_identity,
@@ -26,32 +27,15 @@ from .records import (
 )
 
 
-def _device_info(index: int = 0) -> dict[str, Any]:
+def _device_info(index: int, *, device_uuid: str) -> dict[str, Any]:
     import torch
 
-    visible = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip()
-    logical_index = index
-    if visible and not visible.startswith("GPU-"):
-        entries = [entry.strip() for entry in visible.split(",") if entry.strip()]
-        if str(index) in entries:
-            logical_index = entries.index(str(index))
-        elif len(entries) == 1 and entries[0].isdigit() and int(entries[0]) == index:
-            logical_index = 0
-    props = torch.cuda.get_device_properties(logical_index)
-    uuid = None
-    try:
-        out = subprocess.check_output(
-            ["nvidia-smi", f"--id={index}", "--query-gpu=uuid", "--format=csv,noheader"],
-            text=True,
-            timeout=10,
-        ).strip()
-        uuid = out or None
-    except Exception:
-        pass
+    # gpu_guard exposes exactly this locked physical GPU as logical device zero.
+    props = torch.cuda.get_device_properties(0)
     return {
         "index": index,
         "name": props.name,
-        "uuid": uuid,
+        "uuid": device_uuid,
         "compute_capability": f"{props.major}.{props.minor}",
     }
 
@@ -94,7 +78,7 @@ def _spec_config(mode: str, args) -> Optional[dict[str, Any]]:
 
 
 def _engine_applied_evidence(llm: Any, backend: dict[str, Any]) -> None:
-    """Mark backend labels as applied only when the engine exposes its config."""
+    """Retain observed model fields without certifying unrelated backend labels."""
 
     engine = getattr(llm, "llm_engine", None)
     vllm_config = getattr(engine, "vllm_config", None)
@@ -111,19 +95,44 @@ def _engine_applied_evidence(llm: Any, backend: dict[str, Any]) -> None:
     if speculative_config is not None:
         observed["speculative_method"] = getattr(speculative_config, "method", None)
         observed["num_speculative_tokens"] = getattr(speculative_config, "num_spec_tokens", None)
-    backend["labels_source"] = "engine_object"
-    backend["applied_evidence"] = True
+    # Model/speculative fields do not prove the requested attention backend or
+    # CUDA graph mode was applied. Retain them without promoting CLI labels.
     backend["applied_config"] = observed
 
 
 def run_offline(args) -> dict[str, Any]:
+    require_single_gpu(vars(args))
+    with gpu_guard(
+        int(args.gpu_index),
+        min_free_memory_mib=int(getattr(args, "min_free_memory_mib", 20000)),
+    ) as device_uuid, ExitStack() as cleanup:
+        cleanup.callback(_cleanup_cuda)
+        return _run_offline(args, device_uuid=device_uuid, cleanup=cleanup)
+
+
+def _cleanup_cuda() -> None:
+    gc.collect()
+    torch = sys.modules.get("torch")
+    if torch is not None:
+        try:
+            torch.cuda.empty_cache()
+        except Exception:
+            pass
+
+
+def _shutdown_llm(llm: Any) -> None:
+    # vLLM 0.22's engine client explicitly tears down its worker processes.
+    engine = getattr(llm, "llm_engine", None)
+    core = getattr(engine, "engine_core", None)
+    shutdown = getattr(core, "shutdown", None)
+    if callable(shutdown):
+        shutdown()
+
+
+def _run_offline(args, *, device_uuid: str, cleanup: ExitStack) -> dict[str, Any]:
     from vllm import LLM, SamplingParams
     from .measure import GpuSampler
 
-    # ``LLM`` selects a physical device from the process environment.  Keep
-    # the requested physical index for identity/evidence and use the logical
-    # index only for torch's device properties.
-    os.environ.setdefault("CUDA_VISIBLE_DEVICES", str(args.gpu_index))
     manifest = load_manifest(args.manifest, verify_hashes=not args.skip_hash_check)
     fixtures = natural_fixtures(manifest) + diagnostic_fixtures(manifest)
     if args.limit:
@@ -132,7 +141,7 @@ def run_offline(args) -> dict[str, Any]:
     target = model_identity(model, precision=args.dtype)
     spec = _spec_config(args.mode, args)
     draft = ngram_draft_identity(args.vllm_version, target, spec) if args.mode == "ngram" else None
-    devices = [_device_info(args.gpu_index)]
+    devices = [_device_info(args.gpu_index, device_uuid=device_uuid)]
     backend = backend_identity(
         vllm_version=args.vllm_version,
         code_commit=args.code_commit,
@@ -169,9 +178,12 @@ def run_offline(args) -> dict[str, Any]:
         llm_kwargs["speculative_config"] = copy.deepcopy(spec)
     if args.async_scheduling is not None:
         llm_kwargs["async_scheduling"] = bool(args.async_scheduling)
-    sampler = GpuSampler(args.gpu_index, interval_s=0.5).start()
+    sampler = GpuSampler(args.gpu_index, interval_s=0.5)
+    cleanup.callback(sampler.stop)
+    sampler.start()
     started_load = time.perf_counter()
     llm = LLM(**llm_kwargs)
+    cleanup.callback(_shutdown_llm, llm)
     _engine_applied_evidence(llm, backend)
     load_s = time.perf_counter() - started_load
     sampling = SamplingParams(temperature=0.0, max_tokens=int(args.max_new_tokens))
@@ -289,7 +301,6 @@ def run_offline(args) -> dict[str, Any]:
             raw_requests.append({"request_id": record["request_id"], "category": fixture.category})
     request_wall_s = sum(float(record["latency"]["total_s"]) for record in records)
     allocation_wall_s = float(load_s) + request_wall_s
-    sampler.stop()
     peak_memory_mib: dict[str, int] = {"device": sampler.peak().get("memory_mib", 0)}
     allocation_usage = resource_usage(
         wall_s=allocation_wall_s,
@@ -360,12 +371,4 @@ def run_offline(args) -> dict[str, Any]:
     }
     if args.out:
         write_json_atomic(args.out, document)
-    del llm
-    gc.collect()
-    try:
-        import torch
-
-        torch.cuda.empty_cache()
-    except Exception:
-        pass
     return document

@@ -124,12 +124,15 @@ def _correctness():
     }
 
 
-def test_valid_common_protocol_is_claim_eligible():
+def test_valid_common_protocol_is_pairable_but_failed_correctness_blocks_speedup():
     summary = build_summary(_correctness(), _doc("ar"), _doc("ngram"))
 
     assert summary["protocol"]["ok"] is True
     assert summary["pairing"]["pairs"] == 1
-    assert summary["speedup"]["claim_eligible"] is True
+    assert summary["pairing"]["claim_eligible"] is True
+    assert summary["speedup"]["claim_eligible"] is False
+    assert "sd_correctness_pass_not_verified" in summary["speedup"]["reasons"]
+    assert summary["speedup"]["by_concurrency"]["1"]["claim_eligible"] is False
     assert summary["speedup"]["by_concurrency"]["1"]["ngram_over_ar"] == 1.0
     assert summary["completion_levels"]["SERVING_LIFECYCLE_PASS"] is False
     assert summary["lifecycle"]["status"] == "pending_internal_evidence"
@@ -308,3 +311,48 @@ def test_duplicate_window_is_rejected():
     summary = build_summary(_correctness(), _doc("ar"), sd)
 
     assert any("duplicate window" in reason for reason in summary["pairing"]["reasons"])
+
+
+@pytest.mark.parametrize("level", ["AR_OFFLINE_PASS", "SD_EXECUTED", "SD_CORRECTNESS_PASS"])
+@pytest.mark.parametrize("value", [False, None, "false", "true", 1])
+def test_speedup_requires_explicit_true_correctness_levels(level, value):
+    correctness = _correctness()
+    correctness["completion_levels"].update(AR_OFFLINE_PASS=True, SD_EXECUTED=True, SD_CORRECTNESS_PASS=True)
+    correctness["completion_levels"][level] = value
+
+    summary = build_summary(correctness, _doc("ar"), _doc("ngram"))
+
+    assert summary["pairing"]["claim_eligible"] is True
+    assert summary["speedup"]["claim_eligible"] is False
+    assert f"{level.lower()}_not_verified" in summary["speedup"]["reasons"]
+    assert summary["completion_levels"][level] is False
+
+
+def test_verified_correctness_and_protocol_allow_speedup_claim():
+    correctness = _correctness()
+    correctness["completion_levels"]["SD_CORRECTNESS_PASS"] = True
+
+    summary = build_summary(correctness, _doc("ar"), _doc("ngram"))
+
+    assert summary["speedup"]["claim_eligible"] is True
+    assert summary["speedup"]["reasons"] == []
+
+
+@pytest.mark.parametrize("input_ok", [True, False])
+def test_top_level_lifecycle_respects_full_per_mode_checks(input_ok):
+    ar, sd = _doc("ar"), _doc("ngram")
+    for doc in (ar, sd):
+        doc["summary"]["cancel_probes"][0].update(
+            concurrent_with_healthy_request=True, internal_abort_evidence=True,
+        )
+        doc["summary"]["pair_checks"][0].update(
+            concurrency=1, session=1, input_submission_ok=input_ok,
+            output_attribution_verified=True,
+        )
+
+    summary = build_summary(_correctness(), ar, sd)
+
+    assert summary["lifecycle"]["ar"]["full_lifecycle_ok"] is input_ok
+    assert summary["completion_levels"]["SERVING_LIFECYCLE_PASS"] is input_ok
+    if not input_ok:
+        assert "ar_same_text_different_image_input_submission_unverified" in summary["lifecycle"]["reasons"]
