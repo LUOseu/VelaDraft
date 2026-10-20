@@ -1,0 +1,15 @@
+{
+  "manifest": "/home/lyh/VelaDraft-serving/tests/serving/fixtures/manifest.json",
+  "natural": 32,
+  "boundary": 8,
+  "diagnostic": 8,
+  "counts": {
+    "ocr": 8,
+    "chart_doc": 8,
+    "vqa": 8,
+    "caption": 8,
+    "diagnostic": 8,
+    "boundary": 8
+  },
+  "ok": true
+}

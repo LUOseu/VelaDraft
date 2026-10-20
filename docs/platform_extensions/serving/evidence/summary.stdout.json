@@ -1,0 +1,106 @@
+{
+  "schema_version": "veladraft-serving-summary-v2",
+  "project_scope": "platform_extension",
+  "include_in_paper": false,
+  "completion_levels": {
+    "AR_API_PASS": true,
+    "AR_OFFLINE_PASS": true,
+    "SD_CORRECTNESS_PASS": false,
+    "SD_EXECUTED": true,
+    "SERVING_LIFECYCLE_PASS": false,
+    "ar_status": "verified_greedy_exact",
+    "sd_status": "experimental_numeric_divergence",
+    "serving_lifecycle_status": "pending_internal_evidence"
+  },
+  "protocol": {
+    "ok": false,
+    "reasons": [
+      "target_weight_content_sha256_missing",
+      "target_template_effective_source_missing",
+      "target_content_identity_incomplete",
+      "backend_labels_not_verified_from_engine_or_runtime_evidence",
+      "ar_backend_labels_source_untrusted",
+      "sd_backend_labels_source_untrusted",
+      "measurement_stream_missing"
+    ]
+  },
+  "pairing": {
+    "claim_eligible": false,
+    "reasons": [
+      "target_weight_content_sha256_missing",
+      "target_template_effective_source_missing",
+      "target_content_identity_incomplete",
+      "backend_labels_not_verified_from_engine_or_runtime_evidence",
+      "ar_backend_labels_source_untrusted",
+      "sd_backend_labels_source_untrusted",
+      "measurement_stream_missing",
+      "actual_request_budget_not_verified_for_every_pair"
+    ],
+    "pairs": 315,
+    "windows": 9
+  },
+  "speedup": {
+    "claim_eligible": false,
+    "by_concurrency": {
+      "1": {
+        "pairs": 3,
+        "ar_total_s": 107.2288507502526,
+        "ngram_total_s": 114.31010656617582,
+        "ngram_over_ar": 0.9380522332745463,
+        "claim_eligible": false
+      },
+      "2": {
+        "pairs": 3,
+        "ar_total_s": 59.25531420856714,
+        "ngram_total_s": 67.64886028133333,
+        "ngram_over_ar": 0.875924796990523,
+        "claim_eligible": false
+      },
+      "4": {
+        "pairs": 3,
+        "ar_total_s": 38.306185780093074,
+        "ngram_total_s": 44.635068230330944,
+        "ngram_over_ar": 0.8582082944831886,
+        "claim_eligible": false
+      }
+    }
+  },
+  "lifecycle": {
+    "status": "pending_internal_evidence",
+    "ok": false,
+    "reasons": [
+      "ar_cancel_probe_was_idle_not_concurrent",
+      "ar_no_request_correlated_engine_abort_evidence",
+      "ar_same_text_different_image_output_attribution_unverified",
+      "ngram_cancel_probe_was_idle_not_concurrent",
+      "ngram_no_request_correlated_engine_abort_evidence",
+      "ngram_same_text_different_image_output_attribution_unverified"
+    ],
+    "ar_api_pass": true,
+    "cancel_validated": false,
+    "cross_session_claim_supported": false
+  },
+  "resource": {
+    "allocation_gpu_hours_additive": true,
+    "ar_allocation_wall_s": 661.6144609451294,
+    "ar_gpu_hours": 0.183782,
+    "legacy_request_gpu_hours_note": "request intervals overlap under concurrency; this sum is retained for audit only and is not additive",
+    "legacy_request_gpu_hours_sum": {
+      "ar": 0.104351,
+      "ngram": 0.117666
+    },
+    "ngram_allocation_wall_s": 385.720906496048,
+    "ngram_gpu_hours": 0.107145,
+    "request_gpu_hours_additive": false
+  },
+  "correction_provenance": {
+    "source": "raw evidence replay; no unimplemented engine counters are fabricated",
+    "summary": "protocol-aware-v2"
+  },
+  "inputs": {
+    "ar_measure": "docs/platform_extensions/serving/evidence/ar_measure.json",
+    "correctness": "docs/platform_extensions/serving/evidence/comparison.json",
+    "manifest": "tests/serving/fixtures/manifest.json",
+    "ngram_measure": "docs/platform_extensions/serving/evidence/ngram_measure.json"
+  }
+}

@@ -1,0 +1,509 @@
+{
+  "capabilities": {
+    "ar_image": {
+      "evidence": [
+        [
+          {
+            "found": true,
+            "line": 531,
+            "note": "target architecture is registered",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/registry.py",
+            "symbol": "registry: Qwen2_5_VL"
+          },
+          {
+            "found": true,
+            "line": 1173,
+            "note": "multimodal conditional generation",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/qwen2_5_vl.py",
+            "symbol": "Qwen2_5_VLForConditionalGeneration"
+          },
+          {
+            "found": true,
+            "line": 1243,
+            "note": "MRoPE positions for image/text tokens",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/qwen2_5_vl.py",
+            "symbol": "get_mrope_input_positions"
+          },
+          {
+            "found": true,
+            "line": 1516,
+            "note": "incremental MRoPE recomputation",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/qwen2_5_vl.py",
+            "symbol": "recompute_mrope_positions"
+          }
+        ],
+        {
+          "note": "AR GPU smoke",
+          "path": "docs/platform_extensions/serving/evidence/ar_full.json"
+        }
+      ],
+      "limits": [
+        "TP=1, one A6000, BF16, greedy, prefix caching disabled in the validated config",
+        "Qwen2.5-VL image processor is loaded as the fast processor in vLLM 0.22.1"
+      ],
+      "maturity": "validated",
+      "status": "supported",
+      "version": "0.22.1"
+    },
+    "cancel": {
+      "evidence": [
+        {
+          "path": "docs/platform_extensions/serving/evidence/summary.json"
+        }
+      ],
+      "limits": [
+        "the recorded cancel probes close an idle-baseline request and observe global gauge reclamation; they are not concurrent with healthy requests",
+        "no request-correlated engine abort/end record was observed at the captured log level",
+        "client socket close plus global gauge reclamation is not a validated full lifecycle claim"
+      ],
+      "maturity": "gpu_smoke",
+      "status": "supported",
+      "version": "0.22.1"
+    },
+    "dflash_image": {
+      "evidence": [
+        {
+          "path": "docs/plan/WP5_REPORT.md"
+        }
+      ],
+      "limits": [
+        "WP5 reports AL 1.4059 in vLLM vs 1.6866/1.6924 in-repo (-17% gap), unresolved",
+        "vLLM DFlash draft path uses 1-D RoPE while the source export may use spatial MRoPE",
+        "same-engine reruns are not token-exact (12/32), so a token-exact serving gate is not established",
+        "DFlash is out of scope for the first N-Gram delivery"
+      ],
+      "maturity": "blocked",
+      "status": "experimental",
+      "version": "0.22.1"
+    },
+    "metrics": {
+      "evidence": [
+        [
+          {
+            "found": true,
+            "line": 134,
+            "note": "aggregate draft/verify counters",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/metrics.py",
+            "symbol": "spec_decode_num_drafts"
+          },
+          {
+            "found": true,
+            "line": 126,
+            "note": "accepted token counter",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/metrics.py",
+            "symbol": "spec_decode_num_accepted_tokens"
+          }
+        ]
+      ],
+      "limits": [
+        "counters are global to the engine/session window; no request tag on aggregate counters"
+      ],
+      "maturity": "gpu_smoke",
+      "status": "supported",
+      "version": "0.22.1"
+    },
+    "ngram_image": {
+      "evidence": [
+        [
+          {
+            "found": true,
+            "line": 74,
+            "note": "method/model/prompt_lookup fields",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/config/speculative.py",
+            "symbol": "SpeculativeConfig"
+          },
+          {
+            "found": true,
+            "line": 60,
+            "note": "native ngram method is registered",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/config/speculative.py",
+            "symbol": "SpeculativeMethod.ngram"
+          }
+        ],
+        [
+          {
+            "found": true,
+            "line": 12,
+            "note": "CPU N-Gram proposer; no draft model forward",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/ngram_proposer.py",
+            "symbol": "NgramProposer"
+          },
+          {
+            "found": true,
+            "line": 185,
+            "note": "longest suffix n-gram match, k tokens proposed",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/ngram_proposer.py",
+            "symbol": "_find_longest_matched_ngram_and_propose_tokens"
+          }
+        ],
+        [
+          {
+            "found": true,
+            "line": 558,
+            "note": "engine constructs the proposer from SpeculativeConfig",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/worker/gpu_model_runner.py",
+            "symbol": "gpu_model_runner: NgramProposer"
+          }
+        ],
+        {
+          "note": "N-Gram GPU smoke",
+          "path": "docs/platform_extensions/serving/evidence/ngram_full.json"
+        }
+      ],
+      "limits": [
+        "CPU N-Gram proposer matches token-id suffixes; it does not use image features directly",
+        "N-Gram forces synchronous scheduling in vLLM 0.22.1 (observed startup warning)",
+        "draft proposals are verified by the same target model; no lossless claim beyond the measured greedy gate"
+      ],
+      "maturity": "gpu_smoke",
+      "status": "supported",
+      "version": "0.22.1"
+    },
+    "return_token_ids": {
+      "evidence": [
+        [
+          {
+            "found": true,
+            "line": 365,
+            "note": "vLLM extension returns token IDs over HTTP",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/entrypoints/openai/chat_completion/protocol.py",
+            "symbol": "ChatCompletionRequest.return_token_ids"
+          }
+        ]
+      ],
+      "limits": [
+        "vLLM extension; standard OpenAI clients ignore the extra field"
+      ],
+      "maturity": "gpu_smoke",
+      "status": "supported",
+      "version": "0.22.1"
+    },
+    "round_trace": {
+      "evidence": [
+        [
+          {
+            "found": true,
+            "line": 134,
+            "note": "aggregate draft/verify counters",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/metrics.py",
+            "symbol": "spec_decode_num_drafts"
+          },
+          {
+            "found": true,
+            "line": 126,
+            "note": "accepted token counter",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/metrics.py",
+            "symbol": "spec_decode_num_accepted_tokens"
+          }
+        ]
+      ],
+      "limits": [
+        "vLLM exposes aggregate draft/accept counters, not a public per-round propose/commit hook"
+      ],
+      "maturity": "implemented",
+      "status": "unsupported",
+      "version": "0.22.1"
+    },
+    "stream": {
+      "evidence": [
+        {
+          "path": "docs/platform_extensions/serving/evidence/summary.json"
+        },
+        [
+          {
+            "found": true,
+            "line": 365,
+            "note": "vLLM extension returns token IDs over HTTP",
+            "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/entrypoints/openai/chat_completion/protocol.py",
+            "symbol": "ChatCompletionRequest.return_token_ids"
+          }
+        ]
+      ],
+      "limits": [
+        "SSE stream protocol and timing fields are implemented and CPU-tested",
+        "full lifecycle is pending request-correlated abort and same-text/different-image output-attribution evidence",
+        "SSE chunk timing is a client-side boundary; engine token timestamps are not exposed"
+      ],
+      "maturity": "gpu_smoke",
+      "status": "supported",
+      "version": "0.22.1"
+    },
+    "wire_profile": {
+      "status": "supported",
+      "maturity": "cpu_tested",
+      "version": "1.0",
+      "evidence": [
+        {
+          "path": "vlm_dflash/serving/profile.py",
+          "note": "explicit serving wire profile and normalizer"
+        },
+        {
+          "path": "tests/serving/fixtures/wire_profile_record.json",
+          "note": "real-shaped CPU fixture"
+        }
+      ],
+      "limits": [
+        "profile id veladraft-serving-wire is not interchangeable with the advisor profile despite the shared schema name",
+        "request/window/global counters keep their recorded scope; unavailable counters remain null"
+      ]
+    }
+  },
+  "correctness_evidence": {
+    "path": "docs/platform_extensions/serving/evidence/comparison.json"
+  },
+  "environment": {
+    "Pillow": "12.2.0",
+    "fastapi": "0.136.3",
+    "gpu": {
+      "cuda_available": false,
+      "nvidia_smi": [
+        "0, GPU-8e523700-a47f-04c3-fc33-0f06c59e7428, NVIDIA RTX A6000, 580.126.09, 8.6, 49140 MiB",
+        "1, GPU-864585d7-9789-e033-7781-e773f55178c6, NVIDIA RTX A6000, 580.126.09, 8.6, 49140 MiB",
+        "2, GPU-1d7c6b74-f5df-a297-6796-3986c3701ffa, NVIDIA RTX A6000, 580.126.09, 8.6, 49140 MiB",
+        "3, GPU-06d42c3b-89d2-20d5-8189-9b4564fec135, NVIDIA RTX A6000, 580.126.09, 8.6, 49140 MiB"
+      ],
+      "torch": "2.11.0+cu130",
+      "torch_cuda": "13.0"
+    },
+    "model": {
+      "architectures": [
+        "Qwen2_5_VLForConditionalGeneration"
+      ],
+      "complete": true,
+      "dtype": "bfloat16",
+      "files": {
+        "chat_template.json": {
+          "sha256": "ad60d90252ed0b0705ba14e2d0ad0fec0beac1ea955642b54059b36052d8bc96",
+          "size": 1050
+        },
+        "config.json": {
+          "sha256": "7ed3eed5be6924cc800e8a5e53fc405c1aab1aaf36bad65c33403b36c56827f5",
+          "size": 1373
+        },
+        "generation_config.json": {
+          "sha256": "533f191cc257b7de37a4fccd0a7a1706d75e1aa660f93efaa54e5a2a9f9aace9",
+          "size": 216
+        },
+        "model.safetensors.index.json": {
+          "sha256": "c7dd78a4c6bea60b51332f1baf37b8f8124ecab2c35395a29a29825bf2619768",
+          "size": 65448
+        },
+        "preprocessor_config.json": {
+          "sha256": "f2058c716eef96ccaed1cc1e2d0c08306b62586d535b28d9d08e691b2fab7ca0",
+          "size": 350
+        },
+        "tokenizer.json": {
+          "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+          "size": 7031645
+        },
+        "tokenizer_config.json": {
+          "sha256": "4abd3520120e266da84c0864fee064d1fb10806f02225911a47253dd38dc5f56",
+          "size": 5702
+        }
+      },
+      "image_token_id": 151655,
+      "model": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+      "model_type": "qwen2_5_vl",
+      "rope_scaling": {
+        "mrope_section": [
+          16,
+          24,
+          24
+        ],
+        "type": "mrope"
+      },
+      "shards": {
+        "model-00001-of-00002.safetensors": {
+          "size": 3982649232
+        },
+        "model-00002-of-00002.safetensors": {
+          "size": 3526688744
+        }
+      },
+      "vocab_size": 151936
+    },
+    "numpy": "2.3.5",
+    "openai": "2.41.1",
+    "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.35",
+    "python": "3.12.13 | packaged by conda-forge | (main, Mar  5 2026, 16:50:00) [GCC 14.3.0]",
+    "python_executable": "/home/lyh/envs/pace/bin/python",
+    "source_commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+    "source_commit_note": "VCS commit from direct_url.json or auditor pin.",
+    "tokenizers": "0.22.2",
+    "torch": "2.11.0",
+    "transformers": "4.57.6",
+    "uvicorn": "0.49.0",
+    "vllm": "0.22.1",
+    "vllm_file": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/__init__.py",
+    "vllm_version": "0.22.1"
+  },
+  "generated_at": "2026-10-18",
+  "include_in_paper": false,
+  "project_scope": "platform_extension",
+  "schema_version": "veladraft-platform-v1",
+  "source_evidence": {
+    "metrics": [
+      {
+        "found": true,
+        "line": 134,
+        "note": "aggregate draft/verify counters",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/metrics.py",
+        "symbol": "spec_decode_num_drafts"
+      },
+      {
+        "found": true,
+        "line": 126,
+        "note": "accepted token counter",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/metrics.py",
+        "symbol": "spec_decode_num_accepted_tokens"
+      }
+    ],
+    "ngram_proposer": [
+      {
+        "found": true,
+        "line": 12,
+        "note": "CPU N-Gram proposer; no draft model forward",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/ngram_proposer.py",
+        "symbol": "NgramProposer"
+      },
+      {
+        "found": true,
+        "line": 185,
+        "note": "longest suffix n-gram match, k tokens proposed",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/ngram_proposer.py",
+        "symbol": "_find_longest_matched_ngram_and_propose_tokens"
+      }
+    ],
+    "qwen2_5_vl": [
+      {
+        "found": true,
+        "line": 531,
+        "note": "target architecture is registered",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/registry.py",
+        "symbol": "registry: Qwen2_5_VL"
+      },
+      {
+        "found": true,
+        "line": 1173,
+        "note": "multimodal conditional generation",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/qwen2_5_vl.py",
+        "symbol": "Qwen2_5_VLForConditionalGeneration"
+      },
+      {
+        "found": true,
+        "line": 1243,
+        "note": "MRoPE positions for image/text tokens",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/qwen2_5_vl.py",
+        "symbol": "get_mrope_input_positions"
+      },
+      {
+        "found": true,
+        "line": 1516,
+        "note": "incremental MRoPE recomputation",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/qwen2_5_vl.py",
+        "symbol": "recompute_mrope_positions"
+      }
+    ],
+    "return_token_ids": [
+      {
+        "found": true,
+        "line": 365,
+        "note": "vLLM extension returns token IDs over HTTP",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/entrypoints/openai/chat_completion/protocol.py",
+        "symbol": "ChatCompletionRequest.return_token_ids"
+      }
+    ],
+    "runner_hook": [
+      {
+        "found": true,
+        "line": 558,
+        "note": "engine constructs the proposer from SpeculativeConfig",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/worker/gpu_model_runner.py",
+        "symbol": "gpu_model_runner: NgramProposer"
+      }
+    ],
+    "speculative_config": [
+      {
+        "found": true,
+        "line": 74,
+        "note": "method/model/prompt_lookup fields",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/config/speculative.py",
+        "symbol": "SpeculativeConfig"
+      },
+      {
+        "found": true,
+        "line": 60,
+        "note": "native ngram method is registered",
+        "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/config/speculative.py",
+        "symbol": "SpeculativeMethod.ngram"
+      }
+    ]
+  },
+  "vllm_pin": "0.22.1",
+  "serving_profile": {
+    "profile": {
+      "id": "veladraft-serving-wire",
+      "version": "1.0"
+    },
+    "schema_version": "veladraft-platform-v1",
+    "project_scope": "platform_extension",
+    "include_in_paper": false,
+    "scope": {
+      "request": "one HTTP/offline completion request",
+      "window": "one measured concurrency x session window",
+      "global": "process/engine totals across a server lifetime"
+    },
+    "counters": {
+      "emitted": {
+        "scope": "request_or_window",
+        "definition": "visible output tokens emitted by the completion",
+        "missing": "null with raw_counts.unavailable.emitted"
+      },
+      "proposed": {
+        "scope": "request_or_window",
+        "definition": "draft tokens proposed by the speculative path",
+        "missing": "null when the engine does not expose request/window attribution"
+      },
+      "accepted": {
+        "scope": "request_or_window",
+        "definition": "draft tokens accepted after target verification",
+        "missing": "null when the engine does not expose request/window attribution"
+      },
+      "verify_rounds": {
+        "scope": "request_or_window",
+        "definition": "target verification rounds entered by speculative decoding",
+        "missing": "null when the engine does not expose request/window attribution"
+      },
+      "target_forward_calls": {
+        "scope": "global",
+        "definition": "target model forward calls; vLLM 0.22.1 does not expose this counter",
+        "missing": "null with a mandatory reason"
+      },
+      "draft_forward_calls": {
+        "scope": "request_or_window",
+        "definition": "draft model forward calls; native N-Gram has no draft model forward",
+        "missing": "null with a mandatory reason"
+      }
+    },
+    "latency": {
+      "ttft_s": "client request start to first non-empty content/token chunk",
+      "e2e_s": "client request start to terminal SSE completion or stream close",
+      "tpot_s": "null unless per-token timestamps exist; SSE chunks are not per-token timestamps",
+      "client_visible_token_tpot_proxy_s": "clearly labelled proxy using visible token IDs and content chunk endpoints",
+      "client_chunk_gap_mean_s": "mean gap between non-empty content chunks; not ITL/TPOT",
+      "cancel_requested_s": "client wall time when a cancellation probe closes the stream"
+    },
+    "resource": {
+      "allocation": "additive GPU-hours from the unique allocation ledger",
+      "request_exposure": "non-additive request wall-time exposure; concurrent requests overlap",
+      "window_exposure": "non-additive window wall-time exposure",
+      "peak_memory": "process/session sampler peak, not a per-request exclusive maximum"
+    },
+    "normalization": {
+      "unknown_counter": "null plus reason; never silently 0",
+      "request_counters_require_attribution": true,
+      "window_counters_are_not_request_counters": true,
+      "global_counters_are_not_allocated_to_requests": true
+    }
+  }
+}

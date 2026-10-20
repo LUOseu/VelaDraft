@@ -1,0 +1,359 @@
+{
+  "created_at": "2026-10-17T15:42:44+00:00",
+  "meta": {
+    "allocation_wall_s": 153.56196250393987,
+    "device": [
+      {
+        "compute_capability": "8.6",
+        "index": 3,
+        "name": "NVIDIA RTX A6000",
+        "uuid": "GPU-06d42c3b-89d2-20d5-8189-9b4564fec135"
+      }
+    ],
+    "dtype": "bfloat16",
+    "load_s": 121.5150559656322,
+    "manifest": "/home/lyh/VelaDraft-serving/tests/serving/fixtures/manifest.json",
+    "manifest_sha256": "0830ede336fbd5da7d61a9b6d74ee2460e6c3012beff379053dff64b792a6ca1",
+    "max_model_len": 8192,
+    "max_pixels": 1003520,
+    "min_pixels": 200704,
+    "mode": "ngram",
+    "model": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+    "num_speculative_tokens": 4,
+    "prompt_lookup_max": 2,
+    "prompt_lookup_min": 2,
+    "repeats": 1,
+    "request_wall_s": 32.04690653830767,
+    "speculative_config": {
+      "method": "ngram",
+      "num_speculative_tokens": 4,
+      "prompt_lookup_max": 2,
+      "prompt_lookup_min": 2
+    }
+  },
+  "records": [
+    {
+      "backend_identity": {
+        "attention_backend": "FLASH_ATTN",
+        "backend": "vllm",
+        "code_commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+        "cudagraph_mode": "FULL_AND_PIECEWISE",
+        "device_topology": {
+          "devices": [
+            {
+              "compute_capability": "8.6",
+              "index": 3,
+              "name": "NVIDIA RTX A6000",
+              "uuid": "GPU-06d42c3b-89d2-20d5-8189-9b4564fec135"
+            }
+          ],
+          "gpu_count": 1,
+          "pipeline_parallel_size": 1,
+          "tensor_parallel_size": 1
+        },
+        "missing_reasons": [],
+        "version": "0.22.1"
+      },
+      "category": "ocr",
+      "correctness_status": "not_checked",
+      "draft_identity": {
+        "kind": "cpu_ngram",
+        "missing_reasons": [
+          "N-Gram has no draft model weights; it uses the target tokenizer and token-id suffix lookup"
+        ],
+        "model": "[ngram]",
+        "params": {
+          "method": "ngram",
+          "num_speculative_tokens": 4,
+          "prompt_lookup_max": 2,
+          "prompt_lookup_min": 2
+        },
+        "precision": "not_applicable",
+        "revision": "0.22.1",
+        "tokenizer": {
+          "class": "Qwen2TokenizerFast",
+          "path": "/home/lyh/models/Qwen2.5-VL-3B-Instruct/tokenizer.json",
+          "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"
+        }
+      },
+      "error": null,
+      "finish_reason": "length",
+      "group_id": "offline:ngram:rep0",
+      "image_sha256": "47b37fc2a63510c6de7a001bfdb7d5da332585a005c6e98d312b908abd7fac5a",
+      "include_in_paper": false,
+      "latency": {
+        "total_s": 32.04690653830767,
+        "ttft_s": null
+      },
+      "measurement_scope": {
+        "concurrency": 1,
+        "fixture_category": "ocr",
+        "max_new_tokens": 128,
+        "mode": "ngram",
+        "prefix_caching": false,
+        "repeat_index": 0,
+        "stream": false,
+        "surface": "offline_llm_chat"
+      },
+      "missing_reasons": {
+        "raw_counts.target_forward_calls": "vLLM 0.22.1 exposes aggregate spec counters but no target-forward-call counter"
+      },
+      "project_scope": "platform_extension",
+      "prompt": "what is one of the brands being advertised? Perform an OCR task on the provided image. Please extract the text accurately and provide a detailed explanation of the process. Ensure the response is comprehensive and well-structured.",
+      "prompt_sha256": "99bbdec0d39d9bf242dc7f39ecc79e42fc16693d7e50a9a85adef57b22d7e8b2",
+      "prompt_token_count": 1062,
+      "protocol_hash": "f181d8c208434217fe1ccce37fbd1c3c9b58a8287f4405b6890151bd4632b199",
+      "raw_counts": {
+        "acceptance_length": 3.875,
+        "acceptance_rate": 0.71875,
+        "accepted": 46,
+        "accepted_per_position": {
+          "0": 12,
+          "1": 12,
+          "2": 12,
+          "3": 10
+        },
+        "draft_forward_calls": 0,
+        "emitted": 128,
+        "proposed": 64,
+        "target_forward_calls": null,
+        "unavailable": {
+          "target_forward_calls": "vLLM 0.22.1 exposes aggregate spec counters but no target-forward-call counter"
+        },
+        "verify_rounds": 16
+      },
+      "repeat_index": 0,
+      "request_id": "nat-ocr-00-r0",
+      "resource_usage": {
+        "devices": [
+          {
+            "compute_capability": "8.6",
+            "index": 3,
+            "name": "NVIDIA RTX A6000",
+            "uuid": "GPU-06d42c3b-89d2-20d5-8189-9b4564fec135"
+          }
+        ],
+        "gpu_count": 1,
+        "gpu_hours": 0.008902,
+        "peak_memory_mib": {
+          "allocated": 0,
+          "reserved": 0
+        },
+        "wall_s": 32.04690653830767
+      },
+      "run_id": "ngram-smoke-limited",
+      "schema_version": "veladraft-platform-v1",
+      "spec_counts": {
+        "acceptance_length": 3.875,
+        "acceptance_rate": 0.71875,
+        "accepted_per_position": {
+          "0": 12,
+          "1": 12,
+          "2": 12,
+          "3": 10
+        },
+        "accepted_tokens": 46,
+        "draft_tokens": 64,
+        "drafts": 16
+      },
+      "target_identity": {
+        "architecture": "Qwen2_5_VLForConditionalGeneration",
+        "config_sha256": "7ed3eed5be6924cc800e8a5e53fc405c1aab1aaf36bad65c33403b36c56827f5",
+        "missing_reasons": [],
+        "model": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+        "precision": "bfloat16",
+        "processor": {
+          "class": "qwen2_5_vl",
+          "path": "/home/lyh/models/Qwen2.5-VL-3B-Instruct/preprocessor_config.json",
+          "sha256": "f2058c716eef96ccaed1cc1e2d0c08306b62586d535b28d9d08e691b2fab7ca0"
+        },
+        "revision": "c7dd78a4c6bea60b51332f1baf37b8f8124ecab2c35395a29a29825bf2619768",
+        "template": {
+          "mode": "tokenizer_chat_template",
+          "path": "/home/lyh/models/Qwen2.5-VL-3B-Instruct/chat_template.json",
+          "sha256": "ad60d90252ed0b0705ba14e2d0ad0fec0beac1ea955642b54059b36052d8bc96"
+        },
+        "tokenizer": {
+          "class": "Qwen2TokenizerFast",
+          "path": "/home/lyh/models/Qwen2.5-VL-3B-Instruct/tokenizer.json",
+          "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"
+        }
+      },
+      "text": "The image contains the following text: '52\n統一健身俱樂部\n打擊勝選\nYAMAHA\nPEUGEOT\n2008\n傳藝中心\n降火氣\n灌注安心的美味\n小牛\n全民打棒球2\nYKPI\n好愛人的重口味！\n全民打棒球\nYAMAHA\nPEUGEOT\n2008\n傳藝中心\n降火氣\n灌注安心的美味\n小牛\n全民打棒球2\nYKPI\n好愛人的重口味！\n全民打棒球\nY",
+      "token_ids": [
+        785,
+        2168,
+        5610,
+        279,
+        2701,
+        1467,
+        25,
+        364,
+        20,
+        17,
+        198,
+        100965,
+        14777,
+        101420,
+        101404,
+        100923,
+        32948,
+        198,
+        75437,
+        103197,
+        109434,
+        102456,
+        198,
+        56,
+        38100,
+        17020,
+        198,
+        1740,
+        47644,
+        1793,
+        198,
+        17,
+        15,
+        15,
+        23,
+        198,
+        101350,
+        103411,
+        99488,
+        198,
+        99457,
+        79599,
+        104200,
+        198,
+        102526,
+        25074,
+        107130,
+        9370,
+        106800,
+        198,
+        30709,
+        100664,
+        198,
+        102794,
+        75437,
+        102321,
+        77959,
+        17,
+        198,
+        56,
+        42,
+        1893,
+        198,
+        52801,
+        102271,
+        103947,
+        29258,
+        107102,
+        6313,
+        198,
+        102794,
+        75437,
+        102321,
+        77959,
+        198,
+        56,
+        38100,
+        17020,
+        198,
+        1740,
+        47644,
+        1793,
+        198,
+        17,
+        15,
+        15,
+        23,
+        198,
+        101350,
+        103411,
+        99488,
+        198,
+        99457,
+        79599,
+        104200,
+        198,
+        102526,
+        25074,
+        107130,
+        9370,
+        106800,
+        198,
+        30709,
+        100664,
+        198,
+        102794,
+        75437,
+        102321,
+        77959,
+        17,
+        198,
+        56,
+        42,
+        1893,
+        198,
+        52801,
+        102271,
+        103947,
+        29258,
+        107102,
+        6313,
+        198,
+        102794,
+        75437,
+        102321,
+        77959,
+        198,
+        56
+      ]
+    }
+  ],
+  "resource_usage": {
+    "devices": [
+      {
+        "compute_capability": "8.6",
+        "index": 3,
+        "name": "NVIDIA RTX A6000",
+        "uuid": "GPU-06d42c3b-89d2-20d5-8189-9b4564fec135"
+      }
+    ],
+    "gpu_count": 1,
+    "gpu_hours": 0.042656,
+    "peak_memory_mib": {
+      "allocated": 0,
+      "reserved": 0
+    },
+    "wall_s": 153.56196250393987
+  },
+  "schema_version": "veladraft-serving-offline-v1",
+  "summary": {
+    "allocation_wall_s": 153.56196250393987,
+    "gpu_hours": 0.042656,
+    "load_s": 121.5150559656322,
+    "mode": "ngram",
+    "model": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+    "num_errors": 0,
+    "num_requests": 1,
+    "peak_memory_mib": {
+      "allocated": 0,
+      "reserved": 0
+    },
+    "request_wall_s": 32.04690653830767,
+    "run_id": "ngram-smoke-limited",
+    "speculative_config": {
+      "method": "ngram",
+      "num_speculative_tokens": 4,
+      "prompt_lookup_max": 2,
+      "prompt_lookup_min": 2
+    },
+    "total_accepted_tokens": 46,
+    "total_output_tokens": 128,
+    "total_proposed_tokens": 64,
+    "total_spec_drafts": 16,
+    "vllm_version": "0.22.1"
+  }
+}
