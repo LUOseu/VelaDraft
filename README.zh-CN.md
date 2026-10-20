@@ -3,212 +3,217 @@
 </p>
 
 <p align="center">
-  <strong>用一个工作流训练、评测多模态投机草稿模型。</strong><br />
-  VelaDraft 帮助你用自己的图文数据训练、评测和比较多模态投机草稿模型：多种 drafter
-  共用数据处理、冻结目标特征、训练与评测流程，让你把精力放在方法和数据上；对
-  DFlash、DSpark 这类并行 block-diffusion drafter 提供了完整流程。
+  <strong>面向多模态 drafter 训练、系统分析与基准评测的统一工具包。</strong><br />
+  VelaDraft 将 DFlash、DSpark 等 parallel block-diffusion drafter 接入同一多模态工作流，
+  并通过训练成本 profiling，指导针对这类工作负载的系统优化。
 </p>
 
 <p align="center">
-  <sub>主要验证对象为 Qwen2.5-VL-3B 与 Qwen3-VL-8B，不同算法、配方和运行模式的验证规模不同；
-  SmolVLM2 目前有 DFlash 单图 smoke。详见<a href="SUPPORT_MATRIX.md">支持矩阵</a>。</sub>
+  <sub>主要验证对象为 Qwen2.5-VL-3B 与 Qwen3-VL-8B，验证范围因方法、配方和模式而异；
+  SmolVLM2 目前仅有 DFlash 单图 smoke。详见<a href="SUPPORT_MATRIX.md">支持矩阵</a>。</sub>
 </p>
 
 <p align="center">
   <a href="https://github.com/LUOseu/VelaDraft/actions/workflows/ci.yml"><img src="https://github.com/LUOseu/VelaDraft/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://github.com/LUOseu/VelaDraft/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-12263a" alt="Python 3.10+" /></a>
-  <a href="https://github.com/LUOseu/VelaDraft/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-12263a" alt="Apache-2.0" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-12263a" alt="Apache-2.0" /></a>
 </p>
 
 <p align="center">
-  <a href="#快速开始">快速开始</a> ·
-  <a href="docs/model-zoo.md">模型下载</a> ·
-  <a href="BENCHMARKS.md">基准结果</a> ·
-  <a href="docs/README.md">文档</a> ·
-  <a href="SUPPORT_MATRIX.md">支持矩阵</a> ·
-  <a href="CONTRIBUTING.md">参与贡献</a>
+  <a href="#快速开始">快速开始</a> · <a href="docs/model-zoo.md">模型下载</a> ·
+  <a href="BENCHMARKS.md">基准结果</a> · <a href="docs/README.md">文档</a> ·
+  <a href="SUPPORT_MATRIX.md">支持矩阵</a> · <a href="CONTRIBUTING.md">参与贡献</a>
 </p>
+
+<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a></p>
+
+## 最新动态
+
+- **[2026-10-18]** 新增 **Qwen3.6-35B-A3B target adapter**，接入 partial rotary，提供回答重新生成、特征捕获与 dense drafter 训练路径（[#18](https://github.com/LUOseu/VelaDraft/pull/18)，感谢 [@khazic](https://github.com/khazic)）。验证范围见[支持矩阵](SUPPORT_MATRIX.md#targets)。
+
+## 为什么选择 VelaDraft
+
+Parallel block drafter 的训练同时涉及昂贵的冻结多模态 target 和较小的可训练模型。
+重复提取 target 特征、anchor 展开后的 batch，以及全词表评分，都会影响成本；
+只看 drafter 大小并不足以解释训练效率。方法比较还需要明确数据、target 身份、
+解码和测量协议。
+
+VelaDraft 将三个环节连接起来：
+
+- **共享训练接口。** 图文数据准备、target 答案再生成、特征捕获与不同方法的训练共用基础流程。
+- **围绕训练特征做 profiling 和优化。** 先测量时间与内存开销，再减少重复提取和无效评分，并明确数值与资源上的取舍。
+- **保留可追溯的评测证据。** 接受长度、任务质量、输出一致性、延迟与训练成本分别记录，结果关联配置、checkpoint 和验证记录。
 
 <p align="center">
-  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
+  <img src="docs/assets/how-it-works.svg" alt="VelaDraft 的三阶段流程：数据与 target 特征准备、选择 drafter 训练、评测与导出。训练系统分析依次定位提取和评分成本、减少重复工作、验证数值与资源取舍。" width="1100" />
 </p>
 
-🎉 最新动态
-- [2026-10-18] 🔥 新增 Qwen3.6-35B-A3B 目标模型 adapter，接入 partial
-  rotary，支持回答重新生成、特征捕获与 dense drafter 训练路径
-  （#18，感谢
-  @khazic）。详见支持矩阵。
-为什么选择 VelaDraft
-VelaDraft 是项目名；当前包名与命令名仍是 vlm-dflash。
-- 复用昂贵的目标特征。 兼容的 offline capture 可供多个方法使用；online
-  训练可选择内存缓存，减少重复的目标前向提取。
-- 用同一流程比较方法。 从自己的图文数据出发，统一运行训练、接受率评测和
-  导出；每个记录在案的结果都携带自己的配置与协议。
-- 拿到可检查的训练产物。 checkpoint、目标身份、训练记录和评测结果一起保留，
-  便于恢复、复现和继续接入工具链。
-<p align="center">
-  <img src="docs/assets/how-it-works.svg" alt="图文数据通过目标模型生成回答并捕获特征。训练可选 offline feature store 路径，或 online 实时提取（带可选内存缓存）；校验面板比较投机输出与 target-only 贪心解码是否逐 token 一致，随后导出 checkpoint。" width="1100" />
-</p>
+“统一”指共享接口与协议记录，不代表各方法的目标函数、预算或成熟度完全相同。
+`VelaDraft` 是项目名；当前包名和 CLI 仍为 `vlm-dflash`。
 
-这里的“统一”是统一接口与协议记录，不代表所有算法拥有相同 objective、同样预算
-或相同成熟度。
-支持的算法
-七种 drafter 共用同一套 train / eval / export 命令、checkpoint 格式与
-逐 token 验证路径：
-算法	核心机制	验证状态
-[DFlash](docs/algorithms/dflash.md)	共享 FC context + block drafting	已验证
-[DSpark](docs/algorithms/dspark.md)	Markov logit bias + confidence	已验证
-[Domino](docs/algorithms/domino.md)	因果 GRU correction	已验证
-[JetSpec](docs/algorithms/jetspec.md)	因果块内 mask + forward KL	已验证（按 sequential 服务；生产 tree runtime 未移植）
-[DFlash2](docs/algorithms/dflash2.md)	局部卷积 + candidate selector	实验性重建目标（上游训练目标未公开）
-[DFlare](docs/algorithms/dflare.md)	逐 draft 层融合 + 独立 context K/V	已验证
-[DFly](docs/algorithms/dfly.md)	FC + fusion residual + hidden correction	已验证，含已移植的上游两阶段配方
+## 训练系统：从 profiling 到优化
 
+系统优化由工作负载决定，并非每项优化都适用于每个运行。当前实现与记录包括：
 
-配方选择（默认 objective、可选 recipe、必需 teacher 信号、已发布权重）汇总在
-[docs/README.md](docs/README.md#choose-a-method--recipe) 一张表中；逐 target 的
-证据状态见[支持矩阵](SUPPORT_MATRIX.md)（自动生成）。
-范围与限制：
-- 输入： 图片（一张或多张）+ 文本，单轮或多轮，贪心解码。多轮监督默认是
-  last_turn_only：较早的 assistant 轮次按原样作为 teacher-forced 上下文，只有
-  最后一个回答会被重新生成并监督（见 [data.md](docs/data.md)）。
-- 硬件： 实测参考为单张 48 GB GPU；24 GB preset 仍是建议配置，尚未在真实
-  24 GB 卡上记录运行。训练无 DDP / 多节点启动路径。
-- 昇腾 NPU： 设备解析、分块 attention、七种 trainer、恢复与可移植导出均已
-  接线并通过 CPU 验证，但本 checkout 没有真实 NPU 运行记录（NPU_UNVERIFIED）。
-  fused attention 为 opt-in，NPU device_map 仍是候选，DDP 未实现。见
-  [docs/npu/README.md](docs/npu/README.md)。
-- 训练模式： 默认 offline（读 staged feature store）；online 让冻结目标模型
-  驻留并实时提取特征；--features 复用已有 store。“online”不是 on-policy
-  rollout 训练。
-- Qwen3.6-35B-A3B： qwen3_5_moe adapter 已实现并通过 CPU 测试；上表的
-  方法验证状态不代表这些方法已在此目标模型上完成验证。dense drafter 必须显式
-  设置 drafter.intermediate_size。现已接入[目标模型跨卡加载](docs/online-training.md#devices-what-is-supported-today)
-  和 [chat-template 参数](docs/REFERENCE.md#chat-template-kwargs-render-protocol)，
-  包括 enable_thinking: false。端到端训练尚待验证；混合循环缓存回滚实现前，
-  投机解码的 eval / benchmark / spec_generate 入口会明确报错。
-- Serving： 生产 vLLM/SGLang 集成仍为后续工作；
-  [serving-bridge.md](docs/serving-bridge.md) 是实验性导出/加载工具，其正确性
-  与性能验收尚未完成。
-- 复现： 数据与生成协议可复现；bf16 训练不保证 bitwise deterministic。
-从这里开始
-路径	适合场景
-[跑通完整流程](docs/getting-started.md)	安装、准备本地 target、doctor、第一个 demo，然后用自有数据 train
-[体验已发布 drafter](docs/model-zoo.md)	直接拿训练好的 checkpoint 跑 demo --drafter：报告接受长度、各位置接受率和 token 一致性，无需训练
+| 训练特点 | 系统处理 | 证据与适用边界 |
+|---|---|---|
+| 冻结 target 在多个 epoch 中重复提取特征 | 复用兼容的 offline store；online 可选有容量上限的主机内存缓存，支持自适应预算与固定保留计划 | 命中缓存时原样返回已存张量；不同 batch padding 下重新提取可能改变 bf16 数值。[模式、计数器与数值说明](docs/online-training.md) |
+| Anchor 展开产生零权重 padding block，但这些行仍进入 LM head 和 loss | 在 row-local 评分前压缩无效行；recipe 运行跳过不参与优化的 CE 标量 | 梯度一致性回归测试；row compaction 目前对 DFlare/DFly 自动启用，并非支持所有目标函数。[评分优化](docs/online-training.md#recipe-run-scoring-cost-drafterrecipe_row_compaction) |
+| 部分 recipe stage 的分块 TV/KL 运算占比较高 | 可选编译原有运算，失败时回退 eager | 收益依赖硬件与 stage，不适用于所有 loss。[执行优化](docs/online-training.md#execution-optimization-compile-the-tvkl-chunk-arithmetic) |
 
+Profiling 也用于排除收益有限的方向：记录的 A6000 真实样本 sweep 中，增大 teacher
+分组使提取时间下降 13.3%，但估算端到端收益上限低于 3%。减少 forward 次数本身不足以
+支持继续优先优化这一方向。详见[测量报告](research/system_optimization/REPORT.md)。
 
+这些是有具体条件的工程结果，不是通用加速承诺。例如，在 512 行、3 epoch、每个容量
+两组配对的 production-CLI 测试中，固定保留策略在 0.8 / 1.6 GiB 缓存容量下使 wall time
+下降 **3.6% / 6.9%**。[完整协议](docs/online-training.md#static-pinned-retention-trainonline_feature_cache_policy-pinned)
+将这一结果与 replay 上界分开报告。训练节省不能当作推理加速；缓存策略为可选项，
+不能默认视为每组 benchmark 的配置。
+
+昇腾 NPU 适配与真机验证范围见 [NPU 文档](docs/npu/README.md)。
+
+## 支持的方法
+
+七种 drafter 共享 `train` / `eval` / `export` 接口和 checkpoint 格式。
+下表总结已有证据，不代表在所有 target 上完成验证，也不是大规模实验的最终排名。
+
+| 方法 | 核心机制 | 状态 |
+|---|---|---|
+| [DFlash](docs/algorithms/dflash.md) | Block-parallel drafting | 已验证 |
+| [DSpark](docs/algorithms/dspark.md) | Markov correction + confidence | 已验证 |
+| [Domino](docs/algorithms/domino.md) | 因果 GRU correction | 已验证 |
+| [JetSpec](docs/algorithms/jetspec.md) | 块内因果注意力 + forward KL | Sequential serving 已验证；parallel tree runtime 尚未移植 |
+| [DFlash2](docs/algorithms/dflash2.md) | 局部混合 + candidate selector | 实验性目标重建，上游目标函数未公开 |
+| [DFlare](docs/algorithms/dflare.md) | 逐层 target fusion | 已验证 |
+| [DFly](docs/algorithms/dfly.md) | Fusion residual + hidden correction | 已验证，含移植的上游两阶段配方 |
+
+[配方索引](docs/README.md#choose-a-method--recipe) 列出默认目标、可选 recipe、teacher 信号与权重；
+[支持矩阵](SUPPORT_MATRIX.md) 记录逐方法、target 与运行模式的验证范围。
+
+## 当前范围与限制
+
+- **输入：** 一张或多张图片 + 文本，单轮或多轮，贪心解码。多轮默认 `last_turn_only`，较早的 assistant 回答作为 teacher-forced 上下文，仅重新生成并监督最后一个回答。[数据格式](docs/data.md)
+- **硬件：** 已验证参考为单张 48 GB GPU；24 GB preset 仍是建议配置，没有真实 24 GB 卡上的记录。
+- **训练模式：** 默认 offline staged features；online 从冻结 target 实时提取；`--features` 复用已有 store。没有 DDP / 多节点启动路径。“online”不是 on-policy rollout。
+- **Qwen3.6-35B-A3B：** `qwen3_5_moe` adapter 已实现并通过 CPU 测试，上表不代表该 target 上的方法验证。Dense drafter 必须显式设置 `drafter.intermediate_size`。支持[跨卡 target 加载](docs/online-training.md#devices-what-is-supported-today)及 [chat-template 参数](docs/REFERENCE.md#chat-template-kwargs-render-protocol)，包括 `enable_thinking: false`。端到端训练尚待验证；混合循环缓存回滚实现前，投机 `eval` / `benchmark` / `spec_generate` 被明确阻止。
+- **分片评测：** Capture/training 支持 target 分片不代表 serving 已支持。`eval` / `benchmark` 当前拒绝非空的 `target.device_map`。
+- **Serving：** 生产 vLLM/SGLang 集成仍为后续工作。[Serving bridge](docs/serving-bridge.md) 是实验性导出/加载工具，正确性与性能验收尚未关闭。
+- **复现：** 数据与生成协议可复现；bf16 训练不保证 bitwise deterministic。
+
+## 从这里开始
+
+| 入口 | 用途 |
+|---|---|
+| [完整流程](docs/getting-started.md) | 安装、准备本地 target、运行 `doctor` 与 demo，再训练自有数据 |
+| [模型下载](docs/model-zoo.md) | 直接运行已发布 checkpoint，查看接受长度、逐位置接受率与 token 一致性 |
+
+完成下方安装和 target 准备后，可直接使用已发布 drafter：
+
+```bash
 curl -fL -O https://github.com/LUOseu/VelaDraft/releases/download/zoo-v0.3.0/qwen25vl-3b-dflash.tar.gz
 tar -xzf qwen25vl-3b-dflash.tar.gz
 vlm-dflash demo --target "$VLM_DFLASH_TARGET" --drafter qwen25vl-3b-dflash
-参考机记录：42 s，AL 1.313，token-exact 4/4（随机初始化基线 demo：45 s，AL
-1.000）。两版 DFly 权重都已发布——共享 block CE 默认版与已移植上游两阶段配方版：
-Drafter	Target	下载
-DFlash	Qwen2.5-VL-3B	387 MB zoo-v0.3.0
-DFly（共享 block CE）	Qwen2.5-VL-3B	420 MB zoo-v0.3.1
-DFly（上游两阶段配方，AL 1.839）	Qwen2.5-VL-3B	420 MB zoo-v0.3.2
-DFlash	Qwen3-VL-8B	1.00 GB zoo-v0.3.1
+```
 
+[Model Zoo](docs/model-zoo.md) 收录九个 archive，包括 Qwen2.5-VL-3B 的不同方法、
+DFly 默认与上游配方，以及 Qwen3-VL-8B DFlash；提供下载、验证与加载命令。
 
-全部 9 个归档（含 Domino、DSpark、JetSpec、DFlash2、DFlare）、校验方式与加载
-命令见 [model-zoo.md](docs/model-zoo.md)。
-快速开始
+## 快速开始
+
+```bash
 git clone https://github.com/LUOseu/VelaDraft.git
 cd VelaDraft
-
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[tested]"        # 源码安装；目前没有 PyPI 发布
+pip install -e ".[tested]"  # 从源码安装，目前没有 PyPI release
 
-# 目标模型需要提前准备一次（config 使用 local_files_only，不会自动下载）。
 export VLM_DFLASH_TARGET="$PWD/assets/models/Qwen2.5-VL-3B-Instruct"
 hf download Qwen/Qwen2.5-VL-3B-Instruct --local-dir "$VLM_DFLASH_TARGET"
-# 受限网络：同一命令前加 HF_ENDPOINT=https://hf-mirror.com
-
 vlm-dflash doctor --target "$VLM_DFLASH_TARGET"
-# 成功标志：exit 0、若干 [ok] 行，以及一行解析出的 contract
-# （mask=151669 mrope=[16,24,24] layers=[1,17,33] ...）
-
 vlm-dflash train-demo --target "$VLM_DFLASH_TARGET" --steps 80
-train-demo 在生成的图片上跑完整流程（prepare → 目标回答生成 → capture →
-train → eval → export）。参考机记录（单张 RTX A6000 48 GB，历史数据）：3 min
-13 s，loss 13.0 → 0.013，eval AL 1.138（随机初始化 1.000），token-exact 4/4，
-导出位于 runs/demo_dflash/export/。这是流水线 smoke，不是质量结论。
-长训、日志、停止条件、恢复与硬件要求见
-[getting-started.md](docs/getting-started.md) 与
-[training.md](docs/training.md)。
-今天就能做的三件事
-1. 用自己的图文数据训练。 每行一个 JSON 对象，image 相对 --images-dir
-解析：
+```
+
+配置默认使用本地模型，不自动下载。网络受限时可在下载命令前设置
+`HF_ENDPOINT=https://hf-mirror.com`。`doctor` 成功时应 exit 0，输出 `[ok]` 与解析后的 target contract。
+
+`train-demo` 用生成图片跑通 prepare → regen → capture → train → eval → export。
+历史单张 RTX A6000 48 GB 记录为 3 分 13 秒、loss 13.0 → 0.013、AL 1.138
+（随机初始化 1.000）、4/4 token-exact，导出到 `runs/demo_dflash/export/`。
+这是流程 smoke，不是任务质量结论。长训练与恢复见[入门指南](docs/getting-started.md)和[训练文档](docs/training.md)。
+
+## 现在可以做的三件事
+
+**1. 训练自己的图文数据。** 每行一个 JSON 对象，`image` 相对 `--images-dir` 解析：
+
+```jsonl
 {"id":"row-001","image":"cat.jpg","question":"What is in this image?","answer":"A cat sleeps on a sofa."}
+```
+
+```bash
 python examples/train_from_jsonl.py \
   --target "$VLM_DFLASH_TARGET" \
   --jsonl data/rows.jsonl --images-dir data/images \
   --limit 32 --steps 60
-依次执行 prepare → regen → capture → train → eval，并在 run 目录留下
-checkpoint 和导出。记录结果（12 行 COCO 数据，10 步）：loss 7.69 → 7.06，
-visual check 通过，token-exact 4/4。注意 --limit 是训练行数，验证集在其
-之上另行划分。行格式、划分规则与多轮监督细节：
-[data.md](docs/data.md)。
-2. 一次 capture，比较多个 drafter。 昂贵的目标计算（regen + capture）
-只跑一次，之后各 drafter 从同一 store 训练，训练循环中不再加载目标模型：
+```
+
+`--limit` 指训练行数，验证行另取。多轮格式、划分规则与监督方式见[数据文档](docs/data.md)。
+
+**2. 复用一次 capture 比较方法。** 兼容的 target 身份与所需层必须匹配，不匹配会报错：
+
+```bash
 python examples/reuse_features_compare.py \
   --target "$VLM_DFLASH_TARGET" \
   --jsonl data/rows.jsonl --images-dir data/images --steps 20
-记录结果（12 行 COCO 池，5 步，smoke 规模）：DFlash AL 1.153 / DSpark
-AL 1.094，均 token-exact。复用是校验过的，而非默认成立——store 的 target 身份
-与各方法消费的层必须匹配，不匹配会直接报错（[training.md](docs/training.md)）。
-CLI 形式为 vlm-dflash train --features <store>。
-3. 按资源选择训练方式。 offline 读取已捕获的 feature store（训练时目标不在
-GPU 上；2K capture 约占 9.4 GiB 磁盘）；online 让冻结目标模型驻留并实时提取；
-多 epoch 的 online 可以选择主机内存缓存（不落盘）：
+```
+
+也可通过 `vlm-dflash train --features <store>` 复用特征。
+
+**3. 根据资源选择模式。** Offline 读取 staged store；online 保持冻结 target 驻留，可选主机内存缓存：
+
+```bash
 # offline（默认）
 vlm-dflash train --config configs/dfly/qwen2_5_vl_3b_2k.yaml --run-dir runs/dfly_2k
 
-# online，并启用可选内存缓存
+# online，启用可选缓存
 vlm-dflash train --config configs/dfly/qwen2_5_vl_3b_2k.yaml --mode online \
   --run-dir runs/dfly_online --set train.online_feature_cache_gb=8
-记录的缓存计数（129 行 / 6 epoch）：645 hits / 129 misses / 129 stores /
-0 evictions，峰值 830 MiB（上限 8 GiB），可在 train_summary.json 的
-feature_source.feature_cache 查看。命中按位返回存储的张量；缓存不进任何
-digest，其训练期数值边界见
-[online-training.md](docs/online-training.md)。
-结果与证据
-所有测量——接受长度、各位置接受率、token-exact 门、训练成本、消融、运行时
-探针——都连同协议记录在 [BENCHMARKS.md](BENCHMARKS.md)、
-[RELEASE_VALIDATION.md](RELEASE_VALIDATION.md) 与
-[measured-runs.md](docs/measured-runs.md) 中。机器可读子集：
-benchmarks/results/zoo_canonical.json。
-数字的含义需要说清：
-- AL 是每轮目标验证接受的 token 数，不是加速倍数。token-exact 表示投机
-  输出逐 token 复现目标模型自己的贪心解码，是输出一致性门，不是任务准确率。
-  相对 ground truth 的任务分数（TextVQA/DocVQA/ChartQA 的答案准确率）
-  尚未报告。
-- 基准表里的规范运行来自 offline 路径；online smoke 验证的是流水线
-  （token-exact、provenance、计数器），不是质量。
-- 覆盖范围是显式的：[支持矩阵](SUPPORT_MATRIX.md) 逐格给出
-  canonical-validated / reduced / smoke-only / unsupported，每行可追溯到
-  记录的 run id。
-文档
-[README.md](docs/README.md) 是任务索引：安装与首跑、自有数据、方法与配方
-选择、长训、online、评测与排障；NPU 适配见
-[docs/npu/README.md](docs/npu/README.md)。常用直达：
-[model-zoo.md](docs/model-zoo.md) · [data.md](docs/data.md) ·
-[training.md](docs/training.md) · [online-training.md](docs/online-training.md) ·
-[troubleshooting.md](docs/troubleshooting.md) · [algorithms/](docs/algorithms/) ·
-[benchmark.md](docs/benchmark.md) · [env-preflight.md](docs/env-preflight.md)
-（历史主机记录）· [REFERENCE.md](docs/REFERENCE.md)（实现与数值语义）。
-贡献与引用
-欢迎提交复现记录、聚焦的修复与清楚的使用示例。当前范围与发布政策见
-[CONTRIBUTING.md](CONTRIBUTING.md) 与 [ROADMAP.md](ROADMAP.md)。算法通过
-DrafterAlgorithm 接入，目标家族通过 VLMAdapter 隔离。
-Apache-2.0。移植组件保留上游归属，见 NOTICE 与
-[UPSTREAM_AUDIT.md](UPSTREAM_AUDIT.md)。
+```
+
+缓存预算、固定/自适应保留策略、恢复行为和数值条件见[online 训练](docs/online-training.md)。
+模式应记录在运行协议中，不能在受控比较中悄悄更换。
+
+## 结果与证据
+
+公开记录包括 smoke、canonical runs 和系统研究；进行中的大规模实验不作为已完成结果。
+完整协议见 [BENCHMARKS.md](BENCHMARKS.md)、[RELEASE_VALIDATION.md](RELEASE_VALIDATION.md)
+与[实测运行记录](docs/measured-runs.md)。机器可读子集为 `benchmarks/results/zoo_canonical.json`。
+
+- **AL** 是每轮 target 验证接受的 token 数，不是加速倍数。**Token-exact** 表示复现 target 自身的贪心输出，不等于任务准确率。当前尚未报告 TextVQA / DocVQA / ChartQA 对 ground truth 的任务分数。
+- Canonical benchmark 使用 **offline** 路径；online smoke 验证流程、一致性、来源与计数，不证明任务质量。
+- [支持矩阵](SUPPORT_MATRIX.md) 区分 canonical、reduced、smoke-only 与 unsupported，并关联运行记录。
+
+## 文档
+
+[文档首页](docs/README.md) 按任务组织入口。常用页面：
+[模型下载](docs/model-zoo.md) · [数据](docs/data.md) · [训练](docs/training.md) ·
+[Online](docs/online-training.md) · [排障](docs/troubleshooting.md) ·
+[算法](docs/algorithms/) · [评测](docs/benchmark.md) ·
+[环境预检](docs/env-preflight.md) · [实现参考](docs/REFERENCE.md)。
+
+## 贡献与引用
+
+欢迎复现、聚焦的修复和使用示例。范围与发布政策见 [CONTRIBUTING.md](CONTRIBUTING.md)
+和 [ROADMAP.md](ROADMAP.md)。算法通过 `DrafterAlgorithm` 接入，target 家族通过 `VLMAdapter` 接入。
+
+采用 Apache-2.0；移植部分保留上游归属，见 [NOTICE](NOTICE) 与 [UPSTREAM_AUDIT.md](UPSTREAM_AUDIT.md)。
+
+```bibtex
 @misc{veladraft2026,
   title = {VelaDraft: Multimodal Speculative Drafter Training},
   year  = {2026},
   url   = {https://github.com/LUOseu/VelaDraft}
 }
-<p align="center">
-  <sub><strong>为什么叫 Vela？</strong> Vela 意为“船帆”，也是船帆座的名称。
-  轻量 drafter 借助目标模型提供的视觉上下文前行。</sub>
-</p>
+```
+
+Vela 意为帆，也是一座星座的名字：轻量 drafter 借助 target 提供的视觉上下文前行。

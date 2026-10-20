@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <strong>Train and benchmark multimodal speculative drafters in one workflow.</strong><br />
-  VelaDraft shares data preparation, frozen-target features, training, evaluation,
-  and export across drafter families, with a particular focus on parallel
-  block-diffusion drafters such as DFlash and DSpark.
+  <strong>A shared toolkit for multimodal drafter training, systems analysis and benchmarking.</strong><br />
+  VelaDraft brings parallel block-diffusion drafters such as DFlash and DSpark
+  into a common multimodal workflow, and uses training-cost profiling to guide
+  workload-aware system optimizations.
 </p>
 
 <p align="center">
@@ -45,29 +45,61 @@
 
 ## Why VelaDraft
 
-`VelaDraft` is the project; the package and CLI are still called `vlm-dflash`.
+Parallel block drafters combine an expensive frozen multimodal target with a
+smaller trainable model. Their training cost is shaped by repeated target-feature
+extraction, anchor-expanded batches and full-vocabulary scoring, not just the
+size of the drafter. Comparing algorithms also requires keeping data, target
+identity, decoding and measurement protocols explicit.
 
-- **Reuse expensive target work.** One compatible offline capture serves
-  several drafter methods; online training can keep extracted records in an
-  optional host-RAM cache instead of paying the same target forward every epoch.
-- **Compare methods in one workflow.** From your own image-text data, training,
-  acceptance-length evaluation and export go through the same shared commands,
-  and every recorded result carries its config and protocol.
-- **Keep checkable training artifacts.** Checkpoint, target identity, training
-  records and evaluation results stay together for resume, reproduction and
-  further tooling.
+VelaDraft connects three pieces of that research workflow:
+
+- **Train through shared interfaces.** Prepare image-text data, regenerate
+  target answers, capture features, and train different drafter families without
+  rebuilding the surrounding pipeline.
+- **Profile and optimize the training workload.** Measure where time and memory
+  go, then reduce redundant extraction and scoring work with explicit numerical
+  and resource trade-offs.
+- **Benchmark with traceable evidence.** Keep acceptance, task quality,
+  output fidelity, latency and training cost distinct; link reported results to
+  configurations, checkpoints and validation records.
 
 <p align="center">
-  <img src="docs/assets/how-it-works.svg" alt="Image-text data goes through target-native regen and feature capture; training reads either the offline feature store or a live frozen target (with an optional RAM cache); validation checks the speculative output token-for-token against target-only greedy decoding before export." width="1100" />
+  <img src="docs/assets/how-it-works.svg" alt="VelaDraft workflow: prepare image-text data and target features, train a chosen drafter, then evaluate and export. A training-systems loop profiles extraction and scoring, optimizes reuse and wasted work, and validates numerical and resource trade-offs." width="1100" />
 </p>
 
-"Unified" means shared interfaces and protocol records &mdash; not identical
-objectives, budgets or maturity across algorithms.
+“Unified” means shared interfaces and protocol records, not identical objectives,
+budgets or maturity across algorithms. `VelaDraft` is the project; the package
+and CLI are still called `vlm-dflash`.
+
+## Training systems: from profiling to optimization
+
+The systems work follows the workload rather than applying every optimization
+to every run. Current implementation and measured evidence include:
+
+| Training characteristic | System response | Evidence and boundary |
+|---|---|---|
+| A frozen target can repeat feature extraction across epochs | Compatible offline-store reuse; optional byte-bounded host-RAM caching online, with adaptive budgets and pinned retention | Cache hits preserve stored tensors, but re-extraction with different batch padding can change bf16 numerics. [Modes, counters and numerical caveats](docs/online-training.md) |
+| Anchor expansion sends zero-weight padding blocks through the LM head and loss | Compact padding rows before row-local scoring; skip unused CE scalars in recipe runs | Gradient-exact regression tests; row compaction is currently enabled automatically for DFlare/DFly, not all objectives. [Scoring optimization](docs/online-training.md#recipe-run-scoring-cost-drafterrecipe_row_compaction) |
+| Some recipe stages spend substantial time in chunked TV/KL arithmetic | Opt-in compilation of the existing arithmetic, with eager fallback | Hardware- and stage-dependent; does not apply to every loss. [Execution optimization](docs/online-training.md#execution-optimization-compile-the-tvkl-chunk-arithmetic) |
+
+Profiling also tells us what **not** to prioritize: on the recorded A6000
+real-row sweep, larger teacher groups reduced extraction time by 13.3%, but the
+estimated end-to-end ceiling was below 3%. Fewer forwards alone were not enough
+to justify that direction. See the [measurement report](research/system_optimization/REPORT.md).
+
+These are scoped engineering results, not universal speedup claims. For example,
+pinned retention reduced paired production-CLI wall time by **3.6% / 6.9%** at
+0.8 / 1.6 GiB cache caps on a 512-row, three-epoch workload (two pairs per cap).
+The [full protocol](docs/online-training.md#static-pinned-retention-trainonline_feature_cache_policy-pinned)
+separates this result from replay upper bounds. Training savings do not establish
+inference speedup, and cache policies are opt-in rather than an assumed setting
+of every benchmark.
 
 ## Supported methods
 
-Seven drafter families share one `train` / `eval` / `export` CLI, one
-checkpoint format and one token-exact verification path:
+Seven drafter families share the `train` / `eval` / `export` interfaces and
+checkpoint format. The statuses below summarize existing evidence, not validation
+on every target or a completed large-scale ranking:
 
 | Method | Idea | Status |
 |---|---|---|
@@ -84,7 +116,7 @@ released weights) is one table in
 [docs/README.md](docs/README.md#choose-a-method--recipe); per-target evidence
 states live in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md) (generated).
 
-Scope and limits:
+## Current scope and limitations
 
 - **Input:** images (one or many) + text, single- or multi-turn, greedy
   decoding. Default multi-turn supervision is `last_turn_only`: earlier
@@ -108,6 +140,9 @@ Scope and limits:
   are also available, including `enable_thinking: false`. End-to-end training
   remains unvalidated; speculative `eval` / `benchmark` / `spec_generate`
   are explicitly blocked until hybrid recurrent-cache rollback is implemented.
+- **Sharded evaluation:** target sharding for capture/training does not imply
+  sharded serving support. `eval` / `benchmark` currently reject a nonempty
+  `target.device_map`.
 - **Serving:** production vLLM/SGLang integration is future work;
   [serving-bridge.md](docs/serving-bridge.md) is an experimental export/load
   tool whose correctness and performance gates are not closed.
@@ -225,24 +260,15 @@ vlm-dflash train --config configs/dfly/qwen2_5_vl_3b_2k.yaml --mode online \
   --run-dir runs/dfly_online --set train.online_feature_cache_gb=8
 ```
 
-Recorded cache counters (129 rows / 6 epochs): 645 hits / 129 misses /
-129 stores / 0 evictions, peak 830 MiB against the 8 GiB cap, reported in
-`train_summary.json` → `feature_source.feature_cache`. Hits return stored
-tensors bitwise; the cache stays outside the feature and plan digests, and its
-training-time caveats are documented in
-[docs/online-training.md](docs/online-training.md).
-
-A multi-epoch run whose working set exceeds the cache budget can pin a static
-retention plan instead of thrashing under plain LRU:
-`--set train.online_feature_cache_policy=pinned` freezes a smallest-first plan
-after the first training epoch and reuses those records across the remaining
-epochs (details and counters in the pinned section of
-[docs/online-training.md](docs/online-training.md)). Production CLI A/B
-(512-row subset, 3 epochs, 2 pairs per cap): paired wall **-3.6% / -6.9%** at
-0.8 / 1.6 GiB caps; the harness replay upper bound is -7.6% / -13.0% and
-steady state converges to it.
+Cache budgets, pinned/adaptive policies, resume behavior and the numerical
+conditions for reuse are documented in [online training](docs/online-training.md).
+Choose a mode for the available memory and storage, and record it in the run
+protocol; do not silently change it inside a controlled comparison.
 
 ## Results and evidence
+
+The public ledger contains recorded smokes, canonical runs and systems studies.
+Large-scale experiments in progress are not included as completed results.
 
 Everything measured &mdash; acceptance length, per-slot acceptance, token-exact
 gates, training costs, ablations, runtime probes &mdash; is recorded with its
