@@ -52,7 +52,7 @@ def cmd_dry_run(args) -> int:
             write_deliverables(args.out_dir, validation=validation)
         _print(validation)
         return 2
-    ready = readiness(workload.manifest)
+    ready = readiness(workload.manifest, manifest_dir=workload.manifest_dir)
     plan = build_plan(workload.manifest, validation=validation, readiness=ready, budget_gpu_hours=args.budget_gpu_hours)
     if args.out_dir:
         write_deliverables(args.out_dir, validation=validation, plan=plan)
@@ -202,7 +202,7 @@ def cmd_run(args) -> int:
                 json.dump(error, handle, ensure_ascii=False, indent=2, sort_keys=True)
         _print(error)
         return 2
-    ready = readiness(workload.manifest)
+    ready = readiness(workload.manifest, manifest_dir=workload.manifest_dir)
     plan = build_plan(workload.manifest, validation=validation, readiness=ready, budget_gpu_hours=args.budget_gpu_hours)
     if ready["status"] == "blocked":
         blocker = {
