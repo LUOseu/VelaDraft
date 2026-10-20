@@ -8,7 +8,7 @@ from pathlib import Path
 from vlm_dflash.workload_advisor.decision import decide
 from vlm_dflash.workload_advisor.records import aggregate_record_from_legacy, write_records
 from vlm_dflash.workload_advisor.report import render_markdown, write_share_package
-from vlm_dflash.workload_advisor.schema import sha256_json
+from vlm_dflash.workload_advisor.schema import sha256_json, validate_record
 from vlm_dflash.workload_advisor.stats import summarize
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -153,6 +153,77 @@ class DecisionTests(unittest.TestCase):
 
 
 class ReportTests(unittest.TestCase):
+    def test_share_private_ids_are_pseudonymized_consistently(self) -> None:
+        records = _as_real(_records("records.jsonl"))
+        assignment = _assignment()
+        private_candidate = "/srv/PRIVATE_CUSTOMER/checkpoint"
+        request_ids = {key: f"/srv/PRIVATE_CUSTOMER/{key}" for key in assignment}
+        for record in records:
+            record["request_id"] = request_ids[record["request_id"]]
+            record["group_id"] = f"/srv/PRIVATE_CUSTOMER/{record['group_id']}"
+            record["run_id"] = "/srv/PRIVATE_CUSTOMER/run"
+            record["session_id"] = f"PRIVATE_CUSTOMER session\n{record['session_id']}"
+            if record["candidate_id"] == "dflash-exact":
+                record["candidate_id"] = private_candidate
+            record["correctness"]["failed_request_ids"] = [
+                request_ids[value] for value in record["correctness"]["failed_request_ids"]
+            ]
+            record["artifacts"] = {
+                "weights_sha256": "a" * 64,
+                "log_sha256": "/srv/PRIVATE_CUSTOMER/log",
+            }
+        assignment = {
+            request_ids[key]: {**value, "group_id": f"/srv/PRIVATE_CUSTOMER/{value['group_id']}"}
+            for key, value in assignment.items()
+        }
+        summary = _summarize(records, assignment=assignment, labels=set(request_ids.values()))
+        decision = decide(summary)
+        self.assertEqual(decision["recommended_method"], private_candidate)
+        self.assertEqual(decision["recommended_action"], "accelerate")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            write_share_package(path, records=records, summary=summary, decision=decision, report_md="")
+            for file in path.iterdir():
+                self.assertNotIn("PRIVATE_CUSTOMER", file.read_text(), str(file))
+            shared = [json.loads(line) for line in (path / "records.share.jsonl").read_text().splitlines()]
+            shared_summary = json.loads((path / "summary.share.json").read_text())
+            shared_decision = json.loads((path / "decision.share.json").read_text())
+            candidate = shared_decision["recommended_method"]
+            self.assertTrue(candidate.startswith("redacted-"))
+            self.assertIn(candidate, shared_summary["candidate_ids"])
+            self.assertEqual(shared_summary["candidates"][candidate]["candidate_id"], candidate)
+            self.assertIn(f"{candidate}:task", shared_decision["coverage"]["buckets_insufficient"])
+            ar_keys = {
+                (row["request_id"], row["session_id"], row["repeat_index"])
+                for row in shared if row["candidate_id"] == "ar"
+            }
+            candidate_keys = {
+                (row["request_id"], row["session_id"], row["repeat_index"])
+                for row in shared if row["candidate_id"] == candidate
+            }
+            self.assertEqual(ar_keys, candidate_keys)
+            self.assertEqual(len(ar_keys), 72)
+            self.assertEqual(shared[0]["artifacts"], {"weights_sha256": "a" * 64})
+            wrong = next(row for row in shared if row["correctness"]["failed_request_ids"])
+            self.assertEqual(wrong["correctness"]["failed_request_ids"], [wrong["request_id"]])
+            self.assertEqual(shared[0]["task"], records[0]["task"])
+
+    def test_share_strips_unvalidated_hash_values(self) -> None:
+        records = _as_real(_records("records.jsonl"))
+        summary = _summarize(records)
+        decision = decide(summary)
+        private = "/srv/PRIVATE_HASH_IS_NOT_A_DIGEST"
+        records[0]["protocol_scope_hash"] = private
+        summary["protocol_scope_hashes"] = [private]
+        summary["records_sha256"] = private
+        decision["protocol_hash"] = private
+        decision["protocol_scope_hashes"] = [private]
+        decision["decision_id"] = private
+        with tempfile.TemporaryDirectory() as tmp:
+            write_share_package(Path(tmp), records=records, summary=summary, decision=decision, report_md="")
+            for file in Path(tmp).iterdir():
+                self.assertNotIn(private, file.read_text(), str(file))
+
     def test_report_has_required_decision_fields_and_buckets(self) -> None:
         records = _as_real(_records("records.jsonl"))
         summary = _summarize(records)
@@ -342,6 +413,80 @@ class HoldoutPairingTests(unittest.TestCase):
 
 
 class GateCoverageTests(unittest.TestCase):
+    def test_unknown_memory_fit_never_recommends_acceleration(self) -> None:
+        for value in (None, "false"):
+            with self.subTest(value=value):
+                records = _as_real(_records("records.jsonl"))
+                for record in records:
+                    if record["candidate_id"] == "dflash-exact":
+                        record["resource_usage"]["gpu_memory_fit"] = value
+                summary = _summarize(records)
+                candidate = summary["candidates"]["dflash-exact"]
+                self.assertIsNone(candidate["resources"]["memory_fit"])
+                # Even a passing bucket must not bypass the memory gate.
+                candidate["buckets"] = {"task": {"invoice_fields": {
+                    "status": "ok", "ci95_low": 1.2, "ci95_high": 1.4, "n_groups": 24,
+                }}}
+                decision = decide(summary)
+                self.assertNotIn(decision["recommended_action"], ("accelerate", "conditional_accelerate"))
+                excluded = next(item for item in decision["excluded_candidates"] if item["candidate_id"] == "dflash-exact")
+                self.assertIn("gpu_memory_not_verified", {reason["code"] for reason in excluded["reasons"]})
+
+    def test_partial_memory_evidence_does_not_become_true(self) -> None:
+        records = _as_real(_records("records.jsonl"))
+        target = next(record for record in records if record["candidate_id"] == "dflash-exact")
+        target["resource_usage"]["gpu_memory_fit"] = None
+        summary = _summarize(records)
+        self.assertIsNone(summary["candidates"]["dflash-exact"]["gates"]["memory"])
+        self.assertEqual(decide(summary)["recommended_action"], "retain_ar")
+
+    def test_false_memory_fit_is_distinct_from_missing(self) -> None:
+        records = _as_real(_records("records.jsonl"))
+        target = next(record for record in records if record["candidate_id"] == "dflash-exact")
+        target["resource_usage"]["gpu_memory_fit"] = False
+        summary = _summarize(records)
+        self.assertIs(summary["candidates"]["dflash-exact"]["gates"]["memory"], False)
+        decision = decide(summary)
+        excluded = next(item for item in decision["excluded_candidates"] if item["candidate_id"] == "dflash-exact")
+        self.assertIn("gpu_memory_not_fit", {reason["code"] for reason in excluded["reasons"]})
+
+    def test_memory_fit_and_quality_evaluated_require_booleans(self) -> None:
+        record = _as_real(_records("records.jsonl"))[0]
+        record["resource_usage"]["gpu_memory_fit"] = "false"
+        record["quality"]["evaluated"] = "false"
+        codes = {issue["code"] for issue in validate_record(record)}
+        self.assertIn("invalid_memory_fit", codes)
+        self.assertIn("invalid_quality_evaluated", codes)
+
+    def test_unknown_or_missing_quality_status_remains_conditional(self) -> None:
+        for quality in ({"evaluated": True}, {"evaluated": True, "status": "unknown"},
+                        {"evaluated": True, "status": "conditional"}):
+            with self.subTest(quality=quality):
+                records = _as_real(_records("records.jsonl"))
+                for record in records:
+                    if record["candidate_id"] == "dflash-exact":
+                        record["quality"] = quality.copy()
+                        self.assertEqual(validate_record(record), [])
+                summary = _summarize(records)
+                candidate = summary["candidates"]["dflash-exact"]
+                self.assertEqual(candidate["quality"]["status"], "conditional")
+                self.assertIsNone(candidate["quality"]["score_mean"])
+                self.assertEqual(decide(summary)["recommended_action"], "conditional_accelerate")
+
+    def test_mixed_quality_status_does_not_hide_unknown_session(self) -> None:
+        records = _as_real(_records("records.jsonl"))
+        target = next(record for record in records if record["candidate_id"] == "dflash-exact")
+        target["quality"] = {"evaluated": True, "status": "unknown"}
+        summary = _summarize(records)
+        self.assertEqual(summary["candidates"]["dflash-exact"]["quality"]["status"], "conditional")
+        self.assertEqual(decide(summary)["recommended_action"], "conditional_accelerate")
+
+    def test_no_labels_still_allows_explicitly_conditional_advice(self) -> None:
+        records = _as_real(_records("records.jsonl"))
+        summary = _summarize(records, labels=set())
+        self.assertEqual(summary["candidates"]["dflash-exact"]["quality"]["status"], "not_evaluated")
+        self.assertEqual(decide(summary)["recommended_action"], "conditional_accelerate")
+
     def test_one_labeled_group_cannot_pass_quality_and_sessions_do_not_inflate(self) -> None:
         records = _as_real(_records("records.jsonl"))
         labels = {"req-06"}

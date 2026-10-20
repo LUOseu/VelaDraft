@@ -487,13 +487,16 @@ def _resource_summary(records: list[dict]) -> dict:
             peak = device.get("peak_allocated_bytes")
             if isinstance(peak, int):
                 peaks[uuid] = max(peaks.get(uuid, 0), peak)
-        if record["resource_usage"].get("gpu_memory_fit") is not None:
-            fit_values.append(bool(record["resource_usage"]["gpu_memory_fit"]))
+        fit_values.append(record["resource_usage"].get("gpu_memory_fit"))
     return {
         "all_allocated_gpu_hours_max_record": max(allocated) if allocated else None,
         "measured_run_gpu_hours_max_record": max(measured) if measured else None,
         "peak_allocated_bytes": peaks,
-        "memory_fit": all(fit_values) if fit_values else None,
+        "memory_fit": (
+            False if any(value is False for value in fit_values)
+            else True if fit_values and all(value is True for value in fit_values)
+            else None
+        ),
     }
 
 
@@ -609,7 +612,7 @@ def _quality_summary(
     for request_id, request_records in by_request.items():
         if expected_labels is not None and request_id not in expected_labels:
             continue
-        evaluated = [record for record in request_records if (record.get("quality") or {}).get("evaluated")]
+        evaluated = [record for record in request_records if (record.get("quality") or {}).get("evaluated") is True]
         if not evaluated:
             continue
         statuses = [str((record.get("quality") or {}).get("status", "unknown")) for record in evaluated]
@@ -630,11 +633,13 @@ def _quality_summary(
         ]
         score = min(scores) if scores else None
         threshold = max(thresholds) if thresholds else None
-        failed = "fail" in statuses or any(status == "fail" for status in statuses)
+        failed = "fail" in statuses
         if score is not None and threshold is not None and score < threshold:
             failed = True
         evaluated_requests[request_id] = {
-            "status": "fail" if failed else ("conditional" if "conditional" in statuses else "pass"),
+            # Missing/unknown scorer output is not a quality pass, even when
+            # a label exists. Keep diagnostics without inventing a score.
+            "status": "fail" if failed else ("pass" if all(status == "pass" for status in statuses) else "conditional"),
             "score": score,
             "threshold": threshold,
             "json_schema_valid": all(schema_flags) if schema_flags else None,

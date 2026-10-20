@@ -32,3 +32,15 @@ The generator is deterministic: rerunning it must produce identical bytes.
 unsupported inputs, protocol-mismatched AR cache, non-exact candidates,
 aggregate-only imports, null streaming metrics, deterministic replay and the
 share-package redaction.
+
+Recommendation gates require explicitly verified memory fit for every
+candidate record. Missing memory evidence is not a pass. Missing or unknown
+business-quality status stays conditional, with unavailable scores left null;
+the no-label path can still produce explicitly conditional advice.
+
+The share package preserves token-shaped public IDs for auditability. IDs
+containing paths or free text are replaced consistently with deterministic
+hash-based pseudonyms in records, summaries and decisions, preserving AR /
+candidate joins. This is pseudonymization, not a guarantee of anonymity.
+Hash fields are retained only when their values are actual SHA256 digests;
+a field name ending in `_sha256` does not make arbitrary text safe to share.

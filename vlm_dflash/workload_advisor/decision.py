@@ -76,6 +76,8 @@ def _candidate_exclusions(candidate: dict, summary: dict) -> list[dict]:
         reasons.append(_reason("quality_failed", "Task quality is below the frozen threshold."))
     if gates.get("memory") is False:
         reasons.append(_reason("gpu_memory_not_fit", "Candidate does not fit the available device memory."))
+    elif gates.get("memory") is not True:
+        reasons.append(_reason("gpu_memory_not_verified", "Memory fit is not verified for every candidate record."))
     if not gates.get("real_measurement"):
         reasons.append(_reason("aggregate_only", "Aggregate-only evidence cannot produce per-request speed CIs."))
     if not gates.get("assignment_verified"):
@@ -117,7 +119,7 @@ def _blocking_without_speed(candidate: dict, summary: dict) -> bool:
         or not gates.get("correctness")
         or not gates.get("run_errors")
         or quality.get("status") == "fail"
-        or gates.get("memory") is False
+        or gates.get("memory") is not True
         or not gates.get("real_measurement")
         or "relaxed" in (candidate.get("acceptance_policies") or [])
     )

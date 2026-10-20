@@ -17,6 +17,7 @@ from .schema import (
     PROJECT_SCOPE,
     SCHEMA_VERSION,
     canonical_json,
+    is_sha256,
     sha256_json,
     validate_record,
 )
@@ -232,6 +233,21 @@ def _safe_token(value: Any) -> str | None:
     return value if _SAFE_TOKEN.fullmatch(value) else None
 
 
+def _share_id(value: Any) -> str | None:
+    """Preserve public token IDs; pseudonymize private paths/free text.
+
+    Use the same mapping everywhere so AR/candidate joins and references in
+    the summary and decision remain intact without exporting local paths.
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    return _safe_token(value) or f"redacted-{sha256_json(value)}"
+
+
+def _safe_hash(value: Any) -> str | None:
+    return value.lower() if is_sha256(value) else None
+
+
 def _safe_reason(value: Any) -> str:
     if isinstance(value, str) and _SAFE_REASON.fullmatch(value):
         return value
@@ -362,7 +378,7 @@ def _safe_correctness(correctness: Any) -> dict | None:
             result[key] = value
     for key in ("failed_request_ids", "run_error_request_ids"):
         if isinstance(correctness.get(key), list):
-            result[key] = [token for token in (_safe_token(value) for value in correctness[key]) if token]
+            result[key] = [token for token in (_share_id(value) for value in correctness[key]) if token]
     for key in ("status_counts",):
         if isinstance(correctness.get(key), dict):
             result[key] = {
@@ -515,6 +531,24 @@ def redact_record(record: dict) -> dict:
         "missing_reasons",
     }
     redacted = {key: record.get(key) for key in allowed if key in record}
+    for key in ("run_id", "request_id", "group_id", "session_id", "candidate_id", "task"):
+        if key in redacted:
+            redacted[key] = _share_id(redacted[key])
+    for key in (
+        "schema_version", "project_scope", "split", "method", "requested_method",
+        "effective_method", "correctness_status", "acceptance_policy", "measurement_scope",
+    ):
+        if key in redacted:
+            redacted[key] = _safe_token(redacted[key])
+    for key in ("protocol_hash", "protocol_scope_hash"):
+        if key in redacted:
+            redacted[key] = _safe_hash(redacted[key])
+    for key in ("repeat_index", "execution_order", "output_tokens_R"):
+        if key in redacted and not isinstance(redacted[key], int):
+            redacted[key] = None
+    for key in ("include_in_paper", "synthetic"):
+        if key in redacted and not isinstance(redacted[key], bool):
+            redacted[key] = None
     for key in ("target_identity", "draft_identity"):
         redacted[key] = _safe_identity(redacted.get(key))
     redacted["backend_identity"] = _safe_identity(redacted.get("backend_identity"))
@@ -526,7 +560,7 @@ def redact_record(record: dict) -> dict:
     redacted["visual_tokens"] = {
         key: value
         for key, value in (redacted.get("visual_tokens") or {}).items()
-        if isinstance(value, (int, float, bool)) or value is None
+        if key in {"target_V", "draft_V"} and (isinstance(value, (int, float, bool)) or value is None)
     }
     measurement = redacted.get("measurement")
     if isinstance(measurement, dict):
@@ -558,7 +592,9 @@ def redact_record(record: dict) -> dict:
         else:
             redacted["fallback"] = {"code": "fallback"}
     redacted["artifacts"] = {
-        key: value for key, value in (record.get("artifacts") or {}).items() if key.endswith("_sha256")
+        key: _safe_hash(value)
+        for key, value in (record.get("artifacts") or {}).items()
+        if _safe_token(key) and key.endswith("_sha256") and _safe_hash(value) is not None
     }
     if record.get("error"):
         redacted["error"] = {
