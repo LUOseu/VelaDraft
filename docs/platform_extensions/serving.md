@@ -390,15 +390,55 @@ python scripts/run_serving_gate.py compare \
 # EXIT:2 (expected); SD_EXECUTED=true; SD_CORRECTNESS_PASS=false
 ```
 
-HTTP lifecycle (server already healthy; no GPU visibility is needed in the
+HTTP lifecycle (run this block in Bash; no GPU visibility is needed in the
 measurement client):
 
+The subshell tracks only the launcher PID it starts. The launcher replaces
+itself with the API server, so cleanup signals and waits for that owned process,
+including on failure or interruption. After shutdown, wait until GPU 3 has no
+compute processes before launching the next mode. The bounded check below stops
+with an error if the GPU remains occupied; it never terminates a remaining or
+unrelated job. The launcher independently refuses a busy GPU and takes its UUID
+lock, so another job acquiring the GPU between the check and launch is not
+silently displaced.
+
 ```console
+(
+set -e
+mkdir -p /tmp/veladraft_serving/evidence /tmp/veladraft_serving/logs
+server_pid=
+stop_owned_server() {
+  if [ -n "$server_pid" ]; then
+    # Only signal this shell's still-running child, never a stale or other PID.
+    if jobs -pr | grep -Fxq -- "$server_pid"; then
+      kill -TERM "$server_pid" 2>/dev/null || true
+    fi
+    wait "$server_pid" 2>/dev/null || true
+    server_pid=
+  fi
+}
+wait_for_idle_gpu() {
+  for ((attempt=0; attempt<60; attempt++)); do
+    processes=$(nvidia-smi --id=3 --query-compute-apps=pid --format=csv,noheader,nounits)
+    if [ -z "$processes" ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "GPU 3 is still occupied; wait for its owner to finish, then rerun. No other job was stopped." >&2
+  return 1
+}
+trap stop_owned_server EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+wait_for_idle_gpu
+
 date +%s > /tmp/veladraft_serving/evidence/ar_allocation_start_epoch
 CUDA_VISIBLE_DEVICES=3 VLLM_SOURCE_COMMIT=0decac0d96c42b49572498019f0a0e3600f50398 \
   python scripts/run_serving_gate.py serve \
   --config configs/platform_extensions/serving/ar.json --gpu-index 3 --port 8100 \
   > /tmp/veladraft_serving/logs/ar_lifecycle_server.log 2>&1 &
+server_pid=$!
 
 DEVICES='[{"index":3,"name":"NVIDIA RTX A6000","uuid":"GPU-06d42c3b-89d2-20d5-8189-9b4564fec135","compute_capability":"8.6"}]'
 
@@ -414,12 +454,15 @@ CUDA_VISIBLE_DEVICES="" python scripts/run_serving_gate.py measure \
   --allocation-start-epoch "$(cat /tmp/veladraft_serving/evidence/ar_allocation_start_epoch)" \
   --concurrency 1,2,4 --sessions 3 --no-async-scheduling
 # EXIT:0
+stop_owned_server
+wait_for_idle_gpu
 
 date +%s > /tmp/veladraft_serving/evidence/ngram_allocation_start_epoch
 CUDA_VISIBLE_DEVICES=3 VLLM_SOURCE_COMMIT=0decac0d96c42b49572498019f0a0e3600f50398 \
   python scripts/run_serving_gate.py serve \
   --config configs/platform_extensions/serving/ngram.json --gpu-index 3 --port 8101 \
   > /tmp/veladraft_serving/logs/ngram_lifecycle_server.log 2>&1 &
+server_pid=$!
 
 CUDA_VISIBLE_DEVICES="" python scripts/run_serving_gate.py measure \
   --mode ngram --base-url http://127.0.0.1:8101 \
@@ -433,6 +476,9 @@ CUDA_VISIBLE_DEVICES="" python scripts/run_serving_gate.py measure \
   --allocation-start-epoch "$(cat /tmp/veladraft_serving/evidence/ngram_allocation_start_epoch)" \
   --concurrency 1,2,4 --sessions 3 --no-async-scheduling
 # EXIT:0
+stop_owned_server
+wait_for_idle_gpu
+)
 ```
 
 Merge and audit:
