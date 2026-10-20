@@ -531,7 +531,13 @@ def capabilities_document(evidence_path: str | None = None, state: str = "implem
     }
 
 
-def readiness(manifest: dict) -> dict:
+def readiness(manifest: dict, *, manifest_dir: str | Path | None = None) -> dict:
+    def local_path(value: str) -> Path:
+        path = Path(str(value)).expanduser()
+        if not path.is_absolute() and manifest_dir is not None:
+            path = Path(manifest_dir) / path
+        return path
+
     env = detect_environment()
     blockers: list[dict] = []
     host_blockers: list[dict] = []
@@ -547,7 +553,7 @@ def readiness(manifest: dict) -> dict:
         host_blockers.append({"code": "no_gpu", "detail": "nvidia-smi/torch found no GPU"})
     target = manifest.get("target") or {}
     model_path = target.get("model_path")
-    if model_path and not Path(model_path).expanduser().exists():
+    if model_path and not local_path(model_path).exists():
         host_blockers.append({"code": "target_missing", "detail": f"target model_path not found: {model_path}"})
     elif not model_path:
         warnings.append({"code": "target_path_unset", "detail": "target.model_path is not set; HF cache may resolve it."})
@@ -555,7 +561,7 @@ def readiness(manifest: dict) -> dict:
         if candidate.get("method") != "sd":
             continue
         checkpoint = candidate.get("checkpoint")
-        if checkpoint and not Path(str(checkpoint)).expanduser().exists():
+        if checkpoint and not local_path(checkpoint).exists():
             candidate_blockers.append(
                 {
                     "code": "checkpoint_missing",

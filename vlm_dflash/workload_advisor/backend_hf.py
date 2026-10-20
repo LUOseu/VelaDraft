@@ -12,6 +12,7 @@ TTFT/ITL are null because the HF eval path exposes no per-token stream.
 
 from __future__ import annotations
 
+import gc
 import json
 import math
 import os
@@ -356,6 +357,7 @@ class HFWorkloadBackend:
         self.model = None
         self.processor = None
         self.drafts: dict[str, Any] = {}
+        self.draft_algorithms: dict[str, Any] = {}
         self.ledger: GpuLedger | None = None
         self.run_id = f"wa-{int(time.time())}"
         self.execution_order = 0
@@ -411,6 +413,9 @@ class HFWorkloadBackend:
         pixel_bounds = None
         if min_pixels is not None or max_pixels is not None:
             pixel_bounds = {"min_pixels": min_pixels, "max_pixels": max_pixels}
+        local_processor = self._resolve_local_path(str(processor_path))
+        if local_processor is not None and local_processor.exists():
+            processor_path = str(local_processor)
         return str(processor_path), processor_revision, processor_cfg, pixel_bounds
 
     def _load_pretrained_components(
@@ -667,6 +672,8 @@ class HFWorkloadBackend:
     def _load_model(self):
         target = self.manifest["target"]
         model_path = target.get("model_path") or target.get("model_id")
+        if target.get("model_path"):
+            model_path = str(self._resolve_local_path(target["model_path"]))
         local_only = bool(target.get("local_files_only", True))
         dtype_name = str(target.get("dtype", "bfloat16"))
         dtype = getattr(self._torch(), dtype_name)
@@ -875,6 +882,7 @@ class HFWorkloadBackend:
                 )
                 draft.eval()
                 self.drafts[candidate_id] = draft
+                self.draft_algorithms[candidate_id] = algorithm
                 self.resolved_draft_identities[candidate_id] = resolved
                 self.cold_start[candidate_id] = time.perf_counter() - started
             except BudgetExhausted:
@@ -1372,7 +1380,7 @@ class HFWorkloadBackend:
         return "ok"
 
     def run(self, *, rows: list[dict] | None = None, max_requests: int | None = None) -> dict:
-        ready = readiness(self.manifest)
+        ready = readiness(self.manifest, manifest_dir=self.workload.manifest_dir)
         if ready["status"] == "blocked":
             return self._blocked_result(reason="backend_not_ready", ready=ready)
         rows = list(rows or [row for row in self.workload.rows if row["split"] == "holdout"])
@@ -1407,6 +1415,7 @@ class HFWorkloadBackend:
         stop_reason = "completed"
         execution_stage = "run"
         status = "ok"
+        cleanup_needed = False
         self.blocked_candidate_ids = {
             item.get("candidate_id") for item in ready.get("candidate_blockers") or []
         }
@@ -1435,6 +1444,7 @@ class HFWorkloadBackend:
             execution_stage = "target_preflight"
             self._preflight_target_artifacts()
             execution_stage = "model_load"
+            cleanup_needed = True
             self._load_model()
             self.cold_start["target"] = self.clock() - started
             self._mark_phase("model_load", phase_started)
@@ -1474,7 +1484,7 @@ class HFWorkloadBackend:
             stop_ids = set(int(value) for value in self.manifest["decode"]["stop_ids"])
             max_new_tokens = int(self.manifest["decode"]["max_new_tokens"])
             for candidate in sd_candidates:
-                self.drafts[candidate["candidate_id"]].configure_verify_backend(
+                self.draft_algorithms[candidate["candidate_id"]].configure_verify_backend(
                     self._verify_backend == "reference"
                 )
             # Protocol-matched AR tokens may be reused across sessions; AR timing is re-measured.
@@ -1558,6 +1568,12 @@ class HFWorkloadBackend:
         finally:
             if self.ledger is not None:
                 self.ledger.stop_measured()
+            if cleanup_needed:
+                try:
+                    self._release_models()
+                except Exception as exc:  # cleanup failure must remain visible in the audit
+                    errors.append({"type": type(exc).__name__, "message": str(exc), "stage": "gpu_cleanup"})
+                    stop_reason = "gpu_cleanup_failed"
             if status != "blocked":
                 status = self._aggregate_status(records, errors, stop_reason)
             if status == "failed" and stop_reason == "completed":
@@ -1591,12 +1607,25 @@ class HFWorkloadBackend:
             ),
         }
 
+    def _release_models(self) -> None:
+        """Drop owned CUDA tensors before releasing the lease or stopping its ledger."""
+        self.model = None
+        self.processor = None
+        self.drafts.clear()
+        self.draft_algorithms.clear()
+        gc.collect()
+        self._sync_device()
+        self._torch().cuda.empty_cache()
+
     def _build_protocol(self) -> None:
         from .schema import protocol_payload, protocol_scope_hash  # noqa: PLC0415
 
         self.protocol_payload = protocol_payload(
             self.manifest, self.workload.rows_digest, self.workload.labels_digest
         )
+        # The scope is the frozen manifest contract also checked by report/recommend.
+        # Request hashes additionally bind the actual loaded runtime identities.
+        self.protocol_scope_hash = protocol_scope_hash(self.protocol_payload)
         self.protocol_payload["resolved_target_identity"] = self.resolved_target_identity
         self.protocol_payload["resolved_draft_identities"] = self.resolved_draft_identities
         self.protocol_payload["verify"] = {
@@ -1604,7 +1633,6 @@ class HFWorkloadBackend:
             "verify_backend": self._verify_backend,
         }
         self.protocol_payload["timing_boundary"] = "request_ready_to_committed_output"
-        self.protocol_scope_hash = protocol_scope_hash(self.protocol_payload)
 
     def _reference(self, row: dict, candidate: dict, max_new_tokens: int, stop_ids: set[int]) -> list[int]:
         outcome = self._execute_request(row, candidate, max_new_tokens, sorted(stop_ids))
