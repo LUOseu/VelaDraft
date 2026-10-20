@@ -44,6 +44,16 @@ internal event stream as a public hook.
 
 ## Safety
 
+Pairing eligibility only establishes that timings can be compared diagnostically.
+A `speedup.claim_eligible=true` result additionally requires explicit
+`AR_OFFLINE_PASS`, `SD_EXECUTED`, and `SD_CORRECTNESS_PASS` values of `true`;
+failed or missing correctness never supports an acceleration claim. The full
+lifecycle result must also satisfy every per-mode lifecycle check, including
+same-text/different-image input-submission evidence.
+
+Observed model/speculative configuration is retained as diagnostic metadata.
+It does not by itself verify CLI-declared attention-backend or CUDA-graph labels.
+
 Both `serve` and `offline` take `/tmp/veladraft_gpu_locks/<UUID>.lock` with
 `flock` before checking for compute processes or insufficient free memory.
 They refuse a GPU outside an existing `CUDA_VISIBLE_DEVICES` allocation and
@@ -54,13 +64,3 @@ windows are included.
 
 Do not promote a run to `verified_greedy_exact` based on HTTP status or
 `SD_EXECUTED` alone. The correctness gate and the lifecycle gate are separate.
-
-Pairing eligibility only establishes that timings can be compared diagnostically.
-A `speedup.claim_eligible=true` result additionally requires explicit
-`AR_OFFLINE_PASS`, `SD_EXECUTED`, and `SD_CORRECTNESS_PASS` values of `true`;
-failed or missing correctness never supports an acceleration claim. The full
-lifecycle result must also satisfy every per-mode lifecycle check, including
-same-text/different-image input-submission evidence.
-
-Observed model/speculative configuration is retained as diagnostic metadata.
-It does not by itself verify CLI-declared attention-backend or CUDA-graph labels.
