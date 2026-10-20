@@ -344,7 +344,7 @@ def build_train_config(args) -> dict:
             dataset["annotation"] = args.annotation
     if args.images_dir:
         dataset["images_dir"] = args.images_dir
-        dataset.setdefault("jsonl_images_dir", args.images_dir)
+        dataset["jsonl_images_dir"] = args.images_dir
     if args.limit is not None:
         dataset["slice"] = int(args.limit)
     if not dataset.get("source"):

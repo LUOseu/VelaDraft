@@ -1109,6 +1109,20 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         hidden_state = new_gate + update_gate * (hidden_state - new_gate)
         return hidden_state.unsqueeze(1), hidden_state
 
+    def _domino_gru_sequence(self, token_embeddings: torch.Tensor) -> torch.Tensor:
+        """Differentiable GRU reference for Ascend FP32/BF16 training.
+
+        DynamicGRUV2 on the validated 910B stack accepts only FP16 weights.
+        Reuse the inference cell equations and existing parameters rather than
+        casting the correction head or changing checkpoint keys.
+        """
+        hidden_state = None
+        outputs = []
+        for token in token_embeddings.unbind(dim=1):
+            output, hidden_state = self._domino_gru_step(token.unsqueeze(1), hidden_state)
+            outputs.append(output)
+        return torch.cat(outputs, dim=1)
+
     def backbone_parameters(self) -> list[nn.Parameter]:
         """Return existing DFlash parameters, excluding the visual branch."""
         visual_ids = {id(parameter) for parameter in self.visual_parameters()}

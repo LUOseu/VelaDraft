@@ -138,13 +138,13 @@ def _run_checks(device: torch.device, *, include_fusion: bool, include_h1: bool,
         q = torch.randn(2, 4, 12, 16, device=device, dtype=torch.float32, requires_grad=True)
         k = torch.randn(2, 2, 12, 16, device=device, dtype=torch.float32, requires_grad=True)
         v = torch.randn(2, 2, 12, 16, device=device, dtype=torch.float32, requires_grad=True)
-        output = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        output = F.scaled_dot_product_attention(q, k, v, is_causal=True, enable_gqa=True)
         output.square().mean().backward()
         runtime.synchronize(device)
         q_cpu = q.detach().cpu().requires_grad_(True)
         k_cpu = k.detach().cpu().requires_grad_(True)
         v_cpu = v.detach().cpu().requires_grad_(True)
-        reference = F.scaled_dot_product_attention(q_cpu, k_cpu, v_cpu, is_causal=True)
+        reference = F.scaled_dot_product_attention(q_cpu, k_cpu, v_cpu, is_causal=True, enable_gqa=True)
         reference.square().mean().backward()
         return {
             "heads": 4,
@@ -264,6 +264,9 @@ def _run_checks(device: torch.device, *, include_fusion: bool, include_h1: bool,
             attention_chunk_size=7,
         )
         npu_module = copy.deepcopy(base).to(device)
+        # Frozen target references intentionally are not registered children.
+        npu_module.lm_head.to(device)
+        npu_module.embed_tokens.to(device)
         cpu_module = copy.deepcopy(base).cpu()
         npu_module.train()
         cpu_module.train()
@@ -300,7 +303,7 @@ def _run_checks(device: torch.device, *, include_fusion: bool, include_h1: bool,
             raise AssertionError("draft module parity backward produced no gradients")
         return {
             "loss": float(npu_metrics.loss.detach().cpu()),
-            "max_abs_loss_error": abs(float(npu_metrics.loss.detach().cpu()) - float(cpu_metrics.loss.detach().cpu())),
+            "max_abs_loss_error": _close(npu_metrics.loss, cpu_metrics.loss),
             "max_abs_grad_error": max_grad_error,
             "compared_parameter_grads": compared,
             "attention_chunk_size": 7,
@@ -329,14 +332,15 @@ def _run_checks(device: torch.device, *, include_fusion: bool, include_h1: bool,
         runtime.synchronize(device)
         if info.get("effective_backend") != "npu_fusion":
             raise AssertionError(f"fused path fell back: {info.get('fallback_reason')}")
-        k_cpu = k.detach().cpu().repeat_interleave(2, dim=1).requires_grad_(True)
-        v_cpu = v.detach().cpu().repeat_interleave(2, dim=1).requires_grad_(True)
+        k_cpu = k.detach().cpu().requires_grad_(True)
+        v_cpu = v.detach().cpu().requires_grad_(True)
         q_cpu = q.detach().cpu().requires_grad_(True)
         spec_cpu = DFlashMaskSpec(
             anchors.cpu(), keep.cpu(), ctx_len=4, block_size=2, query_chunk_size=2
         )
         reference = F.scaled_dot_product_attention(
-            q_cpu, k_cpu, v_cpu, attn_mask=spec_cpu.full_additive(dtype=torch.float32)
+            q_cpu, k_cpu, v_cpu, attn_mask=spec_cpu.full_additive(dtype=torch.float32),
+            enable_gqa=True,
         )
         reference.square().mean().backward()
         return {

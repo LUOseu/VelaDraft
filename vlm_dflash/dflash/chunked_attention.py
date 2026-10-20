@@ -131,7 +131,6 @@ def _npu_fusion_call(
         scale=float(scale),
         keep_prob=float(keep_prob),
         sparse_mode=0,
-        return_softmax=False,
     )
     output = result[0] if isinstance(result, (tuple, list)) else result
     return output.reshape(batch, query_len, heads, head_dim).transpose(1, 2)

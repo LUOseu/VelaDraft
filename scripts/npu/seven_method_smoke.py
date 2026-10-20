@@ -5,11 +5,15 @@ This is the H2 execution body used by ``run_npu_smoke.py``. It builds the real
 registered algorithm factory, trainer module, loss and AdamW optimizer for every
 method, trains on deterministic synthetic target features, checks a 5+5 exact
 resume, and exports/reloads the draft. No target checkpoint or image corpus is
-needed; H1/H3/H4 cover real teacher and resource validation separately.
+needed; real teacher validation is a separate CLI run documented under H4.
 
 The script is strict about the device: without ``--allow-cpu`` it refuses any
 device other than ``npu``. A missing NPU writes ``NPU_UNVERIFIED`` and exits 2;
 it never falls back to CPU.
+
+Deterministic operators are enabled for the exact-resume gate. Without them,
+trainable lookup gradients in DSpark/DFlash2 can differ at the bit level on NPU
+despite identical losses and restored state.
 """
 
 from __future__ import annotations
@@ -17,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import platform
+import resource
 import sys
 import tempfile
 import time
@@ -226,6 +231,8 @@ def _specific_gradients(method: str, module, contract: dict, steps: int) -> tupl
     if method == "domino":
         module.set_training_progress(steps // 2, steps)
     batch = _manual_batch(contract)
+    device = next(module.draft_model.parameters()).device
+    batch = {key: value.to(device) if torch.is_tensor(value) else value for key, value in batch.items()}
     metrics = module(
         input_ids=batch["input_ids"],
         hidden_states=batch["hidden"],
@@ -260,6 +267,7 @@ def _write_export_run(
     module,
     draft_config,
     device: torch.device,
+    training_result: dict,
 ) -> Path:
     (run_dir / "train").mkdir(parents=True, exist_ok=True)
     (run_dir / "data").mkdir(parents=True, exist_ok=True)
@@ -272,8 +280,7 @@ def _write_export_run(
     (run_dir / "train" / "train_summary.json").write_text(
         json.dumps(
             {
-                "steps": 2,
-                "final_loss": 1.0,
+                **training_result["summary"],
                 "feature_mode": "offline",
                 "device": str(device),
                 "device_type": device.type,
@@ -282,13 +289,16 @@ def _write_export_run(
         ),
         encoding="utf-8",
     )
+    (run_dir / "train" / "train_log.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in training_result["history"]), encoding="utf-8"
+    )
     algorithm = get_algorithm(method)
     checkpoint = {
         "format": "vlm-dflash-ckpt-v1",
         "algorithm": method,
         "identity": {"model_fingerprint": "f" * 64},
         "feature_mode": "offline",
-        "step": 2,
+        "step": training_result["summary"]["steps"],
         "model": _clone_state(module.draft_model.state_dict()),
         **algorithm.checkpoint_metadata(contract, cfg, draft_config),
         "attention_backend": "sdpa_chunked",
@@ -343,6 +353,17 @@ def _run_method(
     started = time.time()
     module, cfg, draft_config = _build_module(method, contract, steps)
     runtime.reset_peak_memory_stats(device)
+    memory_samples = []
+
+    def sample_memory(step):
+        peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        memory_samples.append({
+            "step": int(step),
+            "accelerator_allocated_bytes": runtime.memory_allocated(device),
+            "host_peak_rss_bytes": int(peak_rss if sys.platform == "darwin" else peak_rss * 1024),
+        })
+
+    sample_memory(0)
     before = {name: parameter.detach().clone() for name, parameter in module.draft_model.named_parameters()}
     continuous = run_training_loop(
         module,
@@ -353,7 +374,10 @@ def _run_method(
         total_steps=steps,
         seed=seed,
         shuffle=False,
+        save_every=max(1, steps // 10),
+        on_checkpoint=lambda state: sample_memory(state["step"]),
     )
+    sample_memory(steps)
     history = continuous["history"]
     if len(history) != steps:
         raise AssertionError(f"expected {steps} optimizer steps, got {len(history)}")
@@ -366,7 +390,8 @@ def _run_method(
         raise AssertionError(f"draft parameter is on {first_parameter.device}, expected {device}")
 
     changed = sum(
-        1 for name, parameter in module.draft_model.named_parameters() if not torch.equal(parameter, before[name])
+        1 for name, parameter in module.draft_model.named_parameters()
+        if not torch.equal(parameter.detach().cpu(), before[name].cpu())
     )
     if changed == 0:
         raise AssertionError("no draft parameter changed after training")
@@ -427,7 +452,7 @@ def _run_method(
         _assert_state_equal(continuous["final_state"][key], resumed["final_state"][key], key)
 
     run_dir = artifact_dir / method
-    _write_export_run(run_dir, contract, cfg, method, module, draft_config, device)
+    _write_export_run(run_dir, contract, cfg, method, module, draft_config, device, continuous)
     _export_round_trip(run_dir, module, contract)
     runtime.synchronize(device)
     peak = runtime.max_memory_allocated(device)
@@ -448,6 +473,7 @@ def _run_method(
         "final_loss": float(history[-1]["loss"]),
         "elapsed_seconds": round(time.time() - started, 3),
         "peak_memory_bytes": None if peak is None else int(peak),
+        "memory_samples": memory_samples,
         "device_type": device.type,
         "device_name": runtime.device_name(device),
     }
@@ -462,7 +488,12 @@ def main() -> int:
     parser.add_argument("--out", default=str(ROOT / "runs" / "npu" / "seven_methods.json"))
     parser.add_argument("--artifact-dir", default=str(ROOT / "runs" / "npu" / "seven_methods_artifacts"))
     parser.add_argument("--allow-cpu", action="store_true", help="debug only: mark evidence CPU_REFERENCE")
+    parser.add_argument(
+        "--deterministic", action=argparse.BooleanOptionalAction, default=True,
+        help="require deterministic operators for the bitwise resume gate (default: enabled)",
+    )
     args = parser.parse_args()
+    torch.use_deterministic_algorithms(args.deterministic)
 
     registered = available_algorithms()
     methods = registered if args.methods == "all" else [item.strip() for item in args.methods.split(",") if item.strip()]
@@ -476,6 +507,7 @@ def main() -> int:
         "methods": methods,
         "steps_requested": args.steps,
         "seed": args.seed,
+        "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
         "environment": {
             "python": platform.python_version(),
             "platform": platform.platform(),

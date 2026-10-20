@@ -21,6 +21,57 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from vlm_dflash.adapters import adapter_for_model, get_adapter
 from vlm_dflash.adapters.smolvlm import SmolVLMAdapter
+
+
+@pytest.mark.parametrize("patches_per_side", [4, 27])
+def test_npu_vision_positions_preserve_bf16_bucket_boundaries(monkeypatch, patches_per_side):
+    from transformers.models.smolvlm.configuration_smolvlm import SmolVLMVisionConfig
+    from transformers.models.smolvlm.modeling_smolvlm import SmolVLMVisionEmbeddings
+    from vlm_dflash.adapters.smolvlm import _npu_vision_embeddings_forward
+
+    size = patches_per_side * 7
+    config = SmolVLMVisionConfig(hidden_size=16, image_size=size, patch_size=7)
+    embeddings = SmolVLMVisionEmbeddings(config).to(torch.bfloat16)
+    pixels = torch.randn(2, 3, size, size, dtype=torch.bfloat16)
+    mask = torch.ones(2, patches_per_side, patches_per_side, dtype=torch.bool)
+    mask[1, -1, :] = False
+    mask[1, :, -2:] = False
+    reference = embeddings(pixels, mask)
+    original = torch.bucketize
+    calls = []
+
+    def bucketize(values, boundaries, **kwargs):
+        assert values.dtype == torch.float32
+        calls.append(values.dtype)
+        return original(values, boundaries, **kwargs)
+
+    monkeypatch.setattr(torch, "bucketize", bucketize)
+    actual = _npu_vision_embeddings_forward(embeddings, pixels, mask)
+    assert len(calls) == 2
+    torch.testing.assert_close(actual, reference, rtol=0, atol=0)
+
+
+def test_npu_vision_adaptation_preserves_accelerate_hooks(monkeypatch):
+    from accelerate.hooks import ModelHook, add_hook_to_module
+    from transformers.models.smolvlm.configuration_smolvlm import SmolVLMVisionConfig
+    from transformers.models.smolvlm.modeling_smolvlm import SmolVLMVisionEmbeddings
+    from vlm_dflash.adapters.base import VLMAdapter
+
+    embeddings = SmolVLMVisionEmbeddings(SmolVLMVisionConfig(hidden_size=16, image_size=28, patch_size=7))
+    calls = []
+
+    class Hook(ModelHook):
+        def pre_forward(self, module, *args, **kwargs):
+            calls.append("hook")
+            return args, kwargs
+
+    add_hook_to_module(embeddings, Hook())
+    model = torch.nn.Module()
+    model.add_module("embeddings", embeddings)
+    monkeypatch.setattr(VLMAdapter, "load_model", lambda *a, **k: model)
+    SmolVLMAdapter().load_model("unused", backend_hint="npu")
+    embeddings(torch.randn(1, 3, 28, 28), torch.ones(1, 4, 4, dtype=torch.bool))
+    assert calls == ["hook"]
 from vlm_dflash.contract import ContractError, ensure_contract, resolve_contract
 
 IMAGE_SEQ_LEN = 81
@@ -216,6 +267,19 @@ def test_expected_image_token_counts_are_tiles_times_fixed_length():
     single = torch.zeros(1, 1, 3, 384, 384)
     assert adapter.expected_image_token_counts({"pixel_values": single}, merge_size=None) == [IMAGE_SEQ_LEN]
     assert adapter.expected_image_token_counts({}, merge_size=None) is None
+
+
+@pytest.mark.parametrize("image_size,patch_size,scale_factor,expected", [(384, 14, 3, 81), (512, 16, 4, 64)])
+def test_tile_length_comes_from_the_loaded_model(image_size, patch_size, scale_factor, expected):
+    from types import SimpleNamespace
+    config = SimpleNamespace(
+        vision_config=SimpleNamespace(image_size=image_size, patch_size=patch_size),
+        scale_factor=scale_factor,
+    )
+    adapter = SmolVLMAdapter()
+    assert adapter.expected_image_token_counts(
+        {"pixel_values": torch.empty(1, 17, 3, 1, 1)}, merge_size=None, model_config=config
+    ) == [17 * expected]
 
 
 def test_capture_forward_inputs_concats_and_rejects_mismatches():

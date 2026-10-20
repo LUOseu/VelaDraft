@@ -5,7 +5,7 @@ Date: 2026-10-19. Host: macOS arm64, no CUDA and no Ascend NPU. Python 3.12.13
 accelerate 1.15.0. Base repository SHA:
 `832edea25dd88ecbda03de96496d140e9fcca0a4`.
 
-## Actual Results
+## Historical CPU preparation results (2026-10-19)
 
 | Check | Command | Result |
 |---|---|---|
@@ -62,17 +62,15 @@ Every method has:
 - export to the self-describing portable format, reload without `torch_npu`,
   and an identical small forward.
 
-## NOT_RUN
+## Real hardware evidence
 
-The following were not executed and must not be reported as passed:
+H0-H3, seven-method real-target BF16 training/evaluation/export, online and
+multi-device placement have now executed. See [HARDWARE_RESULTS.md](HARDWARE_RESULTS.md)
+for the measured scope and raw JSON. The CPU results above remain a separate
+reference, not a substitute for those hardware runs.
 
-- H0/H1 operator, SDPA, GQA, BF16, mask and fused-attention checks on an NPU.
-- H2 real-image training on an NPU; only CPU synthetic-feature evidence exists.
-- H3 200-step continuity and memory-growth checks.
-- H4 Qwen3-VL, SmolVLM, Qwen3.6-35B-A3B, device-map and multi-device checks.
-- CUDA regression execution; the host has no CUDA device.
-- HCCL/DDP; DDP is not implemented in this branch.
-
-The staged runner writes these as NPU_UNVERIFIED or NOT_RUN. Any future pass
-must include the generated JSON and logs, the exact commit, software stack,
-device name and phase timings.
+Not validated: full-weight Qwen3.5/3.6-MoE, CUDA hardware regression in this
+session, HCCL/DDP, full fused-attention training, production convergence or
+matched GPU/NPU performance. H4 in the generic runner remains a command template
+and returns a nonpassing result when requested; separately executed real-model
+and placement runs have their own evidence.

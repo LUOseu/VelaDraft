@@ -262,11 +262,7 @@ class TimingRun:
         event_cls = getattr(api, "Event", None) if api is not None else None
         if event_cls is not None:
             try:
-                if resolved.type == "cuda":
-                    with torch.cuda.device(resolved):
-                        run.start_event = event_cls(enable_timing=True)
-                        run.start_event.record()
-                else:
+                with api.device(resolved):
                     run.start_event = event_cls(enable_timing=True)
                     run.start_event.record()
                 return run
@@ -283,19 +279,20 @@ class TimingRun:
             api = _api_for(self.device)
             event_cls = getattr(api, "Event", None) if api is not None else None
             if event_cls is not None:
-                self.end_event = event_cls(enable_timing=True)
-                self.end_event.record()
+                with api.device(self.device):
+                    self.end_event = event_cls(enable_timing=True)
+                    self.end_event.record()
                 self.stopped = 0.0
                 return
         synchronize(self.device)
         self.stopped = time.perf_counter()
 
     def elapsed_seconds(self) -> float:
+        if self.stopped is None:
+            self.stop()
         if self.start_event is not None and self.end_event is not None:
             synchronize(self.device)
             return float(self.start_event.elapsed_time(self.end_event)) / 1000.0
-        if self.stopped is None:
-            self.stop()
         assert self.stopped is not None
         return max(0.0, self.stopped - self.started)
 

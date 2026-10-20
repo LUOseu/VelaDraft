@@ -74,6 +74,7 @@ jobs:
               "vlm_dflash/presets/npu-split-device.yaml",
               "vlm_dflash/presets/npu-target-device-map.yaml",
               "vlm_dflash/resources/constraints-tested.txt",
+              "vlm_dflash/resources/constraints-npu.txt",
           ]
           missing = [name for name in expected if name not in names]
           assert not missing, f"wheel is missing packaged resources: {missing}"

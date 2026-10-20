@@ -124,11 +124,11 @@ states live in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md) (generated).
   and supervised ([docs/data.md](docs/data.md)).
 - **Hardware:** the validated reference is a single 48 GB GPU; the 24 GB preset
   remains a *suggested* configuration (no recorded run on a real 24 GB card).
-- **Ascend NPU:** device resolution, chunked attention, all seven trainers,
-  resume and portable export are implemented and CPU-verified, but no real NPU
-  run is recorded in this checkout (`NPU_UNVERIFIED`). Fused attention is
-  opt-in, NPU `device_map` is a candidate, and DDP is not implemented. See
-  [docs/npu/README.md](docs/npu/README.md).
+- **Ascend NPU:** all seven methods have BF16 offline training, token-exact
+  evaluation and export evidence on two Ascend 910B3 devices. DFlash also has
+  online, split teacher/drafter, sharded-target and 200-step checks. These are
+  small engineering runs; DDP remains unsupported. See the
+  [NPU results and setup](docs/npu/README.md).
 - **Training modes:** offline staged features (default), online live
   extraction from a frozen target, and `--features` store reuse. There is no
   DDP / multi-node launch path. "Online" is not on-policy rollout training.

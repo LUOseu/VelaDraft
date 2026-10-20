@@ -60,7 +60,7 @@ python scripts/npu/run_npu_smoke.py --device npu:0 --phases H2 --work-dir runs/n
 
 Pass conditions for each of the seven registered methods: at least 10 real
 optimizer steps, finite losses, method-specific gradients, parameter updates,
-exact same-device resume and export/reload parity. The default H2 body uses
+exact same-device resume with deterministic algorithms enabled, and export/reload parity. The default H2 body uses
 deterministic synthetic target features, so it proves the device training path
 but not a real image-text teacher forward.
 
@@ -108,7 +108,7 @@ Qwen3.5/3.6 uses the PyTorch Gated DeltaNet reference; it is a functional
 candidate and needs full-weight memory accounting.
 
 For teacher/drafter placement, use `npu-split-device`; this is not DDP. For the
-Accelerate candidate, use `npu-target-device-map` only as an experiment; its
+validated Qwen2.5-VL placement, use `npu-target-device-map`; its
 module-to-device map places the visual tower on `npu:0` and the language model
 plus LM head on `npu:1`. DDP and HCCL are not implemented in this branch and
 remain NOT_IMPLEMENTED.

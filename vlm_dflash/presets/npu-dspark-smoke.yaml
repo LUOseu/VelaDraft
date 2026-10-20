@@ -28,7 +28,7 @@ regen:
   batch_size: 1
   temperature: 0.0
 capture:
-  seq_length: 256
+  seq_length: 1024
   shard_size: 4
   dtype: bfloat16
   visual_path_check: true
@@ -44,7 +44,6 @@ drafter:
   attention_chunk_size: 32
   spatial_rope_enabled: true
   spatial_rope_mode: replace
-  capture_layer_ids: [0, 1]
 train:
   feature_mode: offline
   micro_batch_size: 1

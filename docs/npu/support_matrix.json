@@ -1,16 +1,26 @@
 {
   "format": "vlm-dflash-npu-support-matrix-v1",
-  "updated": "2026-10-19",
+  "updated": "2026-10-20",
   "baseline_sha": "832edea25dd88ecbda03de96496d140e9fcca0a4",
   "overall": {
     "implementation": "COMPLETE",
     "cpu_evidence": "CPU_VERIFIED",
-    "npu_evidence": "NPU_UNVERIFIED",
-    "conclusion": "CODE_READY + NPU_UNVERIFIED"
+    "npu_evidence": "NPU_SMOKE_PASSED",
+    "conclusion": "CODE_READY + NPU_SMOKE_PASSED (bounded hardware validation)"
   },
   "legend": {
-    "implementation": ["COMPLETE", "PARTIAL", "BLOCKED"],
-    "evidence": ["CPU_VERIFIED", "NPU_UNVERIFIED", "NPU_SMOKE_PASSED", "NPU_TRAINING_VALIDATED", "NOT_RUN"],
+    "implementation": [
+      "COMPLETE",
+      "PARTIAL",
+      "BLOCKED"
+    ],
+    "evidence": [
+      "CPU_VERIFIED",
+      "NPU_UNVERIFIED",
+      "NPU_SMOKE_PASSED",
+      "NPU_TRAINING_VALIDATED",
+      "NOT_RUN"
+    ],
     "CPU_CONTROL_FLOW_ONLY": "A fake backend exercised argument routing/fallback only; no real Ascend operator ran."
   },
   "methods": [
@@ -18,64 +28,234 @@
       "name": "dflash",
       "implementation": "COMPLETE",
       "cpu_evidence": "CPU_VERIFIED",
-      "npu_evidence": "NPU_UNVERIFIED",
-      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "specific_modules": ["fixed anchors", "decay loss", "KV injection", "block mask"]
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "offline": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "online": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "specific_modules": [
+        "fixed anchors",
+        "decay loss",
+        "KV injection",
+        "block mask"
+      ],
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H2.json",
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ],
+      "validated_modes": [
+        "offline",
+        "online"
+      ],
+      "scope": "Synthetic deterministic resume/export plus Qwen2.5-VL-3B BF16 offline 10-step training, 4-prompt init/final sequential token-exact evaluation and export."
     },
     {
       "name": "dspark",
       "implementation": "COMPLETE",
       "cpu_evidence": "CPU_VERIFIED",
-      "npu_evidence": "NPU_UNVERIFIED",
-      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "specific_modules": ["markov_head", "confidence_head", "recipe targets"]
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "offline": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "online": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "specific_modules": [
+        "markov_head",
+        "confidence_head",
+        "recipe targets"
+      ],
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H2.json",
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ],
+      "validated_modes": [
+        "offline"
+      ],
+      "scope": "Synthetic deterministic resume/export plus Qwen2.5-VL-3B BF16 offline 10-step training, 4-prompt init/final sequential token-exact evaluation and export."
     },
     {
       "name": "domino",
       "implementation": "COMPLETE",
       "cpu_evidence": "CPU_VERIFIED",
-      "npu_evidence": "NPU_UNVERIFIED",
-      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "specific_modules": ["prefix_gru", "embed_proj", "label shift", "correction head"]
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "offline": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "online": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "specific_modules": [
+        "prefix_gru",
+        "embed_proj",
+        "label shift",
+        "correction head"
+      ],
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H2.json",
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ],
+      "validated_modes": [
+        "offline"
+      ],
+      "scope": "Synthetic deterministic resume/export plus Qwen2.5-VL-3B BF16 offline 10-step training, 4-prompt init/final sequential token-exact evaluation and export."
     },
     {
       "name": "jetspec",
       "implementation": "COMPLETE",
       "cpu_evidence": "CPU_VERIFIED",
-      "npu_evidence": "NPU_UNVERIFIED",
-      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "specific_modules": ["in-block causal mask", "forward KL", "teacher hidden stream"]
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "offline": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "online": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "specific_modules": [
+        "in-block causal mask",
+        "forward KL",
+        "teacher hidden stream"
+      ],
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H2.json",
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ],
+      "validated_modes": [
+        "offline"
+      ],
+      "scope": "Synthetic deterministic resume/export plus Qwen2.5-VL-3B BF16 offline 10-step training, 4-prompt init/final sequential token-exact evaluation and export."
     },
     {
       "name": "dflash2",
       "implementation": "COMPLETE",
       "cpu_evidence": "CPU_VERIFIED",
-      "npu_evidence": "NPU_UNVERIFIED",
-      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "specific_modules": ["dynamic causal conv", "candidate_selector", "selector objective"]
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "offline": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "online": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "specific_modules": [
+        "dynamic causal conv",
+        "candidate_selector",
+        "selector objective"
+      ],
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H2.json",
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ],
+      "validated_modes": [
+        "offline"
+      ],
+      "scope": "Synthetic deterministic resume/export plus Qwen2.5-VL-3B BF16 offline 10-step training, 4-prompt init/final sequential token-exact evaluation and export."
     },
     {
       "name": "dflare",
       "implementation": "COMPLETE",
       "cpu_evidence": "CPU_VERIFIED",
-      "npu_evidence": "NPU_UNVERIFIED",
-      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "specific_modules": ["layer_fusion_weights", "separate context K/V projection"]
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "offline": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "online": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "specific_modules": [
+        "layer_fusion_weights",
+        "separate context K/V projection"
+      ],
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H2.json",
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ],
+      "validated_modes": [
+        "offline"
+      ],
+      "scope": "Synthetic deterministic resume/export plus Qwen2.5-VL-3B BF16 offline 10-step training, 4-prompt init/final sequential token-exact evaluation and export."
     },
     {
       "name": "dfly",
       "implementation": "COMPLETE",
       "cpu_evidence": "CPU_VERIFIED",
-      "npu_evidence": "NPU_UNVERIFIED",
-      "offline": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "online": {"forward": "implemented", "backward": "implemented", "update": "implemented", "resume": "implemented", "export": "implemented"},
-      "specific_modules": ["layer_fusion_weights", "hidden_correction", "recipe stage switch"]
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "offline": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "online": {
+        "forward": "implemented",
+        "backward": "implemented",
+        "update": "implemented",
+        "resume": "implemented",
+        "export": "implemented"
+      },
+      "specific_modules": [
+        "layer_fusion_weights",
+        "hidden_correction",
+        "recipe stage switch"
+      ],
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H2.json",
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ],
+      "validated_modes": [
+        "offline"
+      ],
+      "scope": "Synthetic deterministic resume/export plus Qwen2.5-VL-3B BF16 offline 10-step training, 4-prompt init/final sequential token-exact evaluation and export."
     }
   ],
   "adapters": [
@@ -83,15 +263,21 @@
       "name": "qwen25_vl",
       "implementation": "COMPLETE",
       "cpu_evidence": "CPU_VERIFIED",
-      "npu_evidence": "NPU_UNVERIFIED",
-      "notes": "First real bring-up target; Qwen2.5-VL-3B."
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "notes": "3B: all seven offline methods; DFlash online and two-device placement.",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ]
     },
     {
       "name": "qwen3_vl",
       "implementation": "COMPLETE",
       "cpu_evidence": "CPU_VERIFIED",
-      "npu_evidence": "NPU_UNVERIFIED",
-      "notes": "Untied head and MRoPE layouts preserved."
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "notes": "2B: DFlash offline 10 steps, 4-prompt sequential eval and export. No 8B NPU run.",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ]
     },
     {
       "name": "qwen3_5_moe",
@@ -104,32 +290,161 @@
       "name": "smolvlm",
       "implementation": "COMPLETE",
       "cpu_evidence": "CPU_VERIFIED",
-      "npu_evidence": "NPU_UNVERIFIED",
-      "notes": "1-D positions and tile image path retained."
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "notes": "256M: DFlash offline 10 steps, 4-prompt sequential eval and export. 1-D positions and tile geometry tested.",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ]
     }
   ],
   "stages": [
-    {"name": "prepare", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
-    {"name": "regen", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
-    {"name": "capture", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
-    {"name": "offline_training", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
-    {"name": "online_training", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
-    {"name": "resume", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
-    {"name": "export", "implementation": "COMPLETE", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED"},
-    {"name": "target_device_map", "implementation": "PARTIAL", "cpu_evidence": "CPU_VERIFIED", "npu_evidence": "NPU_UNVERIFIED", "notes": "Candidate; offload refusal implemented, Accelerate/NPU sharding unverified."},
-    {"name": "npu_fusion_attention", "implementation": "COMPLETE", "cpu_evidence": "CPU_CONTROL_FLOW_ONLY", "npu_evidence": "NPU_UNVERIFIED", "notes": "Opt-in only; forward/backward and mask semantics need real NPU evidence."},
-    {"name": "ddp", "implementation": "BLOCKED", "cpu_evidence": "NOT_RUN", "npu_evidence": "NOT_RUN", "notes": "NOT_IMPLEMENTED in this branch; teacher/drafter split is not DDP."}
+    {
+      "name": "prepare",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ]
+    },
+    {
+      "name": "regen",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ]
+    },
+    {
+      "name": "capture",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ]
+    },
+    {
+      "name": "offline_training",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ]
+    },
+    {
+      "name": "online_training",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ]
+    },
+    {
+      "name": "resume",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H2.json"
+      ]
+    },
+    {
+      "name": "export",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ]
+    },
+    {
+      "name": "target_device_map",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_VERIFIED",
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "notes": "Qwen2.5-VL-3B visual/language split on npu:0/npu:1, 10-step online DFlash; no CPU/disk offload.",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/real_runs.json"
+      ]
+    },
+    {
+      "name": "npu_fusion_attention",
+      "implementation": "COMPLETE",
+      "cpu_evidence": "CPU_CONTROL_FLOW_ONLY",
+      "npu_evidence": "NPU_SMOKE_PASSED",
+      "notes": "Forward/backward operator parity passed. Full fused training and speed are not claimed.",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/fusion.json"
+      ]
+    },
+    {
+      "name": "ddp",
+      "implementation": "BLOCKED",
+      "cpu_evidence": "NOT_RUN",
+      "npu_evidence": "NOT_RUN",
+      "notes": "NOT_IMPLEMENTED in this branch; teacher/drafter split is not DDP."
+    }
   ],
   "phases": [
-    {"name": "H0", "status": "NPU_UNVERIFIED", "reason": "No Ascend device in this checkout."},
-    {"name": "H1", "status": "NPU_UNVERIFIED", "reason": "CPU parity exists; NPU operator and fused-attention parity not run."},
-    {"name": "H2", "status": "NPU_UNVERIFIED", "reason": "Seven-method CPU synthetic training passed; real-image NPU short run not run."},
-    {"name": "H3", "status": "NOT_RUN", "reason": "Requires an NPU and an opt-in long continuity run."},
-    {"name": "H4", "status": "NOT_RUN", "reason": "Requires real extended-model checkpoints, image data and multiple NPUs for routing/HCCL."}
+    {
+      "name": "H0",
+      "status": "NPU_SMOKE_PASSED",
+      "reason": "Executed on Ascend 910B3; see attached phase JSON and log. H2/H3 use synthetic features and deterministic operators.",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H0.json"
+      ]
+    },
+    {
+      "name": "H1",
+      "status": "NPU_SMOKE_PASSED",
+      "reason": "Executed on Ascend 910B3; see attached phase JSON and log. H2/H3 use synthetic features and deterministic operators.",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H1.json"
+      ]
+    },
+    {
+      "name": "H2",
+      "status": "NPU_SMOKE_PASSED",
+      "reason": "Executed on Ascend 910B3; see attached phase JSON and log. H2/H3 use synthetic features and deterministic operators.",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H2.json"
+      ]
+    },
+    {
+      "name": "H3",
+      "status": "NPU_SMOKE_PASSED",
+      "reason": "Executed on Ascend 910B3; see attached phase JSON and log. H2/H3 use synthetic features and deterministic operators.",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H3.json"
+      ]
+    },
+    {
+      "name": "H4",
+      "status": "NOT_RUN",
+      "reason": "Comprehensive H4 remains NOT_RUN: full-weight Qwen3.5/3.6 and HCCL absent. Separately executed Qwen2.5-VL/Qwen3-VL/SmolVLM and placement scopes are in real_runs.json."
+    }
   ],
   "backends": [
-    {"name": "cpu", "status": "CPU_VERIFIED"},
-    {"name": "cuda", "status": "NOT_RUN", "reason": "No CUDA device in this checkout; existing CUDA paths retained."},
-    {"name": "npu", "status": "NPU_UNVERIFIED", "reason": "torch_npu/CANN unavailable in this checkout."}
+    {
+      "name": "cpu",
+      "status": "CPU_VERIFIED"
+    },
+    {
+      "name": "cuda",
+      "status": "NOT_RUN",
+      "reason": "No CUDA device in this checkout; existing CUDA paths retained."
+    },
+    {
+      "name": "npu",
+      "status": "NPU_SMOKE_PASSED",
+      "reason": "Real 910B3 devices with torch/torch-npu 2.10.0 and CANN 9.0.0.",
+      "evidence": [
+        "docs/npu/evidence/2026-10-20/H0.json"
+      ]
+    }
   ]
 }

@@ -430,7 +430,7 @@ class VLMAdapter:
                 forward_kwargs[key] = torch.cat(values, dim=0).to(device)
         return forward_kwargs
 
-    def expected_image_token_counts(self, inputs: dict, *, merge_size: int | None) -> list[int] | None:
+    def expected_image_token_counts(self, inputs: dict, *, merge_size: int | None, model_config=None) -> list[int] | None:
         """Per-image expected image-token counts for one processor row (or None).
 
         Grid families derive the count from the patch grid; tile families

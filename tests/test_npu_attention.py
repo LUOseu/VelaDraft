@@ -253,7 +253,8 @@ def test_attention_memory_estimate_and_budget_rejection():
 def _install_fake_fusion(monkeypatch, *, fail: bool = False):
     captured: list[dict] = []
 
-    def fake_fusion(q, k, v, heads, layout, *, atten_mask, scale, keep_prob, sparse_mode, return_softmax):
+    # TorchNPU 2.10.0's real operator schema has no return_softmax keyword.
+    def fake_fusion(q, k, v, heads, layout, *, atten_mask, scale, keep_prob, sparse_mode):
         captured.append({"mask": atten_mask, "layout": layout, "sparse_mode": sparse_mode})
         if fail:
             raise RuntimeError("simulated unsupported shape")

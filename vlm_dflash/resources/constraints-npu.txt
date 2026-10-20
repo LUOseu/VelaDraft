@@ -1,0 +1,10 @@
+# Ascend 910B3 / aarch64 hardware bring-up, 2026-10-20.
+# Requires CANN toolkit AND 910b ops 9.0.0; install the host driver separately.
+# Do not combine this file with a different TorchNPU/CANN release.
+torch==2.10.0
+torchvision==0.25.0
+torch-npu==2.10.0
+transformers==5.12.1
+datasets==4.2.0
+accelerate==1.15.0
+safetensors==0.8.0

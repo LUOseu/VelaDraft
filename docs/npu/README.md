@@ -1,18 +1,22 @@
 # NPU Training Support
 
-Status on 2026-10-19:
+Status on 2026-10-20:
 
 | Axis | State |
 |---|---|
 | Implementation | COMPLETE |
 | CPU evidence | CPU_VERIFIED |
-| NPU evidence | NPU_UNVERIFIED |
+| NPU evidence | NPU_SMOKE_PASSED on two Ascend 910B3 devices |
 
 The seven registered drafters train through the same factory, trainer, loss,
 AdamW/FP32-master path, resume and export code on CPU, CUDA and Ascend NPU.
-The NPU branches are implemented and CPU-tested, but this checkout has **not**
-run on a real Ascend device. Do not read the CPU evidence as proof of an
-Ascend kernel or device.
+All seven methods have real Qwen2.5-VL-3B BF16 offline training, token-exact
+evaluation and export evidence. DFlash also has online, teacher/drafter split,
+target device-map and 200-step evidence. These are small engineering validation
+runs, not production convergence or speedup benchmarks.
+
+See [hardware results](HARDWARE_RESULTS.md) for exact scopes and raw JSON,
+and [installation](INSTALL.md) for the tested CANN/PyTorch/TorchNPU stack.
 
 ## Install And Preflight
 
@@ -68,8 +72,8 @@ Packaged presets (available after a wheel install through `--preset`):
 - `npu-online-smoke`: DFlash with live frozen-target extraction.
 - `npu-split-device`: teacher on `npu:0`, drafter on `npu:1` (model
   placement, not DDP).
-- `npu-target-device-map`: candidate Accelerate `device_map` template; NPU
-  routing is not yet validated.
+- `npu-target-device-map`: Accelerate placement of Qwen2.5-VL's visual tower
+  and language model across two NPUs, validated in a short online run.
 
 All presets use the real schema (`train:`, `target:`, `drafter:`) and
 `drafter.attention_backend: sdpa_chunked`. They assume local inputs from
@@ -80,17 +84,22 @@ or model is downloaded automatically.
 
 - `sdpa` and `sdpa_chunked` are the supported reference attention paths.
   `flex_attention` remains CUDA-only. `npu_fusion` is an opt-in candidate with
-  explicit Ascend mask inversion and per-chunk fallback; its real fusing and
-  performance are NPU_UNVERIFIED.
+  explicit Ascend mask inversion and per-chunk fallback. Its operator
+  forward/backward parity passed; full fused training and performance are not
+  claimed.
 - Qwen3.5/3.6-MoE loads its tracked PyTorch Gated DeltaNet reference path on
   NPU. It is a functional candidate, not a measured production path. The
   35B-A3B target still requires full-weight memory.
-- `target.device_map` uses the existing loader and refuses CPU/disk offload,
-  but Accelerate/NPU sharding compatibility remains a candidate.
+- `target.device_map` refuses CPU/disk offload. The tested placement is the
+  Qwen2.5-VL preset, not every possible architecture or module map.
 - DDP is not implemented in the training trunk. This work does not claim
   multi-NPU data parallelism or HCCL validation.
 - Portability: exports record the serving backend (`sdpa`) separately from the
   training backend and load without importing `torch_npu`.
+- H2/H3 enable deterministic operators to check **bitwise** resume, including
+  DSpark/DFlash2 lookup gradients. Ordinary CLI training keeps PyTorch's default
+  determinism policy; its BF16 checkpoints are resumable, but these tests do not
+  establish bitwise continuation under nondeterministic kernels.
 
 ## Documents
 

@@ -1,0 +1,8 @@
+$ <venv>/bin/python <repo>/scripts/npu/operator_smoke.py --device npu:0 --out <repo>/runs/npu/final/phase_json/H0.json
+
+[stdout]
+{"status": "NPU_SMOKE_PASSED", "checks": {"allocation_matmul_backward": "passed", "rng_round_trip": "passed", "peak_memory": "passed", "sdpa_forward_backward": "passed"}, "json": "<repo>/runs/npu/final/phase_json/H0.json"}
+
+[stderr]
+<venv>/lib/python3.10/site-packages/torch/autograd/__init__.py:230: UserWarning: Cannot create tensor with interal format while allow_internel_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:340.)
+  torch.ones_like(out, memory_format=torch.preserve_format)

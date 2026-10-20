@@ -10,6 +10,7 @@ import importlib
 import random
 import sys
 import types
+from contextlib import contextmanager
 
 import pytest
 import torch
@@ -193,4 +194,38 @@ def test_accelerator_devices_include_parameters_and_buffers():
 
     devices = runtime.accelerator_devices(_FakeModel())
     assert [(device.type, device.index) for device in devices] == [("npu", 0), ("npu", 1)]
+
+
+def test_event_timer_records_both_boundaries_on_selected_device(monkeypatch):
+    selected = torch.device("privateuseone", 0)
+    current = [torch.device("privateuseone", 1)]
+    recorded = []
+
+    @contextmanager
+    def device_context(device):
+        previous = current[0]
+        current[0] = device
+        try:
+            yield
+        finally:
+            current[0] = previous
+
+    class Event:
+        def __init__(self, *, enable_timing):
+            assert enable_timing
+
+        def record(self):
+            recorded.append(current[0])
+
+        def elapsed_time(self, other):
+            return 250.0
+
+    api = types.SimpleNamespace(Event=Event, device=device_context)
+    monkeypatch.setattr(runtime, "_api_for", lambda device: api)
+    monkeypatch.setattr(runtime, "synchronize", lambda device: None)
+    timer = runtime.TimingRun.start(selected)
+    # elapsed_seconds() must also stop an open event timer.
+    assert timer.elapsed_seconds() == 0.25
+    assert recorded == [selected, selected]
+    assert current[0].index == 1
 

@@ -210,7 +210,9 @@ def forward_and_capture_batch(
         # patches become one token; tile families report tiles x fixed length.
         # The count is always of ``image_token_id`` itself: a bridged family
         # span may also contain its structure/whitespace markers.
-        expected_per_image = adapter.expected_image_token_counts(item["inputs"], merge_size=merge_size)
+        expected_per_image = adapter.expected_image_token_counts(
+            item["inputs"], merge_size=merge_size, model_config=model.config
+        )
         span_count = int(sum((row_ids[start : end + 1] == image_token_id).sum() for start, end in spans))
         expected = sum(expected_per_image) if expected_per_image is not None else None
         record = {

@@ -135,7 +135,7 @@ def _phase_command(name: str, spec: dict, args, phase_json: Path, artifact_dir: 
         return command
     if name in ("H2", "H3"):
         methods = str(spec.get("methods", "all"))
-        steps = int(spec.get("steps", args.steps if name == "H2" else args.h3_steps))
+        steps = int(spec["steps"])
         return [
             python,
             str(SEVEN_METHOD_SMOKE),
@@ -243,8 +243,8 @@ def main() -> int:
     parser.add_argument("--device", default="npu:0")
     parser.add_argument("--phases", default=None, help="comma-separated H0,H1,H2,H3,H4; default uses the manifest")
     parser.add_argument("--manifest", default=None, help="optional JSON manifest overlaying the built-in one")
-    parser.add_argument("--steps", type=int, default=10, help="H2 optimizer steps")
-    parser.add_argument("--h3-steps", type=int, default=200, help="H3 continuity steps")
+    parser.add_argument("--steps", type=int, default=None, help="override H2 optimizer steps (default: manifest or 10)")
+    parser.add_argument("--h3-steps", type=int, default=None, help="override H3 continuity steps (default: manifest or 200)")
     parser.add_argument("--timeout", type=float, default=3600.0, help="per-phase timeout in seconds")
     parser.add_argument("--target", default=None, help="local target path used in H4 command templates")
     parser.add_argument("--dataset", default=None, help="local JSONL used in H4 command templates")
@@ -257,6 +257,11 @@ def main() -> int:
     work_dir.mkdir(parents=True, exist_ok=True)
     out_path = Path(args.out).expanduser().resolve() if args.out else work_dir / "run_npu_smoke.json"
     manifest = _load_manifest(args.manifest)
+    for name, steps in (("H2", args.steps), ("H3", args.h3_steps)):
+        if steps is not None:
+            if steps < 10:
+                parser.error(f"{name} requires at least 10 optimizer steps")
+            manifest["phases"][name]["steps"] = steps
     requested = _requested_phases(manifest, args.phases)
     started = time.time()
     manifest["requested_phases"] = requested
@@ -337,7 +342,7 @@ def main() -> int:
         print(json.dumps({"phase": name, "status": record["status"], "seconds": record.get("seconds")}))
 
     if executable_requested:
-        verdict = aggregate_phase_results(phases, requested=executable_requested)
+        verdict = aggregate_phase_results(phases, requested=requested)
         status = verdict["status"]
         problems = verdict["problems"]
     else:

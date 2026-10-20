@@ -1,7 +1,7 @@
 # Compatibility And Boundaries
 
-Last source check: 2026-10-19. No real Ascend device was available for this
-checkout, so every NPU row below is a candidate, not a tested combination.
+Updated: 2026-10-20. The tested stack and executed scopes are recorded in
+[INSTALL.md](INSTALL.md) and [HARDWARE_RESULTS.md](HARDWARE_RESULTS.md).
 
 ## Candidate Software Stacks
 
@@ -10,6 +10,7 @@ Use the pip version, not the product marketing version, in `pip install`.
 
 | Upstream product | PyTorch | `torch_npu` pip package | CANN | Python | State |
 |---|---|---|---|---|---|
+| TorchNPU 26.0.0 | 2.10.0 | `2.10.0` | 9.0.0 toolkit + 910b ops | 3.10.14 | Tested on two 910B3 devices, aarch64, driver 26.0.rc1 |
 | TorchNPU 2.12.0 | 2.12.0 | matching 2.12.0 wheel | 9.1.0 | 3.10-3.14 | Candidate, recommended by upstream |
 | TorchNPU 26.1.1 | 2.10.0 | `2.10.0.post6` | 9.1.X | check the wheel metadata | Candidate, closest to the repository's tested torch 2.10.0 |
 | TorchNPU 26.1.0 | 2.10.0 | `2.10.0.post4` | 9.1.0 | check the wheel metadata | Candidate |
@@ -20,10 +21,9 @@ Sources:
 - https://github.com/Ascend/pytorch/blob/master/COMPATIBILITY.en.md
 - https://www.hiascend.com/document/detail/en/Pytorch/2610/apiref/customapi/docs/en/custom_APIs/torch_npu/torch_npu-npu_fusion_attention.md
 
-Still unknown for the target host: chip model, NPU count, HBM per device,
-driver version, CANN patch level, container architecture and image tag. Do not
-write a specific 910B/910C or link count into a run report until `npu-smi info`
-and a real training run have recorded it.
+Other rows remain candidates. The tested devices advertise 64 GiB each in
+`npu-smi`; PyTorch reports 65,452,113,920 allocatable bytes per device. No
+interconnect bandwidth or topology performance was measured.
 
 ## Runtime Rules
 
@@ -45,10 +45,10 @@ and a real training run have recorded it.
 
 | Backend | Implementation | Evidence | Notes |
 |---|---|---|---|
-| `sdpa` | Complete | CPU_VERIFIED | Full additive mask; reference semantics. |
-| `sdpa_chunked` | Complete | CPU_VERIFIED | Query-chunked mask construction, full K/V softmax per query, activation checkpointing under grad. |
+| `sdpa` | Complete | NPU_SMOKE_PASSED | Full additive mask; reference semantics. |
+| `sdpa_chunked` | Complete | NPU_SMOKE_PASSED | Query-chunked mask construction, full K/V softmax per query, activation checkpointing under grad. |
 | `flex_attention` | Complete | Existing CUDA evidence | Not routed on NPU. |
-| `npu_fusion` | Complete, opt-in | NPU_UNVERIFIED | `torch_npu.npu_fusion_attention`, `True = masked`, per-chunk fallback when enabled. Never auto-selected. |
+| `npu_fusion` | Complete, opt-in | NPU_SMOKE_PASSED (operator only) | `torch_npu.npu_fusion_attention`, `True = masked`, per-chunk fallback when enabled. Never auto-selected. |
 
 The chunked path keeps DFlash context-prefix visibility, document isolation,
 padding-block safety, bidirectional DFlash blocks and JetSpec causal blocks.
@@ -60,9 +60,9 @@ configuration before allocation.
 
 | Family | NPU routing | State |
 |---|---|---|
-| Qwen2.5-VL | Same adapter, device-neutral capture/online path | NPU_UNVERIFIED; first bring-up target |
-| Qwen3-VL | Same adapter, untied head supported | NPU_UNVERIFIED |
-| SmolVLM2 | 1-D positions and tile image path | NPU_UNVERIFIED |
+| Qwen2.5-VL | Same adapter, device-neutral capture/online path | 3B: seven offline methods; DFlash online and two-device placement |
+| Qwen3-VL | Same adapter, untied head supported | 2B DFlash short run; see hardware report |
+| SmolVLM2 | 1-D positions and tile image path; NPU FP32 bucketize with BF16 rounding retained | See hardware report for 256M scope |
 | Qwen3.5/3.6-MoE | Forces upstream PyTorch Gated DeltaNet reference on NPU | NPU_UNVERIFIED; functional candidate only |
 
 The Qwen3.5/3.6 adapter leaves `cache_crop_rollback=False` and does not remove
@@ -76,7 +76,7 @@ active-parameter label.
 - `target.device` and `train.device` may differ; online extraction returns
   features on the drafter device while hooks accept per-layer devices.
 - `target.device_map` is accepted by the existing loader for regen/capture/
-  online. NPU map semantics through Accelerate are a candidate. The loader
+  online. The Qwen2.5-VL visual/language split passed on two NPUs. The loader
   rejects CPU/disk offload; eval rejects a sharded target.
 - DDP is not implemented. Teacher/drafter split or `device_map` must not be
   described as data parallelism. HCCL and multi-rank equivalence are NOT_RUN.

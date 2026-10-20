@@ -89,6 +89,52 @@ def _tiny_batch(batch_size: int = 2, seq_len: int = 48, seed: int = 0):
     return input_ids, loss_mask, hidden
 
 
+def test_portable_gru_sequence_matches_native_forward_and_backward():
+    import copy
+    native = _tiny_domino_module().draft_model
+    portable = copy.deepcopy(native)
+    inputs = torch.randn(3, 5, native.prefix_gru.input_size, requires_grad=True)
+    reference_inputs = inputs.detach().clone().requires_grad_(True)
+    expected, _ = native.prefix_gru(inputs)
+    actual = portable._domino_gru_sequence(reference_inputs)
+    torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
+    weights = torch.randn_like(expected)
+    (expected * weights).sum().backward()
+    (actual * weights).sum().backward()
+    torch.testing.assert_close(reference_inputs.grad, inputs.grad, rtol=1e-5, atol=1e-6)
+    for name, parameter in native.prefix_gru.named_parameters():
+        torch.testing.assert_close(
+            dict(portable.prefix_gru.named_parameters())[name].grad,
+            parameter.grad, rtol=1e-5, atol=1e-6,
+        )
+
+
+@pytest.mark.parametrize("shift_label", [False, True])
+def test_portable_gru_preserves_full_trainer_objective(shift_label):
+    import copy
+    native = _tiny_domino_module(shift_label=shift_label, pure_draft_prefix_len=2)
+    portable = copy.deepcopy(native)
+    portable._prefix_states = portable.draft_model._domino_gru_sequence
+    ids, mask, hidden = _tiny_batch()
+    anchors = torch.tensor([[8, 20], [12, 28]])
+    for module in (native, portable):
+        module.set_training_progress(5, 10)
+    losses = [
+        module(input_ids=ids, loss_mask=mask, hidden_states=hidden,
+               anchor_table=(anchors, torch.ones_like(anchors, dtype=torch.bool))).loss
+        for module in (native, portable)
+    ]
+    torch.testing.assert_close(losses[0], losses[1])
+    for loss in losses:
+        loss.backward()
+    for name, parameter in native.draft_model.named_parameters():
+        if parameter.grad is not None:
+            torch.testing.assert_close(
+                dict(portable.draft_model.named_parameters())[name].grad,
+                parameter.grad, rtol=1e-4, atol=1e-6,
+            )
+
+
 # --------------------------------------------------------------------------- #
 # curriculum
 # --------------------------------------------------------------------------- #

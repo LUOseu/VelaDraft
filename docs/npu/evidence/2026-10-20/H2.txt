@@ -1,0 +1,141 @@
+$ <venv>/bin/python <repo>/scripts/npu/seven_method_smoke.py --device npu:0 --methods all --steps 10 --out <repo>/runs/npu/final/phase_json/H2.json --artifact-dir <repo>/runs/npu/final/artifacts/H2
+
+[stdout]
+[20:49:46] gradient coverage: 29/29 trainable tensors with grad (1.000 of trainable elements)
+[20:49:46]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01003
+[20:49:46]   draft_model.layer_fusion_weights: trainable=1 tensors/4 elements with_grad=1 grad_norm=0.001049
+[20:49:46]   draft_model.layers: trainable=26 tensors/20640 elements with_grad=26 grad_norm=0.7713
+[20:49:46]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=11.59
+[20:49:47] train: epoch end at step 4/10 in 1.6s
+[20:49:47] train: epoch end at step 8/10 in 0.3s
+[20:49:47] gradient coverage: 29/29 trainable tensors with grad (1.000 of trainable elements)
+[20:49:47]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.01003
+[20:49:47]   draft_model.layer_fusion_weights: trainable=1 tensors/4 elements with_grad=1 grad_norm=0.001049
+[20:49:47]   draft_model.layers: trainable=26 tensors/20640 elements with_grad=26 grad_norm=0.7713
+[20:49:47]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=11.59
+[20:49:48] train: epoch end at step 4/10 in 0.3s
+[20:49:48] train: resumed from step 5 (micro_step=5, skipped=0, history_rows=5)
+[20:49:48] train: epoch end at step 8/10 in 0.2s
+[20:49:48] export: wrote <repo>/runs/npu/final/artifacts/H2/dflare/export (format=vlm-dflash-export-v1, checkpoint=ckpt_final.pt)
+{"method": "dflare", "status": "passed", "steps": 10}
+[20:49:48] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[20:49:48]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.3969
+[20:49:48]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.008396
+[20:49:48]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.8804
+[20:49:48]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=11.6
+[20:49:49] train: epoch end at step 4/10 in 0.3s
+[20:49:49] train: epoch end at step 8/10 in 0.3s
+[20:49:49] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[20:49:49]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.3969
+[20:49:49]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.008396
+[20:49:49]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.8804
+[20:49:49]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=11.6
+[20:49:49] train: epoch end at step 4/10 in 0.3s
+[20:49:50] train: resumed from step 5 (micro_step=5, skipped=0, history_rows=5)
+[20:49:50] train: epoch end at step 8/10 in 0.2s
+[20:49:50] export: wrote <repo>/runs/npu/final/artifacts/H2/dflash/export (format=vlm-dflash-export-v1, checkpoint=ckpt_final.pt)
+{"method": "dflash", "status": "passed", "steps": 10}
+[20:49:50] gradient coverage: 36/36 trainable tensors with grad (1.000 of trainable elements)
+[20:49:50]   draft_model.candidate_selector: trainable=3 tensors/2304 elements with_grad=3 grad_norm=0.002666
+[20:49:50]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.3641
+[20:49:50]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.005922
+[20:49:50]   draft_model.layers: trainable=30 tensors/20128 elements with_grad=30 grad_norm=0.7521
+[20:49:50]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=19.01
+[20:49:51] train: epoch end at step 4/10 in 0.5s
+[20:49:51] train: epoch end at step 8/10 in 0.4s
+[20:49:51] gradient coverage: 36/36 trainable tensors with grad (1.000 of trainable elements)
+[20:49:51]   draft_model.candidate_selector: trainable=3 tensors/2304 elements with_grad=3 grad_norm=0.002666
+[20:49:51]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.3641
+[20:49:51]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.005922
+[20:49:51]   draft_model.layers: trainable=30 tensors/20128 elements with_grad=30 grad_norm=0.7521
+[20:49:51]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=19.01
+[20:49:52] train: epoch end at step 4/10 in 0.4s
+[20:49:52] train: resumed from step 5 (micro_step=5, skipped=0, history_rows=5)
+[20:49:52] train: epoch end at step 8/10 in 0.3s
+[20:49:52] export: wrote <repo>/runs/npu/final/artifacts/H2/dflash2/export (format=vlm-dflash-export-v1, checkpoint=ckpt_final.pt)
+{"method": "dflash2", "status": "passed", "steps": 10}
+[20:49:52] gradient coverage: 31/31 trainable tensors with grad (1.000 of trainable elements)
+[20:49:52]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.05726
+[20:49:52]   draft_model.hidden_correction: trainable=5 tensors/5184 elements with_grad=5 grad_norm=2.668
+[20:49:52]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.005931
+[20:49:52]   draft_model.layer_fusion_weights: trainable=1 tensors/4 elements with_grad=1 grad_norm=0.0006349
+[20:49:52]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.7959
+[20:49:52]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=11.6
+[20:49:53] train: epoch end at step 4/10 in 0.4s
+[20:49:53] train: epoch end at step 8/10 in 0.3s
+[20:49:53] gradient coverage: 31/31 trainable tensors with grad (1.000 of trainable elements)
+[20:49:53]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.05726
+[20:49:53]   draft_model.hidden_correction: trainable=5 tensors/5184 elements with_grad=5 grad_norm=2.668
+[20:49:53]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.005931
+[20:49:53]   draft_model.layer_fusion_weights: trainable=1 tensors/4 elements with_grad=1 grad_norm=0.0006349
+[20:49:53]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.7959
+[20:49:53]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=11.6
+[20:49:54] train: epoch end at step 4/10 in 0.3s
+[20:49:54] train: resumed from step 5 (micro_step=5, skipped=0, history_rows=5)
+[20:49:54] train: epoch end at step 8/10 in 0.2s
+[20:49:54] export: wrote <repo>/runs/npu/final/artifacts/H2/dfly/export (format=vlm-dflash-export-v1, checkpoint=ckpt_final.pt)
+{"method": "dfly", "status": "passed", "steps": 10}
+[20:49:54] gradient coverage: 29/29 trainable tensors with grad (1.000 of trainable elements)
+[20:49:54]   draft_model.embed_proj: trainable=2 tensors/3072 elements with_grad=2 grad_norm=0.02066
+[20:49:54]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.302
+[20:49:54]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.006338
+[20:49:54]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.7674
+[20:49:54]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=8.475
+[20:49:54]   draft_model.prefix_gru: trainable=2 tensors/6144 elements with_grad=2 grad_norm=0.0003652
+[20:49:55] train: epoch end at step 4/10 in 0.4s
+[20:49:55] train: epoch end at step 8/10 in 0.4s
+[20:49:55] gradient coverage: 29/29 trainable tensors with grad (1.000 of trainable elements)
+[20:49:55]   draft_model.embed_proj: trainable=2 tensors/3072 elements with_grad=2 grad_norm=0.02066
+[20:49:55]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.302
+[20:49:55]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.006338
+[20:49:55]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.7674
+[20:49:55]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=8.475
+[20:49:55]   draft_model.prefix_gru: trainable=2 tensors/6144 elements with_grad=2 grad_norm=0.0003652
+[20:49:56] train: epoch end at step 4/10 in 0.3s
+[20:49:56] train: resumed from step 5 (micro_step=5, skipped=0, history_rows=5)
+[20:49:56] train: epoch end at step 8/10 in 0.2s
+[20:49:56] export: wrote <repo>/runs/npu/final/artifacts/H2/domino/export (format=vlm-dflash-export-v1, checkpoint=ckpt_final.pt)
+{"method": "domino", "status": "passed", "steps": 10}
+[20:49:56] gradient coverage: 29/29 trainable tensors with grad (1.000 of trainable elements)
+[20:49:56]   draft_model.confidence_head: trainable=2 tensors/41 elements with_grad=2 grad_norm=1.982
+[20:49:56]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.3351
+[20:49:56]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.007426
+[20:49:56]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.684
+[20:49:56]   draft_model.markov_head: trainable=2 tensors/2048 elements with_grad=2 grad_norm=0.1404
+[20:49:56]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=8.984
+[20:49:57] train: epoch end at step 4/10 in 0.4s
+[20:49:57] train: epoch end at step 8/10 in 0.3s
+[20:49:57] gradient coverage: 29/29 trainable tensors with grad (1.000 of trainable elements)
+[20:49:57]   draft_model.confidence_head: trainable=2 tensors/41 elements with_grad=2 grad_norm=1.982
+[20:49:57]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.3351
+[20:49:57]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.007426
+[20:49:57]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.684
+[20:49:57]   draft_model.markov_head: trainable=2 tensors/2048 elements with_grad=2 grad_norm=0.1404
+[20:49:57]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=8.984
+[20:49:57] train: epoch end at step 4/10 in 0.3s
+[20:49:58] train: resumed from step 5 (micro_step=5, skipped=0, history_rows=5)
+[20:49:58] train: epoch end at step 8/10 in 0.2s
+[20:49:58] export: wrote <repo>/runs/npu/final/artifacts/H2/dspark/export (format=vlm-dflash-export-v1, checkpoint=ckpt_final.pt)
+{"method": "dspark", "status": "passed", "steps": 10}
+[20:49:58] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[20:49:58]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.1304
+[20:49:58]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.00239
+[20:49:58]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.2838
+[20:49:58]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=11.21
+[20:49:58] train: epoch end at step 4/10 in 0.3s
+[20:49:59] train: epoch end at step 8/10 in 0.3s
+[20:49:59] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[20:49:59]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.1304
+[20:49:59]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.00239
+[20:49:59]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.2838
+[20:49:59]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=11.21
+[20:49:59] train: epoch end at step 4/10 in 0.3s
+[20:49:59] train: resumed from step 5 (micro_step=5, skipped=0, history_rows=5)
+[20:50:00] train: epoch end at step 8/10 in 0.2s
+[20:50:00] export: wrote <repo>/runs/npu/final/artifacts/H2/jetspec/export (format=vlm-dflash-export-v1, checkpoint=ckpt_final.pt)
+{"method": "jetspec", "status": "passed", "steps": 10}
+{"status": "NPU_SMOKE_PASSED", "problems": [], "json": "<repo>/runs/npu/final/phase_json/H2.json"}
+
+[stderr]
+<venv>/lib/python3.10/site-packages/torch/autograd/__init__.py:230: UserWarning: Cannot create tensor with interal format while allow_internel_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:340.)
+  torch.ones_like(out, memory_format=torch.preserve_format)
