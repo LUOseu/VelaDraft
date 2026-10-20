@@ -1,123 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="800" viewBox="0 0 1560 800" role="img" aria-labelledby="title desc">
-<title id="title">VelaDraft pipeline: prepare and capture, train offline from the feature store or online against the live frozen target, validate token-exactly, export</title>
-<desc id="desc">Image-text data goes through target-native regen and hidden-state capture to a reusable feature store. Training reads either that store (offline, target off the GPU) or a live frozen target (online, target resident; optional host-RAM record cache). One of seven drafter algorithms trains in each run. Validation compares the verified speculative output against target-only greedy decoding (token-exact), then the checkpoint is exported.</desc>
-<defs>
-  <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#8795A5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
-  <marker id="mintArrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#0D9488" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
-  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/><feOffset in="blur" dx="0" dy="2" result="offset"/><feFlood flood-color="#12263A" flood-opacity=".04" result="color"/><feComposite in="color" in2="offset" operator="in" result="shade"/><feMerge><feMergeNode in="shade"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-</defs>
-<rect width="1560" height="800" rx="30" fill="#F7F9FC"/>
-
-<text x="48" y="40" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="700" fill="#0D9488" text-anchor="start" letter-spacing="2.2">VELADRAFT / THE SHARED TRAINING STACK</text>
-<text x="48" y="94" font-family="Arial, Nimbus Sans, sans-serif" font-size="46" font-weight="700" fill="#12263A" text-anchor="start">Capture. Train. Verify.</text>
-<text x="48" y="133" font-family="Arial, Nimbus Sans, sans-serif" font-size="24" font-weight="400" fill="#607187" text-anchor="start">Turn image–text data into validated multimodal drafters.</text>
-<rect x="1148" y="77" width="364" height="30" rx="15" fill="#EAF7F1" stroke="#EAF7F1" />
-<text x="1330" y="98" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#087F73" text-anchor="middle">ONE CAPTURE · SEVEN DRAFTING PATHS</text>
-
-<!-- Panel 01 -->
-<rect x="48" y="170" width="464" height="534" rx="22" fill="#F0F8F5" stroke="#E0E8EF" />
-<rect x="78" y="194" width="40" height="30" rx="9" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="98" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#0D9488" text-anchor="middle">01</text>
-<text x="130" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="700" fill="#12263A" text-anchor="start" letter-spacing=".8">PREPARE &amp; CAPTURE</text>
-<text x="78" y="254" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start">Target-generated answers, then features</text>
-
-<rect x="78" y="286" width="404" height="74" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<text x="100" y="318" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start">image-text data</text>
-<text x="100" y="342" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">JSONL rows + images · single or multi-turn</text>
-<path d="M280 362 V 392" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
-
-<rect x="78" y="398" width="404" height="74" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<text x="100" y="430" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start">target-native regen</text>
-<text x="100" y="454" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">greedy answers recorded with provenance</text>
-<path d="M280 474 V 504" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
-
-<rect x="78" y="510" width="404" height="92" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<text x="100" y="542" font-family="Arial, Nimbus Sans, sans-serif" font-size="18" font-weight="700" fill="#12263A" text-anchor="start">hidden-state capture</text>
-<text x="100" y="566" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">bf16 shards · image spans · target head</text>
-<text x="100" y="588" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">visual-path check keeps the pipeline honest</text>
-
-<rect x="78" y="630" width="404" height="30" rx="8" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="280" y="650" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="500" fill="#52667B" text-anchor="middle">Target loaded for regen + capture (frozen)</text>
-
-<!-- Panel 02 -->
-<rect x="548" y="170" width="432" height="534" rx="22" fill="#F5F4FC" stroke="#E0E8EF" />
-<rect x="578" y="194" width="40" height="30" rx="9" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="598" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#0D9488" text-anchor="middle">02</text>
-<text x="630" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="700" fill="#12263A" text-anchor="start" letter-spacing=".8">TRAIN</text>
-<text x="578" y="254" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start">Two input paths, one trainer</text>
-
-<rect x="578" y="286" width="372" height="72" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<text x="600" y="316" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#12263A" text-anchor="start">offline (default)</text>
-<text x="600" y="340" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">feature store · target off the GPU</text>
-<path d="M956 322 H 964 Q 970 322 970 328 V 564 Q 970 570 964 570 H 952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
-
-<rect x="578" y="388" width="372" height="104" rx="12" fill="#FFFFFF" stroke="#E0E4ED" filter="url(#shadow)"/>
-<text x="600" y="418" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#12263A" text-anchor="start">online</text>
-<text x="600" y="442" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">live frozen target resident on GPU</text>
-<text x="600" y="462" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">recorded smoke: ~7.5 GB (3B) / ~17.5 GB (8B)</text>
-<text x="600" y="482" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#087F73" text-anchor="start">optional RAM cache: train.online_feature_cache_gb</text>
-<path d="M956 440 H 964 Q 970 440 970 446 V 594 Q 970 600 964 600 H 952" fill="none" stroke="#8795A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
-
-<rect x="578" y="520" width="372" height="120" rx="12" fill="#EFF6FF" stroke="#93C5FD" filter="url(#shadow)"/>
-<text x="600" y="550" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#1D4ED8" text-anchor="start">trainer</text>
-<text x="600" y="574" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#1E40AF" text-anchor="start">one of seven algorithms (docs/algorithms/):</text>
-<text x="600" y="596" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="700" fill="#1E40AF" text-anchor="start"><a href="../algorithms/dflash.md"><tspan fill="#0D9488">DFlash</tspan></a><tspan> · </tspan><a href="../algorithms/dspark.md"><tspan fill="#0D9488">DSpark</tspan></a><tspan> · </tspan><a href="../algorithms/domino.md"><tspan fill="#0D9488">Domino</tspan></a><tspan> · </tspan><a href="../algorithms/jetspec.md"><tspan fill="#0D9488">JetSpec</tspan></a></text>
-<text x="600" y="618" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="700" fill="#1E40AF" text-anchor="start"><a href="../algorithms/dflash2.md"><tspan fill="#0D9488">DFlash2</tspan></a><tspan> · </tspan><a href="../algorithms/dflare.md"><tspan fill="#0D9488">DFlare</tspan></a><tspan> · </tspan><a href="../algorithms/dfly.md"><tspan fill="#0D9488">DFly</tspan></a></text>
-<text x="600" y="634" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="400" fill="#1E40AF" text-anchor="start">target: frozen forwards only · drafter updates</text>
-
-<rect x="578" y="657" width="372" height="28" rx="8" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="764" y="676" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="500" fill="#52667B" text-anchor="middle">one process, one GPU - no DDP path</text>
-
-<!-- Panel 03 -->
-<rect x="1016" y="170" width="496" height="534" rx="22" fill="#F1F5FA" stroke="#E0E8EF" />
-<rect x="1046" y="194" width="40" height="30" rx="9" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="1066" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="700" fill="#0D9488" text-anchor="middle">03</text>
-<text x="1098" y="216" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="700" fill="#12263A" text-anchor="start" letter-spacing=".8">VALIDATE &amp; EXPORT</text>
-<text x="1046" y="254" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start">Check the resulting checkpoint</text>
-
-<rect x="1046" y="286" width="436" height="212" rx="16" fill="#FFFFFF" stroke="#DEE6EE" filter="url(#shadow)"/>
-<circle cx="1077" cy="320" r="14" fill="#E7F6EF"/>
-<path d="M1071 320 l4 4 l9 -10" fill="none" stroke="#0D9488" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1102" y="327" font-family="Arial, Nimbus Sans, sans-serif" font-size="22" font-weight="700" fill="#12263A" text-anchor="start">Validate</text>
-<text x="1072" y="364" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#607187" text-anchor="start">Target-only</text>
-<rect x="1210" y="342" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1238" y="364" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">The</text>
-<rect x="1274" y="342" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1302" y="364" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">cat</text>
-<rect x="1338" y="342" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1366" y="364" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">sits</text>
-<rect x="1402" y="342" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1430" y="364" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">.</text>
-
-<text x="1072" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="500" fill="#0D9488" text-anchor="start">Verified speculative output</text>
-<rect x="1210" y="410" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1238" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">The</text>
-<rect x="1274" y="410" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1302" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">cat</text>
-<rect x="1338" y="410" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1366" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">sits</text>
-<rect x="1402" y="410" width="56" height="32" rx="7" fill="#E8F7F0" stroke="#D5EEE3" />
-<text x="1430" y="432" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="500" fill="#087F73" text-anchor="middle">.</text>
-<circle cx="1462" cy="426" r="13" fill="#0D9488"/>
-<path d="M1457 426 l3.4 3.4 l7.6 -8.6" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1072" y="478" font-family="Arial, Nimbus Sans, sans-serif" font-size="14" font-weight="400" fill="#607187" text-anchor="start">token-exact gate: token-for-token equal to target greedy decoding</text>
-
-<rect x="1046" y="512" width="436" height="100" rx="16" fill="#FFFFFF" stroke="#DEE6EE" filter="url(#shadow)"/>
-<rect x="1071" y="536" width="35" height="48" rx="6" fill="#EDF2F8" stroke="#C8D5E4" />
-<path d="M1080 556 H1097 M1080 567 H1093" fill="none" stroke="#607187" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1125" y="550" font-family="Arial, Nimbus Sans, sans-serif" font-size="22" font-weight="700" fill="#12263A" text-anchor="start">Export checkpoint</text>
-<text x="1125" y="582" font-family="Arial, Nimbus Sans, sans-serif" font-size="16" font-weight="400" fill="#607187" text-anchor="start">weights · config · model card · checksums</text>
-
-<rect x="1046" y="630" width="436" height="30" rx="8" fill="#FFFFFF" stroke="#FFFFFF" />
-<text x="1264" y="650" font-family="Arial, Nimbus Sans, sans-serif" font-size="15" font-weight="500" fill="#52667B" text-anchor="middle">Target + drafter loaded for eval</text>
-
-<!-- flow between panels -->
-<path d="M512 437 H 548" fill="none" stroke="#0D9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<path d="M980 470 H 1016" fill="none" stroke="#0D9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mintArrow)"/>
-<text x="530" y="424" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="500" fill="#087F73" text-anchor="middle">store</text>
-<text x="998" y="457" font-family="Arial, Nimbus Sans, sans-serif" font-size="13" font-weight="500" fill="#087F73" text-anchor="middle">ckpt</text>
-
-<path d="M48 739 H1512" fill="none" stroke="#DEE6EE" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="48" y="773" font-family="Arial, Nimbus Sans, sans-serif" font-size="19" font-weight="400" fill="#607187" text-anchor="start">Compatible captures are shared across methods; each algorithm is trained in its own run.</text>
-<text x="1512" y="773" font-family="Arial, Nimbus Sans, sans-serif" font-size="17" font-weight="400" fill="#64748B" text-anchor="end"><a href="../README.md" fill="#0D9488">Docs</a> · <a href="../../SUPPORT_MATRIX.md" fill="#0D9488">Support matrix</a> · <a href="../../BENCHMARKS.md" fill="#0D9488">Benchmarks</a></text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="620" viewBox="0 0 1320 620" role="img" aria-labelledby="title desc">
+<title id="title">VelaDraft: one workflow, measurable training systems</title>
+<desc id="desc">Three stages connect data and target features, drafter training, and evaluation with export. Below the workflow, a systems loop profiles extraction and scoring, optimizes reuse and wasted work, and validates numerical and resource trade-offs. Optimization settings and validation coverage are documented separately.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1 L8 5 L2 9" fill="none" stroke="#78918f" stroke-width="1.5"/></marker></defs>
+<rect width="1320" height="620" rx="24" fill="#f7faf9"/>
+<g font-family="Arial, Helvetica, sans-serif">
+<text x="48" y="49" font-size="14" font-weight="700" letter-spacing="2.2" fill="#087e74">VELADRAFT / OVERVIEW</text>
+<text x="48" y="97" font-size="34" font-weight="700" fill="#142c38">One workflow. Measurable training systems.</text>
+<text x="48" y="129" font-size="18" fill="#596e77">Shared infrastructure for multimodal parallel block drafters</text>
+<!-- Three deliberately sparse workflow cards -->
+<rect x="48" y="174" width="372" height="216" rx="16" fill="#fff" stroke="#d8e5e2"/>
+<rect x="474" y="174" width="372" height="216" rx="16" fill="#fff" stroke="#d8e5e2"/>
+<rect x="900" y="174" width="372" height="216" rx="16" fill="#fff" stroke="#d8e5e2"/>
+<g font-size="14" font-weight="700" fill="#087e74"><text x="74" y="207">01 / PREPARE</text><text x="500" y="207">02 / TRAIN</text><text x="926" y="207">03 / EVALUATE &amp; RELEASE</text></g>
+<g font-size="25" font-weight="700" fill="#142c38"><text x="74" y="254">Data &amp; target features</text><text x="500" y="254">Choose a drafter</text><text x="926" y="254">Evidence &amp; artifacts</text></g>
+<g font-size="18" fill="#596e77">
+<text x="74" y="292">Image–text data → target answers</text><text x="74" y="322">Frozen-target feature extraction</text>
+<text x="500" y="292">Offline store or online extraction</text><text x="500" y="322">Method-specific objectives</text>
+<text x="926" y="292">Fidelity · quality · latency · cost</text><text x="926" y="322">Checkpoint · config · protocol</text>
+</g>
+<g fill="#eff6f4"><rect x="74" y="345" width="182" height="25" rx="6"/><rect x="500" y="345" width="181" height="25" rx="6"/><rect x="926" y="345" width="202" height="25" rx="6"/></g>
+<g font-size="13" fill="#087e74"><text x="86" y="362">Target-native preparation</text><text x="512" y="362">Shared training interfaces</text><text x="938" y="362">Explicit validation coverage</text></g>
+<path d="M431 281 H461" stroke="#78918f" stroke-width="2" marker-end="url(#arrow)"/><path d="M857 281 H887" stroke="#78918f" stroke-width="2" marker-end="url(#arrow)"/>
+<!-- Systems work is a separate loop, not another model architecture -->
+<rect x="48" y="423" width="1224" height="151" rx="16" fill="#eaf4f0"/>
+<text x="74" y="454" font-size="13" font-weight="700" letter-spacing="1.6" fill="#087e74">TRAINING SYSTEMS / PROFILE → OPTIMIZE → VALIDATE</text>
+<g font-size="21" font-weight="700" fill="#142c38"><text x="74" y="492">Locate the cost</text><text x="500" y="492">Remove wasted work</text><text x="926" y="492">Check the trade-offs</text></g>
+<g font-size="17" fill="#49656a"><text x="74" y="525">Extraction · padding · scoring</text><text x="500" y="525">Reuse · row compaction · kernels</text><text x="926" y="525">Numerics · time · memory</text></g>
+</g>
 </svg>
