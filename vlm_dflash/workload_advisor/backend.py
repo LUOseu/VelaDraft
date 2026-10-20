@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import fcntl
 import json
+import math
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -57,8 +59,12 @@ CAPABILITIES = {
 
 
 class GpuBusy(RuntimeError):
-    def __init__(self, uuid: str):
-        super().__init__(f"GPU {uuid} is locked by another veladraft job (lock={LOCK_DIR / (uuid + '.lock')}).")
+    def __init__(self, uuid: str, *, lock_dir: Path | None = None, detail: str | None = None):
+        lock_dir = lock_dir or LOCK_DIR
+        message = f"GPU {uuid} is locked by another veladraft job (lock={lock_dir / (uuid + '.lock')})."
+        if detail:
+            message = f"{message} {detail}"
+        super().__init__(message)
         self.uuid = uuid
 
 
@@ -81,7 +87,7 @@ class GpuLease:
             except BlockingIOError as exc:
                 handle.close()
                 self.release()
-                raise GpuBusy(uuid) from exc
+                raise GpuBusy(uuid, lock_dir=self.lock_dir) from exc
             handle.seek(0)
             handle.truncate()
             handle.write(f"pid={os.getpid()} acquired={time.time():.6f}\n")
@@ -121,22 +127,36 @@ class GpuLedger:
     measured_started_at: float | None = None
     measured_released_at: float | None = None
 
+    def __post_init__(self) -> None:
+        if not math.isfinite(float(self.budget_gpu_hours)) or float(self.budget_gpu_hours) <= 0:
+            raise ValueError("budget_gpu_hours must be a positive finite number.")
+
     def start_measured(self) -> None:
         self.measured_started_at = time.time()
 
     def stop_measured(self) -> None:
         self.measured_released_at = time.time()
 
-    def record_interval(self, purpose: str) -> None:
+    def record_interval(
+        self,
+        purpose: str,
+        *,
+        start_unix_s: float | None = None,
+        end_unix_s: float | None = None,
+    ) -> None:
         if self.lease.acquired_at is None:
             return
-        end = self.lease.released_at or time.time()
+        start = self.lease.acquired_at if start_unix_s is None else float(start_unix_s)
+        end = self.lease.released_at or time.time() if end_unix_s is None else float(end_unix_s)
+        if end < start:
+            return
         self.intervals.append(
             {
                 "uuids": sorted(self.lease.uuids),
-                "start_unix_s": self.lease.acquired_at,
+                "start_unix_s": start,
                 "end_unix_s": end,
-                "seconds": end - self.lease.acquired_at,
+                "seconds": end - start,
+                "gpu_hours": (end - start) * len(self.lease.uuids) / 3600.0,
                 "purpose": purpose,
             }
         )
@@ -159,6 +179,17 @@ class GpuLedger:
             "all_allocated_gpu_hours": used,
             "remaining_gpu_hours": max(0.0, self.budget_gpu_hours - used),
             "exceeded": used >= self.budget_gpu_hours,
+        }
+
+    def checkpoint(self) -> dict:
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "budget_gpu_hours": self.budget_gpu_hours,
+            "all_allocated_gpu_hours": self.all_allocated_gpu_hours,
+            "measured_run_gpu_hours": self.measured_run_gpu_hours,
+            "uuids": sorted(self.lease.uuids),
+            "checkpoint_unix_s": time.time(),
+            "intervals": list(self.intervals),
         }
 
 
@@ -206,6 +237,255 @@ def discover_gpus() -> list[dict]:
     return []
 
 
+def resolve_device_uuid(
+    device: str,
+    devices: list[dict],
+    *,
+    cuda_visible_devices: str | None = None,
+) -> dict:
+    """Resolve ``cuda:N`` through ``CUDA_VISIBLE_DEVICES`` to one physical UUID.
+
+    ``nvidia-smi`` reports physical devices even when a process sees a remapped
+    subset.  Locking/ledgering every visible physical device while only using
+    one of them overcounts GPU-hours and can block an unrelated job; this helper
+    maps the logical index to the UUID CUDA will actually use.
+    """
+    match = re.fullmatch(r"cuda(?::(\d+))?", str(device or "").strip())
+    if match is None:
+        raise ValueError(f"device must be 'cuda' or 'cuda:N', got {device!r}.")
+    index = int(match.group(1) or 0)
+    if cuda_visible_devices is None:
+        cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
+    cvd = "" if cuda_visible_devices is None else str(cuda_visible_devices).strip()
+    if cvd:
+        entries = [entry.strip() for entry in cvd.split(",") if entry.strip()]
+        if index >= len(entries):
+            raise ValueError(
+                f"device cuda:{index} is outside CUDA_VISIBLE_DEVICES={cvd!r} ({len(entries)} device(s))."
+            )
+        entry = entries[index]
+        if entry.isdigit():
+            physical_index = int(entry)
+            if physical_index >= len(devices):
+                raise ValueError(
+                    f"CUDA_VISIBLE_DEVICES entry {entry!r} does not name a discovered physical GPU."
+                )
+            selected = dict(devices[physical_index])
+        else:
+            selected = next((dict(item) for item in devices if str(item.get("uuid")) == entry), None)
+            if selected is None:
+                selected = {"uuid": entry, "name": None, "source": "CUDA_VISIBLE_DEVICES"}
+    else:
+        if index >= len(devices):
+            raise ValueError(f"device cuda:{index} is not present; discovered {len(devices)} GPU(s).")
+        selected = dict(devices[index])
+    selected.setdefault("source", "torch")
+    selected["logical_device"] = f"cuda:{index}"
+    selected["cuda_visible_devices"] = cvd or None
+    return selected
+
+
+def check_external_occupancy(uuid: str) -> dict:
+    """Best-effort read-only check for non-VelaDraft processes on a GPU.
+
+    The flock only coordinates jobs that opt into the convention, so a lock can
+    be free while another user's process is active.  We never signal or evict
+    that process; the caller must decline to start timed work.
+    """
+    smi = shutil.which("nvidia-smi")
+    if not smi:
+        return {"status": "unavailable", "processes": [], "busy": False}
+    output = _run(
+        [
+            smi,
+            "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+            "--format=csv,noheader,nounits",
+        ],
+        timeout=10.0,
+    )
+    if output is None:
+        return {"status": "unavailable", "processes": [], "busy": False}
+    processes = []
+    for line in output.splitlines():
+        parts = [part.strip() for part in line.split(",")]
+        if len(parts) < 2 or not parts[0]:
+            continue
+        if parts[0] != uuid:
+            continue
+        processes.append(
+            {
+                "gpu_uuid": parts[0],
+                "pid": int(parts[1]) if parts[1].isdigit() else parts[1],
+                "process_name": parts[2] if len(parts) > 2 else None,
+                "used_memory_mib": int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else None,
+            }
+        )
+    return {"status": "checked", "processes": processes, "busy": bool(processes)}
+
+
+_SYMBOLIC_CHAT_TEMPLATES = {"hf_default", "qwen2_5_vl", "qwen3_vl", "smolvlm"}
+_SUPPORTED_STRUCTURES = {"qwen2_5_vl", "qwen3_vl", "smolvlm"}
+_SUPPORTED_DTYPES = {"bfloat16", "float16", "float32"}
+_SUPPORTED_ATTENTION = {"sdpa", "eager", "flash_attention_2"}
+
+
+def _execution_issue(code: str, detail: str, path: str) -> dict:
+    return {"code": code, "detail": detail, "path": path}
+
+
+def validate_execution_contract(manifest: dict) -> list[dict]:
+    """Reject manifest settings the local sequential HF backend cannot honor."""
+    issues: list[dict] = []
+    backend = manifest.get("backend") or {}
+    target = manifest.get("target") or {}
+    decode = manifest.get("decode") or {}
+    name = str(backend.get("name") or "")
+    if name not in {"hf-transformers", "hf_transformers"}:
+        issues.append(
+            _execution_issue(
+                "unsupported_backend",
+                f"the measurement backend implements local hf-transformers, not {name!r}",
+                "backend.name",
+            )
+        )
+    if manifest.get("measurement_scope") != "local_client":
+        issues.append(
+            _execution_issue(
+                "unsupported_measurement_scope",
+                "this backend records local_client timing only; server_endpoint/storage/aggregate_only are not supported",
+                "measurement_scope",
+            )
+        )
+    if manifest.get("concurrency") != 1:
+        issues.append(
+            _execution_issue("unsupported_concurrency", "the HF eval path is serial (concurrency=1)", "concurrency")
+        )
+    endpoint = manifest.get("server_endpoint") or backend.get("server_endpoint")
+    if endpoint:
+        issues.append(
+            _execution_issue(
+                "unsupported_server_endpoint",
+                "server_endpoint cannot be measured by the local HF backend",
+                "server_endpoint",
+            )
+        )
+    for owner, prefix in ((backend, "backend"), (manifest, "")):
+        for key in ("streaming", "stream", "cancel"):
+            if owner.get(key):
+                issues.append(
+                    _execution_issue(
+                        "unsupported_streaming",
+                        f"{key} is not exposed by the HF eval path",
+                        f"{prefix + '.' if prefix else ''}{key}",
+                    )
+                )
+        if owner.get("parallel") or owner.get("parallel_verification"):
+            issues.append(
+                _execution_issue(
+                    "unsupported_parallel",
+                    "parallel verification/serving is not supported by this measurement path",
+                    f"{prefix + '.' if prefix else ''}parallel",
+                )
+            )
+    if backend.get("type") not in (None, "hf", "local", "hf-transformers"):
+        issues.append(
+            _execution_issue(
+                "unsupported_backend_type",
+                f"backend.type={backend.get('type')!r} is not the local HF path",
+                "backend.type",
+            )
+        )
+    verification = decode.get("verification", "sequential")
+    if verification != "sequential":
+        issues.append(
+            _execution_issue(
+                "unsupported_verification",
+                f"decode.verification={verification!r}; only sequential token-exact verification is implemented",
+                "decode.verification",
+            )
+        )
+    eos_policy = decode.get("eos_policy", "natural_eos_first_stop")
+    if eos_policy not in ("natural_eos_first_stop", "stop_ids_only"):
+        issues.append(
+            _execution_issue(
+                "unsupported_eos_policy",
+                f"decode.eos_policy={eos_policy!r} is not implemented by the HF generate path",
+                "decode.eos_policy",
+            )
+        )
+    verify_backend = decode.get("verify_backend", "parity")
+    if verify_backend not in ("parity", "reference"):
+        issues.append(
+            _execution_issue(
+                "unsupported_verify_backend",
+                f"decode.verify_backend={verify_backend!r}; expected 'parity' or 'reference'",
+                "decode.verify_backend",
+            )
+        )
+    dtype = str(target.get("dtype") or "")
+    if dtype not in _SUPPORTED_DTYPES:
+        issues.append(
+            _execution_issue("unsupported_dtype", f"target.dtype={dtype!r} is not supported", "target.dtype")
+        )
+    attn = str(target.get("attn_implementation") or "sdpa")
+    if attn not in _SUPPORTED_ATTENTION:
+        issues.append(
+            _execution_issue(
+                "unsupported_attention",
+                f"target.attn_implementation={attn!r} is not supported",
+                "target.attn_implementation",
+            )
+        )
+    structure = str(target.get("structure") or "")
+    if structure and structure not in _SUPPORTED_STRUCTURES:
+        issues.append(
+            _execution_issue(
+                "unsupported_structure",
+                f"target.structure={structure!r} is not a supported local HF family",
+                "target.structure",
+            )
+        )
+    templates = {
+        "target.chat_template": target.get("chat_template"),
+        "processor.chat_template": (manifest.get("processor") or {}).get("chat_template"),
+    }
+    for path, template in templates.items():
+        if template in (None, ""):
+            continue
+        text = str(template)
+        is_jinja = "{{" in text or "{%" in text
+        if not is_jinja and text not in _SYMBOLIC_CHAT_TEMPLATES:
+            issues.append(
+                _execution_issue(
+                    "unsupported_chat_template",
+                    f"{path}={text!r} is neither a pinned Jinja template nor a supported family name",
+                    path,
+                )
+            )
+    vision = target.get("vision") or {}
+    resolution = manifest.get("resolution") or {}
+    bounds = {
+        "target.vision.min_pixels": vision.get("min_pixels", resolution.get("min_pixels")),
+        "target.vision.max_pixels": vision.get("max_pixels", resolution.get("max_pixels")),
+    }
+    for path, value in bounds.items():
+        if value is None:
+            continue
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            issues.append(_execution_issue("invalid_pixel_bound", f"{path} must be a positive integer", path))
+    min_pixels = bounds["target.vision.min_pixels"]
+    max_pixels = bounds["target.vision.max_pixels"]
+    if isinstance(min_pixels, int) and isinstance(max_pixels, int) and min_pixels > max_pixels:
+        issues.append(
+            _execution_issue(
+                "invalid_pixel_bounds",
+                f"min_pixels {min_pixels} exceeds max_pixels {max_pixels}",
+                "target.vision",
+            )
+        )
+    return issues
+
+
 def detect_environment() -> dict:
     env: dict[str, Any] = {
         "python": sys.version.split()[0],
@@ -251,11 +531,18 @@ def capabilities_document(evidence_path: str | None = None, state: str = "implem
     }
 
 
-def readiness(manifest: dict) -> dict:
+def readiness(manifest: dict, *, manifest_dir: str | Path | None = None) -> dict:
+    def local_path(value: str) -> Path:
+        path = Path(str(value)).expanduser()
+        if not path.is_absolute() and manifest_dir is not None:
+            path = Path(manifest_dir) / path
+        return path
+
     env = detect_environment()
     blockers: list[dict] = []
     host_blockers: list[dict] = []
     candidate_blockers: list[dict] = []
+    contract_blockers = validate_execution_contract(manifest)
     warnings: list[dict] = []
     torch_info = env.get("torch") or {}
     if not torch_info.get("version"):
@@ -266,7 +553,7 @@ def readiness(manifest: dict) -> dict:
         host_blockers.append({"code": "no_gpu", "detail": "nvidia-smi/torch found no GPU"})
     target = manifest.get("target") or {}
     model_path = target.get("model_path")
-    if model_path and not Path(model_path).expanduser().exists():
+    if model_path and not local_path(model_path).exists():
         host_blockers.append({"code": "target_missing", "detail": f"target model_path not found: {model_path}"})
     elif not model_path:
         warnings.append({"code": "target_path_unset", "detail": "target.model_path is not set; HF cache may resolve it."})
@@ -274,7 +561,7 @@ def readiness(manifest: dict) -> dict:
         if candidate.get("method") != "sd":
             continue
         checkpoint = candidate.get("checkpoint")
-        if checkpoint and not Path(str(checkpoint)).expanduser().exists():
+        if checkpoint and not local_path(checkpoint).exists():
             candidate_blockers.append(
                 {
                     "code": "checkpoint_missing",
@@ -282,10 +569,8 @@ def readiness(manifest: dict) -> dict:
                     "detail": f"checkpoint not found: {checkpoint}",
                 }
             )
-    if manifest.get("concurrency") not in (1, None):
-        host_blockers.append({"code": "concurrency_unsupported", "detail": "first-round backend is serial only"})
-    blockers = host_blockers + candidate_blockers
-    state = "blocked" if host_blockers else ("partial" if candidate_blockers else "ready")
+    blockers = host_blockers + candidate_blockers + contract_blockers
+    state = "blocked" if host_blockers or contract_blockers else ("partial" if candidate_blockers else "ready")
     return {
         "schema_version": SCHEMA_VERSION,
         "status": state,
@@ -293,6 +578,7 @@ def readiness(manifest: dict) -> dict:
         "blockers": blockers,
         "host_blockers": host_blockers,
         "candidate_blockers": candidate_blockers,
+        "contract_blockers": contract_blockers,
         "warnings": warnings,
         "capabilities": CAPABILITIES,
     }
