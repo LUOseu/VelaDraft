@@ -494,9 +494,11 @@ def _lifecycle(ar_doc: dict[str, Any], sd_doc: dict[str, Any]) -> dict[str, Any]
             reasons.append(f"{side}_cancel_probe_was_idle_not_concurrent")
         if not checks[side]["internal_abort_correlated"]:
             reasons.append(f"{side}_no_request_correlated_engine_abort_evidence")
+        if not checks[side]["pair_input_ok"]:
+            reasons.append(f"{side}_same_text_different_image_input_submission_unverified")
         if not checks[side]["pair_output_attribution_verified"]:
             reasons.append(f"{side}_same_text_different_image_output_attribution_unverified")
-    lifecycle_pass = not reasons
+    lifecycle_pass = all(checks[side]["full_lifecycle_ok"] for side in ("ar", "ngram"))
     return {
         "status": "pass" if lifecycle_pass else "pending_internal_evidence",
         "ok": lifecycle_pass,
@@ -526,7 +528,15 @@ def build_summary(
         claim_reasons.append("paired_windows_contain_failed_or_cancelled_requests")
     if not all(item["budget_verified"] for item in by_window.values()):
         claim_reasons.append("actual_request_budget_not_verified_for_every_pair")
-    claim_eligible = not claim_reasons
+    # Pairability is useful diagnostic evidence even when the candidate is
+    # incorrect.  It must not be promoted to an acceleration claim.
+    pairing_eligible = not claim_reasons
+    speedup_reasons = list(claim_reasons)
+    correctness_levels = correctness.get("completion_levels") or {}
+    for level in ("AR_OFFLINE_PASS", "SD_EXECUTED", "SD_CORRECTNESS_PASS"):
+        if correctness_levels.get(level) is not True:
+            speedup_reasons.append(f"{level.lower()}_not_verified")
+    claim_eligible = not speedup_reasons
 
     ratios = []
     for key, item in sorted(by_window.items()):
@@ -560,9 +570,9 @@ def build_summary(
     levels["AR_API_PASS"] = lifecycle["ar_api_pass"]
     levels["SERVING_LIFECYCLE_PASS"] = lifecycle["ok"]
     levels["serving_lifecycle_status"] = lifecycle["status"]
-    levels["SD_CORRECTNESS_PASS"] = bool(levels.get("SD_CORRECTNESS_PASS"))
-    levels["SD_EXECUTED"] = bool(levels.get("SD_EXECUTED"))
-    levels["AR_OFFLINE_PASS"] = bool(levels.get("AR_OFFLINE_PASS"))
+    levels["SD_CORRECTNESS_PASS"] = levels.get("SD_CORRECTNESS_PASS") is True
+    levels["SD_EXECUTED"] = levels.get("SD_EXECUTED") is True
+    levels["AR_OFFLINE_PASS"] = levels.get("AR_OFFLINE_PASS") is True
 
     return {
         "schema_version": SUMMARY_SCHEMA,
@@ -580,7 +590,7 @@ def build_summary(
         },
         "protocol": protocol,
         "pairing": {
-            "claim_eligible": claim_eligible,
+            "claim_eligible": pairing_eligible,
             "reasons": claim_reasons,
             "pairs": len(pairs),
             "windows": len(by_window),
@@ -595,7 +605,7 @@ def build_summary(
         },
         "speedup": {
             "claim_eligible": claim_eligible,
-            "reasons": claim_reasons,
+            "reasons": speedup_reasons,
             "definition": "ngram_over_ar = AR total wall / N-Gram total wall; below 1 means N-Gram slower",
             "by_concurrency": ratios_by_c,
         },

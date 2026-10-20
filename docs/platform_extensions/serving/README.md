@@ -44,11 +44,23 @@ internal event stream as a public hook.
 
 ## Safety
 
-The launcher refuses a GPU with compute processes or insufficient free memory,
-then takes `/tmp/veladraft_gpu_locks/<UUID>.lock` with `flock`. It never stops
-or cleans another process. GPU-hours in measurement documents start at the
+Both `serve` and `offline` take `/tmp/veladraft_gpu_locks/<UUID>.lock` with
+`flock` before checking for compute processes or insufficient free memory.
+They refuse a GPU outside an existing `CUDA_VISIBLE_DEVICES` allocation and
+reject multi-GPU topology. Cleanup releases only their own engine and lock;
+they never stop or clean another process. GPU-hours in measurement documents start at the
 captured allocation epoch, so model load, compilation, warmup and failed
 windows are included.
 
 Do not promote a run to `verified_greedy_exact` based on HTTP status or
 `SD_EXECUTED` alone. The correctness gate and the lifecycle gate are separate.
+
+Pairing eligibility only establishes that timings can be compared diagnostically.
+A `speedup.claim_eligible=true` result additionally requires explicit
+`AR_OFFLINE_PASS`, `SD_EXECUTED`, and `SD_CORRECTNESS_PASS` values of `true`;
+failed or missing correctness never supports an acceleration claim. The full
+lifecycle result must also satisfy every per-mode lifecycle check, including
+same-text/different-image input-submission evidence.
+
+Observed model/speculative configuration is retained as diagnostic metadata.
+It does not by itself verify CLI-declared attention-backend or CUDA-graph labels.
