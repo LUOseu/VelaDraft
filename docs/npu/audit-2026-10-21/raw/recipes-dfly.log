@@ -1,0 +1,21 @@
+/root/veladraft-env/lib/python3.10/site-packages/torch/autograd/__init__.py:230: UserWarning: Cannot create tensor with interal format while allow_internel_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:340.)
+  torch.ones_like(out, memory_format=torch.preserve_format)
+[17:34:41] gradient coverage: 42/42 trainable tensors with grad (1.000 of trainable elements)
+[17:34:41]   draft_model.fc: trainable=1 tensors/12582912 elements with_grad=1 grad_norm=53.42
+[17:34:41]   draft_model.hidden_correction: trainable=5 tensors/20975616 elements with_grad=5 grad_norm=4.349
+[17:34:41]   draft_model.hidden_norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=1.082
+[17:34:41]   draft_model.layer_fusion_weights: trainable=1 tensors/9 elements with_grad=1 grad_norm=0.06903
+[17:34:41]   draft_model.layers: trainable=33 tensors/231224064 elements with_grad=33 grad_norm=107.5
+[17:34:41]   draft_model.norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.6947
+[17:34:42] step 1/12 loss=11.0000 acc=0.000 al=1.00
+[17:34:42] step 2/12 loss=18.1250 acc=0.000 al=1.00
+[17:34:42] step 3/12 loss=20.8750 acc=0.000 al=1.00
+[17:34:42] step 4/12 loss=16.6250 acc=0.000 al=1.00
+[17:34:42] step 5/12 loss=5.8438 acc=0.149 al=1.16
+[17:34:46] step 6/12 loss=12.9375 acc=0.000 al=1.00
+[17:34:50] step 7/12 loss=11.0000 acc=0.000 al=1.00
+[17:34:50] step 8/12 loss=8.7500 acc=0.000 al=1.00
+[17:34:50] step 9/12 loss=8.3125 acc=0.000 al=1.00
+[17:34:50] step 10/12 loss=9.5000 acc=0.000 al=1.00
+[17:34:51] step 11/12 loss=7.8750 acc=0.084 al=1.08
+[17:34:51] step 12/12 loss=7.0000 acc=0.208 al=1.18

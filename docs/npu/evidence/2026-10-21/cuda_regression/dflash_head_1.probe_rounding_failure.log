@@ -1,0 +1,13 @@
+/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:111: operator(): block: [0,0,0], thread: [31,0,0] Assertion `-sizes[i] <= index && index < sizes[i] && "index out of bounds"` failed.
+Traceback (most recent call last):
+  File "/home/lyh/veladraft-pr30-audit-20261021/head/scripts/npu/audit_cuda.py", line 251, in <module>
+    main()
+  File "/home/lyh/veladraft-pr30-audit-20261021/head/scripts/npu/audit_cuda.py", line 97, in main
+    probes[f'{step}:{name}']=torch.cat([flat[index],flat.norm().view(1),flat.abs().max().view(1)]).cpu()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: device-side assert triggered
+Search for `cudaErrorAssert' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+

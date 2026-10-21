@@ -1,0 +1,10 @@
+[17:49:07] train: resumed from step 5 (micro_step=5, skipped=0, history_rows=5)
+/root/veladraft-env/lib/python3.10/site-packages/torch/autograd/__init__.py:230: UserWarning: Cannot create tensor with interal format while allow_internel_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:340.)
+  torch.ones_like(out, memory_format=torch.preserve_format)
+[17:49:08] step 6/12 loss=12.9375 acc=0.000 al=1.00
+[17:49:09] step 7/12 loss=11.0000 acc=0.000 al=1.00
+[17:49:09] step 8/12 loss=8.7500 acc=0.000 al=1.00
+[17:49:09] step 9/12 loss=8.3125 acc=0.000 al=1.00
+[17:49:09] step 10/12 loss=9.5000 acc=0.000 al=1.00
+[17:49:09] step 11/12 loss=7.8750 acc=0.084 al=1.08
+[17:49:09] step 12/12 loss=7.0000 acc=0.208 al=1.18

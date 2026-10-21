@@ -1,0 +1,33 @@
+/root/veladraft-env/lib/python3.10/site-packages/torch/autograd/__init__.py:230: UserWarning: Cannot create tensor with interal format while allow_internel_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:340.)
+  torch.ones_like(out, memory_format=torch.preserve_format)
+[17:14:28] gradient coverage: 40/40 trainable tensors with grad (1.000 of trainable elements)
+[17:14:28]   draft_model.confidence_head: trainable=2 tensors/2305 elements with_grad=2 grad_norm=27.98
+[17:14:28]   draft_model.fc: trainable=1 tensors/12582912 elements with_grad=1 grad_norm=64.39
+[17:14:28]   draft_model.hidden_norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=1.252
+[17:14:28]   draft_model.layers: trainable=33 tensors/231224064 elements with_grad=33 grad_norm=122.1
+[17:14:28]   draft_model.markov_head: trainable=2 tensors/77791232 elements with_grad=2 grad_norm=0.1888
+[17:14:28]   draft_model.norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.789
+[17:14:29] step 1/10 loss=13.5000 acc=0.000 al=1.00
+[17:14:29] step 2/10 loss=15.9375 acc=0.000 al=1.00
+[17:14:29] step 3/10 loss=17.5000 acc=0.000 al=1.00
+[17:14:29] step 4/10 loss=13.6875 acc=0.252 al=1.21
+[17:14:29] step 5/10 loss=6.3750 acc=0.150 al=1.16
+[17:14:29] step 6/10 loss=7.4688 acc=0.070 al=1.11
+[17:14:30] step 7/10 loss=6.7812 acc=0.000 al=1.00
+[17:14:30] step 8/10 loss=6.3438 acc=0.000 al=1.00
+[17:14:30] step 9/10 loss=6.2500 acc=0.128 al=1.00
+[17:14:30] step 10/10 loss=6.8438 acc=0.000 al=1.00
+[17:15:05] gradient coverage: 42/42 trainable tensors with grad (1.000 of trainable elements)
+[17:15:05]   draft_model.fc: trainable=1 tensors/12582912 elements with_grad=1 grad_norm=53.42
+[17:15:05]   draft_model.hidden_correction: trainable=5 tensors/20975616 elements with_grad=5 grad_norm=4.349
+[17:15:05]   draft_model.hidden_norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=1.082
+[17:15:05]   draft_model.layer_fusion_weights: trainable=1 tensors/9 elements with_grad=1 grad_norm=0.06903
+[17:15:05]   draft_model.layers: trainable=33 tensors/231224064 elements with_grad=33 grad_norm=107.5
+[17:15:05]   draft_model.norm: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.6947
+[17:15:05] step 1/12 loss=11.0000 acc=0.000 al=1.00
+[17:15:05] step 2/12 loss=18.1250 acc=0.000 al=1.00
+[17:15:05] step 3/12 loss=20.8750 acc=0.000 al=1.00
+[17:15:05] step 4/12 loss=16.6250 acc=0.000 al=1.00
+[17:15:06] step 5/12 loss=5.8438 acc=0.149 al=1.16
+[17:15:09] step 6/12 loss=12.9375 acc=0.000 al=1.00
+/root/veladraft-audit-20261021/run_recipes.sh: line 6: 56560 Killed                  timeout 1800 python -u scripts/npu/audit_recipes.py --device npu:0 --bundle /root/veladraft-audit-20261021/corpus/bundle.pt --out /root/veladraft-audit-20261021/recipes
