@@ -1,0 +1,108 @@
+{
+  "schema_version": "veladraft-serving-env-lock-v1",
+  "created": "2026-10-17",
+  "host": "a6000xuyang (10.65.14.8)",
+  "gpu": "4x NVIDIA RTX A6000 48GB, driver 580.126.09, compute capability 8.6",
+  "python_env": {
+    "path": "/home/lyh/envs/pace",
+    "kind": "venv --system-site-packages over /home/lyh/miniforge3/envs/c1vllm",
+    "note": "No package was installed into the base training env; the venv inherits vLLM/torch from c1vllm."
+  },
+  "packages": {
+    "vllm": "0.22.1",
+    "torch": "2.11.0",
+    "transformers": "4.57.6",
+    "tokenizers": "0.22.2",
+    "numpy": "2.3.5",
+    "Pillow": "12.2.0",
+    "openai": "2.41.1",
+    "fastapi": "0.136.3",
+    "uvicorn": "0.49.0",
+    "python": "3.12.13 | packaged by conda-forge | (main, Mar  5 2026, 16:50:00) [GCC 14.3.0]",
+    "python_executable": "/home/lyh/envs/pace/bin/python",
+    "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.35"
+  },
+  "vllm": {
+    "version": "0.22.1",
+    "source_commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+    "package_path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/__init__.py",
+    "source_commit_note": "VCS commit from direct_url.json or auditor pin."
+  },
+  "cuda": {
+    "torch_cuda": null,
+    "available": null,
+    "gpu_probe": {
+      "cuda_available": false,
+      "nvidia_smi": [
+        "0, GPU-8e523700-a47f-04c3-fc33-0f06c59e7428, NVIDIA RTX A6000, 580.126.09, 8.6, 49140 MiB",
+        "1, GPU-864585d7-9789-e033-7781-e773f55178c6, NVIDIA RTX A6000, 580.126.09, 8.6, 49140 MiB",
+        "2, GPU-1d7c6b74-f5df-a297-6796-3986c3701ffa, NVIDIA RTX A6000, 580.126.09, 8.6, 49140 MiB",
+        "3, GPU-06d42c3b-89d2-20d5-8189-9b4564fec135, NVIDIA RTX A6000, 580.126.09, 8.6, 49140 MiB"
+      ],
+      "torch": "2.11.0+cu130",
+      "torch_cuda": "13.0"
+    }
+  },
+  "model": {
+    "architectures": [
+      "Qwen2_5_VLForConditionalGeneration"
+    ],
+    "complete": true,
+    "dtype": "bfloat16",
+    "files": {
+      "chat_template.json": {
+        "sha256": "ad60d90252ed0b0705ba14e2d0ad0fec0beac1ea955642b54059b36052d8bc96",
+        "size": 1050
+      },
+      "config.json": {
+        "sha256": "7ed3eed5be6924cc800e8a5e53fc405c1aab1aaf36bad65c33403b36c56827f5",
+        "size": 1373
+      },
+      "generation_config.json": {
+        "sha256": "533f191cc257b7de37a4fccd0a7a1706d75e1aa660f93efaa54e5a2a9f9aace9",
+        "size": 216
+      },
+      "model.safetensors.index.json": {
+        "sha256": "c7dd78a4c6bea60b51332f1baf37b8f8124ecab2c35395a29a29825bf2619768",
+        "size": 65448
+      },
+      "preprocessor_config.json": {
+        "sha256": "f2058c716eef96ccaed1cc1e2d0c08306b62586d535b28d9d08e691b2fab7ca0",
+        "size": 350
+      },
+      "tokenizer.json": {
+        "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+        "size": 7031645
+      },
+      "tokenizer_config.json": {
+        "sha256": "4abd3520120e266da84c0864fee064d1fb10806f02225911a47253dd38dc5f56",
+        "size": 5702
+      }
+    },
+    "image_token_id": 151655,
+    "model": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+    "model_type": "qwen2_5_vl",
+    "rope_scaling": {
+      "mrope_section": [
+        16,
+        24,
+        24
+      ],
+      "type": "mrope"
+    },
+    "shards": {
+      "model-00001-of-00002.safetensors": {
+        "size": 3982649232
+      },
+      "model-00002-of-00002.safetensors": {
+        "size": 3526688744
+      }
+    },
+    "vocab_size": 151936
+  },
+  "launch_configs": [
+    "configs/platform_extensions/serving/ar.json",
+    "configs/platform_extensions/serving/ngram.json"
+  ],
+  "fixture_manifest": "tests/serving/fixtures/manifest.json"
+}
