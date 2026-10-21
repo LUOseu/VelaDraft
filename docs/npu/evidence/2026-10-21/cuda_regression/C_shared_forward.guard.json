@@ -1,0 +1,52 @@
+{
+  "tag": "C_shared_forward",
+  "pid": 1758342,
+  "returncode": 0,
+  "reason": null,
+  "wall_seconds": 31.4830412119627,
+  "gpu_index": 1,
+  "free_MiB_samples": [
+    [
+      0.06,
+      31431
+    ],
+    [
+      5.11,
+      31164
+    ],
+    [
+      10.2,
+      31164
+    ],
+    [
+      15.27,
+      31164
+    ],
+    [
+      20.34,
+      31164
+    ],
+    [
+      26.48,
+      29424
+    ]
+  ],
+  "command": [
+    "/home/lyh/veladraft-pr30-audit-20261021/env/bin/python",
+    "/home/lyh/veladraft-pr30-audit-20261021/head/scripts/npu/audit_cuda.py",
+    "shared-forward",
+    "--repo",
+    "/home/lyh/veladraft-pr30-audit-20261021/head",
+    "--bundle",
+    "/home/lyh/veladraft-pr30-audit-20261021/bundle.pt",
+    "--config",
+    "/home/lyh/veladraft-pr30-audit-20261021/continuation/config.cuda.json",
+    "--checkpoint",
+    "/home/lyh/veladraft-pr30-audit-20261021/continuation/train/ckpt_final.pt",
+    "--device",
+    "cuda:0",
+    "--output",
+    "/home/lyh/veladraft-pr30-audit-20261021/continuation/cuda_forward.pt"
+  ],
+  "scope": "contended functional correctness only"
+}

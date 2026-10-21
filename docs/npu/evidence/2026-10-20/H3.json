@@ -1,0 +1,248 @@
+{
+  "format": "vlm-dflash-npu-seven-method-smoke-v1",
+  "requested_device": "npu:0",
+  "methods": [
+    "dflash"
+  ],
+  "steps_requested": 200,
+  "seed": 2026,
+  "deterministic_algorithms": true,
+  "environment": {
+    "python": "3.10.14",
+    "platform": "Linux-6.6.0-72.0.0.76.oe2403sp1.aarch64-aarch64-with-glibc2.35",
+    "machine": "aarch64",
+    "torch": "2.10.0+cpu",
+    "runtime": {
+      "torch": "2.10.0+cpu",
+      "torch_cuda": null,
+      "torch_npu": "2.10.0",
+      "cann": "/opt/veladraft-ascend/cann-9.0.0",
+      "python": "3.10.14",
+      "cuda": {
+        "available": false,
+        "device_count": 0,
+        "devices": []
+      },
+      "npu": {
+        "available": true,
+        "device_count": 2,
+        "devices": [
+          {
+            "index": 0,
+            "name": "Ascend910B3",
+            "memory": [
+              65020579840,
+              65452113920
+            ]
+          },
+          {
+            "index": 1,
+            "name": "Ascend910B3",
+            "memory": [
+              65019015168,
+              65452113920
+            ]
+          }
+        ],
+        "import_error": null
+      }
+    }
+  },
+  "records": [
+    {
+      "method": "dflash",
+      "steps": 200,
+      "nan_seen": false,
+      "exit_code": 0,
+      "skipped": false,
+      "forward": true,
+      "backward": true,
+      "update": true,
+      "resume": true,
+      "export": true,
+      "method_specific_grad": true,
+      "params_with_grad": 25,
+      "changed_parameters": 25,
+      "final_loss": 6.369841575622559,
+      "elapsed_seconds": 29.497,
+      "peak_memory_bytes": 34813952,
+      "memory_samples": [
+        {
+          "step": 0,
+          "accelerator_allocated_bytes": 0,
+          "host_peak_rss_bytes": 1795518464
+        },
+        {
+          "step": 20,
+          "accelerator_allocated_bytes": 425472,
+          "host_peak_rss_bytes": 2060140544
+        },
+        {
+          "step": 40,
+          "accelerator_allocated_bytes": 425472,
+          "host_peak_rss_bytes": 2060140544
+        },
+        {
+          "step": 60,
+          "accelerator_allocated_bytes": 425472,
+          "host_peak_rss_bytes": 2060140544
+        },
+        {
+          "step": 80,
+          "accelerator_allocated_bytes": 425472,
+          "host_peak_rss_bytes": 2060140544
+        },
+        {
+          "step": 100,
+          "accelerator_allocated_bytes": 425472,
+          "host_peak_rss_bytes": 2060140544
+        },
+        {
+          "step": 120,
+          "accelerator_allocated_bytes": 425472,
+          "host_peak_rss_bytes": 2061713408
+        },
+        {
+          "step": 140,
+          "accelerator_allocated_bytes": 425472,
+          "host_peak_rss_bytes": 2061713408
+        },
+        {
+          "step": 160,
+          "accelerator_allocated_bytes": 425472,
+          "host_peak_rss_bytes": 2061713408
+        },
+        {
+          "step": 180,
+          "accelerator_allocated_bytes": 425472,
+          "host_peak_rss_bytes": 2061713408
+        },
+        {
+          "step": 200,
+          "accelerator_allocated_bytes": 425472,
+          "host_peak_rss_bytes": 2061713408
+        },
+        {
+          "step": 200,
+          "accelerator_allocated_bytes": 113152,
+          "host_peak_rss_bytes": 2061713408
+        }
+      ],
+      "device_type": "npu",
+      "device_name": "Ascend910B3"
+    }
+  ],
+  "resolved_device": "npu:0",
+  "device_name": "Ascend910B3",
+  "status": "NPU_SMOKE_PASSED",
+  "evidence_level": "NPU_SMOKE_PASSED",
+  "verdict": {
+    "status": "PASSED",
+    "expected_methods": [
+      "dflash"
+    ],
+    "record_count": 1,
+    "per_method": {
+      "dflash": {
+        "status": "passed",
+        "steps": 200,
+        "nan_seen": false,
+        "checks": {
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        },
+        "problems": [],
+        "record": {
+          "method": "dflash",
+          "steps": 200,
+          "nan_seen": false,
+          "exit_code": 0,
+          "skipped": false,
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true,
+          "params_with_grad": 25,
+          "changed_parameters": 25,
+          "final_loss": 6.369841575622559,
+          "elapsed_seconds": 29.497,
+          "peak_memory_bytes": 34813952,
+          "memory_samples": [
+            {
+              "step": 0,
+              "accelerator_allocated_bytes": 0,
+              "host_peak_rss_bytes": 1795518464
+            },
+            {
+              "step": 20,
+              "accelerator_allocated_bytes": 425472,
+              "host_peak_rss_bytes": 2060140544
+            },
+            {
+              "step": 40,
+              "accelerator_allocated_bytes": 425472,
+              "host_peak_rss_bytes": 2060140544
+            },
+            {
+              "step": 60,
+              "accelerator_allocated_bytes": 425472,
+              "host_peak_rss_bytes": 2060140544
+            },
+            {
+              "step": 80,
+              "accelerator_allocated_bytes": 425472,
+              "host_peak_rss_bytes": 2060140544
+            },
+            {
+              "step": 100,
+              "accelerator_allocated_bytes": 425472,
+              "host_peak_rss_bytes": 2060140544
+            },
+            {
+              "step": 120,
+              "accelerator_allocated_bytes": 425472,
+              "host_peak_rss_bytes": 2061713408
+            },
+            {
+              "step": 140,
+              "accelerator_allocated_bytes": 425472,
+              "host_peak_rss_bytes": 2061713408
+            },
+            {
+              "step": 160,
+              "accelerator_allocated_bytes": 425472,
+              "host_peak_rss_bytes": 2061713408
+            },
+            {
+              "step": 180,
+              "accelerator_allocated_bytes": 425472,
+              "host_peak_rss_bytes": 2061713408
+            },
+            {
+              "step": 200,
+              "accelerator_allocated_bytes": 425472,
+              "host_peak_rss_bytes": 2061713408
+            },
+            {
+              "step": 200,
+              "accelerator_allocated_bytes": 113152,
+              "host_peak_rss_bytes": 2061713408
+            }
+          ],
+          "device_type": "npu",
+          "device_name": "Ascend910B3"
+        }
+      }
+    },
+    "problems": []
+  },
+  "duration_seconds": 31.45,
+  "artifact_dir": "<repo>/runs/npu/final/artifacts/H3",
+  "note": "Synthetic target features; this validates the real training path on the device, not a real Qwen target forward or model quality."
+}

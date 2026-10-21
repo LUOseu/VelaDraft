@@ -1,0 +1,7 @@
+{
+  "terminated_pids": [
+    1762435
+  ],
+  "reason": "Harness omitted production configure_verify_backend(False), so sequential verification used reference SDPA backend rather than generate-parity backend; preserve partial results and rerun original64 with intended parity mode.",
+  "unix_time": 1792578019.627586
+}

@@ -1,0 +1,154 @@
+[
+  {
+    "indices": [
+      16,
+      38,
+      55,
+      37,
+      45,
+      51,
+      39,
+      40
+    ],
+    "padding_fraction": 0.04067460317460314,
+    "context": 569,
+    "requested_anchors": 256,
+    "actual_anchors": 126,
+    "query_rows_per_sample": 1008,
+    "allocated_rows": 8064,
+    "kept_rows": 7736
+  },
+  {
+    "indices": [
+      7,
+      63,
+      18,
+      62,
+      32,
+      60,
+      19,
+      57
+    ],
+    "padding_fraction": 0.4853515625,
+    "context": 825,
+    "requested_anchors": 256,
+    "actual_anchors": 256,
+    "query_rows_per_sample": 2048,
+    "allocated_rows": 16384,
+    "kept_rows": 8432
+  },
+  {
+    "indices": [
+      7,
+      18,
+      32,
+      19,
+      20,
+      0,
+      8,
+      21
+    ],
+    "padding_fraction": 0.21875,
+    "context": 475,
+    "requested_anchors": 256,
+    "actual_anchors": 12,
+    "query_rows_per_sample": 96,
+    "allocated_rows": 768,
+    "kept_rows": 600
+  },
+  {
+    "indices": [
+      22,
+      9,
+      25,
+      1,
+      5,
+      23,
+      11,
+      3
+    ],
+    "padding_fraction": 0.30952380952380953,
+    "context": 442,
+    "requested_anchors": 256,
+    "actual_anchors": 21,
+    "query_rows_per_sample": 168,
+    "allocated_rows": 1344,
+    "kept_rows": 928
+  },
+  {
+    "indices": [
+      14,
+      13,
+      2,
+      26,
+      30,
+      4,
+      24,
+      27
+    ],
+    "padding_fraction": 0.464527027027027,
+    "context": 465,
+    "requested_anchors": 256,
+    "actual_anchors": 74,
+    "query_rows_per_sample": 592,
+    "allocated_rows": 4736,
+    "kept_rows": 2536
+  },
+  {
+    "indices": [
+      28,
+      6,
+      61,
+      12,
+      42,
+      10,
+      31,
+      44
+    ],
+    "padding_fraction": 0.10204081632653061,
+    "context": 649,
+    "requested_anchors": 256,
+    "actual_anchors": 98,
+    "query_rows_per_sample": 784,
+    "allocated_rows": 6272,
+    "kept_rows": 5632
+  },
+  {
+    "indices": [
+      33,
+      34,
+      43,
+      29,
+      48,
+      47,
+      17,
+      35
+    ],
+    "padding_fraction": 0.05555555555555558,
+    "context": 535,
+    "requested_anchors": 256,
+    "actual_anchors": 108,
+    "query_rows_per_sample": 864,
+    "allocated_rows": 6912,
+    "kept_rows": 6528
+  },
+  {
+    "indices": [
+      15,
+      49,
+      16,
+      38,
+      55,
+      37,
+      45,
+      51
+    ],
+    "padding_fraction": 0.058467741935483875,
+    "context": 569,
+    "requested_anchors": 256,
+    "actual_anchors": 124,
+    "query_rows_per_sample": 992,
+    "allocated_rows": 7936,
+    "kept_rows": 7472
+  }
+]

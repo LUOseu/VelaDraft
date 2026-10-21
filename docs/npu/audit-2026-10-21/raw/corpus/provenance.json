@@ -1,0 +1,98 @@
+{
+  "created": "2026-10-21T15:00:44+0800",
+  "stages": {
+    "capture": {
+      "identity": {
+        "target_model_path": "/root/veladraft-models/Qwen2.5-VL-3B-Instruct",
+        "model_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+        "processor_fingerprint": "ed94e2fa5734073524651401de89882531084a817ed212300893591d6b35ff3e",
+        "mask_token_id": 151669,
+        "spatial_rope_sections": [
+          16,
+          24,
+          24
+        ],
+        "draft_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "capture_layer_ids": [
+          1,
+          9,
+          17,
+          25,
+          33
+        ],
+        "image_min_pixels": 200704,
+        "image_max_pixels": 1003520
+      },
+      "manifest": {
+        "format": "vlm-dflash-features-v1",
+        "schema_version": 1,
+        "seq_length": 4096,
+        "storage_dtype": "bfloat16",
+        "num_samples": 64,
+        "num_truncated": 0,
+        "num_multi_turn": 0,
+        "multi_turn_modes": [],
+        "draft_layer_ids": [
+          1,
+          9,
+          17,
+          25,
+          33
+        ],
+        "capture_layer_ids": [
+          1,
+          9,
+          17,
+          25,
+          33
+        ],
+        "hidden_size": 2048,
+        "hidden_layout": "concat_capture_layers",
+        "stores_final_hidden": true,
+        "tie_word_embeddings": true,
+        "lm_head_saved": false,
+        "seq_len_stats": {
+          "min": 297,
+          "max": 825,
+          "mean": 478.0625
+        }
+      },
+      "visual_path_check": {
+        "sample_id": "000000559162",
+        "swap_sample_id": "000000122001",
+        "expected_image_tokens": 256,
+        "found_image_tokens": 256,
+        "span_ok": true,
+        "replay_bitwise_equal": true,
+        "replay_max_abs_diff": 0.0,
+        "swap_token_count_match": true,
+        "swap_deltas": {
+          "span": {
+            "max_abs_diff": 120.0,
+            "mean_abs_diff": 2.20552134513855,
+            "min_cosine": 0.3810166120529175,
+            "changed_positions": 256
+          },
+          "downstream": {
+            "max_abs_diff": 38.03125,
+            "mean_abs_diff": 0.5673674941062927,
+            "min_cosine": 0.7645618915557861,
+            "changed_positions": 26
+          }
+        },
+        "thresholds": {
+          "min_downstream_changed": 16,
+          "min_span_cosine_drop": 0.001
+        },
+        "passed": true
+      },
+      "code": "vlm_dflash.target.capture.run_capture",
+      "recorded_at": "2026-10-21T15:00:44+0800"
+    }
+  },
+  "updated": "2026-10-21T15:00:44+0800"
+}

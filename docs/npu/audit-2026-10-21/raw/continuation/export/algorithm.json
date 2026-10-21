@@ -1,0 +1,69 @@
+{
+  "format": "vlm-dflash-algorithm-v1",
+  "algorithm": "dfly",
+  "metadata": {
+    "name": "dfly",
+    "description": "DFlash shared-FC context plus a per-layer fusion residual and an optional zero-init SwiGLU hidden-states correction conditioned on the previous token (DFlareV2).",
+    "maturity": {
+      "architecture": "validated",
+      "training": "validated",
+      "multimodal": "validated",
+      "runtime": "experimental"
+    },
+    "references": {
+      "paper": "arXiv:2607.25852 (AngelSpec / DFly)",
+      "upstream_reference": "Tencent/AngelSpec@d3412bed231025ea85d35dbf5e0af44f1ac62a5b angelspec/models/draft/dfly.py (Apache-2.0)",
+      "port_notes": "docs/upstream/dfly.md",
+      "algorithm_doc": "docs/algorithms/dfly.md"
+    },
+    "capabilities": {
+      "image": true,
+      "multi_image": true,
+      "video": false,
+      "eval": true,
+      "export": true
+    },
+    "targets": {
+      "qwen25_vl": "validated",
+      "qwen3_vl": "reduced_validation"
+    },
+    "evidence": [
+      {
+        "family": "qwen25_vl",
+        "layout": "single_image",
+        "feature_mode": "offline",
+        "state": "canonical_validated",
+        "evidence": "R-20261014-11 E4 canonical 2K upstream_two_stage recipe (AL 1.839 vs controlled_ce 1.682, 128/128 exact; configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml); zoo-v0.3.2 archive + demo reload"
+      },
+      {
+        "family": "qwen3_vl",
+        "layout": "single_image",
+        "feature_mode": "offline",
+        "state": "reduced_validation",
+        "evidence": "docs/algorithms/dfly.md Qwen3-VL-8B reduced validation (configs/dfly/qwen3_vl_8b_reduced.yaml)"
+      }
+    ],
+    "training_signals": {
+      "hard_label": "Yes - decayed block CE by default; under the recipe, D-PACE-weighted block CE in stage 2 (stage 1 is LK-only, no CE).",
+      "context_layers": "context_layer_ids with per-layer fusion + the hidden-states correction (upstream recipe: [1,9,17,25,33]; matched 3-layer variant: [1,17,33]).",
+      "teacher_final_hidden": "Recipe only - train_recipe: upstream_two_stage consumes the target's final hidden states in both stages (LK and e2e TV).",
+      "distribution_objective": "Under the recipe: LK hybrid (KL/TV blend) cold start, then the end-to-end multi-step TV term.",
+      "confidence_objective": "None as a trained head; D-PACE confidences are detached position weights derived from the CE.",
+      "stage": "Single stage by default; the recipe switches cold_start_lk_dpace -> e2e_tv.",
+      "block_convention": "Forced DFlash convention (sample_from_anchor=false regardless of the YAML value).",
+      "notes": ""
+    }
+  },
+  "method_details": {
+    "context_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "fusion_trainable": true,
+    "fusion_init": "distance",
+    "enable_hidden_correction": true,
+    "hidden_correction_intermediate_size": null
+  },
+  "runtime_note": "Trained with this repo's port of upstream AngelSpec's two-stage recipe (objective_profile=upstream_two_stage: LK / D-PACE cold start -> end-to-end TV; see docs/upstream/dfly.md). At inference the block backbone runs in parallel, then the hidden-states correction and the LM-head projection run per slot sequentially, conditioned on the previously proposed tokens -- the documented local adaptation of upstream's train-time-only correction transformation."
+}

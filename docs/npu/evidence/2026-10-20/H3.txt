@@ -1,0 +1,119 @@
+$ <venv>/bin/python <repo>/scripts/npu/seven_method_smoke.py --device npu:0 --methods dflash --steps 200 --out <repo>/runs/npu/final/phase_json/H3.json --artifact-dir <repo>/runs/npu/final/artifacts/H3
+
+[stdout]
+[20:50:18] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[20:50:18]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.3969
+[20:50:18]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.008396
+[20:50:18]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.8804
+[20:50:18]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=11.6
+[20:50:18] train: epoch end at step 4/200 in 1.6s
+[20:50:19] train: epoch end at step 8/200 in 0.3s
+[20:50:19] train: epoch end at step 12/200 in 0.3s
+[20:50:19] train: epoch end at step 16/200 in 0.3s
+[20:50:19] train: epoch end at step 20/200 in 0.3s
+[20:50:20] train: epoch end at step 24/200 in 0.3s
+[20:50:20] train: epoch end at step 28/200 in 0.3s
+[20:50:20] train: epoch end at step 32/200 in 0.3s
+[20:50:21] train: epoch end at step 36/200 in 0.3s
+[20:50:21] train: epoch end at step 40/200 in 0.3s
+[20:50:21] train: epoch end at step 44/200 in 0.3s
+[20:50:21] train: epoch end at step 48/200 in 0.3s
+[20:50:22] train: epoch end at step 52/200 in 0.3s
+[20:50:22] train: epoch end at step 56/200 in 0.3s
+[20:50:22] train: epoch end at step 60/200 in 0.3s
+[20:50:23] train: epoch end at step 64/200 in 0.3s
+[20:50:23] train: epoch end at step 68/200 in 0.3s
+[20:50:23] train: epoch end at step 72/200 in 0.3s
+[20:50:23] train: epoch end at step 76/200 in 0.3s
+[20:50:24] train: epoch end at step 80/200 in 0.3s
+[20:50:24] train: epoch end at step 84/200 in 0.3s
+[20:50:24] train: epoch end at step 88/200 in 0.3s
+[20:50:25] train: epoch end at step 92/200 in 0.3s
+[20:50:25] train: epoch end at step 96/200 in 0.3s
+[20:50:25] train: epoch end at step 100/200 in 0.3s
+[20:50:25] train: epoch end at step 104/200 in 0.3s
+[20:50:26] train: epoch end at step 108/200 in 0.3s
+[20:50:26] train: epoch end at step 112/200 in 0.3s
+[20:50:26] train: epoch end at step 116/200 in 0.3s
+[20:50:27] train: epoch end at step 120/200 in 0.3s
+[20:50:27] train: epoch end at step 124/200 in 0.3s
+[20:50:27] train: epoch end at step 128/200 in 0.3s
+[20:50:27] train: epoch end at step 132/200 in 0.3s
+[20:50:28] train: epoch end at step 136/200 in 0.3s
+[20:50:28] train: epoch end at step 140/200 in 0.3s
+[20:50:28] train: epoch end at step 144/200 in 0.3s
+[20:50:29] train: epoch end at step 148/200 in 0.3s
+[20:50:29] train: epoch end at step 152/200 in 0.3s
+[20:50:29] train: epoch end at step 156/200 in 0.3s
+[20:50:29] train: epoch end at step 160/200 in 0.3s
+[20:50:30] train: epoch end at step 164/200 in 0.3s
+[20:50:30] train: epoch end at step 168/200 in 0.3s
+[20:50:30] train: epoch end at step 172/200 in 0.3s
+[20:50:31] train: epoch end at step 176/200 in 0.3s
+[20:50:31] train: epoch end at step 180/200 in 0.3s
+[20:50:31] train: epoch end at step 184/200 in 0.3s
+[20:50:31] train: epoch end at step 188/200 in 0.3s
+[20:50:32] train: epoch end at step 192/200 in 0.3s
+[20:50:32] train: epoch end at step 196/200 in 0.3s
+[20:50:32] gradient coverage: 25/25 trainable tensors with grad (1.000 of trainable elements)
+[20:50:32]   draft_model.fc: trainable=1 tensors/2048 elements with_grad=1 grad_norm=0.3969
+[20:50:32]   draft_model.hidden_norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=0.008396
+[20:50:32]   draft_model.layers: trainable=22 tensors/18592 elements with_grad=22 grad_norm=0.8804
+[20:50:32]   draft_model.norm: trainable=1 tensors/32 elements with_grad=1 grad_norm=11.6
+[20:50:33] train: epoch end at step 4/200 in 0.3s
+[20:50:33] train: epoch end at step 8/200 in 0.3s
+[20:50:33] train: epoch end at step 12/200 in 0.3s
+[20:50:33] train: epoch end at step 16/200 in 0.3s
+[20:50:34] train: epoch end at step 20/200 in 0.3s
+[20:50:34] train: epoch end at step 24/200 in 0.3s
+[20:50:34] train: epoch end at step 28/200 in 0.3s
+[20:50:35] train: epoch end at step 32/200 in 0.3s
+[20:50:35] train: epoch end at step 36/200 in 0.3s
+[20:50:35] train: epoch end at step 40/200 in 0.3s
+[20:50:35] train: epoch end at step 44/200 in 0.3s
+[20:50:36] train: epoch end at step 48/200 in 0.3s
+[20:50:36] train: epoch end at step 52/200 in 0.3s
+[20:50:36] train: epoch end at step 56/200 in 0.3s
+[20:50:36] train: epoch end at step 60/200 in 0.3s
+[20:50:37] train: epoch end at step 64/200 in 0.3s
+[20:50:37] train: epoch end at step 68/200 in 0.3s
+[20:50:37] train: epoch end at step 72/200 in 0.3s
+[20:50:38] train: epoch end at step 76/200 in 0.3s
+[20:50:38] train: epoch end at step 80/200 in 0.3s
+[20:50:38] train: epoch end at step 84/200 in 0.3s
+[20:50:38] train: epoch end at step 88/200 in 0.3s
+[20:50:39] train: epoch end at step 92/200 in 0.3s
+[20:50:39] train: epoch end at step 96/200 in 0.3s
+[20:50:39] train: resumed from step 100 (micro_step=100, skipped=0, history_rows=100)
+[20:50:39] train: epoch end at step 100/200 in 0.0s
+[20:50:40] train: epoch end at step 104/200 in 0.3s
+[20:50:40] train: epoch end at step 108/200 in 0.3s
+[20:50:40] train: epoch end at step 112/200 in 0.3s
+[20:50:40] train: epoch end at step 116/200 in 0.3s
+[20:50:41] train: epoch end at step 120/200 in 0.3s
+[20:50:41] train: epoch end at step 124/200 in 0.3s
+[20:50:41] train: epoch end at step 128/200 in 0.3s
+[20:50:41] train: epoch end at step 132/200 in 0.3s
+[20:50:42] train: epoch end at step 136/200 in 0.3s
+[20:50:42] train: epoch end at step 140/200 in 0.3s
+[20:50:42] train: epoch end at step 144/200 in 0.3s
+[20:50:42] train: epoch end at step 148/200 in 0.3s
+[20:50:43] train: epoch end at step 152/200 in 0.3s
+[20:50:43] train: epoch end at step 156/200 in 0.3s
+[20:50:43] train: epoch end at step 160/200 in 0.3s
+[20:50:44] train: epoch end at step 164/200 in 0.3s
+[20:50:44] train: epoch end at step 168/200 in 0.3s
+[20:50:44] train: epoch end at step 172/200 in 0.3s
+[20:50:44] train: epoch end at step 176/200 in 0.3s
+[20:50:45] train: epoch end at step 180/200 in 0.3s
+[20:50:45] train: epoch end at step 184/200 in 0.3s
+[20:50:45] train: epoch end at step 188/200 in 0.3s
+[20:50:46] train: epoch end at step 192/200 in 0.3s
+[20:50:46] train: epoch end at step 196/200 in 0.3s
+[20:50:46] export: wrote <repo>/runs/npu/final/artifacts/H3/dflash/export (format=vlm-dflash-export-v1, checkpoint=ckpt_final.pt)
+{"method": "dflash", "status": "passed", "steps": 200}
+{"status": "NPU_SMOKE_PASSED", "problems": [], "json": "<repo>/runs/npu/final/phase_json/H3.json"}
+
+[stderr]
+<venv>/lib/python3.10/site-packages/torch/autograd/__init__.py:230: UserWarning: Cannot create tensor with interal format while allow_internel_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:340.)
+  torch.ones_like(out, memory_format=torch.preserve_format)

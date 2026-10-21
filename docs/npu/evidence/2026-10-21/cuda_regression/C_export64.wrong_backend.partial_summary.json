@@ -1,0 +1,17 @@
+{
+  "status": "INVALID_PROTOCOL",
+  "reason": "Omitted generate-parity backend configuration; not an accepted checkpoint evaluation",
+  "completed_samples": 116,
+  "by_format": {
+    "native": {
+      "samples": 64,
+      "not_token_exact": 24,
+      "accepted": 1948.0
+    },
+    "portable": {
+      "samples": 52,
+      "not_token_exact": 21,
+      "accepted": 1628.0
+    }
+  }
+}

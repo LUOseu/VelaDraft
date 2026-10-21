@@ -47,6 +47,7 @@ from ..provenance import identity_from_contract
 from ..utils import read_json, sha256_file, sha256_json
 from .cache_budget import CacheBudgetController
 from .load import load_target
+from .. import runtime
 from .sample_capture import (
     extract_target_head,
     finalize_prepared_records,
@@ -498,11 +499,8 @@ class OnlineFeatureSource:
 
         self.model, self.processor = load_target(cfg, contract)
         self.target_device = next(self.model.parameters()).device
-        # Every CUDA device holding target weights (several with target.device_map).
-        self.target_devices = sorted(
-            {parameter.device for parameter in self.model.parameters() if parameter.device.type == "cuda"},
-            key=lambda device: device.index,
-        )
+        # Every CUDA/NPU device holding target weights (several with target.device_map).
+        self.target_devices = runtime.accelerator_devices(self.model)
         offenders = [name for name, parameter in self.model.named_parameters() if parameter.requires_grad]
         if offenders or self.model.training:
             raise RuntimeError(
@@ -527,7 +525,7 @@ class OnlineFeatureSource:
             parameter.numel() * parameter.element_size() for parameter in self.model.parameters()
         )
 
-        self.train_device = str((cfg.get("train") or {}).get("device", "cuda:0"))
+        self.train_device = str((cfg.get("train") or {}).get("device", target_cfg.get("device", "cuda:0")))
         self.phase = "train"
         self.digest_value = online_source_digest(cfg, contract, self.rows, self.media_dir, self.run_dir)
         self._reset_target_peak()
@@ -536,7 +534,7 @@ class OnlineFeatureSource:
     # -- extraction bookkeeping ---------------------------------------------
     def _reset_target_peak(self) -> None:
         for device in self.target_devices:
-            torch.cuda.reset_peak_memory_stats(device)
+            runtime.reset_peak_memory_stats(device)
 
     def _close_peak_window(self) -> None:
         # Tolerates partially-constructed instances (no target loaded yet).
@@ -546,12 +544,26 @@ class OnlineFeatureSource:
         if not self.target_devices:
             return
         entry = self.stats.setdefault(self.phase, {"target_forwards": 0, "wall_seconds": 0.0})
-        peaks = {str(device): torch.cuda.max_memory_allocated(device) / 1e9 for device in self.target_devices}
-        entry["target_device_peak_gb"] = max(float(entry.get("target_device_peak_gb", 0.0)), max(peaks.values()))
+        peak_bytes = {device: runtime.max_memory_allocated(device) for device in self.target_devices}
+        peaks = {
+            str(device): (None if value is None else value / 1e9)
+            for device, value in peak_bytes.items()
+        }
+        available = [value for value in peaks.values() if value is not None]
+        if available:
+            entry["target_device_peak_gb"] = max(
+                float(entry.get("target_device_peak_gb") or 0.0), max(available)
+            )
+        else:
+            entry["target_device_peak_gb"] = None
+            entry["target_device_peak_unavailable"] = True
         if len(peaks) > 1:
             recorded = entry.setdefault("target_device_peaks_gb", {})
             for name, peak in peaks.items():
-                recorded[name] = max(float(recorded.get(name, 0.0)), peak)
+                if peak is None:
+                    recorded[name] = None
+                else:
+                    recorded[name] = max(float(recorded.get(name) or 0.0), peak)
 
     def _open_peak_window(self) -> None:
         if self.target_devices:
@@ -566,13 +578,13 @@ class OnlineFeatureSource:
     def _sync_target(self) -> None:
         """Synchronize every target device so wall-clock attribution is honest.
 
-        Timed regions bracket their own CUDA work with a synchronize on both
-        sides: without it ``perf_counter`` deltas only measure kernel launch
+        Timed regions bracket their own accelerator work with a synchronize on
+        both sides: without it ``perf_counter`` deltas only measure kernel launch
         time and the reported preparation/forward split (and total) would
         depend on queue depth instead of actual work.
         """
         for device in self.target_devices:
-            torch.cuda.synchronize(device)
+            runtime.synchronize(device)
 
     def _stats_entry(self) -> dict:
         return self.stats.setdefault(
@@ -910,7 +922,7 @@ class OnlineFeatureSource:
                 "fast_forward_items, never as wall_seconds)"
             ),
             "target_device_peak_note": (
-                "target_device_peak_gb is the CUDA peak on the target's device during that phase "
+                "target_device_peak_gb is the accelerator peak on the target's device during that phase "
                 "(reset per phase; the largest per-device peak when target.device_map shards the target "
                 "over several devices). When target.device == train.device the phase peak includes the "
                 "trainer's own allocations; on split devices it isolates the target, which "

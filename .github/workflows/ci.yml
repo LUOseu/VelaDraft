@@ -27,8 +27,16 @@ jobs:
         env:
           CUDA_VISIBLE_DEVICES: ""
         run: pytest tests/ -q
+      - name: NPU-readiness CPU suite (fail-closed aggregate)
+        env:
+          CUDA_VISIBLE_DEVICES: ""
+        run: python scripts/npu/run_cpu_suite.py --json runs/npu/cpu_suite.json
       - name: Documentation checks (links, paths, CLI examples, generated drift)
         run: python scripts/check_docs.py
+      - name: Validate hardware profile evidence and digests
+        run: |
+          python scripts/npu/summarize_audit.py --check
+          python scripts/npu/validate_support_matrix.py
 
   package:
     name: package build + fresh wheel install
@@ -59,7 +67,18 @@ jobs:
               "vlm_dflash/presets/smoke.yaml",
               "vlm_dflash/presets/single-gpu-24g.yaml",
               "vlm_dflash/presets/single-gpu-48g.yaml",
+              "vlm_dflash/presets/npu-dflash-smoke.yaml",
+              "vlm_dflash/presets/npu-dspark-smoke.yaml",
+              "vlm_dflash/presets/npu-domino-smoke.yaml",
+              "vlm_dflash/presets/npu-jetspec-smoke.yaml",
+              "vlm_dflash/presets/npu-dflash2-smoke.yaml",
+              "vlm_dflash/presets/npu-dflare-smoke.yaml",
+              "vlm_dflash/presets/npu-dfly-smoke.yaml",
+              "vlm_dflash/presets/npu-online-smoke.yaml",
+              "vlm_dflash/presets/npu-split-device.yaml",
+              "vlm_dflash/presets/npu-target-device-map.yaml",
               "vlm_dflash/resources/constraints-tested.txt",
+              "vlm_dflash/resources/constraints-npu.txt",
           ]
           missing = [name for name in expected if name not in names]
           assert not missing, f"wheel is missing packaged resources: {missing}"
@@ -86,9 +105,19 @@ jobs:
           from vlm_dflash.cli import _parse_constraints, load_preset
 
           assert md.version("vlm-dflash") == __version__, (md.version("vlm-dflash"), __version__)
-          for name in ("smoke", "single-gpu-24g", "single-gpu-48g"):
+          for name in (
+              "smoke",
+              "single-gpu-24g",
+              "single-gpu-48g",
+              "npu-dflash-smoke",
+              "npu-online-smoke",
+              "npu-split-device",
+          ):
               cfg = load_preset(name)
-              assert cfg["drafter"]["block_size"] == 8, name
+              assert cfg["drafter"]["block_size"] in (4, 8), name
+          npu = load_preset("npu-dflash-smoke")
+          assert npu["train"]["device"].startswith("npu:"), npu["train"]["device"]
+          assert npu["drafter"]["attention_backend"] == "sdpa_chunked"
           pins = _parse_constraints()
           assert pins.get("torch") and pins.get("transformers"), pins
           print("packaged resources OK:", __version__, len(pins), "pins")

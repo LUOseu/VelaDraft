@@ -124,6 +124,11 @@ states live in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md) (generated).
   and supervised ([docs/data.md](docs/data.md)).
 - **Hardware:** the validated reference is a single 48 GB GPU; the 24 GB preset
   remains a *suggested* configuration (no recorded run on a real 24 GB card).
+- **Ascend NPU:** all seven methods have BF16 offline training, token-exact
+  evaluation and export evidence on two Ascend 910B3 devices. DFlash also has
+  online, split teacher/drafter, sharded-target and 200-step checks. These are
+  small engineering runs; DDP remains unsupported. See the
+  [NPU results and setup](docs/npu/README.md).
 - **Training modes:** offline staged features (default), online live
   extraction from a frozen target, and `--features` store reuse. There is no
   DDP / multi-node launch path. "Online" is not on-policy rollout training.
@@ -293,6 +298,7 @@ troubleshooting. Direct links: [model-zoo.md](docs/model-zoo.md) ·
 [data.md](docs/data.md) · [training.md](docs/training.md) ·
 [online-training.md](docs/online-training.md) ·
 [troubleshooting.md](docs/troubleshooting.md) ·
+[npu/](docs/npu/README.md) ·
 [algorithms/](docs/algorithms/) · [benchmark.md](docs/benchmark.md) ·
 [env-preflight.md](docs/env-preflight.md) (historical host notes) ·
 [REFERENCE.md](docs/REFERENCE.md) (implementation and numerical semantics).

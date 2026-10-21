@@ -12,6 +12,26 @@ import torch
 from torch import nn
 
 
+def model_attention_implementation(attention_backend: str | None) -> str:
+    """Map a VelaDraft training backend to a transformers attention implementation.
+
+    Chunked/fused DFlash backends are implemented inside this repository's
+    attention module and need a materialised mask spec, not a transformers
+    backend. They therefore use the ordinary ``sdpa`` implementation for the
+    projection/backend dispatch while ``DFlashTrainerModule.attention_backend``
+    keeps the requested path for mask construction and diagnostics.
+    """
+    requested = str(attention_backend or "flex_attention")
+    if requested == "flex_attention":
+        return "flex_attention"
+    if requested in ("sdpa", "sdpa_chunked", "npu_fusion"):
+        return "sdpa"
+    raise ValueError(
+        "attention_backend must be one of flex_attention, sdpa, sdpa_chunked or npu_fusion; "
+        f"got {requested!r}."
+    )
+
+
 def build_draft_config(contract: dict, cfg: dict):
     from transformers import AutoConfig
     from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
@@ -69,7 +89,9 @@ def build_draft_config(contract: dict, cfg: dict):
         if partial_rotary_factor != 1.0:
             draft["rope_parameters"]["partial_rotary_factor"] = partial_rotary_factor
     config = Qwen3Config.from_dict(draft)
-    config._attn_implementation = str(drafter.get("attention_backend", "flex_attention"))
+    config._attn_implementation = model_attention_implementation(
+        str(drafter.get("attention_backend", "flex_attention"))
+    )
     return config
 
 
@@ -147,6 +169,9 @@ def build_trainer_module(
         # row-local scoring tail; an explicit false always disables.
         recipe_row_compaction=drafter.get("recipe_row_compaction"),
         recipe_compile_tv_kl=recipe_compile_tv_kl,
+        attention_chunk_size=int(drafter.get("attention_chunk_size", 128)),
+        attention_memory_budget_gb=drafter.get("attention_memory_budget_gb"),
+        npu_fusion_fallback=bool(drafter.get("npu_fusion_fallback", False)),
         **(module_kwargs or {}),
     )
     return module
@@ -163,7 +188,9 @@ def load_checkpoint(path, map_location="cpu", model_class=None):
     if checkpoint.get("format") != "vlm-dflash-ckpt-v1":
         raise ValueError(f"Unrecognized checkpoint format in {path}: {checkpoint.get('format')!r}")
     config = Qwen3Config.from_dict(checkpoint["draft_config"])
-    config._attn_implementation = checkpoint.get("attention_backend", "flex_attention")
+    config._attn_implementation = model_attention_implementation(
+        checkpoint.get("attention_backend", "flex_attention")
+    )
     draft = model_class(config)
     draft.load_state_dict(checkpoint["model"])
     draft.eval()

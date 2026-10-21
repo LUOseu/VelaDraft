@@ -1,0 +1,107 @@
+{
+  "contract_version": 1,
+  "resolved_at": "2026-10-21T15:00:12+0800",
+  "target": {
+    "model_path": "/root/veladraft-models/Qwen2.5-VL-3B-Instruct",
+    "model_type": "qwen2_5_vl",
+    "model_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+    "processor_fingerprint": "ed94e2fa5734073524651401de89882531084a817ed212300893591d6b35ff3e",
+    "fingerprint_source": "sha256 of config/generation/index + weight shard sizes; processor files",
+    "model_files": {
+      "config.json": "7ed3eed5be6924cc800e8a5e53fc405c1aab1aaf36bad65c33403b36c56827f5",
+      "generation_config.json": "533f191cc257b7de37a4fccd0a7a1706d75e1aa660f93efaa54e5a2a9f9aace9",
+      "model.safetensors.index.json": "c7dd78a4c6bea60b51332f1baf37b8f8124ecab2c35395a29a29825bf2619768"
+    },
+    "processor_files": {
+      "preprocessor_config.json": "f2058c716eef96ccaed1cc1e2d0c08306b62586d535b28d9d08e691b2fab7ca0",
+      "processor_config.json": null,
+      "tokenizer_config.json": "4abd3520120e266da84c0864fee064d1fb10806f02225911a47253dd38dc5f56",
+      "chat_template.json": "ad60d90252ed0b0705ba14e2d0ad0fec0beac1ea955642b54059b36052d8bc96",
+      "tokenizer.json": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+      "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+      "merges.txt": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+    },
+    "weight_shards": {
+      "model-00001-of-00002.safetensors": 3982649232,
+      "model-00002-of-00002.safetensors": 3526688744
+    }
+  },
+  "text": {
+    "num_target_layers": 36,
+    "hidden_size": 2048,
+    "head_dim": 128,
+    "vocab_size": 151936,
+    "intermediate_size": 11008,
+    "source": "target config.text_config"
+  },
+  "mask": {
+    "token_id": 151669,
+    "token_str": null,
+    "policy": "reserved embedding row outside tokenizer vocabulary",
+    "tokenizer_vocab_size": 151643,
+    "source": "config default validated against tokenizer"
+  },
+  "rope": {
+    "type": "mrope",
+    "mode": "mrope",
+    "sections": [
+      16,
+      24,
+      24
+    ],
+    "interleaved": false,
+    "partial_rotary_factor": 1.0,
+    "source": "target text_config.rope_parameters.mrope_section + mrope_interleaved (absent = False) + partial_rotary_factor (absent = 1.0)"
+  },
+  "layers": {
+    "num_target_layers": 36,
+    "num_draft_layers": 3,
+    "draft_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "capture_layer_ids": [
+      1,
+      9,
+      17,
+      25,
+      33
+    ],
+    "capture_layer_ids_source": "explicit drafter.capture_layer_ids",
+    "block_size": 8,
+    "source": "config default (start=1, end=num_target_layers-3, uniform) validated against target depth; capture_layer_ids is the ordered layer list every feature store holds"
+  },
+  "image": {
+    "min_pixels": 200704,
+    "max_pixels": 1003520,
+    "processor_min_pixels": 3136,
+    "processor_max_pixels": 12845056,
+    "processor_bounds_source": "preprocessor_config.json.min_pixels/max_pixels",
+    "token_count_mode": "grid",
+    "patch_size": 14,
+    "merge_size": 2,
+    "tokens_per_patch": 784,
+    "min_tokens": 256,
+    "max_tokens": 1280,
+    "sequence_length_per_tile": null,
+    "source": "config override validated against processor; processor defaults recorded"
+  },
+  "tokens": {
+    "image_token_id": 151655,
+    "vision_start_token_id": 151652,
+    "vision_end_token_id": 151653,
+    "im_start_token_id": 151644,
+    "im_end_token_id": 151645,
+    "endoftext_token_id": 151643,
+    "source": "tokenizer, cross-checked against target config"
+  },
+  "prompt": {
+    "chat_template_kwargs": {},
+    "source": "config target.chat_template_kwargs (absent = {})"
+  },
+  "head": {
+    "tie_word_embeddings": true,
+    "source": "target config.json (tie_word_embeddings; absent = True)"
+  }
+}

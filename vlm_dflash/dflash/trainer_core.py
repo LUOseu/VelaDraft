@@ -44,16 +44,31 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+def _sum_nonzero_weights(weights: torch.Tensor) -> torch.Tensor:
+    """Reduce the same ordered effective terms regardless of zero padding.
+
+    Recipe compaction changes the zero-padded layout. The legacy decayed-CE
+    weight is reporting-only for those recipes, but shape-dependent FP32
+    reductions can otherwise report different totals for identical terms.
+    """
+    flat = weights.reshape(-1)
+    return flat[flat != 0].sum()
+
 if TYPE_CHECKING:
     from torch.nn.attention.flex_attention import BlockMask
 
 from .mask import (
+    DFlashMaskSpec,
     create_dflash_block_mask,
     create_dflash_sdpa_mask,
+    estimate_dflash_attention_memory,
 )
+from .chunked_attention import AttentionRuntimeStats
 from .decay_loss import DFlashDecayLoss
 from .draft_model import Qwen3DFlashDraftModel
 from ..objectives import CONFIDENCE_LOGITS_AUX_KEY, TeacherLogitsStream, recipe_loss
+from .. import runtime
 
 
 def _context_doc_ids(seq_lens: torch.Tensor, seq_len: int, device: torch.device) -> torch.Tensor:
@@ -168,6 +183,7 @@ def compute_acceptance_stats(
 
 
 _DFLASH_LOSS_TYPES = ("dflash", "variable_prefix")
+SUPPORTED_ATTENTION_BACKENDS = ("flex_attention", "sdpa", "sdpa_chunked", "npu_fusion")
 
 
 class DFlashTrainerModule(nn.Module):
@@ -205,6 +221,9 @@ class DFlashTrainerModule(nn.Module):
         train_recipe=None,
         recipe_row_compaction: Optional[bool] = None,
         recipe_compile_tv_kl: bool = False,
+        attention_chunk_size: int = 128,
+        attention_memory_budget_gb: float | None = None,
+        npu_fusion_fallback: bool = False,
     ):
         super().__init__()
         if loss_type not in _DFLASH_LOSS_TYPES:
@@ -222,7 +241,22 @@ class DFlashTrainerModule(nn.Module):
         object.__setattr__(self, "embed_tokens", target_embed_tokens)
         self.block_size = block_size
         self.mask_token_id = mask_token_id
-        self.attention_backend = attention_backend
+        self.attention_backend = str(attention_backend)
+        if self.attention_backend not in SUPPORTED_ATTENTION_BACKENDS:
+            raise ValueError(
+                f"attention_backend must be one of {SUPPORTED_ATTENTION_BACKENDS}, "
+                f"got {attention_backend!r}."
+            )
+        self.attention_chunk_size = int(attention_chunk_size)
+        if self.attention_chunk_size <= 0:
+            raise ValueError("attention_chunk_size must be a positive integer.")
+        self.attention_memory_budget_gb = (
+            None if attention_memory_budget_gb in (None, "", 0, 0.0) else float(attention_memory_budget_gb)
+        )
+        if self.attention_memory_budget_gb is not None and self.attention_memory_budget_gb <= 0:
+            raise ValueError("attention_memory_budget_gb must be positive when set.")
+        self.npu_fusion_fallback = bool(npu_fusion_fallback)
+        self.last_attention_memory_plan: dict | None = None
         self.num_anchors = num_anchors
         self.loss_decay_gamma = loss_decay_gamma
         self.loss_type = loss_type
@@ -639,7 +673,56 @@ class DFlashTrainerModule(nn.Module):
         draft_position_ids = self._create_position_ids(anchor_positions, context_position_ids if packed else None)
         full_position_ids = torch.cat([context_position_ids, draft_position_ids], dim=1)
 
+        config = getattr(self.draft_model, "config", None)
+        heads = int(getattr(config, "num_attention_heads", 1))
+        head_dim = int(
+            getattr(config, "head_dim", None)
+            or getattr(config, "hidden_size", heads * 1) // max(heads, 1)
+        )
+        plan = estimate_dflash_attention_memory(
+            batch_size=bsz,
+            num_blocks=anchor_positions.shape[1],
+            block_size=self.block_size,
+            context_len=seq_len,
+            num_heads=heads,
+            head_dim=head_dim,
+            dtype=noise_embedding.dtype,
+            query_chunk_size=(
+                self.attention_chunk_size
+                if self.attention_backend in ("sdpa_chunked", "npu_fusion")
+                else None
+            ),
+        )
+        plan["requested_backend"] = self.attention_backend
+        budget = self.attention_memory_budget_gb
+        if budget is not None:
+            # Compare raw bytes: the JSON-facing GB fields are rounded to four
+            # decimals, which would make a sub-0.0001 GB budget look satisfied.
+            relevant_bytes = (
+                plan["chunked"]["total_bytes"] if plan["chunked"] is not None else plan["dense"]["total_bytes"]
+            )
+            relevant = relevant_bytes / 1e9
+            plan["budget_gb"] = budget
+            plan["fits_budget"] = bool(relevant <= budget)
+            if not plan["fits_budget"]:
+                hint = (
+                    "lower drafter.attention_chunk_size"
+                    if plan["chunked"] is not None
+                    else "select attention_backend=sdpa_chunked or raise drafter.attention_memory_budget_gb"
+                )
+                raise RuntimeError(
+                    f"Attention memory plan needs {relevant:.3f} GB for "
+                    f"B={bsz}, anchors={anchor_positions.shape[1]}, context={seq_len}, "
+                    f"block={self.block_size}, heads={heads} but the configured budget is {budget:.3f} GB; {hint}."
+                )
+        self.last_attention_memory_plan = plan
+
         if self.attention_backend == "flex_attention":
+            if device.type == "npu":
+                raise RuntimeError(
+                    "attention_backend=flex_attention is not enabled on Ascend NPU; "
+                    "use sdpa_chunked or opt into npu_fusion explicitly."
+                )
             attn_mask = create_dflash_block_mask(
                 anchor_positions,
                 block_keep_mask,
@@ -650,7 +733,7 @@ class DFlashTrainerModule(nn.Module):
                 ctx_doc_id=ctx_doc_id,
                 anchor_doc_id=anchor_doc_id,
             )
-        else:
+        elif self.attention_backend == "sdpa":
             attn_mask = create_dflash_sdpa_mask(
                 anchor_positions,
                 block_keep_mask,
@@ -662,7 +745,85 @@ class DFlashTrainerModule(nn.Module):
                 ctx_doc_id=ctx_doc_id,
                 anchor_doc_id=anchor_doc_id,
             )
+        else:
+            if self.attention_backend == "npu_fusion" and device.type != "npu":
+                raise RuntimeError(
+                    "attention_backend=npu_fusion requires an Ascend NPU training device; "
+                    f"the batch is on {device}. Use sdpa_chunked for CPU/CUDA execution."
+                )
+            attn_mask = DFlashMaskSpec(
+                anchor_positions=anchor_positions,
+                block_keep_mask=block_keep_mask,
+                ctx_len=seq_len,
+                block_size=self.block_size,
+                causal=causal,
+                ctx_doc_id=ctx_doc_id,
+                anchor_doc_id=anchor_doc_id,
+                query_chunk_size=self.attention_chunk_size,
+                backend=self.attention_backend,
+                npu_fusion_fallback=self.npu_fusion_fallback,
+            )
         return anchor_positions, block_keep_mask, noise_embedding, full_position_ids, attn_mask, prefix_lengths
+
+    def reset_attention_runtime_stats(self) -> None:
+        """Start a local measurement window after warmup; never changes model state."""
+        for layer in getattr(self.draft_model, "layers", ()):
+            attention = getattr(layer, "self_attn", None)
+            stats = getattr(attention, "attention_runtime_stats", None)
+            if stats is not None:
+                stats.reset()
+                attention.last_attention_backend_info = None
+
+    def attention_runtime_report(self) -> dict:
+        """Snapshot latest layer paths plus cumulative local measurement-window counts.
+
+        See ``measurement_window.count_semantics`` before interpreting counts.
+        This does not measure hardware memory, backward kernels, or update time.
+        """
+        layers = getattr(self.draft_model, "layers", ())
+        infos = [
+            info
+            for info in (
+                getattr(getattr(layer, "self_attn", None), "last_attention_backend_info", None)
+                for layer in layers
+            )
+            if info
+        ]
+        window = AttentionRuntimeStats()
+        for layer in layers:
+            stats = getattr(getattr(layer, "self_attn", None), "attention_runtime_stats", None)
+            if stats is not None:
+                window.merge(stats.snapshot())
+        effective = sorted({str(info.get("effective_backend")) for info in infos})
+        fallback_reasons = sorted(
+            {str(info["fallback_reason"]) for info in infos if info.get("fallback_reason")}
+        )
+        device = next(self.draft_model.parameters()).device
+        compile_requested = bool(self.recipe_compile_tv_kl)
+        compile_allowed = runtime.compile_supported(device)
+        compile_gate = {
+            "requested": compile_requested,
+            "effective": compile_requested and compile_allowed,
+            "reason": (
+                "not_requested" if not compile_requested else
+                f"runtime.compile_supported disabled for {device.type}" if not compile_allowed else
+                "device_gate_allows_compile; actual use depends on active objective"
+            ),
+            "scope": "device_gate_not_execution_evidence",
+        }
+        return {
+            "requested_backend": self.attention_backend,
+            "effective_backends": effective,
+            "training_switches": {"recipe_compile_tv_kl": compile_gate},
+            "fallback_reasons": fallback_reasons,
+            "chunked_layers": sum(1 for info in infos if info.get("activation_checkpointing")),
+            "memory_plan": self.last_attention_memory_plan,
+            "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+            "measurement_window": window.snapshot(),
+            "mixed_backend": any(info.get("mixed_backend", False) for info in infos) or len(effective) > 1,
+            "fused_chunks": sum(info.get("fused_chunks", 0) for info in infos),
+            "fallback_chunks": sum(info.get("fallback_chunks", 0) for info in infos),
+        }
 
     def _apply_algorithm_terms(
         self,
@@ -1029,7 +1190,11 @@ class DFlashTrainerModule(nn.Module):
                 -torch.arange(slots, device=pred_mask.device, dtype=pred_mask.dtype) / self.loss_decay_gamma
             )
             loss_weights = loss_weights * depth_weights
-        loss_weight = loss_weights.sum()
+        loss_weight = (
+            _sum_nonzero_weights(loss_weights)
+            if self._recipe_active() and self.supports_recipe_row_compaction
+            else loss_weights.sum()
+        )
 
         valid_tokens = count_per_pos.sum()
         correct_tokens = correct_per_pos.sum()

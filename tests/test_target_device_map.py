@@ -67,6 +67,29 @@ def test_device_map_is_forwarded_and_skips_single_device_move(captured_load):
     assert model.frozen is True
 
 
+def test_device_map_infers_an_npu_backend_from_module_placements(captured_load):
+    _, model = captured_load
+    cfg = {
+        "target": {
+            "device_map": {
+                "model.visual": "npu:0",
+                "model.language_model": "npu:1",
+                "lm_head": "npu:1",
+            }
+        }
+    }
+    loaded, _ = load_module.load_target(cfg, CONTRACT)
+    assert loaded is model
+    assert model._vlm_dflash_device_map_backend == "npu"
+
+
+def test_device_map_rejects_mixed_cuda_and_npu_placements(captured_load):
+    with pytest.raises(ValueError, match="mixes CUDA and NPU"):
+        load_module.load_target(
+            {"target": {"device_map": {"model.visual": "npu:0", "lm_head": "cuda:1"}}}, CONTRACT
+        )
+
+
 def test_without_device_map_the_target_moves_to_one_device(captured_load):
     calls, model = captured_load
     load_module.load_target({"target": {"device": "cuda:1"}}, CONTRACT)

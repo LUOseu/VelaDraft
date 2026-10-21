@@ -1,0 +1,41 @@
+{
+  "mode": "qualification",
+  "returncode": 1,
+  "reason": null,
+  "wall_seconds": 34.07012553885579,
+  "prior_A_seconds": 0,
+  "gpu": 1,
+  "free_MiB_samples": [
+    [
+      0.05,
+      31431
+    ],
+    [
+      6.02,
+      31417
+    ],
+    [
+      11.66,
+      31164
+    ],
+    [
+      17.48,
+      31164
+    ],
+    [
+      23.2,
+      31104
+    ],
+    [
+      29.07,
+      28798
+    ]
+  ],
+  "command": [
+    "/home/lyh/veladraft-pr30-audit-20261021/env/bin/python",
+    "/home/lyh/veladraft-pr30-audit-20261021/A_child.py",
+    "qualification",
+    "600"
+  ],
+  "scope": "contended diagnostic; no exclusive GPU performance claim"
+}

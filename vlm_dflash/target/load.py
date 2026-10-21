@@ -4,6 +4,51 @@ from __future__ import annotations
 
 import torch
 
+from .. import runtime
+
+
+def _device_map_backend_hint(device_map) -> str | None:
+    """Infer the accelerator backend from an explicit module-to-device map."""
+    if not isinstance(device_map, dict):
+        if isinstance(device_map, str):
+            text = device_map.strip()
+            if text == "cpu":
+                return "cpu"
+            try:
+                kind = runtime.device_type(text)
+            except runtime.DeviceResolutionError:
+                return None
+            return kind if kind in ("cpu", "cuda", "npu") else None
+        return None
+    kinds: set[str] = set()
+    for raw in device_map.values():
+        if isinstance(raw, int):
+            kinds.add("cuda")
+        elif isinstance(raw, torch.device):
+            kinds.add(raw.type)
+        elif isinstance(raw, str):
+            text = raw.strip()
+            if text.isdigit():
+                kinds.add("cuda")
+            elif text in ("cpu", "disk"):
+                kinds.add(text)
+            else:
+                try:
+                    kinds.add(runtime.device_type(text))
+                except runtime.DeviceResolutionError:
+                    continue
+    accelerators = kinds & {"cuda", "npu"}
+    if len(accelerators) > 1:
+        raise ValueError(
+            "target.device_map mixes CUDA and NPU placements; one training run must use a single "
+            f"accelerator backend, got {sorted(accelerators)}."
+        )
+    if accelerators:
+        return next(iter(accelerators))
+    if "cpu" in kinds:
+        return "cpu"
+    return None
+
 
 def _dtype(name: str) -> torch.dtype:
     mapping = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}
@@ -38,6 +83,8 @@ def load_target(cfg: dict, contract: dict, device: str | None = None):
 
     adapter = adapter_for_contract(contract)
     target_cfg = cfg.get("target", {})
+    configured_device = device or target_cfg.get("device") or (cfg.get("train") or {}).get("device") or "cuda:0"
+    backend_hint = runtime.device_type(configured_device)
     model_path = contract["target"]["model_path"]
     local_only = bool(target_cfg.get("local_files_only", True))
     # ``target.device_map`` shards a target that does not fit next to the
@@ -46,6 +93,8 @@ def load_target(cfg: dict, contract: dict, device: str | None = None):
     device_map = target_cfg.get("device_map")
     if device_map is None and target_cfg.get("max_memory") is not None:
         raise ValueError("target.max_memory only applies with target.device_map; set both or neither.")
+    if device_map is not None:
+        backend_hint = _device_map_backend_hint(device_map) or backend_hint
     load_kwargs: dict = {}
     if device_map is not None:
         if device is not None:
@@ -61,6 +110,7 @@ def load_target(cfg: dict, contract: dict, device: str | None = None):
         dtype=_dtype(target_cfg.get("dtype", "bfloat16")),
         attn_implementation=target_cfg.get("attn_implementation", "sdpa"),
         local_files_only=local_only,
+        backend_hint=backend_hint,
         **load_kwargs,
     )
     if device_map is not None:
@@ -84,7 +134,18 @@ def load_target(cfg: dict, contract: dict, device: str | None = None):
     )
     adapter.finalize_processor(processor, contract)
     if device_map is None:
-        model.to(device or target_cfg.get("device", "cuda:0"))
+        # Training/regen resolve this device again with backend availability
+        # checks. Here we allow a CUDA device object without probing CUDA so the
+        # model contract can be exercised on CPU CI with lightweight fakes; an
+        # explicit NPU request still imports torch_npu and fails loudly when it
+        # is unavailable.
+        require_available = backend_hint == "npu"
+        resolved = runtime.resolve_device(
+            configured_device, context="target.device", require_available=require_available
+        )
+        model.to(str(resolved))
+    else:
+        setattr(model, "_vlm_dflash_device_map_backend", backend_hint)
     model.eval()
     model.requires_grad_(False)
     return model, processor

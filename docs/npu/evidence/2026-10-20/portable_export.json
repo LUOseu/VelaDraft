@@ -1,0 +1,13 @@
+{
+  "status": "CPU_PORTABLE_EXPORT_PASSED",
+  "torch_npu_imported": false,
+  "device": "cpu",
+  "output_shape": [
+    1,
+    4,
+    2048
+  ],
+  "finite": true,
+  "serving_attention_backend": "sdpa",
+  "training_attention_backend": "sdpa_chunked"
+}

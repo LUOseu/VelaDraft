@@ -1,0 +1,292 @@
+{
+  "format": "vlm-dflash-export-v1",
+  "created": "2026-10-21T17:56:16+0800",
+  "method": "dfly",
+  "algorithm_metadata": {
+    "name": "dfly",
+    "description": "DFlash shared-FC context plus a per-layer fusion residual and an optional zero-init SwiGLU hidden-states correction conditioned on the previous token (DFlareV2).",
+    "maturity": {
+      "architecture": "validated",
+      "training": "validated",
+      "multimodal": "validated",
+      "runtime": "experimental"
+    },
+    "references": {
+      "paper": "arXiv:2607.25852 (AngelSpec / DFly)",
+      "upstream_reference": "Tencent/AngelSpec@d3412bed231025ea85d35dbf5e0af44f1ac62a5b angelspec/models/draft/dfly.py (Apache-2.0)",
+      "port_notes": "docs/upstream/dfly.md",
+      "algorithm_doc": "docs/algorithms/dfly.md"
+    },
+    "capabilities": {
+      "image": true,
+      "multi_image": true,
+      "video": false,
+      "eval": true,
+      "export": true
+    },
+    "targets": {
+      "qwen25_vl": "validated",
+      "qwen3_vl": "reduced_validation"
+    },
+    "evidence": [
+      {
+        "family": "qwen25_vl",
+        "layout": "single_image",
+        "feature_mode": "offline",
+        "state": "canonical_validated",
+        "evidence": "R-20261014-11 E4 canonical 2K upstream_two_stage recipe (AL 1.839 vs controlled_ce 1.682, 128/128 exact; configs/dfly/qwen2_5_vl_3b_2k_recipe.yaml); zoo-v0.3.2 archive + demo reload"
+      },
+      {
+        "family": "qwen3_vl",
+        "layout": "single_image",
+        "feature_mode": "offline",
+        "state": "reduced_validation",
+        "evidence": "docs/algorithms/dfly.md Qwen3-VL-8B reduced validation (configs/dfly/qwen3_vl_8b_reduced.yaml)"
+      }
+    ],
+    "training_signals": {
+      "hard_label": "Yes - decayed block CE by default; under the recipe, D-PACE-weighted block CE in stage 2 (stage 1 is LK-only, no CE).",
+      "context_layers": "context_layer_ids with per-layer fusion + the hidden-states correction (upstream recipe: [1,9,17,25,33]; matched 3-layer variant: [1,17,33]).",
+      "teacher_final_hidden": "Recipe only - train_recipe: upstream_two_stage consumes the target's final hidden states in both stages (LK and e2e TV).",
+      "distribution_objective": "Under the recipe: LK hybrid (KL/TV blend) cold start, then the end-to-end multi-step TV term.",
+      "confidence_objective": "None as a trained head; D-PACE confidences are detached position weights derived from the CE.",
+      "stage": "Single stage by default; the recipe switches cold_start_lk_dpace -> e2e_tv.",
+      "block_convention": "Forced DFlash convention (sample_from_anchor=false regardless of the YAML value).",
+      "notes": ""
+    }
+  },
+  "method_details": {
+    "context_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "fusion_trainable": true,
+    "fusion_init": "distance",
+    "enable_hidden_correction": true,
+    "hidden_correction_intermediate_size": null
+  },
+  "runtime_note": "Trained with this repo's port of upstream AngelSpec's two-stage recipe (objective_profile=upstream_two_stage: LK / D-PACE cold start -> end-to-end TV; see docs/upstream/dfly.md). At inference the block backbone runs in parallel, then the hidden-states correction and the LM-head projection run per slot sequentially, conditioned on the previously proposed tokens -- the documented local adaptation of upstream's train-time-only correction transformation.",
+  "objective_profile": "upstream_two_stage",
+  "train_recipe": {
+    "name": "upstream_two_stage",
+    "scheme": "vlm-dflash-recipe-v1",
+    "cold_start_fraction": 0.5,
+    "needs_teacher": true,
+    "stages": [
+      {
+        "name": "cold_start_lk_dpace",
+        "weighting": "dpace",
+        "ce_coef": 0.0,
+        "lk_coef": 1.0,
+        "e2e_tv_coef": 0.0,
+        "lk_loss_type": "hybrid",
+        "lk_eta": 3.0,
+        "dpace_alpha": 0.5
+      },
+      {
+        "name": "e2e_tv",
+        "weighting": "dpace",
+        "ce_coef": 1.0,
+        "lk_coef": 0.0,
+        "e2e_tv_coef": 1.0,
+        "lk_loss_type": "hybrid",
+        "lk_eta": 3.0,
+        "dpace_alpha": 0.5
+      }
+    ]
+  },
+  "visual_conditioning": null,
+  "checkpoint": "ckpt_final.pt",
+  "feature_mode": "offline",
+  "code_commit": null,
+  "adapter": "qwen2_5_vl",
+  "target": {
+    "model_path": "/root/veladraft-models/Qwen2.5-VL-3B-Instruct",
+    "model_type": "qwen2_5_vl",
+    "model_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+    "processor_fingerprint": "ed94e2fa5734073524651401de89882531084a817ed212300893591d6b35ff3e",
+    "image_min_pixels": 200704,
+    "image_max_pixels": 1003520,
+    "chat_template_kwargs": {},
+    "head": {
+      "trained_with": "tied_embedding",
+      "tie_word_embeddings": true
+    },
+    "special_tokens": {
+      "image_token_id": 151655,
+      "vision_start_token_id": 151652,
+      "vision_end_token_id": 151653,
+      "im_start_token_id": 151644,
+      "im_end_token_id": 151645,
+      "endoftext_token_id": 151643,
+      "source": "tokenizer, cross-checked against target config"
+    }
+  },
+  "drafter": {
+    "num_hidden_layers": 3,
+    "block_size": 8,
+    "num_anchors": 256,
+    "loss_decay_gamma": 7.0,
+    "attention_backend": "sdpa",
+    "training_attention_backend": "sdpa_chunked",
+    "mask_token_id": 151669,
+    "target_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "capture_layer_ids": [
+      1,
+      9,
+      17,
+      25,
+      33
+    ],
+    "spatial_rope": {
+      "sections": [
+        16,
+        24,
+        24
+      ],
+      "interleaved": false,
+      "partial_rotary_factor": 1.0,
+      "mode": "replace",
+      "enabled": true
+    },
+    "draft_config": {
+      "transformers_version": "5.12.1",
+      "architectures": [
+        "Qwen3DFlyDraftModel"
+      ],
+      "output_hidden_states": false,
+      "return_dict": true,
+      "dtype": "bfloat16",
+      "chunk_size_feed_forward": 0,
+      "is_encoder_decoder": false,
+      "id2label": {
+        "0": "LABEL_0",
+        "1": "LABEL_1"
+      },
+      "label2id": {
+        "LABEL_0": 0,
+        "LABEL_1": 1
+      },
+      "problem_type": null,
+      "vocab_size": 151936,
+      "hidden_size": 2048,
+      "intermediate_size": 11008,
+      "num_hidden_layers": 3,
+      "num_attention_heads": 16,
+      "num_key_value_heads": 2,
+      "head_dim": 128,
+      "hidden_act": "silu",
+      "max_position_embeddings": 128000,
+      "initializer_range": 0.02,
+      "rms_norm_eps": 1e-06,
+      "use_cache": true,
+      "tie_word_embeddings": false,
+      "rope_parameters": {
+        "rope_type": "default",
+        "rope_theta": 1000000.0
+      },
+      "attention_bias": false,
+      "use_sliding_window": false,
+      "sliding_window": null,
+      "max_window_layers": 3,
+      "layer_types": [
+        "full_attention",
+        "full_attention",
+        "full_attention"
+      ],
+      "attention_dropout": 0.0,
+      "pad_token_id": null,
+      "bos_token_id": 151643,
+      "eos_token_id": 151645,
+      "_name_or_path": "",
+      "model_type": "qwen3",
+      "num_target_layers": 36,
+      "target_hidden_size": 2048,
+      "block_size": 8,
+      "dflash_config": {
+        "mask_token_id": 151669,
+        "target_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "spatial_rope_enabled": true,
+        "spatial_rope_mode": "replace",
+        "spatial_rope_sections": [
+          16,
+          24,
+          24
+        ],
+        "spatial_rope_interleaved": false,
+        "visual_num_query_tokens": 0,
+        "context_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "objective_profile": "upstream_two_stage",
+        "separate_context_kv": false,
+        "sample_from_anchor": false,
+        "fusion_trainable": true,
+        "fusion_init": "distance",
+        "enable_hidden_correction": true,
+        "hidden_correction_intermediate_size": null
+      },
+      "output_attentions": false
+    }
+  },
+  "training": {
+    "steps": 10,
+    "final_loss": 0.69921875,
+    "first10_mean_loss": null,
+    "last10_mean_loss": null,
+    "nan_seen": false,
+    "wall_seconds": 3.2166218077763915,
+    "peak_gpu_mem_gb": null,
+    "gpu_name": null,
+    "peak_accelerator_mem_gb": 6.920274432,
+    "device": "npu:0",
+    "device_type": "npu",
+    "backend": "npu",
+    "attention": null,
+    "feature_mode": "offline"
+  },
+  "data": {
+    "source": "fixed_natural_training_subset",
+    "num_train": 64,
+    "num_val": 64,
+    "rows_sha256": null
+  },
+  "eval": null,
+  "provenance_stages": [],
+  "identity": {
+    "target_model_path": "/root/veladraft-models/Qwen2.5-VL-3B-Instruct",
+    "model_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+    "processor_fingerprint": "ed94e2fa5734073524651401de89882531084a817ed212300893591d6b35ff3e",
+    "mask_token_id": 151669,
+    "spatial_rope_sections": [
+      16,
+      24,
+      24
+    ],
+    "draft_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "capture_layer_ids": [
+      1,
+      9,
+      17,
+      25,
+      33
+    ],
+    "image_min_pixels": 200704,
+    "image_max_pixels": 1003520
+  }
+}

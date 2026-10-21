@@ -1,0 +1,200 @@
+{
+  "reference": "/tmp/audit-B-fp32-natural-dense.pt",
+  "candidate": "/tmp/audit-B-fp32-natural-chunked_checkpoint.pt",
+  "rtol": 0.02,
+  "atol": 0.02,
+  "tolerance_source": "scripts/npu/operator_smoke.py BF16",
+  "pass": true,
+  "tensors": {
+    "output": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "loss": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.q_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.k_proj.weight": {
+      "max_abs_error": 0.000244140625,
+      "relative_l2_error": 0.002531885402277112,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.v_proj.weight": {
+      "max_abs_error": 0.001953125,
+      "relative_l2_error": 0.0009030455257743597,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.o_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.q_norm.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.k_norm.weight": {
+      "max_abs_error": 6.103515625e-05,
+      "relative_l2_error": 0.002634361619129777,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.mlp.gate_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.mlp.up_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.mlp.down_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.input_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.post_attention_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.q_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.k_proj.weight": {
+      "max_abs_error": 6.103515625e-05,
+      "relative_l2_error": 0.0025611636228859425,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.v_proj.weight": {
+      "max_abs_error": 0.0009765625,
+      "relative_l2_error": 0.0008957356330938637,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.o_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.q_norm.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.k_norm.weight": {
+      "max_abs_error": 3.0517578125e-05,
+      "relative_l2_error": 0.0026063364930450916,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.mlp.gate_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.mlp.up_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.mlp.down_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.input_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.post_attention_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.q_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.k_proj.weight": {
+      "max_abs_error": 0.0001220703125,
+      "relative_l2_error": 0.0016394704580307007,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.v_proj.weight": {
+      "max_abs_error": 0.000732421875,
+      "relative_l2_error": 0.0009082099422812462,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.o_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.q_norm.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.k_norm.weight": {
+      "max_abs_error": 3.0517578125e-05,
+      "relative_l2_error": 0.00135675014462322,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.mlp.gate_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.mlp.up_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.mlp.down_proj.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.input_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.post_attention_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.norm.weight": {
+      "max_abs_error": 0.0,
+      "relative_l2_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.fc.weight": {
+      "max_abs_error": 0.0078125,
+      "relative_l2_error": 0.001146386144682765,
+      "pass": true
+    },
+    "grad:draft_model.hidden_norm.weight": {
+      "max_abs_error": 0.000244140625,
+      "relative_l2_error": 0.0009870537323877215,
+      "pass": true
+    }
+  }
+}

@@ -9,6 +9,7 @@ from pathlib import Path
 import torch
 from PIL import Image
 
+from .. import runtime
 from ..adapters import adapter_for_contract, adapter_for_model, require_cache_crop_rollback
 from ..algorithms import get_algorithm
 from ..data.sharegpt import load_sharegpt, row_image_path, row_image_paths, row_is_multi_turn, row_question
@@ -179,11 +180,13 @@ def prepare_prompts(model, processor, rows, media_dir, *, max_new_tokens: int, d
             image = Image.open(row_image_path(row, media_dir)).convert("RGB")
             inputs = encode_prompt(processor, row_question(row), image)
         inputs = {key: value.to(device) for key, value in inputs.items()}
+        runtime.synchronize(device)
         started = time.perf_counter()
         with torch.inference_mode():
             generated = model.generate(
                 **inputs, max_new_tokens=max_new_tokens, do_sample=False, repetition_penalty=1.0
             )
+        runtime.synchronize(device)
         wall = time.perf_counter() - started
         prompt_len = int(inputs["input_ids"].shape[1])
         prompts.append(
@@ -246,6 +249,7 @@ def run_checkpoints(
         for entry in prompts:
             inputs = entry["inputs"]
             target_kwargs = eval_adapter.forward_kwargs_from_inputs(inputs)
+            runtime.synchronize(inputs["input_ids"].device)
             started = time.perf_counter()
             with torch.inference_mode():
                 output_ids, stats = draft.spec_generate(
@@ -259,6 +263,7 @@ def run_checkpoints(
                     sequential_target_verification=sequential_verification,
                     strict_parallel_margin=strict_parallel_margin,
                 )
+            runtime.synchronize(inputs["input_ids"].device)
             wall = time.perf_counter() - started
             strict_rounds += float(stats.get("strict_parallel_rounds", 0.0) or 0.0)
             strict_fallbacks += float(stats.get("strict_fallback_rounds", 0.0) or 0.0)

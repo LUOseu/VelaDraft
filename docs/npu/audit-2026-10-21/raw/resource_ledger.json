@@ -1,0 +1,63 @@
+{
+  "schema": "bounded-audit-process-wall-v1",
+  "rows": [
+    {
+      "run": "recipes",
+      "start_epoch": 1792574023,
+      "end_epoch": 1792574111,
+      "reserved_wall_seconds": 88,
+      "exitcode": 137,
+      "device": "npu:0"
+    },
+    {
+      "run": "recipes-dfly",
+      "start_epoch": 1792575245,
+      "end_epoch": 1792575326,
+      "reserved_wall_seconds": 81,
+      "exitcode": 137,
+      "device": "npu:0"
+    },
+    {
+      "run": "compaction",
+      "start_epoch": 1792575326,
+      "end_epoch": 1792575404,
+      "reserved_wall_seconds": 78,
+      "exitcode": 1,
+      "device": "npu:0"
+    },
+    {
+      "run": "resume-5",
+      "start_epoch": 1792576107,
+      "end_epoch": 1792576158,
+      "reserved_wall_seconds": 51,
+      "exitcode": 0,
+      "device": "npu:0"
+    },
+    {
+      "run": "resume-6",
+      "start_epoch": 1792576158,
+      "end_epoch": 1792576210,
+      "reserved_wall_seconds": 52,
+      "exitcode": 0,
+      "device": "npu:0"
+    },
+    {
+      "run": "compaction-v2",
+      "start_epoch": 1792576210,
+      "end_epoch": 1792576536,
+      "reserved_wall_seconds": 326,
+      "exitcode": 0,
+      "device": "npu:0"
+    },
+    {
+      "run": "continuation",
+      "start_epoch": 1792576536,
+      "end_epoch": 1792576583,
+      "reserved_wall_seconds": 47,
+      "exitcode": 0,
+      "device": "npu:0"
+    }
+  ],
+  "scope": "Exact process wall bounds; includes failures and CPU/loading time, not accelerator busy time; capture/shared-forward lack complete bounds",
+  "total_recorded_npu0_process_wall_seconds": 723
+}

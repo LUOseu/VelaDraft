@@ -1,0 +1,99 @@
+{
+  "status": "FAILED",
+  "metadata": {
+    "npu": {
+      "device": "npu:0",
+      "dtype": "torch.bfloat16",
+      "student_logits_dtype": "torch.bfloat16",
+      "weights_sha256": "60212b3945975efbd75639770574163e63a03ccd59132339326ba2df5311be54",
+      "input_sha256": "a4da76eeed15965e256869da760183901548511fac6233357b488f2212a15d61",
+      "source_sha256": {
+        "vlm_dflash/dflash/trainer_core.py": "e6047401444f218943975f6a9ae986fd97c66a391c4a18a0148ca5b47f524273",
+        "vlm_dflash/dfly/trainer.py": "15a2679710f9afbdf51c205fb391011443165a3c7f2bc6225d282d0996dc112a",
+        "vlm_dflash/dfly/model.py": "c1b2c63d7aa73a03c27e09057ddd133a22ede188801ad81ed7900e2d0e605ed5",
+        "vlm_dflash/dflash/draft_model.py": "02d1d77a827c3e633803cfe538a90343672c3299a3b59ecbf6ce3b3845b57c25"
+      }
+    },
+    "cuda": {
+      "device": "cuda:0",
+      "dtype": "torch.bfloat16",
+      "student_logits_dtype": "torch.bfloat16",
+      "weights_sha256": "60212b3945975efbd75639770574163e63a03ccd59132339326ba2df5311be54",
+      "input_sha256": "a4da76eeed15965e256869da760183901548511fac6233357b488f2212a15d61",
+      "source_sha256": {
+        "vlm_dflash/dflash/trainer_core.py": "e6047401444f218943975f6a9ae986fd97c66a391c4a18a0148ca5b47f524273",
+        "vlm_dflash/dfly/trainer.py": "15a2679710f9afbdf51c205fb391011443165a3c7f2bc6225d282d0996dc112a",
+        "vlm_dflash/dfly/model.py": "c1b2c63d7aa73a03c27e09057ddd133a22ede188801ad81ed7900e2d0e605ed5",
+        "vlm_dflash/dflash/draft_model.py": "02d1d77a827c3e633803cfe538a90343672c3299a3b59ecbf6ce3b3845b57c25"
+      }
+    }
+  },
+  "scope": "BF16 cross-backend forward gate",
+  "identity_checks": {
+    "weights_sha256": true,
+    "input_sha256": true,
+    "dtype": true,
+    "student_logits_dtype": true,
+    "source_sha256": true,
+    "anchors_equal": true
+  },
+  "checks": {
+    "draft_hidden": {
+      "passed": false,
+      "shape": [
+        1,
+        32,
+        2048
+      ],
+      "max_abs_error": 0.125,
+      "mean_abs_error": 0.0036107085179537535,
+      "violating_elements": 5,
+      "total_elements": 65536,
+      "violating_fraction": 7.62939453125e-05,
+      "relative_l2_error": 0.0054679266177117825
+    },
+    "post_correction_hidden": {
+      "passed": false,
+      "shape": [
+        32,
+        2048
+      ],
+      "max_abs_error": 0.25,
+      "mean_abs_error": 0.005910385400056839,
+      "violating_elements": 93,
+      "total_elements": 65536,
+      "violating_fraction": 0.0014190673828125,
+      "relative_l2_error": 0.004012514837086201
+    },
+    "student_logits": {
+      "passed": false,
+      "shape": [
+        32,
+        151936
+      ],
+      "max_abs_error": 0.125,
+      "mean_abs_error": 0.008293825201690197,
+      "violating_elements": 5356,
+      "total_elements": 4861952,
+      "violating_fraction": 0.001101615153748947,
+      "relative_l2_error": 0.003094194922596216
+    },
+    "loss": {
+      "passed": true,
+      "npu": 0.2353515625,
+      "cuda": 0.2353515625,
+      "abs_error": 0.0,
+      "exact": true
+    }
+  },
+  "tolerance": {
+    "rtol": 0.02,
+    "atol": 0.02,
+    "reference": "CUDA",
+    "source": "pre-existing scripts/npu/operator_smoke.py BF16 envelope"
+  },
+  "artifact_sha256": {
+    "npu": "b9a2b6759239dc009ef6774dd75fe877d96d2355e30015a96e500c8c51ba519d",
+    "cuda": "2d605e5617482f7b0748f193cf21fa30cc1621250539e34d59b3137161eae60e"
+  }
+}

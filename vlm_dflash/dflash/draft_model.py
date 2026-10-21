@@ -52,6 +52,9 @@ from transformers.models.qwen3.modeling_qwen3 import (
 )
 
 from ..rope_layout import mrope_section_error, partial_rotary_dim
+from .. import runtime
+from .chunked_attention import AttentionRuntimeStats, npu_fusion_chunked_attention, sdpa_chunked_attention
+from .mask import DFlashMaskSpec
 
 
 # --- vlm-dflash local modification -------------------------------------
@@ -340,6 +343,8 @@ class Qwen3DFlashAttention(nn.Module):
         self.q_norm = Qwen3RMSNorm(self.head_dim, eps=config.rms_norm_eps)
         self.k_norm = Qwen3RMSNorm(self.head_dim, eps=config.rms_norm_eps)
         self.sliding_window = None
+        self.last_attention_backend_info: dict | None = None
+        self.attention_runtime_stats = AttentionRuntimeStats()
 
     def forward(
         self,
@@ -403,40 +408,69 @@ class Qwen3DFlashAttention(nn.Module):
         if past_key_values is not None:
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
             k, v = past_key_values.update(k, v, self.layer_idx, cache_kwargs)
-        attn_fn: Callable = eager_attention_forward
-        if self.config._attn_implementation != "eager":
-            attn_fn = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
-        attn_kwargs = dict(kwargs)
-        if self.config._attn_implementation == "flex_attention":
-            # Torch >= 2.10 can route this block attention to the flex
-            # *decoding* kernel (q_len < 128 plus a power-of-two GQA ratio).
-            # Its BLOCK_M = next_pow2(q_len * gqa_ratio) heuristic -- 80 * 8
-            # -> 1024 for a ten-anchor smoke block -- makes the kernel exceed
-            # the sm_86 shared-memory budget at Triton compile time (272 KiB
-            # needed vs 99 KiB available) and on torch 2.11 every decoding
-            # candidate is filtered out (NoValidChoicesError). The main flex
-            # kernel handles the same block-sparse mask, so pin it here;
-            # explicit caller-provided kernel options still win.
-            attn_kwargs.setdefault("kernel_options", {"FORCE_USE_FLEX_ATTENTION": True})
-        backend_context = nullcontext()
-        if not self.training and q.device.type == "cuda" and self.config._attn_implementation == "sdpa":
-            # DFlash changes the cached context length after nearly every block.
-            # cuDNN SDPA repeatedly plans those dynamic shapes, while efficient
-            # attention supports the same additive non-causal block mask without
-            # that host overhead. Keep math enabled for older CUDA architectures.
-            backend_context = sdpa_kernel([SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH])
-        with backend_context:
-            attn_output, attn_weights = attn_fn(
-                self,
-                q,
-                k,
-                v,
-                attention_mask,
-                dropout=0.0 if not self.training else self.attention_dropout,
-                scaling=self.scaling,
-                sliding_window=self.sliding_window,
-                **attn_kwargs,
-            )
+        dropout = 0.0 if not self.training else self.attention_dropout
+        if isinstance(attention_mask, DFlashMaskSpec):
+            if past_key_values is not None:
+                raise RuntimeError(
+                    "Query-chunked DFlash attention is a training path and does not accept a KV cache."
+                )
+            if attention_mask.backend == "npu_fusion":
+                attn_output, backend_info = npu_fusion_chunked_attention(
+                    q, k, v, attention_mask, dropout_p=dropout, scale=self.scaling
+                )
+            else:
+                attn_output, backend_info = sdpa_chunked_attention(
+                    q, k, v, attention_mask, dropout_p=dropout, scale=self.scaling
+                )
+            # Both chunked helpers return [B, H, Q, D]; the shared tail below
+            # (and every transformers SDPA implementation) expects [B, Q, H, D]
+            # before flattening heads into the output projection.
+            attn_output = attn_output.transpose(1, 2).contiguous()
+            attn_weights = None
+        else:
+            attn_fn: Callable = eager_attention_forward
+            if self.config._attn_implementation != "eager":
+                attn_fn = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
+            attn_kwargs = dict(kwargs)
+            if self.config._attn_implementation == "flex_attention":
+                # Torch >= 2.10 can route this block attention to the flex
+                # *decoding* kernel (q_len < 128 plus a power-of-two GQA ratio).
+                # Its BLOCK_M = next_pow2(q_len * gqa_ratio) heuristic -- 80 * 8
+                # -> 1024 for a ten-anchor smoke block -- makes the kernel exceed
+                # the sm_86 shared-memory budget at Triton compile time (272 KiB
+                # needed vs 99 KiB available) and on torch 2.11 every decoding
+                # candidate is filtered out (NoValidChoicesError). The main flex
+                # kernel handles the same block-sparse mask, so pin it here;
+                # explicit caller-provided kernel options still win.
+                attn_kwargs.setdefault("kernel_options", {"FORCE_USE_FLEX_ATTENTION": True})
+            backend_context = nullcontext()
+            if not self.training and q.device.type == "cuda" and self.config._attn_implementation == "sdpa":
+                # DFlash changes the cached context length after nearly every block.
+                # cuDNN SDPA repeatedly plans those dynamic shapes, while efficient
+                # attention supports the same additive non-causal block mask without
+                # that host overhead. Keep math enabled for older CUDA architectures.
+                backend_context = sdpa_kernel([SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH])
+            with backend_context:
+                attn_output, attn_weights = attn_fn(
+                    self,
+                    q,
+                    k,
+                    v,
+                    attention_mask,
+                    dropout=dropout,
+                    scaling=self.scaling,
+                    sliding_window=self.sliding_window,
+                    **attn_kwargs,
+                )
+            backend_info = {
+                "requested_backend": self.config._attn_implementation,
+                "effective_backend": self.config._attn_implementation,
+                "chunks": 0,
+                "activation_checkpointing": False,
+                "fallback_reason": None,
+            }
+        self.last_attention_backend_info = backend_info
+        self.attention_runtime_stats.record(backend_info)
         attn_output = attn_output.reshape(bsz, q_len, -1)
         return self.o_proj(attn_output), attn_weights
 
@@ -1084,6 +1118,20 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
         hidden_state = new_gate + update_gate * (hidden_state - new_gate)
         return hidden_state.unsqueeze(1), hidden_state
 
+    def _domino_gru_sequence(self, token_embeddings: torch.Tensor) -> torch.Tensor:
+        """Differentiable GRU reference for Ascend FP32/BF16 training.
+
+        DynamicGRUV2 on the validated 910B stack accepts only FP16 weights.
+        Reuse the inference cell equations and existing parameters rather than
+        casting the correction head or changing checkpoint keys.
+        """
+        hidden_state = None
+        outputs = []
+        for token in token_embeddings.unbind(dim=1):
+            output, hidden_state = self._domino_gru_step(token.unsqueeze(1), hidden_state)
+            outputs.append(output)
+        return torch.cat(outputs, dim=1)
+
     def backbone_parameters(self) -> list[nn.Parameter]:
         """Return existing DFlash parameters, excluding the visual branch."""
         visual_ids = {id(parameter) for parameter in self.visual_parameters()}
@@ -1461,7 +1509,7 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                         "top_values": [float(value) for value in top2.values[index]],
                     }
                 )
-        timing_events: dict[str, list[tuple[torch.cuda.Event, torch.cuda.Event]]] = {
+        timing_runs: dict[str, list[runtime.TimingRun]] = {
             "target_prefill": [],
             "round_prep": [],
             "draft": [],
@@ -1470,19 +1518,16 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
             "commit": [],
         }
 
-        def start_timing() -> torch.cuda.Event | None:
-            if not return_stats or not torch.cuda.is_available():
+        def start_timing() -> runtime.TimingRun | None:
+            if not return_stats:
                 return None
-            event = torch.cuda.Event(enable_timing=True)
-            event.record()
-            return event
+            return runtime.TimingRun.start(target.device)
 
-        def end_timing(phase: str, start_event: torch.cuda.Event | None) -> None:
-            if start_event is None:
+        def end_timing(phase: str, run: runtime.TimingRun | None) -> None:
+            if run is None:
                 return
-            end_event = torch.cuda.Event(enable_timing=True)
-            end_event.record()
-            timing_events[phase].append((start_event, end_event))
+            run.stop()
+            timing_runs[phase].append(run)
 
         def target_verify_backend() -> AbstractContextManager[None]:
             if not _VERIFY_SDPA_BACKEND_SWITCH:
@@ -1846,9 +1891,23 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                                 start, block_output_ids
                             )
 
+            # Acceptance metrics describe emitted positions. A verified block
+            # may contain EOS before its end, so budget-only clipping would
+            # count accepted drafts that final output truncation discards.
+            count_max_length = max_length
+            if stop_token_ids:
+                committed_ids = torch.cat(
+                    (block_output_ids[:, : acceptance_length + 1],
+                     posterior[:, acceptance_length : acceptance_length + 1]),
+                    dim=1,
+                )
+                stop_ids = torch.tensor(stop_token_ids, device=committed_ids.device)
+                stop_offsets = torch.isin(committed_ids[0], stop_ids).nonzero(as_tuple=True)[0]
+                if stop_offsets.numel():
+                    count_max_length = min(max_length, start + int(stop_offsets[0]) + 1)
             round_draft_tokens, round_accepted_tokens = _bounded_acceptance_counts(
                 start=start,
-                max_length=max_length,
+                max_length=count_max_length,
                 block_size=block_output_ids.shape[1],
                 acceptance_length=int(acceptance_length),
             )
@@ -1883,13 +1942,10 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                 output_ids = output_ids[:, : num_input_tokens + stop_indices[0] + 1]
         if not return_stats:
             return output_ids
-        timing_seconds = {f"{phase}_seconds": 0.0 for phase in timing_events}
-        if any(timing_events.values()):
-            torch.cuda.synchronize()
-            timing_seconds = {
-                f"{phase}_seconds": sum(start.elapsed_time(end) for start, end in events) / 1000.0
-                for phase, events in timing_events.items()
-            }
+        timing_seconds = {
+            f"{phase}_seconds": sum(run.elapsed_seconds() for run in runs)
+            for phase, runs in timing_runs.items()
+        }
         return output_ids, {
             "draft_tokens": float(draft_tokens),
             "accepted_tokens": float(accepted_tokens),

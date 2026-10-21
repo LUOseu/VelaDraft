@@ -1,0 +1,29 @@
+{
+  "platform": "Linux-6.6.0-72.0.0.76.oe2403sp1.aarch64-aarch64-with-glibc2.35",
+  "architecture": "aarch64",
+  "python": "3.10.14",
+  "torch": "2.10.0+cpu",
+  "torch_npu": "2.10.0",
+  "cann": "9.0.0",
+  "driver": "26.0.rc1",
+  "devices": [
+    {
+      "logical_index": 0,
+      "name": "Ascend910B3",
+      "total_memory_bytes": 65452113920
+    },
+    {
+      "logical_index": 1,
+      "name": "Ascend910B3",
+      "total_memory_bytes": 65452113920
+    }
+  ],
+  "packages": {
+    "transformers": "5.12.1",
+    "torchvision": "0.25.0",
+    "datasets": "4.2.0",
+    "accelerate": "1.15.0",
+    "safetensors": "0.8.0",
+    "numpy": "2.2.6"
+  }
+}

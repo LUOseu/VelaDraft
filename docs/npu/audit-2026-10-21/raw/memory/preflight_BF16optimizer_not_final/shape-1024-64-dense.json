@@ -1,0 +1,484 @@
+{
+  "protocol": "reviewer_audit_B_v1",
+  "mode": "dense",
+  "context": 1024,
+  "anchors": 64,
+  "frozen_shapes": [
+    [
+      1024,
+      64
+    ],
+    [
+      4096,
+      256
+    ],
+    [
+      4096,
+      512
+    ]
+  ],
+  "dtype": "bfloat16",
+  "device": "npu:1",
+  "checkpoint_scope": "mask materialization plus SDPA only; K/V repeat outside; no MLP/layer/head checkpoint",
+  "initial_seed": 20261021,
+  "optimizer": "AdamW lr=6e-4 betas=(.9,.95) weight_decay=0; clip=1",
+  "scope": "offline draft full forward/backward/clip/optimizer update; excludes teacher capture",
+  "status": "pass",
+  "warmup_updates": [
+    {
+      "seconds": 1.6999128432944417,
+      "peak_hbm_bytes": 3117941248,
+      "loss": 12.3125,
+      "grad_norm": 14.6875,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense"
+        ],
+        "fallback_reasons": [],
+        "chunked_layers": 0,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 64,
+          "block_size": 8,
+          "context_len": 1024,
+          "query_len": 512,
+          "kv_len": 1536,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "dense_total_gb": 0.0519,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 393216,
+            "score_bytes": 12582912,
+            "total_bytes": 12976128
+          },
+          "chunked_total_gb": 0.013,
+          "chunks": 4,
+          "requested_backend": "sdpa_chunked"
+        }
+      }
+    },
+    {
+      "seconds": 0.09252010565251112,
+      "peak_hbm_bytes": 3115579392,
+      "loss": 11.4375,
+      "grad_norm": 11.375,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense"
+        ],
+        "fallback_reasons": [],
+        "chunked_layers": 0,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 64,
+          "block_size": 8,
+          "context_len": 1024,
+          "query_len": 512,
+          "kv_len": 1536,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "dense_total_gb": 0.0519,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 393216,
+            "score_bytes": 12582912,
+            "total_bytes": 12976128
+          },
+          "chunked_total_gb": 0.013,
+          "chunks": 4,
+          "requested_backend": "sdpa_chunked"
+        }
+      }
+    },
+    {
+      "seconds": 0.04827588610351086,
+      "peak_hbm_bytes": 3115579392,
+      "loss": 12.625,
+      "grad_norm": 13.4375,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense"
+        ],
+        "fallback_reasons": [],
+        "chunked_layers": 0,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 64,
+          "block_size": 8,
+          "context_len": 1024,
+          "query_len": 512,
+          "kv_len": 1536,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "dense_total_gb": 0.0519,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 393216,
+            "score_bytes": 12582912,
+            "total_bytes": 12976128
+          },
+          "chunked_total_gb": 0.013,
+          "chunks": 4,
+          "requested_backend": "sdpa_chunked"
+        }
+      }
+    },
+    {
+      "seconds": 0.04870662838220596,
+      "peak_hbm_bytes": 3115579392,
+      "loss": 21.5,
+      "grad_norm": 40.5,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense"
+        ],
+        "fallback_reasons": [],
+        "chunked_layers": 0,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 64,
+          "block_size": 8,
+          "context_len": 1024,
+          "query_len": 512,
+          "kv_len": 1536,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "dense_total_gb": 0.0519,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 393216,
+            "score_bytes": 12582912,
+            "total_bytes": 12976128
+          },
+          "chunked_total_gb": 0.013,
+          "chunks": 4,
+          "requested_backend": "sdpa_chunked"
+        }
+      }
+    },
+    {
+      "seconds": 0.04688504617661238,
+      "peak_hbm_bytes": 3115579392,
+      "loss": 10.25,
+      "grad_norm": 2.484375,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense"
+        ],
+        "fallback_reasons": [],
+        "chunked_layers": 0,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 64,
+          "block_size": 8,
+          "context_len": 1024,
+          "query_len": 512,
+          "kv_len": 1536,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "dense_total_gb": 0.0519,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 393216,
+            "score_bytes": 12582912,
+            "total_bytes": 12976128
+          },
+          "chunked_total_gb": 0.013,
+          "chunks": 4,
+          "requested_backend": "sdpa_chunked"
+        }
+      }
+    }
+  ],
+  "measured_updates": [
+    {
+      "seconds": 0.046301902271807194,
+      "peak_hbm_bytes": 3115579392,
+      "loss": 9.8125,
+      "grad_norm": 1.65625,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense"
+        ],
+        "fallback_reasons": [],
+        "chunked_layers": 0,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 64,
+          "block_size": 8,
+          "context_len": 1024,
+          "query_len": 512,
+          "kv_len": 1536,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "dense_total_gb": 0.0519,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 393216,
+            "score_bytes": 12582912,
+            "total_bytes": 12976128
+          },
+          "chunked_total_gb": 0.013,
+          "chunks": 4,
+          "requested_backend": "sdpa_chunked"
+        }
+      }
+    },
+    {
+      "seconds": 0.04636610299348831,
+      "peak_hbm_bytes": 3115579392,
+      "loss": 9.1875,
+      "grad_norm": 2.203125,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense"
+        ],
+        "fallback_reasons": [],
+        "chunked_layers": 0,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 64,
+          "block_size": 8,
+          "context_len": 1024,
+          "query_len": 512,
+          "kv_len": 1536,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "dense_total_gb": 0.0519,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 393216,
+            "score_bytes": 12582912,
+            "total_bytes": 12976128
+          },
+          "chunked_total_gb": 0.013,
+          "chunks": 4,
+          "requested_backend": "sdpa_chunked"
+        }
+      }
+    },
+    {
+      "seconds": 0.046500793658196926,
+      "peak_hbm_bytes": 3115579392,
+      "loss": 8.1875,
+      "grad_norm": 3.03125,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense"
+        ],
+        "fallback_reasons": [],
+        "chunked_layers": 0,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 64,
+          "block_size": 8,
+          "context_len": 1024,
+          "query_len": 512,
+          "kv_len": 1536,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "dense_total_gb": 0.0519,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 393216,
+            "score_bytes": 12582912,
+            "total_bytes": 12976128
+          },
+          "chunked_total_gb": 0.013,
+          "chunks": 4,
+          "requested_backend": "sdpa_chunked"
+        }
+      }
+    }
+  ],
+  "geometry": {
+    "transformers_version": "5.12.1",
+    "architectures": [
+      "Qwen3DFlashDraftModel"
+    ],
+    "output_hidden_states": false,
+    "return_dict": true,
+    "dtype": "bfloat16",
+    "chunk_size_feed_forward": 0,
+    "is_encoder_decoder": false,
+    "id2label": {
+      "0": "LABEL_0",
+      "1": "LABEL_1"
+    },
+    "label2id": {
+      "LABEL_0": 0,
+      "LABEL_1": 1
+    },
+    "problem_type": null,
+    "vocab_size": 151936,
+    "hidden_size": 2048,
+    "intermediate_size": 11008,
+    "num_hidden_layers": 3,
+    "num_attention_heads": 16,
+    "num_key_value_heads": 2,
+    "head_dim": 128,
+    "hidden_act": "silu",
+    "max_position_embeddings": 128000,
+    "initializer_range": 0.02,
+    "rms_norm_eps": 1e-06,
+    "use_cache": true,
+    "tie_word_embeddings": false,
+    "rope_parameters": {
+      "rope_type": "default",
+      "rope_theta": 1000000.0
+    },
+    "attention_bias": false,
+    "use_sliding_window": false,
+    "sliding_window": null,
+    "max_window_layers": 3,
+    "layer_types": [
+      "full_attention",
+      "full_attention",
+      "full_attention"
+    ],
+    "attention_dropout": 0.0,
+    "pad_token_id": null,
+    "bos_token_id": 151643,
+    "eos_token_id": 151645,
+    "_name_or_path": "",
+    "model_type": "qwen3",
+    "num_target_layers": 36,
+    "target_hidden_size": 2048,
+    "block_size": 8,
+    "dflash_config": {
+      "mask_token_id": 151669,
+      "target_layer_ids": [
+        1,
+        17,
+        33
+      ],
+      "spatial_rope_enabled": true,
+      "spatial_rope_mode": "replace",
+      "spatial_rope_sections": [
+        16,
+        24,
+        24
+      ],
+      "spatial_rope_interleaved": false,
+      "visual_num_query_tokens": 0
+    },
+    "output_attentions": false
+  },
+  "contract": {
+    "target": {
+      "model_path": "/root/veladraft-models/Qwen2.5-VL-3B-Instruct"
+    },
+    "layers": {
+      "num_target_layers": 36,
+      "draft_layer_ids": [
+        1,
+        17,
+        33
+      ],
+      "num_draft_layers": 3,
+      "capture_layer_ids": [
+        1,
+        17,
+        33
+      ]
+    },
+    "rope": {
+      "sections": [
+        16,
+        24,
+        24
+      ],
+      "interleaved": false
+    },
+    "text": {
+      "hidden_size": 2048
+    },
+    "tokens": {
+      "image_token_id": 151655
+    }
+  },
+  "rows": {
+    "source": "shape_only_synthetic_features_real_frozen_target_head",
+    "sample_id": null,
+    "actual_context_length": 1024,
+    "context_bucket": 1024,
+    "context_padding_fraction": 0.0,
+    "requested_anchors": 64,
+    "allocated_anchors": 64,
+    "effective_anchors": 64,
+    "allocated_query_rows": 512,
+    "effective_supervision_rows": 448,
+    "anchor_padding_fraction": 0.0,
+    "requested_shape_achieved": true
+  },
+  "setup_seconds": 23.41257815156132,
+  "first5_estimate": {
+    "seconds": [
+      1.6999128432944417,
+      0.09252010565251112,
+      0.04827588610351086,
+      0.04870662838220596,
+      0.04688504617661238
+    ],
+    "mean_seconds": 0.3872601019218564,
+    "projected_remaining_seconds": 1.1617803057655691
+  },
+  "total_seconds": 25.505596262402833,
+  "telemetry_corrections": [
+    {
+      "field": "rows.effective_supervision_rows",
+      "original": 512,
+      "corrected": 448,
+      "reason": "DFlash slot0 is clean anchor and excluded by loss; full synthetic supervision in slots1..7. Timing/memory/loss unchanged."
+    }
+  ]
+}

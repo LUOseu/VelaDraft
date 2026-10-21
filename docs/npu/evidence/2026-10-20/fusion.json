@@ -1,0 +1,136 @@
+{
+  "format": "vlm-dflash-npu-operator-smoke-v1",
+  "requested_device": "npu:1",
+  "include_fusion": true,
+  "include_h1": true,
+  "environment": {
+    "python": "3.10.14",
+    "platform": "Linux-6.6.0-72.0.0.76.oe2403sp1.aarch64-aarch64-with-glibc2.35",
+    "machine": "aarch64",
+    "torch": "2.10.0+cpu",
+    "torch_cuda": null,
+    "runtime": {
+      "torch": "2.10.0+cpu",
+      "torch_cuda": null,
+      "torch_npu": "2.10.0",
+      "cann": "/opt/veladraft-ascend/cann-9.0.0",
+      "python": "3.10.14",
+      "cuda": {
+        "available": false,
+        "device_count": 0,
+        "devices": []
+      },
+      "npu": {
+        "available": true,
+        "device_count": 2,
+        "devices": [
+          {
+            "index": 0,
+            "name": "Ascend910B3",
+            "memory": [
+              59443859456,
+              65452113920
+            ]
+          },
+          {
+            "index": 1,
+            "name": "Ascend910B3",
+            "memory": [
+              65081110528,
+              65452113920
+            ]
+          }
+        ],
+        "import_error": null
+      }
+    },
+    "npu_smi": {
+      "available": true,
+      "exit_code": 0,
+      "stdout": "+------------------------------------------------------------------------------------------------------------------+\n| npu-smi 26.0.rc1                            Version: 26.0.rc1                                                    |\n+---------------------------+---------------+----------------------------------------------------------------------+\n| NPU   Name                | Health        | Power(W)             Temp(C)                 Hugepages-Usage(page)   |\n| Chip                      | Bus-Id        | AICore(%)            Memory-Usage(MB)        HBM-Usage(MB)           |\n+===========================+===============+======================================================================+\n| 6     910B3               | OK            | 101.8                38                      0    / 0                |\n| 0                         | 0000:41:00.0  | 0                    0    / 0                9561 / 65536            |\n+===========================+===============+======================================================================+\n| 7     910B3               | OK            | 100.8                37                      0    / 0                |\n| 0                         | 0000:42:00.0  | 0                    0    / 0                3469 / 65536            |\n+===========================+===============+======================================================================+\n+---------------------------+---------------+----------------------------------------------------------------------+\n| NPU     Chip              | Process id    | Process name       | Process memory(MB)    | Process id in container |\n+===========================+===============+======================================================================+\n| 6       0                 | 52992         | python             | 5386                  | 52992                   |\n| 6       0                 | 53055         | python             | 52                    | 53055                   |\n+===========================+===============+======================================================================+\n| 7       0                 | 53055         | python             | 0                     | 53055                   |\n+===========================+===============+======================================================================+\n",
+      "stderr": ""
+    }
+  },
+  "checks": [
+    {
+      "name": "allocation_matmul_backward",
+      "status": "passed",
+      "seconds": 0.6914,
+      "loss": 253.93161010742188,
+      "grad_norm": 2.818215847015381
+    },
+    {
+      "name": "rng_round_trip",
+      "status": "passed",
+      "seconds": 0.0161,
+      "npu_states": 2,
+      "first_sample": 0.712185263633728
+    },
+    {
+      "name": "peak_memory",
+      "status": "passed",
+      "seconds": 0.0006,
+      "peak_bytes": 8389120,
+      "peak_gb": 0.0084
+    },
+    {
+      "name": "sdpa_forward_backward",
+      "status": "passed",
+      "seconds": 0.1601,
+      "max_abs_output_error": 2.384185791015625e-07,
+      "max_abs_grad_error": 3.725290298461914e-09
+    },
+    {
+      "name": "gqa_sdpa_forward_backward",
+      "status": "passed",
+      "seconds": 0.0073,
+      "heads": 4,
+      "kv_heads": 2,
+      "max_abs_output_error": 3.5762786865234375e-07,
+      "max_abs_grad_error": 4.190951585769653e-09
+    },
+    {
+      "name": "bf16_sdpa_forward_backward",
+      "status": "passed",
+      "seconds": 0.3009,
+      "max_abs_output_error": 0.004056096076965332,
+      "max_abs_grad_error": 1.4165416359901428e-05
+    },
+    {
+      "name": "mask_spec_chunked_parity",
+      "status": "passed",
+      "seconds": 0.0921,
+      "query_len": 12,
+      "kv_len": 24,
+      "chunks": 4
+    },
+    {
+      "name": "draft_module_forward_backward_parity",
+      "status": "passed",
+      "seconds": 0.4888,
+      "loss": 61.29267501831055,
+      "max_abs_loss_error": 1.52587890625e-05,
+      "max_abs_grad_error": 1.430511474609375e-06,
+      "compared_parameter_grads": 25,
+      "attention_chunk_size": 7
+    },
+    {
+      "name": "npu_fusion_forward_backward",
+      "status": "passed",
+      "seconds": 0.0199,
+      "max_abs_output_error": 1.1920928955078125e-07,
+      "max_abs_q_grad_error": 7.450580596923828e-09,
+      "max_abs_kv_grad_error": 2.2351741790771484e-08,
+      "effective_backend": "npu_fusion"
+    }
+  ],
+  "resolved_device": "npu:1",
+  "device_name": "Ascend910B3",
+  "device_memory": [
+    65081008128,
+    65452113920
+  ],
+  "duration_seconds": 1.781,
+  "status": "NPU_SMOKE_PASSED",
+  "evidence_level": "NPU_SMOKE_PASSED"
+}

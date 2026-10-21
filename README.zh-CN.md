@@ -71,6 +71,8 @@ Profiling 也用于排除收益有限的方向：记录的 A6000 真实样本 sw
 将这一结果与 replay 上界分开报告。训练节省不能当作推理加速；缓存策略为可选项，
 不能默认视为每组 benchmark 的配置。
 
+昇腾 NPU：七种方法已在两块 910B3 上完成 BF16 离线训练、逐 token 一致性评测和导出验证；DFlash 另有在线、双卡放置和 200 步检查。这些是小规模工程验证，DDP 仍未实现。安装与证据见 [NPU 文档](docs/npu/README.md)。
+
 ## 支持的方法
 
 七种 drafter 共享 `train` / `eval` / `export` 接口和 checkpoint 格式。

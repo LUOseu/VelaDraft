@@ -15,6 +15,17 @@ metrics; see docs/REFERENCE.md for the port notes.
 
 Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+Additional notice for the Ascend SmolVLM vision-position adaptation:
+
+  * vlm_dflash/adapters/smolvlm.py (_npu_vision_embeddings_forward)
+
+  Adapted from Transformers 5.12.1 SmolVLMVisionEmbeddings.forward,
+  src/transformers/models/smolvlm/modeling_smolvlm.py.
+  Copyright 2025 the HuggingFace Inc. team. All rights reserved.
+  Written by Orr Zohar. Apache-2.0 (see LICENSE).
+  Modification: preserve pixel-dtype coordinate rounding, then promote
+  bucketize operands to FP32 because the NPU searchsorted kernel rejects BF16.
+
 Additional notice for the DFlash2 port (v0.3-dev, experimental):
 
   * vlm_dflash/dflash2/conv.py      (GroupedDynamicCausalConv, ported)

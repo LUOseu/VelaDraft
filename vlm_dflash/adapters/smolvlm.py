@@ -7,9 +7,9 @@ Differences from the Qwen-VL families that this adapter resolves:
   ``position3`` feature field is still populated with three identical axes so
   the store schema is unchanged; a 1-D-family draft trains with
   ``spatial_rope_enabled=false`` and never consumes it.
-* Images tokenize to a contiguous run of ``<image>`` ids, but the count is not
-  grid-derived: each vision tile emits a fixed ``image_seq_len`` (81 for
-  SmolVLM2), so a row's count is ``tiles x 81``.
+* Images tokenize to runs of ``<image>`` ids. Each vision tile emits the
+  model's fixed ``image_seq_len`` (81 for 2.2B, 64 for 256M), so token counts
+  must be derived from the loaded model's vision geometry.
 * Processor outputs ``pixel_values``/``pixel_attention_mask`` (no
   ``image_grid_thw`` / ``mm_token_type_ids``).
 * The checkpoint reserves explicit never-emitted special rows
@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import re
+from types import MethodType
 from pathlib import Path
 
 import torch
@@ -32,6 +33,38 @@ from .base import AdapterInfo, VLMAdapter, locate_image_token_spans
 
 _RESERVED_TOKEN = re.compile(r"^<\|reserved_special_token_\d+\|>$")
 _ROW_COL_TOKEN = re.compile(r"^<row_\d+_col_\d+>$")
+
+
+def _npu_vision_embeddings_forward(self, pixel_values, patch_attention_mask):
+    """Transformers 5.12 SmolVLM position calculation with NPU-safe bucketize.
+
+    Adapted from transformers.models.smolvlm.modeling_smolvlm
+    SmolVLMVisionEmbeddings.forward (Apache-2.0). Keep the upstream rounding to
+    pixel dtype *before* promoting coordinates for searchsorted: omitting that
+    round-trip changes position IDs near boundaries in BF16.
+    """
+    batch_size, _, height, width = pixel_values.shape
+    embeddings = self.patch_embedding(pixel_values).flatten(2).transpose(1, 2)
+    boundaries = torch.arange(
+        1 / self.num_patches_per_side, 1.0, 1 / self.num_patches_per_side,
+        device=pixel_values.device,
+    )
+    position_ids = torch.zeros(
+        batch_size, (height // self.patch_size) * (width // self.patch_size),
+        dtype=torch.long, device=pixel_values.device,
+    )
+    count_h = patch_attention_mask[:, :, 0].sum(dim=1)
+    count_w = patch_attention_mask[:, 0, :].sum(dim=1)
+    h = torch.arange(patch_attention_mask.size(1), device=pixel_values.device, dtype=torch.float32)
+    w = torch.arange(patch_attention_mask.size(2), device=pixel_values.device, dtype=torch.float32)
+    coords_h = (h[None, :] * (1.0 / count_h)[:, None]).clamp(max=1.0 - 1e-6)
+    coords_w = (w[None, :] * (1.0 / count_w)[:, None]).clamp(max=1.0 - 1e-6)
+    buckets_h = torch.bucketize(coords_h.to(pixel_values.dtype).float(), boundaries.float(), right=True)
+    buckets_w = torch.bucketize(coords_w.to(pixel_values.dtype).float(), boundaries.float(), right=True)
+    ids = (buckets_h[:, :, None] * self.num_patches_per_side + buckets_w[:, None, :]).reshape(batch_size, -1)
+    valid = patch_attention_mask.reshape(batch_size, -1)
+    position_ids[valid] = ids[valid]
+    return embeddings + self.position_embedding(position_ids)
 
 
 class SmolVLMAdapter(VLMAdapter):
@@ -50,8 +83,21 @@ class SmolVLMAdapter(VLMAdapter):
         forward_input_keys=("pixel_values", "pixel_attention_mask"),
     )
 
-    # SmolVLM2 vision tiles always decode to 81 <image> tokens (processor_config.json).
+    # Legacy direct callers without a model config retain the 2.2B convention.
+    # Capture always passes the loaded config instead.
     IMAGE_SEQ_LEN = 81
+
+    def load_model(self, model_path, *, backend_hint=None, **kwargs):
+        model = super().load_model(model_path, backend_hint=backend_hint, **kwargs)
+        if backend_hint == "npu":
+            from transformers.models.smolvlm.modeling_smolvlm import SmolVLMVisionEmbeddings
+
+            for module in model.modules():
+                if isinstance(module, SmolVLMVisionEmbeddings):
+                    # Accelerate wraps forward for device_map dispatch.
+                    name = "_old_forward" if hasattr(module, "_hf_hook") else "forward"
+                    setattr(module, name, MethodType(_npu_vision_embeddings_forward, module))
+        return model
 
     def processor_kwargs(self, contract: dict) -> dict:
         # The SmolVLM processor scores its own resize/split budget; no pixel bounds are injected.
@@ -215,9 +261,16 @@ class SmolVLMAdapter(VLMAdapter):
             forward_kwargs[key] = torch.cat([value.to(device) for value in values], dim=0)
         return forward_kwargs
 
-    def expected_image_token_counts(self, inputs: dict, *, merge_size: int | None) -> list[int] | None:
+    def expected_image_token_counts(self, inputs: dict, *, merge_size: int | None, model_config=None) -> list[int] | None:
         pixel_values = inputs.get("pixel_values")
         if pixel_values is None:
             return None
         tiles = int(pixel_values.shape[1])
-        return [tiles * self.IMAGE_SEQ_LEN]
+        tokens_per_tile = self.IMAGE_SEQ_LEN
+        if model_config is not None:
+            vision = model_config.vision_config
+            tokens_per_tile = int(
+                (int(vision.image_size) // int(vision.patch_size)) ** 2
+                / int(model_config.scale_factor) ** 2
+            )
+        return [tiles * tokens_per_tile]

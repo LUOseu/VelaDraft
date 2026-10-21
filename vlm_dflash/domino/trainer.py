@@ -57,6 +57,11 @@ class DominoTrainerModule(DFlashTrainerModule):
     the correction head's contribution from training randomness.
     """
 
+    def _prefix_states(self, embeddings: torch.Tensor) -> torch.Tensor:
+        if embeddings.device.type == "npu":
+            return self.draft_model._domino_gru_sequence(embeddings)
+        return self.draft_model.prefix_gru(embeddings)[0]
+
     def __init__(
         self,
         draft_model,
@@ -151,7 +156,7 @@ class DominoTrainerModule(DFlashTrainerModule):
             prev_indices = (label_indices - 1).clamp(min=0)
             prev_ids = torch.gather(input_ids.unsqueeze(1).expand(-1, n, -1), 2, prev_indices)
             block_emb = self.embed_tokens(prev_ids)
-            gru_out, _ = self.draft_model.prefix_gru(block_emb.reshape(bsz * n, bs, -1))
+            gru_out = self._prefix_states(block_emb.reshape(bsz * n, bs, -1))
             gru_out = gru_out.reshape(bsz, n, bs, -1)
             prefix_states = gru_out[:, :, self.correction_suffix_start :, :]
         else:
@@ -160,7 +165,7 @@ class DominoTrainerModule(DFlashTrainerModule):
             # (slot 1) conditions on the block's first token.
             block_emb = self.embed_tokens(target_ids)
             gru_inputs = block_emb[:, :, : bs - 1, :].reshape(bsz * n, bs - 1, -1)
-            gru_out, _ = self.draft_model.prefix_gru(gru_inputs)
+            gru_out = self._prefix_states(gru_inputs)
             gru_out = gru_out.reshape(bsz, n, bs - 1, -1)
             prefix_states = gru_out[:, :, self.correction_suffix_start - 1 :, :]
         backbone_states = hidden4d[:, :, self.correction_suffix_start :, :]

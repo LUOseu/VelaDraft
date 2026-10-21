@@ -21,9 +21,23 @@ from importlib import resources as importlib_resources
 from pathlib import Path
 
 from . import __version__
-from .config import apply_overrides, dump_effective_config, load_config, resolve_run_dir
+from .config import apply_overrides, dump_effective_config, load_config, resolve_run_dir, validate_runtime_config
 
-_PRESET_NAMES = ("smoke", "single-gpu-24g", "single-gpu-48g")
+_PRESET_NAMES = (
+    "smoke",
+    "single-gpu-24g",
+    "single-gpu-48g",
+    "npu-dflash-smoke",
+    "npu-dspark-smoke",
+    "npu-domino-smoke",
+    "npu-jetspec-smoke",
+    "npu-dflash2-smoke",
+    "npu-dflare-smoke",
+    "npu-dfly-smoke",
+    "npu-online-smoke",
+    "npu-split-device",
+    "npu-target-device-map",
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -127,6 +141,7 @@ def collect_doctor_report(
     samples: int,
     seq_length: int,
     algorithm: str | None = None,
+    device: str | None = None,
 ) -> dict:
     report: dict = {"ok": True, "checks": [], "warnings": [], "errors": []}
 
@@ -161,7 +176,7 @@ def collect_doctor_report(
             check(f"algorithm {algorithm!r} registered", False, str(error))
 
     pins = _parse_constraints()
-    for package in ("torch", "transformers", "tokenizers", "torchvision", "safetensors"):
+    for package in ("torch", "torch_npu", "transformers", "tokenizers", "torchvision", "safetensors", "accelerate"):
         version = _package_version(package)
         if version is None:
             if package == "torchvision":
@@ -178,22 +193,24 @@ def collect_doctor_report(
             report["warnings"].append(f"{package} {version} differs from tested {pinned}")
 
     try:
-        import torch
+        from . import runtime
 
-        if torch.cuda.is_available():
-            count = torch.cuda.device_count()
-            devices = []
-            for index in range(count):
-                free, total = torch.cuda.mem_get_info(index)
-                devices.append(
-                    {"index": index, "name": torch.cuda.get_device_name(index), "free_gb": round(free / 1e9, 1), "total_gb": round(total / 1e9, 1)}
-                )
-            report["cuda"] = {"available": True, "devices": devices}
-        else:
-            report["cuda"] = {"available": False}
-            check("cuda available", False, "torch.cuda.is_available() is False")
+        environment = runtime.environment_report()
+        report["runtime"] = environment
+        report["cuda"] = environment["cuda"]
+        report["npu"] = environment["npu"]
+        report["backend_status"] = "NPU_UNVERIFIED"
+        if device:
+            info = runtime.device_report(device, context="doctor.device")
+            report["selected_device"] = info
+            check(f"device {device} available", bool(info.get("available")), info.get("error", info.get("name", "ok")))
+        elif not environment["cuda"]["available"] and not environment["npu"]["available"]:
+            report["warnings"].append(
+                "No CUDA or Ascend NPU accelerator is available; CPU-only checks can run, but device "
+                "training remains NPU_UNVERIFIED/unmeasured."
+            )
     except Exception as error:  # pragma: no cover - environment dependent
-        check("torch import", False, str(error))
+        check("torch runtime inspection", False, str(error))
 
     if target:
         try:
@@ -235,7 +252,12 @@ def collect_doctor_report(
 
 def cmd_doctor(args) -> int:
     report = collect_doctor_report(
-        args.target, args.mask_token_id, args.samples, args.seq_length, algorithm=args.algorithm
+        args.target,
+        args.mask_token_id,
+        args.samples,
+        args.seq_length,
+        algorithm=args.algorithm,
+        device=args.device,
     )
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False, default=str))
@@ -262,6 +284,14 @@ def cmd_doctor(args) -> int:
             )
         if "estimates" in report:
             print(f"  estimates: {report['estimates']}")
+        if "npu" in report:
+            npu = report["npu"]
+            print(
+                f"  npu: available={npu['available']} count={npu['device_count']} "
+                f"torch_npu={report.get('runtime', {}).get('torch_npu')}"
+            )
+        if "selected_device" in report:
+            print(f"  selected device: {report['selected_device']}")
     return 0 if report["ok"] else 2
 
 
@@ -314,7 +344,7 @@ def build_train_config(args) -> dict:
             dataset["annotation"] = args.annotation
     if args.images_dir:
         dataset["images_dir"] = args.images_dir
-        dataset.setdefault("jsonl_images_dir", args.images_dir)
+        dataset["jsonl_images_dir"] = args.images_dir
     if args.limit is not None:
         dataset["slice"] = int(args.limit)
     if not dataset.get("source"):
@@ -333,6 +363,7 @@ def build_train_config(args) -> dict:
     # and feature mode on the config training will actually run with, so an
     # override can never be validated away (or fail validation it satisfied).
     cfg = apply_overrides(cfg, args.set_list)
+    validate_runtime_config(cfg)
     algorithm = get_algorithm(cfg.get("algorithm"))
     algorithm.validate_config(cfg)
     feature_mode = resolve_feature_mode(cfg, getattr(args, "feature_mode", None))
@@ -529,6 +560,16 @@ def cmd_train(args) -> int:
     from .utils import log
 
     cfg = build_train_config(args)
+    # Probe explicitly configured devices before the first write. An explicit
+    # npu request must fail here (with an actionable error) rather than after a
+    # prepare/regen stage has already produced partial artifacts. Configs that
+    # omit train.device keep the historical default (cuda:0) and are probed by
+    # the training entry point once it actually selects a device; this keeps
+    # config-only unit tests independent of the host accelerator.
+    explicit_device = bool(
+        (cfg.get("train") or {}).get("device") or (cfg.get("target") or {}).get("device")
+    )
+    validate_runtime_config(cfg, require_devices=explicit_device)
     feature_mode = str((cfg.get("train") or {}).get("feature_mode", "offline")).lower()
     external_features = Path(args.features).expanduser().resolve() if args.features else None
     if feature_mode == "online" and external_features is not None:
@@ -729,6 +770,7 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--algorithm", default=None, help="check a drafter algorithm name against the registry")
     doctor.add_argument("--samples", type=int, default=1000, help="feature-disk estimate sample count")
     doctor.add_argument("--seq-length", type=int, default=2048)
+    doctor.add_argument("--device", default=None, help="require this runtime device, e.g. npu:0")
     doctor.add_argument("--json", action="store_true")
     doctor.set_defaults(func=cmd_doctor)
 

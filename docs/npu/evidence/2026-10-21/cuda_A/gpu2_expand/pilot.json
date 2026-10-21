@@ -1,0 +1,183 @@
+{
+  "leg": {
+    "seed": 42,
+    "compaction": false,
+    "initial_sha256": "d16f57d2333d937a3af55dc4266a19e8037986cc2999ab42699d4deb06fa04da",
+    "initial_state_hashes": {
+      "model": "d16f57d2333d937a3af55dc4266a19e8037986cc2999ab42699d4deb06fa04da",
+      "master": "b219ef55ec076b505fc8cb3874b43787f813e210c3c93b4449a2369d21d01267",
+      "optimizer": "a7fa261fef4b0f27e60ad9a279fc903dacee2318bc6f39298ca8b9cd99acb8d1",
+      "scheduler": "5b3f0e16804bfb1030845fcb04b1a77b8d52f0af16709ef54e6b2b36c8efb69e",
+      "rng": "140524cc2324ee946d264b90e0f4c36d27ca759c0e5e089c81d61ca1d967aa47"
+    },
+    "optimizer": "production FP32-master AdamW",
+    "optimizer_horizon": 100,
+    "optimizer_start_step": 0,
+    "objective_progress_start": 75,
+    "steps": [
+      {
+        "step": 0,
+        "measured": true,
+        "batch": 0,
+        "loss": 1.2265625,
+        "valid_tokens": 6573,
+        "loss_weight": 4477.451171875,
+        "grad_norm": 0.9291983842849731,
+        "forward_seconds": 1.2397050093859434,
+        "backward_seconds": 0.9532842319458723,
+        "update_seconds": 0.10767791979014874,
+        "wall_seconds": 2.3006671611219645,
+        "student_projected_rows_forward": 8064,
+        "teacher_projected_rows_forward": 7056,
+        "projected_rows_including_backward_recomputation": 22176,
+        "allocated_rows": 8064,
+        "kept_rows": 7736,
+        "padding_fraction": 0.04067460317460314
+      },
+      {
+        "step": 1,
+        "measured": true,
+        "batch": 1,
+        "loss": 1.2578125,
+        "valid_tokens": 7182,
+        "loss_weight": 4890.56396484375,
+        "grad_norm": 1.0625523328781128,
+        "forward_seconds": 1.4338663909584284,
+        "backward_seconds": 2.262028593569994,
+        "update_seconds": 0.03977656364440918,
+        "wall_seconds": 3.7356715481728315,
+        "student_projected_rows_forward": 16384,
+        "teacher_projected_rows_forward": 14336,
+        "projected_rows_including_backward_recomputation": 45056,
+        "allocated_rows": 16384,
+        "kept_rows": 8432,
+        "padding_fraction": 0.4853515625
+      },
+      {
+        "step": 2,
+        "measured": true,
+        "batch": 2,
+        "loss": 0.369140625,
+        "valid_tokens": 329,
+        "loss_weight": 241.85426330566406,
+        "grad_norm": 2.3404417037963867,
+        "forward_seconds": 0.044840484857559204,
+        "backward_seconds": 0.05994231998920441,
+        "update_seconds": 0.03960740379989147,
+        "wall_seconds": 0.14439020864665508,
+        "student_projected_rows_forward": 768,
+        "teacher_projected_rows_forward": 672,
+        "projected_rows_including_backward_recomputation": 2112,
+        "allocated_rows": 768,
+        "kept_rows": 600,
+        "padding_fraction": 0.21875
+      },
+      {
+        "step": 3,
+        "measured": true,
+        "batch": 3,
+        "loss": 0.8984375,
+        "valid_tokens": 629,
+        "loss_weight": 445.03662109375,
+        "grad_norm": 2.174797296524048,
+        "forward_seconds": 0.0646716021001339,
+        "backward_seconds": 0.10489817149937153,
+        "update_seconds": 0.039689816534519196,
+        "wall_seconds": 0.20925959013402462,
+        "student_projected_rows_forward": 1344,
+        "teacher_projected_rows_forward": 1176,
+        "projected_rows_including_backward_recomputation": 3696,
+        "allocated_rows": 1344,
+        "kept_rows": 928,
+        "padding_fraction": 0.30952380952380953
+      },
+      {
+        "step": 4,
+        "measured": true,
+        "batch": 4,
+        "loss": 1.203125,
+        "valid_tokens": 2023,
+        "loss_weight": 1390.9736328125,
+        "grad_norm": 2.378608465194702,
+        "forward_seconds": 0.19182920642197132,
+        "backward_seconds": 0.41195990703999996,
+        "update_seconds": 0.03995046950876713,
+        "wall_seconds": 0.6437395829707384,
+        "student_projected_rows_forward": 4736,
+        "teacher_projected_rows_forward": 4144,
+        "projected_rows_including_backward_recomputation": 13024,
+        "allocated_rows": 4736,
+        "kept_rows": 2536,
+        "padding_fraction": 0.464527027027027
+      }
+    ],
+    "peak_hbm_bytes": 35632752640,
+    "attention": {
+      "requested_backend": "sdpa_chunked",
+      "effective_backends": [
+        "sdpa_chunked"
+      ],
+      "training_switches": {
+        "recipe_compile_tv_kl": {
+          "requested": false,
+          "effective": false,
+          "reason": "not_requested",
+          "scope": "device_gate_not_execution_evidence"
+        }
+      },
+      "fallback_reasons": [],
+      "chunked_layers": 3,
+      "memory_plan": {
+        "batch_size": 8,
+        "num_blocks": 74,
+        "block_size": 8,
+        "context_len": 465,
+        "query_len": 592,
+        "kv_len": 1057,
+        "num_heads": 16,
+        "head_dim": 128,
+        "dense": {
+          "mask_bytes": 10011904,
+          "score_bytes": 320380928,
+          "total_bytes": 330392832
+        },
+        "dense_total_gb": 0.3304,
+        "chunked": {
+          "query_chunk_size": 128,
+          "mask_bytes": 2164736,
+          "score_bytes": 69271552,
+          "total_bytes": 71436288
+        },
+        "chunked_total_gb": 0.0714,
+        "chunks": 5,
+        "requested_backend": "sdpa_chunked"
+      },
+      "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+      "measurement_window": {
+        "completed_attention_calls": 15,
+        "chunks": 96,
+        "fused_chunks": 0,
+        "fallback_chunks": 0,
+        "sdpa_chunks": 96,
+        "effective_backends": [
+          "sdpa_chunked"
+        ],
+        "fallback_reasons": [],
+        "mixed_backend": false,
+        "count_semantics": "completed attention calls across layers; excludes internal chunk checkpoint recomputation, failed calls and backward kernels; completed external layer replays count as calls; not model-forward or optimizer-update counts"
+      },
+      "mixed_backend": false,
+      "fused_chunks": 0,
+      "fallback_chunks": 0
+    },
+    "model_geometry": {
+      "hidden_size": 2048,
+      "intermediate_size": 11008,
+      "num_hidden_layers": 3,
+      "num_attention_heads": 16,
+      "num_key_value_heads": 2,
+      "head_dim": 128
+    }
+  },
+  "estimated_90_update_seconds": 126.60710563883185
+}

@@ -54,6 +54,8 @@ import torch
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
 
+from . import runtime
+
 __all__ = [
     "CONFIDENCE_LOGITS_AUX_KEY",
     "RECIPE_ALGORITHMS",
@@ -762,7 +764,13 @@ def recipe_loss(
         # only when this stage's objective actually routes through it
         # (``lk_coef`` > 0) *and* the run opted in. Stages whose objective does
         # not call ``_tv_kl`` (e.g. ``e2e_tv``) never reach the compiled path.
-        tv_kl_impl = _compiled_tv_kl() if compile_tv_kl else None
+        # NPU keeps the eager fp32 arithmetic by default: torch.compile/Inductor
+        # coverage for this fused elementwise chain is not assumed on TorchNPU.
+        tv_kl_impl = (
+            _compiled_tv_kl()
+            if compile_tv_kl and runtime.compile_supported(student_logits.device)
+            else None
+        )
         lk = lk_term(
             student_logits.reshape(-1, student_logits.size(-1)),
             None if teacher_chunk_fn is not None else teacher_logits.reshape(-1, teacher_logits.size(-1)),

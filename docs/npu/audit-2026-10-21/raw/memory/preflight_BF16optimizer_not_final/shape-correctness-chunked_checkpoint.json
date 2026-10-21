@@ -1,0 +1,162 @@
+{
+  "reference": "/tmp/audit-B-dense.pt",
+  "candidate": "/tmp/audit-B-chunked_checkpoint.pt",
+  "rtol": 0.02,
+  "atol": 0.02,
+  "tolerance_source": "scripts/npu/operator_smoke.py BF16",
+  "pass": true,
+  "tensors": {
+    "output": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "loss": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.q_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.k_proj.weight": {
+      "max_abs_error": 0.000244140625,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.v_proj.weight": {
+      "max_abs_error": 0.000244140625,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.o_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.q_norm.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.self_attn.k_norm.weight": {
+      "max_abs_error": 0.00012969970703125,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.mlp.gate_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.mlp.up_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.mlp.down_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.input_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.0.post_attention_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.q_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.k_proj.weight": {
+      "max_abs_error": 1.52587890625e-05,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.v_proj.weight": {
+      "max_abs_error": 1.52587890625e-05,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.o_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.q_norm.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.self_attn.k_norm.weight": {
+      "max_abs_error": 7.62939453125e-06,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.mlp.gate_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.mlp.up_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.mlp.down_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.input_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.1.post_attention_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.q_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.k_proj.weight": {
+      "max_abs_error": 7.62939453125e-06,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.v_proj.weight": {
+      "max_abs_error": 7.62939453125e-06,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.o_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.q_norm.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.self_attn.k_norm.weight": {
+      "max_abs_error": 3.814697265625e-06,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.mlp.gate_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.mlp.up_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.mlp.down_proj.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.input_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.layers.2.post_attention_layernorm.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.norm.weight": {
+      "max_abs_error": 0.0,
+      "pass": true
+    },
+    "grad:draft_model.fc.weight": {
+      "max_abs_error": 6.628036499023438e-05,
+      "pass": true
+    },
+    "grad:draft_model.hidden_norm.weight": {
+      "max_abs_error": 9.1552734375e-05,
+      "pass": true
+    }
+  }
+}

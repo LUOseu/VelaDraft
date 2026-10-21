@@ -110,9 +110,20 @@ class VLMAdapter:
 
     # ---- model / processor loading -------------------------------------
     def load_model(
-        self, model_path: str, *, dtype, attn_implementation: str, local_files_only: bool, **load_kwargs
+        self,
+        model_path: str,
+        *,
+        dtype,
+        attn_implementation: str,
+        local_files_only: bool,
+        backend_hint: str | None = None,
+        **load_kwargs,
     ):
-        """Load the target; ``load_kwargs`` (e.g. ``device_map``/``max_memory``) go to ``from_pretrained``."""
+        """Load the target; ``load_kwargs`` (e.g. ``device_map``/``max_memory``) go to ``from_pretrained``.
+
+        ``backend_hint`` is consumed by family adapters for backend-specific
+        kernel selection and is not forwarded to transformers.
+        """
         import transformers
 
         model_class = getattr(transformers, self.info.model_class, None)
@@ -419,7 +430,7 @@ class VLMAdapter:
                 forward_kwargs[key] = torch.cat(values, dim=0).to(device)
         return forward_kwargs
 
-    def expected_image_token_counts(self, inputs: dict, *, merge_size: int | None) -> list[int] | None:
+    def expected_image_token_counts(self, inputs: dict, *, merge_size: int | None, model_config=None) -> list[int] | None:
         """Per-image expected image-token counts for one processor row (or None).
 
         Grid families derive the count from the patch grid; tile families

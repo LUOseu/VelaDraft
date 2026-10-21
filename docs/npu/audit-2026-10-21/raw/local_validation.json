@@ -1,0 +1,11 @@
+{
+  "tests": 879,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 6,
+  "passed": 873,
+  "source": "docs/npu/audit-2026-10-21/raw/cpu_tests.xml.gz",
+  "sha256": "d8426f58c23e46629bd9323713a26a237792df32d93ecc31d26d9ec69c284fa7",
+  "scope": "Full CPU suite after final harness, evidence-generator and inference-schema changes",
+  "status": "PASS"
+}

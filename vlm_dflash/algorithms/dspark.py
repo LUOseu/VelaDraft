@@ -218,10 +218,11 @@ class DSparkAlgorithm(DrafterAlgorithm):
     def build_inference_module(self, draft_config_dict: dict, attention_backend: str):
         from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
 
+        from ..dflash.factory import model_attention_implementation
         from ..dspark.model import Qwen3DSparkDraftModel
 
         config = Qwen3Config.from_dict(draft_config_dict)
-        config._attn_implementation = attention_backend or "flex_attention"
+        config._attn_implementation = model_attention_implementation(attention_backend)
         return Qwen3DSparkDraftModel(config)
 
 

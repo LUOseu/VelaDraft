@@ -1,0 +1,63 @@
+{
+  "method": "dflash",
+  "leg": "head",
+  "steps": 3,
+  "pid": 1684340,
+  "returncode": 0,
+  "reason": null,
+  "wall_seconds": 43.3564630728215,
+  "gpu_index": 1,
+  "scope": "contended functional only; no performance inference",
+  "free_MiB_samples": [
+    [
+      0.07,
+      31431
+    ],
+    [
+      5.12,
+      31431
+    ],
+    [
+      10.18,
+      31164
+    ],
+    [
+      15.35,
+      31164
+    ],
+    [
+      21.08,
+      31148
+    ],
+    [
+      26.81,
+      29008
+    ],
+    [
+      32.63,
+      24514
+    ],
+    [
+      38.36,
+      24510
+    ]
+  ],
+  "command": [
+    "/home/lyh/veladraft-pr30-audit-20261021/env/bin/python",
+    "/home/lyh/veladraft-pr30-audit-20261021/head/scripts/npu/audit_cuda.py",
+    "--repo",
+    "/home/lyh/veladraft-pr30-audit-20261021/head",
+    "--bundle",
+    "/home/lyh/veladraft-pr30-audit-20261021/bundle.pt",
+    "--config",
+    "/home/lyh/veladraft-pr30-audit-20261021/corpus/r3/config.json",
+    "--output",
+    "/home/lyh/veladraft-pr30-audit-20261021/results/dflash_head_3.json",
+    "--method",
+    "dflash",
+    "--steps",
+    "3",
+    "--memory-budget-gib",
+    "22"
+  ]
+}

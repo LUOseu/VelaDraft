@@ -1,0 +1,289 @@
+{
+  "scope": "formal model geometry and recipe / natural features / diagnostic microbatch1 CUDA regression",
+  "source_config_sha256": "dd37c719fd7cf700bbac1ed7c9bf52f86847922f859c698695d4a5126996db2a",
+  "scope_overrides": {
+    "feature_mode": "offline",
+    "micro_batch_size": 1,
+    "grad_accumulation_steps": 1,
+    "steps": 3,
+    "fixed_stage_step": 75,
+    "fixed_horizon": 100
+  },
+  "repo": "/home/lyh/veladraft-pr30-audit-20261021/base",
+  "method": "domino",
+  "config": {
+    "algorithm": {
+      "name": "domino"
+    },
+    "run": {
+      "name": "qwen25vl3b_dfly_r3_n20000",
+      "dir": "runs/r3r5_n20000/r3"
+    },
+    "dataset": {
+      "source": "llava_instruct",
+      "annotation": "/home/dhz/Data/llava_instruct_150k.json",
+      "images_dir": "/home/dhz/Data/COCO-caption/train2017",
+      "slice": 24000,
+      "val_size": 256,
+      "test_size": 256,
+      "seed": 42,
+      "min_answer_chars": 0,
+      "image_link_mode": "hardlink"
+    },
+    "regen": {
+      "max_new_tokens": 256,
+      "min_response_tokens": 8,
+      "batch_size": 64,
+      "temperature": 0.0
+    },
+    "target": {
+      "model": "/home/lyh/vlm-dflash/assets/models/Qwen2.5-VL-3B-Instruct",
+      "dtype": "bfloat16",
+      "attn_implementation": "sdpa",
+      "device": "cuda:0",
+      "local_files_only": true,
+      "image_min_pixels": 200704,
+      "image_max_pixels": 1003520
+    },
+    "capture": {
+      "seq_length": 2048,
+      "shard_size": 32,
+      "dtype": "bfloat16",
+      "store_final_hidden": true,
+      "visual_path_check": true,
+      "visual_check_samples": 2
+    },
+    "drafter": {
+      "num_hidden_layers": 3,
+      "block_size": 8,
+      "num_anchors": 256,
+      "loss_decay_gamma": 7.0,
+      "capture_layer_ids": [
+        1,
+        17,
+        33
+      ],
+      "mask_token_id": 151669,
+      "attention_backend": "flex_attention",
+      "spatial_rope_enabled": true,
+      "spatial_rope_mode": "replace",
+      "spatial_rope_sections": [
+        16,
+        24,
+        24
+      ]
+    },
+    "train": {
+      "feature_mode": "offline",
+      "online_batch_size": 8,
+      "online_feature_cache_gb": 32,
+      "micro_batch_size": 1,
+      "grad_accumulation_steps": 1,
+      "num_epochs": 3,
+      "save_every_fraction_of_epoch": 0.5,
+      "milestone_snapshots": true,
+      "resume_state_dir": "/dev/shm/r3r5_r3/train_state",
+      "lr": 0.0003,
+      "betas": [
+        0.9,
+        0.95
+      ],
+      "weight_decay": 0.0,
+      "warmup_ratio": 0.04,
+      "min_lr_ratio": 0.1,
+      "max_grad_norm": 1.0,
+      "log_every_steps": 1,
+      "seed": 42,
+      "device": "cuda:0",
+      "overfit_sanity": {
+        "enabled": true,
+        "num_samples": 4,
+        "steps": 200,
+        "ce_drop": 0.6,
+        "slot0_acc": 0.9
+      }
+    },
+    "eval": {
+      "verification": "sequential",
+      "strict_parallel_margin": 2.0,
+      "num_prompts": 64,
+      "max_new_tokens": 128,
+      "sequential_target_verification": true,
+      "verify_sdpa_backend": "parity",
+      "parallel_diagnostic_prompts": 0,
+      "checkpoints": [
+        "ckpt_step0006250.pt"
+      ]
+    }
+  },
+  "draft_config": {
+    "transformers_version": "5.12.1",
+    "architectures": [
+      "Qwen3DFlashDraftModel"
+    ],
+    "output_hidden_states": false,
+    "return_dict": true,
+    "dtype": "bfloat16",
+    "chunk_size_feed_forward": 0,
+    "is_encoder_decoder": false,
+    "id2label": {
+      "0": "LABEL_0",
+      "1": "LABEL_1"
+    },
+    "label2id": {
+      "LABEL_0": 0,
+      "LABEL_1": 1
+    },
+    "problem_type": null,
+    "vocab_size": 151936,
+    "hidden_size": 2048,
+    "intermediate_size": 11008,
+    "num_hidden_layers": 3,
+    "num_attention_heads": 16,
+    "num_key_value_heads": 2,
+    "head_dim": 128,
+    "hidden_act": "silu",
+    "max_position_embeddings": 128000,
+    "initializer_range": 0.02,
+    "rms_norm_eps": 1e-06,
+    "use_cache": true,
+    "tie_word_embeddings": false,
+    "rope_parameters": {
+      "rope_type": "default",
+      "rope_theta": 1000000.0
+    },
+    "attention_bias": false,
+    "use_sliding_window": false,
+    "sliding_window": null,
+    "max_window_layers": 3,
+    "layer_types": [
+      "full_attention",
+      "full_attention",
+      "full_attention"
+    ],
+    "attention_dropout": 0.0,
+    "pad_token_id": null,
+    "bos_token_id": 151643,
+    "eos_token_id": 151645,
+    "_name_or_path": "",
+    "model_type": "qwen3",
+    "num_target_layers": 36,
+    "target_hidden_size": 2048,
+    "block_size": 8,
+    "dflash_config": {
+      "mask_token_id": 151669,
+      "target_layer_ids": [
+        1,
+        17,
+        33
+      ],
+      "spatial_rope_enabled": true,
+      "spatial_rope_mode": "replace",
+      "spatial_rope_sections": [
+        16,
+        24,
+        24
+      ],
+      "spatial_rope_interleaved": false,
+      "visual_num_query_tokens": 0,
+      "projector_type": "domino",
+      "emb_dim": 256,
+      "gru_hidden_dim": 1024,
+      "pure_draft_prefix_len": 1,
+      "shift_label": true
+    },
+    "output_attentions": false
+  },
+  "steps": 3,
+  "seed": 42,
+  "torch": "2.11.0+cu130",
+  "transformers": "5.12.1",
+  "device": "NVIDIA RTX A6000",
+  "contended_functional_only": true,
+  "allocator_budget_gib": 22.0,
+  "torch_npu_imported": false,
+  "initial_sha256": "bb56097bb1679c504a970fb175d5b54efed028f8d81e2d6b02030c9704ec822a",
+  "final_sha256": "9f79443f25ffe0880e11839a2ef70fab26da2507c9f0092105050501f0ce9d70",
+  "history": [
+    {
+      "step": 0,
+      "input_shape": [
+        1,
+        297
+      ],
+      "draft_shapes": [
+        [
+          1,
+          32,
+          2048
+        ]
+      ],
+      "loss": 11.5,
+      "valid_tokens": 31.0,
+      "gradient_sha256": "d877855ec923b710b1cdea6fe1673adb093bc7579e030a524d1fc0d6672ddbab",
+      "extra_metrics": {
+        "lambda_base": 0.25,
+        "correction_enabled": 1.0,
+        "correction_abs_mean": 0.1279296875,
+        "final_loss": 11.5,
+        "base_loss": 11.4375,
+        "base_accuracy": 0.0,
+        "base_accept_len": 1.0
+      }
+    },
+    {
+      "step": 1,
+      "input_shape": [
+        1,
+        311
+      ],
+      "draft_shapes": [
+        [
+          1,
+          64,
+          2048
+        ]
+      ],
+      "loss": 16.75,
+      "valid_tokens": 63.0,
+      "gradient_sha256": "e812731feb6f45fd1c143f5be8b29b300087a596005fd91c1a166a9641e4e8a8",
+      "extra_metrics": {
+        "lambda_base": 0.24,
+        "correction_enabled": 1.0,
+        "correction_abs_mean": 0.109375,
+        "final_loss": 16.75,
+        "base_loss": 16.75,
+        "base_accuracy": 0.0,
+        "base_accept_len": 1.0
+      }
+    },
+    {
+      "step": 2,
+      "input_shape": [
+        1,
+        320
+      ],
+      "draft_shapes": [
+        [
+          1,
+          136,
+          2048
+        ]
+      ],
+      "loss": 12.6875,
+      "valid_tokens": 135.0,
+      "gradient_sha256": "cc4c5f1e24e05641be42a68f042ff6f3b6c7e4903cedf87de811dee8ea7bb3c6",
+      "extra_metrics": {
+        "lambda_base": 0.22999999999999998,
+        "correction_enabled": 1.0,
+        "correction_abs_mean": 0.119140625,
+        "final_loss": 12.6875,
+        "base_loss": 12.6875,
+        "base_accuracy": 0.0,
+        "base_accept_len": 1.0
+      }
+    }
+  ],
+  "wall_seconds": 36.41814897954464,
+  "peak_allocated_bytes": 7852425728
+}
