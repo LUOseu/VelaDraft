@@ -16,6 +16,57 @@ from torch.utils.checkpoint import checkpoint
 from .mask import DFlashMaskSpec
 
 
+class AttentionRuntimeStats:
+    """Process-local counters; not model state or hardware profiling.
+
+    Count completed attention calls across layers (not model forwards/updates).
+    Internal chunk checkpoint recomputation is excluded. If a caller wraps an
+    entire layer in an external checkpoint, a completed replay is another call.
+    Failed/incomplete calls and backward kernel dispatches are not measured.
+    Reset after warmup and snapshot after the measured updates on each rank.
+    """
+
+    count_semantics = (
+        "completed attention calls across layers; excludes internal chunk checkpoint "
+        "recomputation, failed calls and backward kernels; completed external layer "
+        "replays count as calls; not model-forward or optimizer-update counts"
+    )
+    counters = ("completed_attention_calls", "chunks", "fused_chunks", "fallback_chunks", "sdpa_chunks")
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.counts = dict.fromkeys(self.counters, 0)
+        self.backends = set()
+        self.reasons = set()
+
+    def record(self, info: dict):
+        self.counts["completed_attention_calls"] += 1
+        for key in self.counters[1:]:
+            self.counts[key] += int(info.get(key, 0))
+        backend = info["effective_backend"]
+        self.backends.update(("npu_fusion", "sdpa_chunked") if backend == "mixed" else (backend,))
+        self.reasons.update(info.get("fallback_reasons", ()))
+        if info.get("fallback_reason"):
+            self.reasons.add(info["fallback_reason"])
+
+    def merge(self, snapshot: dict):
+        for key in self.counters:
+            self.counts[key] += snapshot[key]
+        self.backends.update(snapshot["effective_backends"])
+        self.reasons.update(snapshot["fallback_reasons"])
+
+    def snapshot(self) -> dict:
+        return {
+            **self.counts,
+            "effective_backends": sorted(self.backends),
+            "fallback_reasons": sorted(self.reasons),
+            "mixed_backend": len(self.backends) > 1,
+            "count_semantics": self.count_semantics,
+        }
+
+
 def _repeat_kv(states: torch.Tensor, repeats: int) -> torch.Tensor:
     if repeats == 1:
         return states
@@ -61,7 +112,6 @@ def sdpa_chunked_attention(
     key = _repeat_kv(key, repeats)
     value = _repeat_kv(value, repeats)
     chunk_size = min(spec.query_chunk_size, spec.query_len)
-    fallback_reasons: list[str] = []
 
     def run_chunk(q_chunk: torch.Tensor, start: int, stop: int) -> torch.Tensor:
         mask = spec.materialize_additive(start, stop, dtype=q_chunk.dtype)
@@ -89,7 +139,13 @@ def sdpa_chunked_attention(
         "effective_backend": "sdpa_chunked",
         "query_chunk_size": chunk_size,
         "chunks": (spec.query_len + chunk_size - 1) // chunk_size,
+        "fused_chunks": 0,
+        "fallback_chunks": 0,
+        "sdpa_chunks": len(outputs),
+        "mixed_backend": False,
+        "fallback_mode": "not_applicable",
         "fallback_reason": None,
+        "fallback_reasons": [],
         "activation_checkpointing": bool(use_checkpoint),
     }
 
@@ -163,13 +219,17 @@ def npu_fusion_chunked_attention(
     value = _repeat_kv(value, repeats)
     chunk_size = min(spec.query_chunk_size, spec.query_len)
     fallback_reasons: list[str] = []
+    fused_chunks = 0
+    fallback_chunks = 0
+    collecting = True
 
     def run_chunk(q_chunk: torch.Tensor, start: int, stop: int) -> torch.Tensor:
+        nonlocal fused_chunks, fallback_chunks
         # Ascend convention: True means masked out. Never pass the additive
         # SDPA -inf mask here.
         mask = spec.materialize_bool(start, stop, inverted=True)
         try:
-            return _npu_fusion_call(
+            result = _npu_fusion_call(
                 q_chunk,
                 key,
                 value,
@@ -177,10 +237,15 @@ def npu_fusion_chunked_attention(
                 scale=scale,
                 keep_prob=1.0 - float(dropout_p),
             )
+            if collecting:
+                fused_chunks += 1
+            return result
         except RuntimeError as error:
             if not spec.npu_fusion_fallback:
                 raise
-            fallback_reasons.append(str(error))
+            if collecting:
+                fallback_chunks += 1
+                fallback_reasons.append(str(error))
             return F.scaled_dot_product_attention(
                 q_chunk,
                 key,
@@ -199,10 +264,19 @@ def npu_fusion_chunked_attention(
             outputs.append(checkpoint(run_chunk, q_chunk, start, stop, use_reentrant=False))
         else:
             outputs.append(run_chunk(q_chunk, start, stop))
+    # Freeze forward-only telemetry before checkpoint closures replay in backward.
+    collecting = False
     output = torch.cat(outputs, dim=2)
+    mixed = fused_chunks > 0 and fallback_chunks > 0
     return output, {
         "requested_backend": spec.backend,
-        "effective_backend": "npu_fusion" if not fallback_reasons else "sdpa_chunked",
+        "effective_backend": "mixed" if mixed else ("npu_fusion" if not fallback_chunks else "sdpa_chunked"),
+        "fused_chunks": fused_chunks,
+        "fallback_chunks": fallback_chunks,
+        "sdpa_chunks": fallback_chunks,
+        "mixed_backend": mixed,
+        "fallback_mode": "profile" if spec.npu_fusion_fallback else "strict",
+        "fallback_reasons": sorted(set(fallback_reasons)),
         "query_chunk_size": chunk_size,
         "chunks": (spec.query_len + chunk_size - 1) // chunk_size,
         "fallback_reason": None if not fallback_reasons else fallback_reasons[0],
@@ -210,4 +284,4 @@ def npu_fusion_chunked_attention(
     }
 
 
-__all__ = ["npu_fusion_chunked_attention", "sdpa_chunked_attention"]
+__all__ = ["AttentionRuntimeStats", "npu_fusion_chunked_attention", "sdpa_chunked_attention"]

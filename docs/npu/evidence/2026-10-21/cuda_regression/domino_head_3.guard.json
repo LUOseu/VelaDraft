@@ -1,0 +1,63 @@
+{
+  "method": "domino",
+  "leg": "head",
+  "steps": 3,
+  "pid": 1696835,
+  "returncode": 0,
+  "reason": null,
+  "wall_seconds": 42.16705960407853,
+  "gpu_index": 1,
+  "scope": "contended functional only; no performance inference",
+  "free_MiB_samples": [
+    [
+      0.05,
+      31431
+    ],
+    [
+      5.1,
+      31164
+    ],
+    [
+      10.16,
+      31164
+    ],
+    [
+      15.21,
+      31164
+    ],
+    [
+      20.28,
+      31164
+    ],
+    [
+      25.33,
+      28586
+    ],
+    [
+      30.94,
+      23768
+    ],
+    [
+      37.17,
+      23060
+    ]
+  ],
+  "command": [
+    "/home/lyh/veladraft-pr30-audit-20261021/env/bin/python",
+    "/home/lyh/veladraft-pr30-audit-20261021/head/scripts/npu/audit_cuda.py",
+    "--repo",
+    "/home/lyh/veladraft-pr30-audit-20261021/head",
+    "--bundle",
+    "/home/lyh/veladraft-pr30-audit-20261021/bundle.pt",
+    "--config",
+    "/home/lyh/veladraft-pr30-audit-20261021/corpus/r3/config.json",
+    "--output",
+    "/home/lyh/veladraft-pr30-audit-20261021/results/domino_head_3.json",
+    "--method",
+    "domino",
+    "--steps",
+    "3",
+    "--memory-budget-gib",
+    "22"
+  ]
+}

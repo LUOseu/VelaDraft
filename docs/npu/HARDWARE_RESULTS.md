@@ -7,6 +7,15 @@ and 910b ops, Python 3.10.14, torch/TorchNPU 2.10.0 and Transformers 5.12.1.
 
 ## Scope and results
 
+The seven method runs below used `train_recipe: null`. They establish each
+method's default objective only; they do not validate DSpark's
+`upstream_dspark` or DFly's `upstream_two_stage` recipe. Their 32 query rows
+and chunk size 32 execute one chunk, and all four-prompt evaluations accepted
+zero draft tokens. Token-exact fallback therefore does not establish useful
+draft acceptance or a multi-chunk memory benefit. The separate
+[2026-10-21 reviewer follow-up](audit-2026-10-21/REPORT.md) records formal
+recipe, natural-data, capacity and CUDA evidence with its own limits.
+
 All seven methods used Qwen2.5-VL-3B-Instruct features from **real pretrained
 teacher forwards on generated geometric images**. This is a plumbing/overfit
 workload, not a natural-image task benchmark: 20 source rows, 16 train / 4 val,

@@ -1,0 +1,289 @@
+{
+  "status": "PASS",
+  "rows": [
+    {
+      "method": "dflash",
+      "status": "PASS",
+      "checks": {
+        "initial_weights_exact": true,
+        "final_weights_exact": true,
+        "all_losses_gradients_and_metrics_exact": true,
+        "all_gradient_probes_exact": true,
+        "same_config": true,
+        "no_torch_npu": true
+      },
+      "losses": [
+        13.1875,
+        16.0,
+        13.8125
+      ],
+      "valid_tokens": [
+        28.0,
+        56.0,
+        119.0
+      ],
+      "input_shapes": [
+        [
+          1,
+          297
+        ],
+        [
+          1,
+          311
+        ],
+        [
+          1,
+          320
+        ]
+      ],
+      "query_shapes": [
+        [
+          [
+            1,
+            32,
+            2048
+          ]
+        ],
+        [
+          [
+            1,
+            64,
+            2048
+          ]
+        ],
+        [
+          [
+            1,
+            136,
+            2048
+          ]
+        ]
+      ],
+      "base_json_sha256": "63ea6460f0ef4c622ba12b847c72749c4b1403c44f92de1f78385ce600fb8c01",
+      "head_json_sha256": "94da36c2332cb75da41904b35007ec7fb257235ad608675f05e35cf79962f200"
+    },
+    {
+      "method": "dspark",
+      "status": "PASS",
+      "checks": {
+        "initial_weights_exact": true,
+        "final_weights_exact": true,
+        "all_losses_gradients_and_metrics_exact": true,
+        "all_gradient_probes_exact": true,
+        "same_config": true,
+        "no_torch_npu": true
+      },
+      "losses": [
+        13.5,
+        12.8125,
+        14.375
+      ],
+      "valid_tokens": [
+        31.0,
+        63.0,
+        135.0
+      ],
+      "input_shapes": [
+        [
+          1,
+          297
+        ],
+        [
+          1,
+          311
+        ],
+        [
+          1,
+          320
+        ]
+      ],
+      "query_shapes": [
+        [
+          [
+            1,
+            32,
+            2048
+          ]
+        ],
+        [
+          [
+            1,
+            64,
+            2048
+          ]
+        ],
+        [
+          [
+            1,
+            136,
+            2048
+          ]
+        ]
+      ],
+      "base_json_sha256": "2e855b41c464d47617d97046929d43f42fcd2629492d16ea80c1f63891dd1173",
+      "head_json_sha256": "a2b739a946fa2cab9bcf6627776f2da0fcdeec647f757710c5e7f1b3470556d0"
+    },
+    {
+      "method": "dfly",
+      "status": "PASS",
+      "checks": {
+        "initial_weights_exact": true,
+        "final_weights_exact": true,
+        "all_losses_gradients_and_metrics_exact": true,
+        "all_gradient_probes_exact": true,
+        "same_config": true,
+        "no_torch_npu": true
+      },
+      "losses": [
+        12.1875,
+        16.625,
+        16.375
+      ],
+      "valid_tokens": [
+        28.0,
+        56.0,
+        119.0
+      ],
+      "input_shapes": [
+        [
+          1,
+          297
+        ],
+        [
+          1,
+          311
+        ],
+        [
+          1,
+          320
+        ]
+      ],
+      "query_shapes": [
+        [
+          [
+            1,
+            32,
+            2048
+          ]
+        ],
+        [
+          [
+            1,
+            64,
+            2048
+          ]
+        ],
+        [
+          [
+            1,
+            136,
+            2048
+          ]
+        ]
+      ],
+      "base_json_sha256": "226240edfbb5041eecb08fb09915f7209d402bbfd8a833347c3b0e4da11bd312",
+      "head_json_sha256": "eba3111eea64511ddcec8afb14f91c774bbdd5e3ed4f5125f2af631f898c773d"
+    },
+    {
+      "method": "domino",
+      "status": "PASS",
+      "checks": {
+        "initial_weights_exact": true,
+        "final_weights_exact": true,
+        "all_losses_gradients_and_metrics_exact": true,
+        "all_gradient_probes_exact": true,
+        "same_config": true,
+        "no_torch_npu": true
+      },
+      "losses": [
+        11.5,
+        16.75,
+        12.6875
+      ],
+      "valid_tokens": [
+        31.0,
+        63.0,
+        135.0
+      ],
+      "input_shapes": [
+        [
+          1,
+          297
+        ],
+        [
+          1,
+          311
+        ],
+        [
+          1,
+          320
+        ]
+      ],
+      "query_shapes": [
+        [
+          [
+            1,
+            32,
+            2048
+          ]
+        ],
+        [
+          [
+            1,
+            64,
+            2048
+          ]
+        ],
+        [
+          [
+            1,
+            136,
+            2048
+          ]
+        ]
+      ],
+      "base_json_sha256": "4c7b06d1337a59e334d7b917512145dfd7aa08a828a71d89446784c769fdbf6c",
+      "head_json_sha256": "a456762493dcbabc322beba1058bba07506aee48204aee2c2d9e1f909cb6320f"
+    }
+  ],
+  "scope": "Contended A6000 functional base/head regression only; no throughput, hardware speed, or memory performance comparison",
+  "initialization": "same seed42 freshly initialized model; equality verified by full state tensor SHA; not a trained-quality check",
+  "data": "first3 of fixed first8 natural-image teacher-feature subset; same reconstructed teacher embedding",
+  "geometry": "3 layers, hidden2048, FFN11008, heads16, KVheads2, head_dim128, block8, requested anchors256; actual query counts recorded",
+  "optimizer": "production FP32-master AdamW helper; diagnostic microbatch1/accum1,3updates,horizon100,stage75..77; source LR/betas retained",
+  "base_revision": "8cacc9db4cee10de4a7c7aedfe3b3d461b8d9716",
+  "source_tree_sha256": {
+    "base": "ebaded4b09e685540fc0fe1bd55fe8c549416219754179d431e7f15b567522c5",
+    "head": "cda679cb36d79a7cb6667eb55d969a3a9289e7f7339ec4a85e3a84b6fa49f972"
+  },
+  "harness_sha256": {
+    "audit_cuda.py": "6d75b5a7f3318b774c138aed40a0d7e423663644689bcb0cfa798eeae63d05ad",
+    "audit_common.py": "7fbc3dd8423368975b33a0abdb19ef11933f1822112eed200e99bb5d153fe24b"
+  },
+  "bundle_sha256": "576298436b607e57a4dcabfb20ecbcbf6f37dd0f964ae8c27586b462a52c89e1",
+  "materialization": {
+    "source_lite_sha256": "b430fc766303183c0be5c52a720334bba02d9b9a1dc576f464d85894fd6e7932",
+    "embedding_raw_tensor_sha256": "b84907567aa829c6f24cadbdeb68c3c44d25fc0a8be8e917fd603cb64f72810d",
+    "samples": 8,
+    "sample_ids": [
+      "000000559162",
+      "000000122001",
+      "000000036542",
+      "000000310300",
+      "000000538249",
+      "000000527092",
+      "000000393129",
+      "000000311578"
+    ],
+    "scope": "first8 natural training capture records; original teacher embedding reconstructed locally"
+  },
+  "environment": {
+    "python": "/home/lyh/veladraft-pr30-audit-20261021/env/bin/python",
+    "torch": "2.11.0+cu130",
+    "transformers": "5.12.1",
+    "isolation": "new system-site-packages venv with transformers5.12.1 installed only in overlay; existing c1vllm unchanged"
+  },
+  "gpu_reservation_wall_seconds_including_pilot_failure": 520.3657531104982,
+  "minimum_recorded_free_MiB": 22544,
+  "pilot_failure": "Preserved probe_rounding_failure files: float32 linspace rounded out-of-bounds on large matrices; integer probe indexing fixed and covered by six CPU tests; no production-model failure."
+}

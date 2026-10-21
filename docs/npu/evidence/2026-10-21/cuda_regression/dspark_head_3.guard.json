@@ -1,0 +1,67 @@
+{
+  "method": "dspark",
+  "leg": "head",
+  "steps": 3,
+  "pid": 1688247,
+  "returncode": 0,
+  "reason": null,
+  "wall_seconds": 52.38638500869274,
+  "gpu_index": 1,
+  "scope": "contended functional only; no performance inference",
+  "free_MiB_samples": [
+    [
+      0.1,
+      31431
+    ],
+    [
+      6.38,
+      31431
+    ],
+    [
+      12.32,
+      31419
+    ],
+    [
+      18.03,
+      31164
+    ],
+    [
+      23.78,
+      31164
+    ],
+    [
+      29.73,
+      31040
+    ],
+    [
+      35.49,
+      28258
+    ],
+    [
+      41.3,
+      23020
+    ],
+    [
+      47.39,
+      22544
+    ]
+  ],
+  "command": [
+    "/home/lyh/veladraft-pr30-audit-20261021/env/bin/python",
+    "/home/lyh/veladraft-pr30-audit-20261021/head/scripts/npu/audit_cuda.py",
+    "--repo",
+    "/home/lyh/veladraft-pr30-audit-20261021/head",
+    "--bundle",
+    "/home/lyh/veladraft-pr30-audit-20261021/bundle.pt",
+    "--config",
+    "/home/lyh/veladraft-pr30-audit-20261021/corpus/r3/config.json",
+    "--output",
+    "/home/lyh/veladraft-pr30-audit-20261021/results/dspark_head_3.json",
+    "--method",
+    "dspark",
+    "--steps",
+    "3",
+    "--memory-budget-gib",
+    "22"
+  ]
+}

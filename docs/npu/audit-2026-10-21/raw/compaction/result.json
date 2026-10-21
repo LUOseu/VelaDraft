@@ -1,0 +1,6 @@
+{
+  "status": "FAILED",
+  "error": "Fixed numerical gate failed; no performance claim permitted",
+  "traceback": "Traceback (most recent call last):\n  File \"/root/veladraft-npu/scripts/npu/audit_compaction.py\", line 249, in main\n    if a.phase in ('parity','all'):run_parity(module,bundle,plans,a.out,binding)\n  File \"/root/veladraft-npu/scripts/npu/audit_compaction.py\", line 186, in run_parity\n    if not all(x['passed'] for x in results):raise RuntimeError('Fixed numerical gate failed; no performance claim permitted')\nRuntimeError: Fixed numerical gate failed; no performance claim permitted\n",
+  "elapsed_seconds": 64.38437477964908
+}

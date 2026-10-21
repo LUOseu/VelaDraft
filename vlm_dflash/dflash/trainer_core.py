@@ -44,6 +44,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+def _sum_nonzero_weights(weights: torch.Tensor) -> torch.Tensor:
+    """Reduce the same ordered effective terms regardless of zero padding.
+
+    Recipe compaction changes the zero-padded layout. The legacy decayed-CE
+    weight is reporting-only for those recipes, but shape-dependent FP32
+    reductions can otherwise report different totals for identical terms.
+    """
+    flat = weights.reshape(-1)
+    return flat[flat != 0].sum()
+
 if TYPE_CHECKING:
     from torch.nn.attention.flex_attention import BlockMask
 
@@ -53,9 +64,11 @@ from .mask import (
     create_dflash_sdpa_mask,
     estimate_dflash_attention_memory,
 )
+from .chunked_attention import AttentionRuntimeStats
 from .decay_loss import DFlashDecayLoss
 from .draft_model import Qwen3DFlashDraftModel
 from ..objectives import CONFIDENCE_LOGITS_AUX_KEY, TeacherLogitsStream, recipe_loss
+from .. import runtime
 
 
 def _context_doc_ids(seq_lens: torch.Tensor, seq_len: int, device: torch.device) -> torch.Tensor:
@@ -752,8 +765,21 @@ class DFlashTrainerModule(nn.Module):
             )
         return anchor_positions, block_keep_mask, noise_embedding, full_position_ids, attn_mask, prefix_lengths
 
+    def reset_attention_runtime_stats(self) -> None:
+        """Start a local measurement window after warmup; never changes model state."""
+        for layer in getattr(self.draft_model, "layers", ()):
+            attention = getattr(layer, "self_attn", None)
+            stats = getattr(attention, "attention_runtime_stats", None)
+            if stats is not None:
+                stats.reset()
+                attention.last_attention_backend_info = None
+
     def attention_runtime_report(self) -> dict:
-        """Effective attention path selected by the most recent forward."""
+        """Snapshot latest layer paths plus cumulative local measurement-window counts.
+
+        See ``measurement_window.count_semantics`` before interpreting counts.
+        This does not measure hardware memory, backward kernels, or update time.
+        """
         layers = getattr(self.draft_model, "layers", ())
         infos = [
             info
@@ -763,16 +789,40 @@ class DFlashTrainerModule(nn.Module):
             )
             if info
         ]
+        window = AttentionRuntimeStats()
+        for layer in layers:
+            stats = getattr(getattr(layer, "self_attn", None), "attention_runtime_stats", None)
+            if stats is not None:
+                window.merge(stats.snapshot())
         effective = sorted({str(info.get("effective_backend")) for info in infos})
         fallback_reasons = sorted(
             {str(info["fallback_reason"]) for info in infos if info.get("fallback_reason")}
         )
+        device = next(self.draft_model.parameters()).device
+        compile_requested = bool(self.recipe_compile_tv_kl)
+        compile_allowed = runtime.compile_supported(device)
+        compile_gate = {
+            "requested": compile_requested,
+            "effective": compile_requested and compile_allowed,
+            "reason": (
+                "not_requested" if not compile_requested else
+                f"runtime.compile_supported disabled for {device.type}" if not compile_allowed else
+                "device_gate_allows_compile; actual use depends on active objective"
+            ),
+            "scope": "device_gate_not_execution_evidence",
+        }
         return {
             "requested_backend": self.attention_backend,
             "effective_backends": effective,
+            "training_switches": {"recipe_compile_tv_kl": compile_gate},
             "fallback_reasons": fallback_reasons,
             "chunked_layers": sum(1 for info in infos if info.get("activation_checkpointing")),
             "memory_plan": self.last_attention_memory_plan,
+            "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+            "measurement_window": window.snapshot(),
+            "mixed_backend": any(info.get("mixed_backend", False) for info in infos) or len(effective) > 1,
+            "fused_chunks": sum(info.get("fused_chunks", 0) for info in infos),
+            "fallback_chunks": sum(info.get("fallback_chunks", 0) for info in infos),
         }
 
     def _apply_algorithm_terms(
@@ -1140,7 +1190,11 @@ class DFlashTrainerModule(nn.Module):
                 -torch.arange(slots, device=pred_mask.device, dtype=pred_mask.dtype) / self.loss_decay_gamma
             )
             loss_weights = loss_weights * depth_weights
-        loss_weight = loss_weights.sum()
+        loss_weight = (
+            _sum_nonzero_weights(loss_weights)
+            if self._recipe_active() and self.supports_recipe_row_compaction
+            else loss_weights.sum()
+        )
 
         valid_tokens = count_per_pos.sum()
         correct_tokens = correct_per_pos.sum()

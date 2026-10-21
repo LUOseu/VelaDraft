@@ -1,0 +1,12 @@
+{
+  "python": "3.12.13 | packaged by conda-forge | (main, Mar  5 2026, 16:50:00) [GCC 14.3.0]",
+  "executable": "/home/lyh/veladraft-pr30-audit-20261021/env/bin/python",
+  "torch": "2.11.0+cu130",
+  "cuda": "13.0",
+  "transformers": "5.12.1",
+  "transformers_path": "/home/lyh/veladraft-pr30-audit-20261021/env/lib/python3.12/site-packages/transformers/__init__.py",
+  "torch_npu_installed": false,
+  "original_environment_transformers": "5.11.0",
+  "host": "a6000xuyang",
+  "scope": "existing CUDA stack, isolated system-site-packages overlay installed transformers5.12.1 only; active environment untouched"
+}

@@ -1,0 +1,11 @@
+{
+  "tests": 841,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 6,
+  "passed": 835,
+  "source": "runs/npu/audit-20261021/cpu_tests.xml",
+  "sha256": "4d7fa8401ba7a51eca7304b4916a4701e5725ac1f133dad07f8377b1d367bc91",
+  "scope": "Full CPU suite at this saved run; later targeted tests are separate",
+  "status": "PASS"
+}

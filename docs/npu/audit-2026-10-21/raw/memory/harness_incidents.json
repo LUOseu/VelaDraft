@@ -1,0 +1,10 @@
+{
+  "incidents": [
+    {
+      "phase": "metadata before model construction or training",
+      "issue": "Remote deployed source tree lacks .git; initial git rev-parse raised CalledProcessError.",
+      "resolution": "Git revision nullable; per-file source SHA256 stored. Natural matrix restarted before measuring any rows.",
+      "classification": "harness provenance failure, not hardware or model failure"
+    }
+  ]
+}

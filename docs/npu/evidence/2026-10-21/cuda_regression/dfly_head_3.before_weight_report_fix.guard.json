@@ -1,0 +1,71 @@
+{
+  "method": "dfly",
+  "leg": "head",
+  "steps": 3,
+  "pid": 1692395,
+  "returncode": 0,
+  "reason": null,
+  "wall_seconds": 57.43945695832372,
+  "gpu_index": 1,
+  "scope": "contended functional only; no performance inference",
+  "free_MiB_samples": [
+    [
+      0.81,
+      31431
+    ],
+    [
+      5.97,
+      31431
+    ],
+    [
+      11.58,
+      31164
+    ],
+    [
+      17.36,
+      31164
+    ],
+    [
+      23.18,
+      31164
+    ],
+    [
+      29.0,
+      28928
+    ],
+    [
+      34.88,
+      28928
+    ],
+    [
+      41.0,
+      28928
+    ],
+    [
+      46.76,
+      24360
+    ],
+    [
+      52.44,
+      23962
+    ]
+  ],
+  "command": [
+    "/home/lyh/veladraft-pr30-audit-20261021/env/bin/python",
+    "/home/lyh/veladraft-pr30-audit-20261021/head/scripts/npu/audit_cuda.py",
+    "--repo",
+    "/home/lyh/veladraft-pr30-audit-20261021/head",
+    "--bundle",
+    "/home/lyh/veladraft-pr30-audit-20261021/bundle.pt",
+    "--config",
+    "/home/lyh/veladraft-pr30-audit-20261021/corpus/r3/config.json",
+    "--output",
+    "/home/lyh/veladraft-pr30-audit-20261021/results/dfly_head_3.json",
+    "--method",
+    "dfly",
+    "--steps",
+    "3",
+    "--memory-budget-gib",
+    "22"
+  ]
+}

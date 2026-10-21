@@ -1,0 +1,98 @@
+{
+  "frozen_shapes": [
+    [
+      1024,
+      64
+    ],
+    [
+      4096,
+      256
+    ],
+    [
+      4096,
+      512
+    ]
+  ],
+  "block_size": 8,
+  "microbatch": 1,
+  "model": "Qwen2.5-VL-3B formal DFlash 2048 hidden/11008 FFN/16Q/2KV/3layers",
+  "chunk_size": 128,
+  "modes": [
+    "dense",
+    "dense_checkpoint",
+    "chunked_checkpoint"
+  ],
+  "warmup_updates": 5,
+  "measured_updates": 3,
+  "limitations": [
+    "Shape-only data uses random hidden/input IDs and actual frozen target embedding/head. It does not measure natural-image training.",
+    "Small correctness saved first-update output/loss/all gradients; its CPU copy and disk save overhead is included in first pilot timing, excluded from measured3 updates.",
+    "Natural samples only <=825 tokens; padding to4096 is not a4096 real context.",
+    "No full-decoder/MLP checkpoint. Checkpoint scope only mask materialization plus SDPA; repeated K/V outside.",
+    "All pre-disconnection NPU rows used direct BF16 AdamW. Archived preflight_BF16optimizer_not_final; not final capacity/HBM evidence. The final complete FP32-master matrix was rerun after SSH restoration and is recorded in summary.json."
+  ],
+  "preflight_BF16optimizer_not_final": [
+    {
+      "file": "shape-1024-64-chunked_checkpoint.json",
+      "status": "pass",
+      "mode": "chunked_checkpoint",
+      "mean_update_seconds": 0.10111329642434914,
+      "peak_hbm_bytes": 3119245824,
+      "first5_estimate": {
+        "seconds": [
+          1.761608224362135,
+          0.14411904104053974,
+          0.0994666488841176,
+          0.09886956587433815,
+          0.09851446375250816
+        ],
+        "mean_seconds": 0.44051558878272773,
+        "projected_remaining_seconds": 1.3215467663481832
+      },
+      "total_seconds": 31.8549660500139
+    },
+    {
+      "file": "shape-1024-64-dense.json",
+      "status": "pass",
+      "mode": "dense",
+      "mean_update_seconds": 0.046389599641164146,
+      "peak_hbm_bytes": 3115579392,
+      "first5_estimate": {
+        "seconds": [
+          1.6999128432944417,
+          0.09252010565251112,
+          0.04827588610351086,
+          0.04870662838220596,
+          0.04688504617661238
+        ],
+        "mean_seconds": 0.3872601019218564,
+        "projected_remaining_seconds": 1.1617803057655691
+      },
+      "total_seconds": 25.505596262402833
+    },
+    {
+      "file": "shape-1024-64-dense_checkpoint.json",
+      "status": "pass",
+      "mode": "dense_checkpoint",
+      "mean_update_seconds": 0.05630248629798492,
+      "peak_hbm_bytes": 3115840512,
+      "first5_estimate": {
+        "seconds": [
+          1.674096180126071,
+          0.09918634872883558,
+          0.05749691464006901,
+          0.057109732180833817,
+          0.0557648129761219
+        ],
+        "mean_seconds": 0.38873079773038627,
+        "projected_remaining_seconds": 1.1661923931911589
+      },
+      "total_seconds": 25.321167985908687
+    }
+  ],
+  "optimizer": "Production audit_common.create_optimizer/optimizer_step FP32 masters/moments, BF16 live parameters. Formal lr6e-4 betas.9/.95 wd0 warmup.04 minlr.1; fixed8update diagnostic horizon.",
+  "checkpoint_scope": "Mask materialization plus SDPA only. K/V head repetition is outside checkpoint. No MLP, projection, whole-layer, or loss checkpoint.",
+  "baseline_scope": "Harness dense comparators use the same DFlashMaskSpec and explicit SDPA/GQA dispatch as chunked, with one full-query call per layer; they are not the stock HF dense-mask-once trainer dispatch. Dense masks are materialized separately per attention layer.",
+  "common_sha256": "7fbc3dd8423368975b33a0abdb19ef11933f1822112eed200e99bb5d153fe24b",
+  "execution_environment_note": "NPU1 was exclusively assigned to B. Separate recipe work ran concurrently on NPU0 and shared host CPU/RAM. Host-side concurrency may affect update timing; all B cells completed, no B OOM. No speedup or discovered capacity-boundary claim."
+}

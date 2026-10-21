@@ -299,6 +299,10 @@ def test_fake_npu_fusion_receives_inverted_mask_and_matches_reference(monkeypatc
     )
     torch.testing.assert_close(fused, dense, rtol=1e-4, atol=1e-5)
     assert info["effective_backend"] == "npu_fusion"
+    assert info["fused_chunks"] == info["chunks"]
+    assert info["fallback_chunks"] == 0
+    assert info["mixed_backend"] is False
+    assert info["fallback_mode"] == "strict"
     assert info["fallback_reason"] is None
     assert captured and all(item["layout"] == "BSH" and item["sparse_mode"] == 0 for item in captured)
     # Ascend: True = masked. The first chunk's mask is the exact inverse of SDPA visibility.
@@ -332,6 +336,10 @@ def test_fake_npu_fusion_fallback_is_explicit_and_can_be_disabled(monkeypatch):
     torch.testing.assert_close(output, dense, rtol=1e-4, atol=1e-5)
     assert info["effective_backend"] == "sdpa_chunked"
     assert "simulated unsupported shape" in info["fallback_reason"]
+    assert info["fused_chunks"] == 0
+    assert info["fallback_chunks"] == info["chunks"]
+    assert info["mixed_backend"] is False
+    assert info["fallback_mode"] == "profile"
 
     strict = DFlashMaskSpec(
         spec.anchor_positions,

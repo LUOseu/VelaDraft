@@ -1,3 +1,5 @@
+# Default-objective engineering smoke (train_recipe is absent).
+# Formal upstream_dspark acceptance: scripts/npu/audit_recipes.py.
 algorithm:
   name: dspark
   dspark:

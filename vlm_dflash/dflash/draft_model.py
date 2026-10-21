@@ -53,7 +53,7 @@ from transformers.models.qwen3.modeling_qwen3 import (
 
 from ..rope_layout import mrope_section_error, partial_rotary_dim
 from .. import runtime
-from .chunked_attention import npu_fusion_chunked_attention, sdpa_chunked_attention
+from .chunked_attention import AttentionRuntimeStats, npu_fusion_chunked_attention, sdpa_chunked_attention
 from .mask import DFlashMaskSpec
 
 
@@ -344,6 +344,7 @@ class Qwen3DFlashAttention(nn.Module):
         self.k_norm = Qwen3RMSNorm(self.head_dim, eps=config.rms_norm_eps)
         self.sliding_window = None
         self.last_attention_backend_info: dict | None = None
+        self.attention_runtime_stats = AttentionRuntimeStats()
 
     def forward(
         self,
@@ -421,7 +422,6 @@ class Qwen3DFlashAttention(nn.Module):
                 attn_output, backend_info = sdpa_chunked_attention(
                     q, k, v, attention_mask, dropout_p=dropout, scale=self.scaling
                 )
-            self.last_attention_backend_info = backend_info
             # Both chunked helpers return [B, H, Q, D]; the shared tail below
             # (and every transformers SDPA implementation) expects [B, Q, H, D]
             # before flattening heads into the output projection.
@@ -462,6 +462,15 @@ class Qwen3DFlashAttention(nn.Module):
                     sliding_window=self.sliding_window,
                     **attn_kwargs,
                 )
+            backend_info = {
+                "requested_backend": self.config._attn_implementation,
+                "effective_backend": self.config._attn_implementation,
+                "chunks": 0,
+                "activation_checkpointing": False,
+                "fallback_reason": None,
+            }
+        self.last_attention_backend_info = backend_info
+        self.attention_runtime_stats.record(backend_info)
         attn_output = attn_output.reshape(bsz, q_len, -1)
         return self.o_proj(attn_output), attn_weights
 
@@ -1882,9 +1891,23 @@ class Qwen3DFlashDraftModel(Qwen3PreTrainedModel):
                                 start, block_output_ids
                             )
 
+            # Acceptance metrics describe emitted positions. A verified block
+            # may contain EOS before its end, so budget-only clipping would
+            # count accepted drafts that final output truncation discards.
+            count_max_length = max_length
+            if stop_token_ids:
+                committed_ids = torch.cat(
+                    (block_output_ids[:, : acceptance_length + 1],
+                     posterior[:, acceptance_length : acceptance_length + 1]),
+                    dim=1,
+                )
+                stop_ids = torch.tensor(stop_token_ids, device=committed_ids.device)
+                stop_offsets = torch.isin(committed_ids[0], stop_ids).nonzero(as_tuple=True)[0]
+                if stop_offsets.numel():
+                    count_max_length = min(max_length, start + int(stop_offsets[0]) + 1)
             round_draft_tokens, round_accepted_tokens = _bounded_acceptance_counts(
                 start=start,
-                max_length=max_length,
+                max_length=count_max_length,
                 block_size=block_output_ids.shape[1],
                 acceptance_length=int(acceptance_length),
             )

@@ -1,0 +1,767 @@
+{
+  "method": "dspark",
+  "status": "pass",
+  "source_config": "/root/veladraft-npu/configs/dspark/qwen2_5_vl_3b_2k_recipe.yaml",
+  "horizon": 10,
+  "boundary_step": null,
+  "scope": "natural_capture_v2_offline_diagnostic_microbatch_one",
+  "config": {
+    "algorithm": {
+      "name": "dspark",
+      "train_recipe": "upstream_dspark",
+      "dspark": {
+        "markov_rank": 256,
+        "markov_head_type": "vanilla",
+        "enable_confidence_head": true,
+        "confidence_head_with_markov": true,
+        "confidence_head_alpha": 1.0,
+        "sample_from_anchor": true
+      }
+    },
+    "run": {
+      "name": "qwen25vl3b_dspark_2k_recipe",
+      "dir": "runs/qwen25vl3b_dspark_2k_recipe"
+    },
+    "target": {
+      "model": "/root/veladraft-models/Qwen2.5-VL-3B-Instruct",
+      "dtype": "bfloat16",
+      "attn_implementation": "sdpa",
+      "device": "npu:0",
+      "local_files_only": true,
+      "image_min_pixels": 200704,
+      "image_max_pixels": 1003520
+    },
+    "dataset": {
+      "source": "llava_instruct",
+      "annotation": "${VLM_DFLASH_LLAVA_JSON:-data/llava_instruct_150k.json}",
+      "images_dir": "${VLM_DFLASH_COCO_IMAGES:-data/coco/train2017}",
+      "slice": 2000,
+      "val_size": 128,
+      "seed": 42,
+      "min_answer_chars": 600
+    },
+    "regen": {
+      "max_new_tokens": 160,
+      "min_response_tokens": 128,
+      "batch_size": 8,
+      "temperature": 0.0
+    },
+    "capture": {
+      "seq_length": 2048,
+      "shard_size": 32,
+      "dtype": "bfloat16",
+      "store_final_hidden": true,
+      "visual_path_check": true,
+      "visual_check_samples": 2
+    },
+    "drafter": {
+      "num_hidden_layers": 3,
+      "block_size": 8,
+      "num_anchors": 256,
+      "loss_decay_gamma": 7.0,
+      "mask_token_id": 151669,
+      "attention_backend": "sdpa_chunked",
+      "spatial_rope_enabled": true,
+      "spatial_rope_mode": "replace",
+      "spatial_rope_sections": [
+        16,
+        24,
+        24
+      ],
+      "attention_chunk_size": 128,
+      "capture_layer_ids": [
+        1,
+        9,
+        17,
+        25,
+        33
+      ]
+    },
+    "train": {
+      "micro_batch_size": 1,
+      "grad_accumulation_steps": 1,
+      "num_epochs": 12,
+      "lr": 0.0006,
+      "betas": [
+        0.9,
+        0.95
+      ],
+      "weight_decay": 0.0,
+      "warmup_ratio": 0.04,
+      "min_lr_ratio": 0.1,
+      "max_grad_norm": 1.0,
+      "log_every_steps": 1,
+      "seed": 42,
+      "device": "npu:0",
+      "overfit_sanity": {
+        "enabled": false
+      },
+      "num_workers": 0,
+      "pin_memory": false,
+      "non_blocking": false,
+      "draft_dtype": "bfloat16",
+      "feature_mode": "offline"
+    },
+    "eval": {
+      "verification": "sequential",
+      "strict_parallel_margin": 2.0,
+      "num_prompts": 128,
+      "max_new_tokens": 128,
+      "sequential_target_verification": true,
+      "verify_sdpa_backend": "parity",
+      "parallel_diagnostic_prompts": 16,
+      "checkpoints": [
+        "ckpt_final.pt",
+        "ckpt_init.pt"
+      ]
+    }
+  },
+  "checkpoint_reload_steps": [],
+  "geometry": {
+    "hidden_size": 2048,
+    "intermediate_size": 11008,
+    "num_hidden_layers": 3,
+    "num_attention_heads": 16,
+    "num_key_value_heads": 2
+  },
+  "summary": {
+    "steps": 10,
+    "first10_mean_loss": 13.5,
+    "last10_mean_loss": 6.84375,
+    "final_loss": 6.84375,
+    "loss_decreased": true,
+    "nan_seen": false,
+    "skipped_no_anchor_batches": 0,
+    "resumed_from_step": 0,
+    "resume_fast_forward_batches": 0,
+    "resume_fast_forward_reduced_cost": false,
+    "wall_seconds": 3.6154468059539795,
+    "epoch_wall_seconds": [
+      2.797074317932129
+    ],
+    "peak_gpu_mem_gb": null,
+    "peak_accelerator_mem_gb": 8.786452992,
+    "gpu_name": null,
+    "device_name": "Ascend910B3",
+    "device": "npu:0",
+    "device_type": "npu",
+    "backend": "npu",
+    "attention": {
+      "requested_backend": "sdpa_chunked",
+      "effective_backends": [
+        "sdpa_chunked"
+      ],
+      "training_switches": {
+        "recipe_compile_tv_kl": {
+          "requested": false,
+          "effective": false,
+          "reason": "not_requested",
+          "scope": "device_gate_not_execution_evidence"
+        }
+      },
+      "fallback_reasons": [],
+      "chunked_layers": 3,
+      "memory_plan": {
+        "batch_size": 1,
+        "num_blocks": 6,
+        "block_size": 8,
+        "context_len": 389,
+        "query_len": 48,
+        "kv_len": 437,
+        "num_heads": 16,
+        "head_dim": 128,
+        "dense": {
+          "mask_bytes": 41952,
+          "score_bytes": 1342464,
+          "total_bytes": 1384416
+        },
+        "dense_total_gb": 0.0014,
+        "chunked": {
+          "query_chunk_size": 48,
+          "mask_bytes": 41952,
+          "score_bytes": 1342464,
+          "total_bytes": 1384416
+        },
+        "chunked_total_gb": 0.0014,
+        "chunks": 1,
+        "requested_backend": "sdpa_chunked"
+      },
+      "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+      "measurement_window": {
+        "completed_attention_calls": 30,
+        "chunks": 51,
+        "fused_chunks": 0,
+        "fallback_chunks": 0,
+        "sdpa_chunks": 51,
+        "effective_backends": [
+          "sdpa_chunked"
+        ],
+        "fallback_reasons": [],
+        "mixed_backend": false,
+        "count_semantics": "completed attention calls across layers; excludes internal chunk checkpoint recomputation, failed calls and backward kernels; completed external layer replays count as calls; not model-forward or optimizer-update counts"
+      },
+      "mixed_backend": false,
+      "fused_chunks": 0,
+      "fallback_chunks": 0
+    }
+  },
+  "attention": {
+    "requested_backend": "sdpa_chunked",
+    "effective_backends": [
+      "sdpa_chunked"
+    ],
+    "training_switches": {
+      "recipe_compile_tv_kl": {
+        "requested": false,
+        "effective": false,
+        "reason": "not_requested",
+        "scope": "device_gate_not_execution_evidence"
+      }
+    },
+    "fallback_reasons": [],
+    "chunked_layers": 3,
+    "memory_plan": {
+      "batch_size": 1,
+      "num_blocks": 6,
+      "block_size": 8,
+      "context_len": 389,
+      "query_len": 48,
+      "kv_len": 437,
+      "num_heads": 16,
+      "head_dim": 128,
+      "dense": {
+        "mask_bytes": 41952,
+        "score_bytes": 1342464,
+        "total_bytes": 1384416
+      },
+      "dense_total_gb": 0.0014,
+      "chunked": {
+        "query_chunk_size": 48,
+        "mask_bytes": 41952,
+        "score_bytes": 1342464,
+        "total_bytes": 1384416
+      },
+      "chunked_total_gb": 0.0014,
+      "chunks": 1,
+      "requested_backend": "sdpa_chunked"
+    },
+    "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+    "measurement_window": {
+      "completed_attention_calls": 30,
+      "chunks": 51,
+      "fused_chunks": 0,
+      "fallback_chunks": 0,
+      "sdpa_chunks": 51,
+      "effective_backends": [
+        "sdpa_chunked"
+      ],
+      "fallback_reasons": [],
+      "mixed_backend": false,
+      "count_semantics": "completed attention calls across layers; excludes internal chunk checkpoint recomputation, failed calls and backward kernels; completed external layer replays count as calls; not model-forward or optimizer-update counts"
+    },
+    "mixed_backend": false,
+    "fused_chunks": 0,
+    "fallback_chunks": 0
+  },
+  "history": [
+    {
+      "step": 1,
+      "loss": 13.5,
+      "accuracy": 0.0,
+      "accept_len": 1.0,
+      "valid_tokens": 31,
+      "lr": 0.0006,
+      "grad_norm": 140.83905029296875,
+      "markov_bias_abs_mean": 0.00457763671875,
+      "confidence_pred_mean": 0.6238744258880615,
+      "lk_loss": 12.544317245483398,
+      "confidence_bce": 0.9778454303741455,
+      "confidence_target_mean": 0.0033313343301415443,
+      "confidence_abs_error": 0.6205430626869202,
+      "recipe_stage": 0.0,
+      "slot0_accuracy": 0.0
+    },
+    {
+      "step": 2,
+      "loss": 15.9375,
+      "accuracy": 0.0,
+      "accept_len": 1.0,
+      "valid_tokens": 63,
+      "lr": 0.0005837170076121951,
+      "grad_norm": 52.72971725463867,
+      "markov_bias_abs_mean": 0.004608154296875,
+      "confidence_pred_mean": 0.0017201169393956661,
+      "lk_loss": 15.891761779785156,
+      "confidence_bce": 0.037664685398340225,
+      "confidence_target_mean": 0.007037411443889141,
+      "confidence_abs_error": 0.007324851118028164,
+      "recipe_stage": 0.0,
+      "slot0_accuracy": 0.0
+    },
+    {
+      "step": 3,
+      "loss": 17.5,
+      "accuracy": 0.0,
+      "accept_len": 1.0,
+      "valid_tokens": 135,
+      "lr": 0.000536831999642124,
+      "grad_norm": 34.72759246826172,
+      "markov_bias_abs_mean": 0.004638671875,
+      "confidence_pred_mean": 0.009339762851595879,
+      "lk_loss": 17.519487380981445,
+      "confidence_bce": 0.016522737219929695,
+      "confidence_target_mean": 0.0015277571510523558,
+      "confidence_abs_error": 0.007812005467712879,
+      "recipe_stage": 0.0,
+      "slot0_accuracy": 0.0
+    },
+    {
+      "step": 4,
+      "loss": 13.6875,
+      "accuracy": 0.2522522509098053,
+      "accept_len": 1.2142857313156128,
+      "valid_tokens": 111,
+      "lr": 0.00046499999999999997,
+      "grad_norm": 15.964105606079102,
+      "markov_bias_abs_mean": 0.00469970703125,
+      "confidence_pred_mean": 0.0007552492315880954,
+      "lk_loss": 12.931121826171875,
+      "confidence_bce": 0.7270015478134155,
+      "confidence_target_mean": 0.10345210134983063,
+      "confidence_abs_error": 0.1028159037232399,
+      "recipe_stage": 0.0,
+      "slot0_accuracy": 0.2142857164144516
+    },
+    {
+      "step": 5,
+      "loss": 6.375,
+      "accuracy": 0.15041783452033997,
+      "accept_len": 1.1555556058883667,
+      "valid_tokens": 359,
+      "lr": 0.0003768850079700712,
+      "grad_norm": 4.496400833129883,
+      "markov_bias_abs_mean": 0.004638671875,
+      "confidence_pred_mean": 0.0027487543411552906,
+      "lk_loss": 5.907683849334717,
+      "confidence_bce": 0.47851991653442383,
+      "confidence_target_mean": 0.08064279705286026,
+      "confidence_abs_error": 0.0781334713101387,
+      "recipe_stage": 0.0,
+      "slot0_accuracy": 0.15555556118488312
+    },
+    {
+      "step": 6,
+      "loss": 7.46875,
+      "accuracy": 0.07042253762483597,
+      "accept_len": 1.111111044883728,
+      "valid_tokens": 71,
+      "lr": 0.0002831149920299288,
+      "grad_norm": 4.941483497619629,
+      "markov_bias_abs_mean": 0.004638671875,
+      "confidence_pred_mean": 0.011966176331043243,
+      "lk_loss": 7.378134250640869,
+      "confidence_bce": 0.08299408107995987,
+      "confidence_target_mean": 0.016755206510424614,
+      "confidence_abs_error": 0.010076199658215046,
+      "recipe_stage": 0.0,
+      "slot0_accuracy": 0.1111111119389534
+    },
+    {
+      "step": 7,
+      "loss": 6.78125,
+      "accuracy": 0.0,
+      "accept_len": 1.0,
+      "valid_tokens": 607,
+      "lr": 0.00019500000000000005,
+      "grad_norm": 2.3265647888183594,
+      "markov_bias_abs_mean": 0.004608154296875,
+      "confidence_pred_mean": 0.028808297589421272,
+      "lk_loss": 6.6734490394592285,
+      "confidence_bce": 0.11232830584049225,
+      "confidence_target_mean": 0.0234240610152483,
+      "confidence_abs_error": 0.016564680263400078,
+      "recipe_stage": 0.0,
+      "slot0_accuracy": 0.0
+    },
+    {
+      "step": 8,
+      "loss": 6.34375,
+      "accuracy": 0.0,
+      "accept_len": 1.0,
+      "valid_tokens": 15,
+      "lr": 0.00012316800035787597,
+      "grad_norm": 2.2930715084075928,
+      "markov_bias_abs_mean": 0.00494384765625,
+      "confidence_pred_mean": 0.044327687472105026,
+      "lk_loss": 6.188957214355469,
+      "confidence_bce": 0.16894026100635529,
+      "confidence_target_mean": 0.037874605506658554,
+      "confidence_abs_error": 0.026440216228365898,
+      "recipe_stage": 0.0,
+      "slot0_accuracy": 0.0
+    },
+    {
+      "step": 9,
+      "loss": 6.25,
+      "accuracy": 0.12820512056350708,
+      "accept_len": 1.0,
+      "valid_tokens": 39,
+      "lr": 7.628299238780474e-05,
+      "grad_norm": 2.5543644428253174,
+      "markov_bias_abs_mean": 0.004730224609375,
+      "confidence_pred_mean": 0.05417947098612785,
+      "lk_loss": 6.062048435211182,
+      "confidence_bce": 0.19795845448970795,
+      "confidence_target_mean": 0.055165909230709076,
+      "confidence_abs_error": 0.05838105082511902,
+      "recipe_stage": 0.0,
+      "slot0_accuracy": 0.0
+    },
+    {
+      "step": 10,
+      "loss": 6.84375,
+      "accuracy": 0.0,
+      "accept_len": 1.0,
+      "valid_tokens": 47,
+      "lr": 5.9999999999999995e-05,
+      "grad_norm": 2.292457342147827,
+      "markov_bias_abs_mean": 0.004730224609375,
+      "confidence_pred_mean": 0.05840252339839935,
+      "lk_loss": 6.580102443695068,
+      "confidence_bce": 0.25831490755081177,
+      "confidence_target_mean": 0.07825928181409836,
+      "confidence_abs_error": 0.05990436300635338,
+      "recipe_stage": 0.0,
+      "slot0_accuracy": 0.0
+    }
+  ],
+  "continuous_observation": {
+    "recipe": {
+      "name": "upstream_dspark",
+      "scheme": "vlm-dflash-recipe-v1",
+      "cold_start_fraction": 1.0,
+      "needs_teacher": true,
+      "stages": [
+        {
+          "name": "verifier_kl_confidence",
+          "weighting": "decay",
+          "ce_coef": 0.0,
+          "lk_coef": 1.0,
+          "e2e_tv_coef": 0.0,
+          "lk_loss_type": "kl",
+          "lk_eta": 3.0,
+          "dpace_alpha": 0.5,
+          "confidence_coef": 1.0
+        }
+      ]
+    },
+    "observations": [
+      {
+        "call": 1,
+        "stage_index": 0,
+        "stage": {
+          "name": "verifier_kl_confidence",
+          "weighting": "decay",
+          "ce_coef": 0.0,
+          "lk_coef": 1.0,
+          "e2e_tv_coef": 0.0,
+          "lk_loss_type": "kl",
+          "lk_eta": 3.0,
+          "dpace_alpha": 0.5,
+          "confidence_coef": 1.0
+        },
+        "loss": 13.5,
+        "valid_tokens": 31,
+        "loss_weight": 20.097347259521484,
+        "valid_blocks": 4,
+        "teacher_calls": 1,
+        "teacher_rows": 32,
+        "components": {
+          "markov_bias_abs_mean": 0.00457763671875,
+          "confidence_pred_mean": 0.6238744258880615,
+          "lk_loss": 12.544317245483398,
+          "confidence_bce": 0.9778454303741455,
+          "confidence_target_mean": 0.0033313343301415443,
+          "confidence_abs_error": 0.6205430626869202,
+          "recipe_stage": 0.0
+        }
+      },
+      {
+        "call": 2,
+        "stage_index": 0,
+        "stage": {
+          "name": "verifier_kl_confidence",
+          "weighting": "decay",
+          "ce_coef": 0.0,
+          "lk_coef": 1.0,
+          "e2e_tv_coef": 0.0,
+          "lk_loss_type": "kl",
+          "lk_eta": 3.0,
+          "dpace_alpha": 0.5,
+          "confidence_coef": 1.0
+        },
+        "loss": 15.9375,
+        "valid_tokens": 63,
+        "loss_weight": 40.56257247924805,
+        "valid_blocks": 8,
+        "teacher_calls": 1,
+        "teacher_rows": 64,
+        "components": {
+          "markov_bias_abs_mean": 0.004608154296875,
+          "confidence_pred_mean": 0.0017201169393956661,
+          "lk_loss": 15.891761779785156,
+          "confidence_bce": 0.037664685398340225,
+          "confidence_target_mean": 0.007037411443889141,
+          "confidence_abs_error": 0.007324851118028164,
+          "recipe_stage": 0.0
+        }
+      },
+      {
+        "call": 3,
+        "stage_index": 0,
+        "stage": {
+          "name": "verifier_kl_confidence",
+          "weighting": "decay",
+          "ce_coef": 0.0,
+          "lk_coef": 1.0,
+          "e2e_tv_coef": 0.0,
+          "lk_loss_type": "kl",
+          "lk_eta": 3.0,
+          "dpace_alpha": 0.5,
+          "confidence_coef": 1.0
+        },
+        "loss": 17.5,
+        "valid_tokens": 135,
+        "loss_weight": 86.60932922363281,
+        "valid_blocks": 17,
+        "teacher_calls": 1,
+        "teacher_rows": 136,
+        "components": {
+          "markov_bias_abs_mean": 0.004638671875,
+          "confidence_pred_mean": 0.009339762851595879,
+          "lk_loss": 17.519487380981445,
+          "confidence_bce": 0.016522737219929695,
+          "confidence_target_mean": 0.0015277571510523558,
+          "confidence_abs_error": 0.007812005467712879,
+          "recipe_stage": 0.0
+        }
+      },
+      {
+        "call": 4,
+        "stage_index": 0,
+        "stage": {
+          "name": "verifier_kl_confidence",
+          "weighting": "decay",
+          "ce_coef": 0.0,
+          "lk_coef": 1.0,
+          "e2e_tv_coef": 0.0,
+          "lk_loss_type": "kl",
+          "lk_eta": 3.0,
+          "dpace_alpha": 0.5,
+          "confidence_coef": 1.0
+        },
+        "loss": 13.6875,
+        "valid_tokens": 111,
+        "loss_weight": 71.26040649414062,
+        "valid_blocks": 14,
+        "teacher_calls": 1,
+        "teacher_rows": 112,
+        "components": {
+          "markov_bias_abs_mean": 0.00469970703125,
+          "confidence_pred_mean": 0.0007552492315880954,
+          "lk_loss": 12.931121826171875,
+          "confidence_bce": 0.7270015478134155,
+          "confidence_target_mean": 0.10345210134983063,
+          "confidence_abs_error": 0.1028159037232399,
+          "recipe_stage": 0.0
+        }
+      },
+      {
+        "call": 5,
+        "stage_index": 0,
+        "stage": {
+          "name": "verifier_kl_confidence",
+          "weighting": "decay",
+          "ce_coef": 0.0,
+          "lk_coef": 1.0,
+          "e2e_tv_coef": 0.0,
+          "lk_loss_type": "kl",
+          "lk_eta": 3.0,
+          "dpace_alpha": 0.5,
+          "confidence_coef": 1.0
+        },
+        "loss": 6.375,
+        "valid_tokens": 359,
+        "loss_weight": 229.86590576171875,
+        "valid_blocks": 45,
+        "teacher_calls": 1,
+        "teacher_rows": 360,
+        "components": {
+          "markov_bias_abs_mean": 0.004638671875,
+          "confidence_pred_mean": 0.0027487543411552906,
+          "lk_loss": 5.907683849334717,
+          "confidence_bce": 0.47851991653442383,
+          "confidence_target_mean": 0.08064279705286026,
+          "confidence_abs_error": 0.0781334713101387,
+          "recipe_stage": 0.0
+        }
+      },
+      {
+        "call": 6,
+        "stage_index": 0,
+        "stage": {
+          "name": "verifier_kl_confidence",
+          "weighting": "decay",
+          "ce_coef": 0.0,
+          "lk_coef": 1.0,
+          "e2e_tv_coef": 0.0,
+          "lk_loss_type": "kl",
+          "lk_eta": 3.0,
+          "dpace_alpha": 0.5,
+          "confidence_coef": 1.0
+        },
+        "loss": 7.46875,
+        "valid_tokens": 71,
+        "loss_weight": 45.67887878417969,
+        "valid_blocks": 9,
+        "teacher_calls": 1,
+        "teacher_rows": 72,
+        "components": {
+          "markov_bias_abs_mean": 0.004638671875,
+          "confidence_pred_mean": 0.011966176331043243,
+          "lk_loss": 7.378134250640869,
+          "confidence_bce": 0.08299408107995987,
+          "confidence_target_mean": 0.016755206510424614,
+          "confidence_abs_error": 0.010076199658215046,
+          "recipe_stage": 0.0
+        }
+      },
+      {
+        "call": 7,
+        "stage_index": 0,
+        "stage": {
+          "name": "verifier_kl_confidence",
+          "weighting": "decay",
+          "ce_coef": 0.0,
+          "lk_coef": 1.0,
+          "e2e_tv_coef": 0.0,
+          "lk_loss_type": "kl",
+          "lk_eta": 3.0,
+          "dpace_alpha": 0.5,
+          "confidence_coef": 1.0
+        },
+        "loss": 6.78125,
+        "valid_tokens": 607,
+        "loss_weight": 388.471435546875,
+        "valid_blocks": 76,
+        "teacher_calls": 1,
+        "teacher_rows": 608,
+        "components": {
+          "markov_bias_abs_mean": 0.004608154296875,
+          "confidence_pred_mean": 0.028808297589421272,
+          "lk_loss": 6.6734490394592285,
+          "confidence_bce": 0.11232830584049225,
+          "confidence_target_mean": 0.0234240610152483,
+          "confidence_abs_error": 0.016564680263400078,
+          "recipe_stage": 0.0
+        }
+      },
+      {
+        "call": 8,
+        "stage_index": 0,
+        "stage": {
+          "name": "verifier_kl_confidence",
+          "weighting": "decay",
+          "ce_coef": 0.0,
+          "lk_coef": 1.0,
+          "e2e_tv_coef": 0.0,
+          "lk_loss_type": "kl",
+          "lk_eta": 3.0,
+          "dpace_alpha": 0.5,
+          "confidence_coef": 1.0
+        },
+        "loss": 6.34375,
+        "valid_tokens": 15,
+        "loss_weight": 9.864733695983887,
+        "valid_blocks": 2,
+        "teacher_calls": 1,
+        "teacher_rows": 16,
+        "components": {
+          "markov_bias_abs_mean": 0.00494384765625,
+          "confidence_pred_mean": 0.044327687472105026,
+          "lk_loss": 6.188957214355469,
+          "confidence_bce": 0.16894026100635529,
+          "confidence_target_mean": 0.037874605506658554,
+          "confidence_abs_error": 0.026440216228365898,
+          "recipe_stage": 0.0
+        }
+      },
+      {
+        "call": 9,
+        "stage_index": 0,
+        "stage": {
+          "name": "verifier_kl_confidence",
+          "weighting": "decay",
+          "ce_coef": 0.0,
+          "lk_coef": 1.0,
+          "e2e_tv_coef": 0.0,
+          "lk_loss_type": "kl",
+          "lk_eta": 3.0,
+          "dpace_alpha": 0.5,
+          "confidence_coef": 1.0
+        },
+        "loss": 6.25,
+        "valid_tokens": 39,
+        "loss_weight": 25.213653564453125,
+        "valid_blocks": 5,
+        "teacher_calls": 1,
+        "teacher_rows": 40,
+        "components": {
+          "markov_bias_abs_mean": 0.004730224609375,
+          "confidence_pred_mean": 0.05417947098612785,
+          "lk_loss": 6.062048435211182,
+          "confidence_bce": 0.19795845448970795,
+          "confidence_target_mean": 0.055165909230709076,
+          "confidence_abs_error": 0.05838105082511902,
+          "recipe_stage": 0.0
+        }
+      },
+      {
+        "call": 10,
+        "stage_index": 0,
+        "stage": {
+          "name": "verifier_kl_confidence",
+          "weighting": "decay",
+          "ce_coef": 0.0,
+          "lk_coef": 1.0,
+          "e2e_tv_coef": 0.0,
+          "lk_loss_type": "kl",
+          "lk_eta": 3.0,
+          "dpace_alpha": 0.5,
+          "confidence_coef": 1.0
+        },
+        "loss": 6.84375,
+        "valid_tokens": 47,
+        "loss_weight": 30.329959869384766,
+        "valid_blocks": 6,
+        "teacher_calls": 1,
+        "teacher_rows": 48,
+        "components": {
+          "markov_bias_abs_mean": 0.004730224609375,
+          "confidence_pred_mean": 0.05840252339839935,
+          "lk_loss": 6.580102443695068,
+          "confidence_bce": 0.25831490755081177,
+          "confidence_target_mean": 0.07825928181409836,
+          "confidence_abs_error": 0.05990436300635338,
+          "recipe_stage": 0.0
+        }
+      }
+    ],
+    "max_head_gradient_norm_by_stage": {
+      "0": {
+        "confidence_head": 27.97191619873047,
+        "markov_head": 0.18237707018852234
+      }
+    }
+  }
+}

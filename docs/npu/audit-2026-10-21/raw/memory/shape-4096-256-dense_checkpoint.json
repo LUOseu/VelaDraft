@@ -1,0 +1,792 @@
+{
+  "protocol": "reviewer_audit_B_v1",
+  "mode": "dense_checkpoint",
+  "context": 4096,
+  "anchors": 256,
+  "frozen_shapes": [
+    [
+      1024,
+      64
+    ],
+    [
+      4096,
+      256
+    ],
+    [
+      4096,
+      512
+    ]
+  ],
+  "dtype": "bfloat16",
+  "device": "npu:1",
+  "checkpoint_scope": "mask materialization plus SDPA only; K/V repeat outside; no MLP/layer/head checkpoint",
+  "initial_seed": 20261021,
+  "optimizer": "Production AdamW FP32 masters/moments, BF16 forward/backward; lr=6e-4 betas=(.9,.95) weight_decay=0 clip=1 warmup=.04 min_lr_ratio=.1; shared fixed diagnostic horizon",
+  "scope": "offline draft full forward/backward/clip/optimizer update; excludes teacher capture",
+  "status": "pass",
+  "warmup_updates": [
+    {
+      "seconds": 1.339447045698762,
+      "correctness_artifact_io_included": false,
+      "peak_hbm_bytes": 6082379264,
+      "loss": 12.375,
+      "grad_norm": 7.520048141479492,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense_checkpoint"
+        ],
+        "training_switches": {
+          "recipe_compile_tv_kl": {
+            "requested": false,
+            "effective": false,
+            "reason": "not_requested",
+            "scope": "device_gate_not_execution_evidence"
+          }
+        },
+        "fallback_reasons": [],
+        "chunked_layers": 3,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 256,
+          "block_size": 8,
+          "context_len": 4096,
+          "query_len": 2048,
+          "kv_len": 6144,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 25165824,
+            "score_bytes": 805306368,
+            "total_bytes": 830472192
+          },
+          "dense_total_gb": 0.8305,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "chunked_total_gb": 0.0519,
+          "chunks": 16,
+          "requested_backend": "sdpa_chunked"
+        },
+        "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+        "measurement_window": {
+          "completed_attention_calls": 3,
+          "chunks": 3,
+          "fused_chunks": 0,
+          "fallback_chunks": 0,
+          "sdpa_chunks": 0,
+          "effective_backends": [
+            "dense_checkpoint"
+          ],
+          "fallback_reasons": [],
+          "mixed_backend": false,
+          "count_semantics": "completed attention calls across layers; excludes internal chunk checkpoint recomputation, failed calls and backward kernels; completed external layer replays count as calls; not model-forward or optimizer-update counts"
+        },
+        "mixed_backend": false,
+        "fused_chunks": 0,
+        "fallback_chunks": 0
+      }
+    },
+    {
+      "seconds": 0.1869698390364647,
+      "correctness_artifact_io_included": false,
+      "peak_hbm_bytes": 7772070400,
+      "loss": 11.8125,
+      "grad_norm": 7.542957782745361,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense_checkpoint"
+        ],
+        "training_switches": {
+          "recipe_compile_tv_kl": {
+            "requested": false,
+            "effective": false,
+            "reason": "not_requested",
+            "scope": "device_gate_not_execution_evidence"
+          }
+        },
+        "fallback_reasons": [],
+        "chunked_layers": 3,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 256,
+          "block_size": 8,
+          "context_len": 4096,
+          "query_len": 2048,
+          "kv_len": 6144,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 25165824,
+            "score_bytes": 805306368,
+            "total_bytes": 830472192
+          },
+          "dense_total_gb": 0.8305,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "chunked_total_gb": 0.0519,
+          "chunks": 16,
+          "requested_backend": "sdpa_chunked"
+        },
+        "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+        "measurement_window": {
+          "completed_attention_calls": 6,
+          "chunks": 6,
+          "fused_chunks": 0,
+          "fallback_chunks": 0,
+          "sdpa_chunks": 0,
+          "effective_backends": [
+            "dense_checkpoint"
+          ],
+          "fallback_reasons": [],
+          "mixed_backend": false,
+          "count_semantics": "completed attention calls across layers; excludes internal chunk checkpoint recomputation, failed calls and backward kernels; completed external layer replays count as calls; not model-forward or optimizer-update counts"
+        },
+        "mixed_backend": false,
+        "fused_chunks": 0,
+        "fallback_chunks": 0
+      }
+    },
+    {
+      "seconds": 0.15238129906356335,
+      "correctness_artifact_io_included": false,
+      "peak_hbm_bytes": 7772070400,
+      "loss": 15.1875,
+      "grad_norm": 13.902295112609863,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense_checkpoint"
+        ],
+        "training_switches": {
+          "recipe_compile_tv_kl": {
+            "requested": false,
+            "effective": false,
+            "reason": "not_requested",
+            "scope": "device_gate_not_execution_evidence"
+          }
+        },
+        "fallback_reasons": [],
+        "chunked_layers": 3,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 256,
+          "block_size": 8,
+          "context_len": 4096,
+          "query_len": 2048,
+          "kv_len": 6144,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 25165824,
+            "score_bytes": 805306368,
+            "total_bytes": 830472192
+          },
+          "dense_total_gb": 0.8305,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "chunked_total_gb": 0.0519,
+          "chunks": 16,
+          "requested_backend": "sdpa_chunked"
+        },
+        "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+        "measurement_window": {
+          "completed_attention_calls": 9,
+          "chunks": 9,
+          "fused_chunks": 0,
+          "fallback_chunks": 0,
+          "sdpa_chunks": 0,
+          "effective_backends": [
+            "dense_checkpoint"
+          ],
+          "fallback_reasons": [],
+          "mixed_backend": false,
+          "count_semantics": "completed attention calls across layers; excludes internal chunk checkpoint recomputation, failed calls and backward kernels; completed external layer replays count as calls; not model-forward or optimizer-update counts"
+        },
+        "mixed_backend": false,
+        "fused_chunks": 0,
+        "fallback_chunks": 0
+      }
+    },
+    {
+      "seconds": 0.1523842690512538,
+      "correctness_artifact_io_included": false,
+      "peak_hbm_bytes": 7772070400,
+      "loss": 20.375,
+      "grad_norm": 45.1344108581543,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense_checkpoint"
+        ],
+        "training_switches": {
+          "recipe_compile_tv_kl": {
+            "requested": false,
+            "effective": false,
+            "reason": "not_requested",
+            "scope": "device_gate_not_execution_evidence"
+          }
+        },
+        "fallback_reasons": [],
+        "chunked_layers": 3,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 256,
+          "block_size": 8,
+          "context_len": 4096,
+          "query_len": 2048,
+          "kv_len": 6144,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 25165824,
+            "score_bytes": 805306368,
+            "total_bytes": 830472192
+          },
+          "dense_total_gb": 0.8305,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "chunked_total_gb": 0.0519,
+          "chunks": 16,
+          "requested_backend": "sdpa_chunked"
+        },
+        "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+        "measurement_window": {
+          "completed_attention_calls": 12,
+          "chunks": 12,
+          "fused_chunks": 0,
+          "fallback_chunks": 0,
+          "sdpa_chunks": 0,
+          "effective_backends": [
+            "dense_checkpoint"
+          ],
+          "fallback_reasons": [],
+          "mixed_backend": false,
+          "count_semantics": "completed attention calls across layers; excludes internal chunk checkpoint recomputation, failed calls and backward kernels; completed external layer replays count as calls; not model-forward or optimizer-update counts"
+        },
+        "mixed_backend": false,
+        "fused_chunks": 0,
+        "fallback_chunks": 0
+      }
+    },
+    {
+      "seconds": 0.15172844380140305,
+      "correctness_artifact_io_included": false,
+      "peak_hbm_bytes": 7772070400,
+      "loss": 11.8125,
+      "grad_norm": 1.1311659812927246,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense_checkpoint"
+        ],
+        "training_switches": {
+          "recipe_compile_tv_kl": {
+            "requested": false,
+            "effective": false,
+            "reason": "not_requested",
+            "scope": "device_gate_not_execution_evidence"
+          }
+        },
+        "fallback_reasons": [],
+        "chunked_layers": 3,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 256,
+          "block_size": 8,
+          "context_len": 4096,
+          "query_len": 2048,
+          "kv_len": 6144,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 25165824,
+            "score_bytes": 805306368,
+            "total_bytes": 830472192
+          },
+          "dense_total_gb": 0.8305,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "chunked_total_gb": 0.0519,
+          "chunks": 16,
+          "requested_backend": "sdpa_chunked"
+        },
+        "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+        "measurement_window": {
+          "completed_attention_calls": 15,
+          "chunks": 15,
+          "fused_chunks": 0,
+          "fallback_chunks": 0,
+          "sdpa_chunks": 0,
+          "effective_backends": [
+            "dense_checkpoint"
+          ],
+          "fallback_reasons": [],
+          "mixed_backend": false,
+          "count_semantics": "completed attention calls across layers; excludes internal chunk checkpoint recomputation, failed calls and backward kernels; completed external layer replays count as calls; not model-forward or optimizer-update counts"
+        },
+        "mixed_backend": false,
+        "fused_chunks": 0,
+        "fallback_chunks": 0
+      }
+    }
+  ],
+  "measured_updates": [
+    {
+      "seconds": 0.15175490453839302,
+      "correctness_artifact_io_included": false,
+      "peak_hbm_bytes": 7772070400,
+      "loss": 11.5,
+      "grad_norm": 0.5466907024383545,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense_checkpoint"
+        ],
+        "training_switches": {
+          "recipe_compile_tv_kl": {
+            "requested": false,
+            "effective": false,
+            "reason": "not_requested",
+            "scope": "device_gate_not_execution_evidence"
+          }
+        },
+        "fallback_reasons": [],
+        "chunked_layers": 3,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 256,
+          "block_size": 8,
+          "context_len": 4096,
+          "query_len": 2048,
+          "kv_len": 6144,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 25165824,
+            "score_bytes": 805306368,
+            "total_bytes": 830472192
+          },
+          "dense_total_gb": 0.8305,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "chunked_total_gb": 0.0519,
+          "chunks": 16,
+          "requested_backend": "sdpa_chunked"
+        },
+        "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+        "measurement_window": {
+          "completed_attention_calls": 18,
+          "chunks": 18,
+          "fused_chunks": 0,
+          "fallback_chunks": 0,
+          "sdpa_chunks": 0,
+          "effective_backends": [
+            "dense_checkpoint"
+          ],
+          "fallback_reasons": [],
+          "mixed_backend": false,
+          "count_semantics": "completed attention calls across layers; excludes internal chunk checkpoint recomputation, failed calls and backward kernels; completed external layer replays count as calls; not model-forward or optimizer-update counts"
+        },
+        "mixed_backend": false,
+        "fused_chunks": 0,
+        "fallback_chunks": 0
+      }
+    },
+    {
+      "seconds": 0.15239507984369993,
+      "correctness_artifact_io_included": false,
+      "peak_hbm_bytes": 7772070400,
+      "loss": 11.3125,
+      "grad_norm": 0.571553647518158,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense_checkpoint"
+        ],
+        "training_switches": {
+          "recipe_compile_tv_kl": {
+            "requested": false,
+            "effective": false,
+            "reason": "not_requested",
+            "scope": "device_gate_not_execution_evidence"
+          }
+        },
+        "fallback_reasons": [],
+        "chunked_layers": 3,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 256,
+          "block_size": 8,
+          "context_len": 4096,
+          "query_len": 2048,
+          "kv_len": 6144,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 25165824,
+            "score_bytes": 805306368,
+            "total_bytes": 830472192
+          },
+          "dense_total_gb": 0.8305,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "chunked_total_gb": 0.0519,
+          "chunks": 16,
+          "requested_backend": "sdpa_chunked"
+        },
+        "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+        "measurement_window": {
+          "completed_attention_calls": 21,
+          "chunks": 21,
+          "fused_chunks": 0,
+          "fallback_chunks": 0,
+          "sdpa_chunks": 0,
+          "effective_backends": [
+            "dense_checkpoint"
+          ],
+          "fallback_reasons": [],
+          "mixed_backend": false,
+          "count_semantics": "completed attention calls across layers; excludes internal chunk checkpoint recomputation, failed calls and backward kernels; completed external layer replays count as calls; not model-forward or optimizer-update counts"
+        },
+        "mixed_backend": false,
+        "fused_chunks": 0,
+        "fallback_chunks": 0
+      }
+    },
+    {
+      "seconds": 0.15225218795239925,
+      "correctness_artifact_io_included": false,
+      "peak_hbm_bytes": 7772070400,
+      "loss": 11.1875,
+      "grad_norm": 0.5789062976837158,
+      "attention": {
+        "requested_backend": "sdpa_chunked",
+        "effective_backends": [
+          "dense_checkpoint"
+        ],
+        "training_switches": {
+          "recipe_compile_tv_kl": {
+            "requested": false,
+            "effective": false,
+            "reason": "not_requested",
+            "scope": "device_gate_not_execution_evidence"
+          }
+        },
+        "fallback_reasons": [],
+        "chunked_layers": 3,
+        "memory_plan": {
+          "batch_size": 1,
+          "num_blocks": 256,
+          "block_size": 8,
+          "context_len": 4096,
+          "query_len": 2048,
+          "kv_len": 6144,
+          "num_heads": 16,
+          "head_dim": 128,
+          "dense": {
+            "mask_bytes": 25165824,
+            "score_bytes": 805306368,
+            "total_bytes": 830472192
+          },
+          "dense_total_gb": 0.8305,
+          "chunked": {
+            "query_chunk_size": 128,
+            "mask_bytes": 1572864,
+            "score_bytes": 50331648,
+            "total_bytes": 51904512
+          },
+          "chunked_total_gb": 0.0519,
+          "chunks": 16,
+          "requested_backend": "sdpa_chunked"
+        },
+        "memory_plan_kind": "analytical_estimate_not_measured_peak_hbm",
+        "measurement_window": {
+          "completed_attention_calls": 24,
+          "chunks": 24,
+          "fused_chunks": 0,
+          "fallback_chunks": 0,
+          "sdpa_chunks": 0,
+          "effective_backends": [
+            "dense_checkpoint"
+          ],
+          "fallback_reasons": [],
+          "mixed_backend": false,
+          "count_semantics": "completed attention calls across layers; excludes internal chunk checkpoint recomputation, failed calls and backward kernels; completed external layer replays count as calls; not model-forward or optimizer-update counts"
+        },
+        "mixed_backend": false,
+        "fused_chunks": 0,
+        "fallback_chunks": 0
+      }
+    }
+  ],
+  "script_sha256": "9d26dcd58c96b43f4bc1ec2942a90932dfee7ee291e757f3aff81c80ce72a29e",
+  "git_head": null,
+  "git_metadata_note": "Deployed source tree has no .git; per-file hashes are authoritative.",
+  "source_hashes": {
+    "vlm_dflash/dflash/chunked_attention.py": "122df61ad7ab69d9420354fae2b5f3c0541a5727d93bf8dcd75e1633834f0b2c",
+    "vlm_dflash/dflash/train.py": "3bd2e0ad062b9e9711f72110e32456ab6603b857cfd9198e83979b270680aba6",
+    "vlm_dflash/dflash/factory.py": "a4f87445e04c82a683f7159f02bebbcdbefdefa485bf1183986a7efa1a92e22a",
+    "vlm_dflash/dflash/__init__.py": "57e95ef3d49a73a4bcbc702e0c4b48e2a98a2f034b906adf515102316914be2f",
+    "vlm_dflash/dflash/trainer_core.py": "1e7ccef1c5f34699a5279288b7ad1ec9a6002f450b77122c62faf60bc000cbdf",
+    "vlm_dflash/dflash/draft_model.py": "02d1d77a827c3e633803cfe538a90343672c3299a3b59ecbf6ce3b3845b57c25",
+    "vlm_dflash/dflash/mask.py": "a2349c0c0fa20d8091ee512b03ad3fff51e29e5baefd74058d5dc320e2eb3183",
+    "vlm_dflash/dflash/visual_check.py": "b66c1ddfb373776a4d0439352201baba9664119e2ab6da660e7c00c63b9a4072",
+    "vlm_dflash/dflash/features.py": "03db79f22584117029a760cfd68506a7c10568f244efcc0e45be6704f25eafd2",
+    "vlm_dflash/dflash/decay_loss.py": "a23d7a4e975fa0b25d2ea373cce940af23875fb6462939c0d208221a3eab9e9c",
+    "vlm_dflash/dflash/regroup.py": "dcad9bb5e62a40c3a46e55bee76291169476458267557a9ab85ef783756553fb"
+  },
+  "geometry": {
+    "transformers_version": "5.12.1",
+    "architectures": [
+      "Qwen3DFlashDraftModel"
+    ],
+    "output_hidden_states": false,
+    "return_dict": true,
+    "dtype": "bfloat16",
+    "chunk_size_feed_forward": 0,
+    "is_encoder_decoder": false,
+    "id2label": {
+      "0": "LABEL_0",
+      "1": "LABEL_1"
+    },
+    "label2id": {
+      "LABEL_0": 0,
+      "LABEL_1": 1
+    },
+    "problem_type": null,
+    "vocab_size": 151936,
+    "hidden_size": 2048,
+    "intermediate_size": 11008,
+    "num_hidden_layers": 3,
+    "num_attention_heads": 16,
+    "num_key_value_heads": 2,
+    "head_dim": 128,
+    "hidden_act": "silu",
+    "max_position_embeddings": 128000,
+    "initializer_range": 0.02,
+    "rms_norm_eps": 1e-06,
+    "use_cache": true,
+    "tie_word_embeddings": false,
+    "rope_parameters": {
+      "rope_type": "default",
+      "rope_theta": 1000000.0
+    },
+    "attention_bias": false,
+    "use_sliding_window": false,
+    "sliding_window": null,
+    "max_window_layers": 3,
+    "layer_types": [
+      "full_attention",
+      "full_attention",
+      "full_attention"
+    ],
+    "attention_dropout": 0.0,
+    "pad_token_id": null,
+    "bos_token_id": 151643,
+    "eos_token_id": 151645,
+    "_name_or_path": "",
+    "model_type": "qwen3",
+    "num_target_layers": 36,
+    "target_hidden_size": 2048,
+    "block_size": 8,
+    "dflash_config": {
+      "mask_token_id": 151669,
+      "target_layer_ids": [
+        1,
+        17,
+        33
+      ],
+      "spatial_rope_enabled": true,
+      "spatial_rope_mode": "replace",
+      "spatial_rope_sections": [
+        16,
+        24,
+        24
+      ],
+      "spatial_rope_interleaved": false,
+      "visual_num_query_tokens": 0
+    },
+    "output_attentions": false
+  },
+  "hardware": {
+    "requested": "npu:1",
+    "type": "npu",
+    "index": 1,
+    "available": true,
+    "resolved": "npu:1",
+    "name": "Ascend910B3",
+    "free_gb": 63.95,
+    "total_gb": 65.45
+  },
+  "software": {
+    "torch": "2.10.0+cpu",
+    "torch_npu": null
+  },
+  "contract": {
+    "contract_version": 1,
+    "resolved_at": "2026-10-21T15:00:12+0800",
+    "target": {
+      "model_path": "/root/veladraft-models/Qwen2.5-VL-3B-Instruct",
+      "model_type": "qwen2_5_vl",
+      "model_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+      "processor_fingerprint": "ed94e2fa5734073524651401de89882531084a817ed212300893591d6b35ff3e",
+      "fingerprint_source": "sha256 of config/generation/index + weight shard sizes; processor files",
+      "model_files": {
+        "config.json": "7ed3eed5be6924cc800e8a5e53fc405c1aab1aaf36bad65c33403b36c56827f5",
+        "generation_config.json": "533f191cc257b7de37a4fccd0a7a1706d75e1aa660f93efaa54e5a2a9f9aace9",
+        "model.safetensors.index.json": "c7dd78a4c6bea60b51332f1baf37b8f8124ecab2c35395a29a29825bf2619768"
+      },
+      "processor_files": {
+        "preprocessor_config.json": "f2058c716eef96ccaed1cc1e2d0c08306b62586d535b28d9d08e691b2fab7ca0",
+        "processor_config.json": null,
+        "tokenizer_config.json": "4abd3520120e266da84c0864fee064d1fb10806f02225911a47253dd38dc5f56",
+        "chat_template.json": "ad60d90252ed0b0705ba14e2d0ad0fec0beac1ea955642b54059b36052d8bc96",
+        "tokenizer.json": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+        "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+        "merges.txt": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+      },
+      "weight_shards": {
+        "model-00001-of-00002.safetensors": 3982649232,
+        "model-00002-of-00002.safetensors": 3526688744
+      }
+    },
+    "text": {
+      "num_target_layers": 36,
+      "hidden_size": 2048,
+      "head_dim": 128,
+      "vocab_size": 151936,
+      "intermediate_size": 11008,
+      "source": "target config.text_config"
+    },
+    "mask": {
+      "token_id": 151669,
+      "token_str": null,
+      "policy": "reserved embedding row outside tokenizer vocabulary",
+      "tokenizer_vocab_size": 151643,
+      "source": "config default validated against tokenizer"
+    },
+    "rope": {
+      "type": "mrope",
+      "mode": "mrope",
+      "sections": [
+        16,
+        24,
+        24
+      ],
+      "interleaved": false,
+      "partial_rotary_factor": 1.0,
+      "source": "target text_config.rope_parameters.mrope_section + mrope_interleaved (absent = False) + partial_rotary_factor (absent = 1.0)"
+    },
+    "layers": {
+      "num_target_layers": 36,
+      "num_draft_layers": 3,
+      "draft_layer_ids": [
+        1,
+        17,
+        33
+      ],
+      "capture_layer_ids": [
+        1,
+        9,
+        17,
+        25,
+        33
+      ],
+      "capture_layer_ids_source": "explicit drafter.capture_layer_ids",
+      "block_size": 8,
+      "source": "config default (start=1, end=num_target_layers-3, uniform) validated against target depth; capture_layer_ids is the ordered layer list every feature store holds"
+    },
+    "image": {
+      "min_pixels": 200704,
+      "max_pixels": 1003520,
+      "processor_min_pixels": 3136,
+      "processor_max_pixels": 12845056,
+      "processor_bounds_source": "preprocessor_config.json.min_pixels/max_pixels",
+      "token_count_mode": "grid",
+      "patch_size": 14,
+      "merge_size": 2,
+      "tokens_per_patch": 784,
+      "min_tokens": 256,
+      "max_tokens": 1280,
+      "sequence_length_per_tile": null,
+      "source": "config override validated against processor; processor defaults recorded"
+    },
+    "tokens": {
+      "image_token_id": 151655,
+      "vision_start_token_id": 151652,
+      "vision_end_token_id": 151653,
+      "im_start_token_id": 151644,
+      "im_end_token_id": 151645,
+      "endoftext_token_id": 151643,
+      "source": "tokenizer, cross-checked against target config"
+    },
+    "prompt": {
+      "chat_template_kwargs": {},
+      "source": "config target.chat_template_kwargs (absent = {})"
+    },
+    "head": {
+      "tie_word_embeddings": true,
+      "source": "target config.json (tie_word_embeddings; absent = True)"
+    }
+  },
+  "rows": {
+    "source": "shape_only_synthetic_features_real_frozen_target_head",
+    "sample_id": null,
+    "actual_context_length": 4096,
+    "context_bucket": 4096,
+    "context_padding_fraction": 0.0,
+    "requested_anchors": 256,
+    "allocated_anchors": 256,
+    "effective_anchors": 256,
+    "allocated_query_rows": 2048,
+    "effective_supervision_rows": 1792,
+    "dataset_records_considered": 0,
+    "unique_samples_replayed": 1,
+    "anchor_padding_fraction": 0.0,
+    "requested_anchor_count_achieved": true,
+    "requested_natural_context_extent_achieved": true,
+    "requested_shape_achieved": true
+  },
+  "setup_seconds": 24.17770581226796,
+  "first5_estimate": {
+    "seconds": [
+      1.339447045698762,
+      0.1869698390364647,
+      0.15238129906356335,
+      0.1523842690512538,
+      0.15172844380140305
+    ],
+    "mean_seconds": 0.3965821793302894,
+    "projected_remaining_seconds": 1.1897465379908683
+  },
+  "total_seconds": 26.639623823575675
+}
