@@ -1,11 +1,11 @@
 {
-  "tests": 841,
+  "tests": 879,
   "failures": 0,
   "errors": 0,
   "skipped": 6,
-  "passed": 835,
-  "source": "runs/npu/audit-20261021/cpu_tests.xml",
-  "sha256": "4d7fa8401ba7a51eca7304b4916a4701e5725ac1f133dad07f8377b1d367bc91",
-  "scope": "Full CPU suite at this saved run; later targeted tests are separate",
+  "passed": 873,
+  "source": "docs/npu/audit-2026-10-21/raw/cpu_tests.xml.gz",
+  "sha256": "d8426f58c23e46629bd9323713a26a237792df32d93ecc31d26d9ec69c284fa7",
+  "scope": "Full CPU suite after final harness, evidence-generator and inference-schema changes",
   "status": "PASS"
 }

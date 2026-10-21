@@ -1,0 +1,18 @@
+{
+  "gpu_index": 2,
+  "gpu_uuid": "GPU-1d7c6b74-f5df-a297-6796-3986c3701ffa",
+  "lock_path": "/tmp/veladraft_gpu_locks/GPU-1d7c6b74-f5df-a297-6796-3986c3701ffa.lock",
+  "preflight_free_MiB": 48522,
+  "preflight_apps": [],
+  "allocator_cap_gib": 40,
+  "max_seconds": 600,
+  "source_sha256": {
+    "A_gpu2_expand_child.py": "c58d5794a64fe0086cad4fc06e0eaf24efee6db37299bdadebb3527ad19e5516",
+    "A_gpu2_expand_guard.py": "baa4d0d4466b3ccca51448c1a3987e107a3f3835d06f4672941276cdf5c52902"
+  },
+  "allocator_environment": {
+    "PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CUBLAS_WORKSPACE_CONFIG": ":4096:8"
+  },
+  "reason": "One process-allocator retry after default allocator backward OOM:29.13GiB live allocated,7.18GiB cached-unallocated,requested4.06GiB; same40GiB cap and unchanged full workload."
+}

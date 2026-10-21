@@ -1,0 +1,26 @@
+{
+  "status": "PASS",
+  "plan_tree_digest": "713a1dec4d24ac996de64abd0dd889851c9eba0fc0743ed4b5d216ed232226da",
+  "all_plan_fields_exact": true,
+  "worst_batch": 1,
+  "selection": "max allocated_rows * (context + query_rows_per_sample), before timings",
+  "worst_plan": {
+    "indices": [
+      7,
+      63,
+      18,
+      62,
+      32,
+      60,
+      19,
+      57
+    ],
+    "padding_fraction": 0.4853515625,
+    "context": 825,
+    "requested_anchors": 256,
+    "actual_anchors": 256,
+    "query_rows_per_sample": 2048,
+    "allocated_rows": 16384,
+    "kept_rows": 8432
+  }
+}

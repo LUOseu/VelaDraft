@@ -35,3 +35,39 @@ Use existing 3090 environment if an idle device is available; otherwise a genuin
 ## Delivery
 
 Add objective/profile/stage/backend/mode records to the existing matrix with dtype, geometry, effective rows/chunks, data kind, counts, source revision and artifact digests. Provide a fail-closed validator and recomputable tables. Add cumulative attention execution counters and requested/effective compile gating. Keep implementation, numerical evidence and performance evidence separate.
+
+## Execution amendments and retained failures
+
+These changes were made after observations and are recorded separately from the
+initial protocol. Numerical tolerances and the fixed data/shape selection were
+not changed.
+
+- The first NPU compaction gate found a layout-dependent legacy reporting-weight
+  reduction. After fixing that reporting scalar, all eight parity batches and
+  all six timing legs were rerun. The original failed gate remains archived.
+- Early attention pilots used direct BF16 optimizer state. They were excluded;
+  all 18 reported cells were rerun with production FP32 masters and moments.
+- DFly checkpoint reload exceeded the Notebook's host-memory cgroup limit.
+  Reloads moved to separate processes with CPU mmap; horizon, checkpoint
+  boundaries and final-state comparison were preserved.
+- The cross-backend BF16 forward gate failed and remains failed. A separately
+  labelled FP32 diagnostic was added to investigate precision effects.
+- The first CUDA decoding harness omitted production's explicit parity verifier
+  setting. Its partial output is INVALID_PROTOCOL. The corrected harness reran
+  all 64 prompts for both native and portable formats from the beginning.
+- Shared GPU1 capacity qualifications at 22 and 25 GiB failed without changing
+  the workload. Later, GPU2 became available; its existing queue advisory lock
+  and a foreign-process/headroom watchdog protected a separate attempt.
+- GPU2's first 40 GiB attempt passed parity and the pilot but failed during the
+  first timing leg: 29.13 GiB allocated, 7.18 GiB reserved but unused, and a new
+  4.06 GiB request. Fragmentation was a hypothesis based on this evidence.
+  One fresh full run used process-local
+  `PYTORCH_ALLOC_CONF=expandable_segments:True` in **both** compaction arms,
+  retaining the 40 GiB limit and original data, anchors, geometry and schedule.
+  No per-update cache flushing was added. PyTorch documents this allocator
+  option for varying allocation sizes in its
+  [2.11 memory-management documentation](https://docs.pytorch.org/docs/2.11/notes/cuda.html#optimizing-memory-usage-with-pytorch-alloc-conf).
+
+The report and raw exit records determine which attempts completed. Later
+harness hardening and supplemental integrity checks retain their own source
+identities; they are not attributed retroactively to earlier executions.

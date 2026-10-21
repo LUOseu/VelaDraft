@@ -35,3 +35,57 @@ def test_shared_forward_gate_catches_head_only_or_identity_mismatch(tmp_path,mon
         assert result['checks']['post_correction_hidden']['passed']
         assert result['checks']['student_logits']['violating_elements']==1
         assert result['status']=='FAILED'
+
+
+@pytest.mark.parametrize('dtype',['float32','bfloat16'])
+def test_shared_forward_respects_configured_compute_dtype(tmp_path,monkeypatch,dtype):
+    import json
+    import sys
+    import torch
+    from pathlib import Path
+    from scripts.npu.audit_common import build_module
+    from scripts.npu.audit_cuda import shared_forward
+    from scripts.npu.seven_method_smoke import _make_target,_contract,_config_for,_SyntheticFeatures,VOCAB,HIDDEN
+    target=_make_target(tmp_path/'target')
+    contract=_contract(target)
+    config=_config_for('dfly',1)
+    config['train']['draft_dtype']=dtype
+    bundle={'contract':contract,'manifest':{'capture_layer_ids':[0,1],'hidden_size':HIDDEN},
+            'records':[_SyntheticFeatures()[0]],'embed_weight':torch.randn(VOCAB,HIDDEN),'lm_head_weight':None}
+    module,_=build_module(bundle,config,'cpu')
+    import scripts.npu.audit_common as common
+    original_make_batch=common.make_batch
+    batch_dtypes=[]
+    def record_batch_dtype(*args,**kwargs):
+        batch=original_make_batch(*args,**kwargs)
+        batch_dtypes.append(batch['hidden_states'].dtype)
+        return batch
+    monkeypatch.setattr(common,'make_batch',record_batch_dtype)
+    monkeypatch.setitem(sys.modules,'audit_common',common)
+    torch.save({'model':module.draft_model.state_dict()},tmp_path/'checkpoint.pt')
+    torch.save(bundle,tmp_path/'bundle.pt')
+    (tmp_path/'config.json').write_text(json.dumps(config))
+    output=tmp_path/'forward.pt'
+    monkeypatch.setattr(sys,'argv',['audit_cuda.py','shared-forward','--repo',str(Path(__file__).resolve().parents[1]),
+        '--bundle',str(tmp_path/'bundle.pt'),'--config',str(tmp_path/'config.json'),
+        '--checkpoint',str(tmp_path/'checkpoint.pt'),'--output',str(output),'--device','cpu'])
+    shared_forward()
+    record=torch.load(output,weights_only=False)
+    expected=getattr(torch,dtype)
+    assert batch_dtypes==[expected]
+    assert record['draft_hidden'].dtype==expected
+    assert record['post_correction_hidden'].dtype==expected
+    assert record['student_logits'].dtype==expected
+
+
+def test_export_verifier_explicitly_selects_production_parity_backend():
+    from scripts.npu.audit_cuda import configure_export_verifier
+    from vlm_dflash.dflash.draft_model import set_verify_sdpa_backend_switch,verify_sdpa_backend_switch_enabled
+    original=verify_sdpa_backend_switch_enabled()
+    set_verify_sdpa_backend_switch(True)
+    try:
+        algorithm=configure_export_verifier()
+        assert algorithm.name=='dfly'
+        assert verify_sdpa_backend_switch_enabled() is False
+    finally:
+        set_verify_sdpa_backend_switch(original)

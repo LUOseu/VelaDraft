@@ -1,0 +1,79 @@
+{
+  "status": "PASS_ON_NEWLY_AVAILABLE_GPU2_WITH_EXPANDABLE_ALLOCATOR",
+  "matched_cuda_performance": "PASS",
+  "scope": "Exact frozen NPU workload, tested only under explicit residual-memory caps while foreign job remains resident; not a whole-device A6000 capacity result.",
+  "plan_verification": {
+    "status": "PASS",
+    "plan_tree_digest": "713a1dec4d24ac996de64abd0dd889851c9eba0fc0743ed4b5d216ed232226da",
+    "all_plan_fields_exact": true,
+    "worst_batch": 1,
+    "selection": "max allocated_rows * (context + query_rows_per_sample), before timings",
+    "worst_plan": {
+      "indices": [
+        7,
+        63,
+        18,
+        62,
+        32,
+        60,
+        19,
+        57
+      ],
+      "padding_fraction": 0.4853515625,
+      "context": 825,
+      "requested_anchors": 256,
+      "actual_anchors": 256,
+      "query_rows_per_sample": 2048,
+      "allocated_rows": 16384,
+      "kept_rows": 8432
+    }
+  },
+  "attempts": [
+    {
+      "name": "qualification",
+      "status": "FAILED",
+      "oom": true,
+      "cap_gib": 22,
+      "error": "CUDA out of memory. Tried to allocate 594.00 MiB. GPU 0 has a total capacity of 47.40 GiB of which 8.81 GiB is free. Process 2287235 has 16.69 GiB memory in use. Including non-PyTorch memory, this process has 21.88 GiB memory in use. 22.00 GiB allowed; Of the allocated memory 21.21 GiB is allocated by PyTorch, and 336.07 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+      "wall_seconds": 34.07012553885579,
+      "raw_sha256": "7e6af9ddefc9ecc9dc73ec89024e501d755d80b035b33e7402ccd99682d82eae",
+      "guard_sha256": "7cf217c2230ed4b5ae89b0c5a54f1d1b002bb685a5b5b42fd21c3f4189a4b7f8"
+    },
+    {
+      "name": "qualification25",
+      "status": "FAILED",
+      "oom": true,
+      "cap_gib": 25,
+      "error": "CUDA out of memory. Tried to allocate 594.00 MiB. GPU 0 has a total capacity of 47.40 GiB of which 5.91 GiB is free. Process 2287235 has 16.69 GiB memory in use. Including non-PyTorch memory, this process has 24.78 GiB memory in use. 25.00 GiB allowed; Of the allocated memory 24.11 GiB is allocated by PyTorch, and 336.05 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+      "wall_seconds": 27.481875151395798,
+      "raw_sha256": "ce643603d23c7a33004d18606af2f72bffbb2c07316100d81b4a3951136e8e70",
+      "guard_sha256": "50755da18a1cac84dccd5f038fa6ccaf2e9a7dc7e1a7cfa37d354dc85c46194b"
+    }
+  ],
+  "successful_run": "gpu2_expand",
+  "default_allocator_failed_run": "gpu2_full",
+  "successful_scope": "Same fixed workload, newly available GPU2 held under queue flock; expandable_segments:True fixed for both arms; prior shared-cap and default allocator OOM attempts preserved.",
+  "pairs": [
+    {
+      "pair": 0,
+      "off_mean_seconds": 0.999488048069179,
+      "on_mean_seconds": 0.8127555930987,
+      "off_peak_GiB": 33.18558692932129,
+      "on_peak_GiB": 23.63800573348999
+    },
+    {
+      "pair": 1,
+      "off_mean_seconds": 0.9954733267426491,
+      "on_mean_seconds": 0.8106517003849149,
+      "off_peak_GiB": 33.18558692932129,
+      "on_peak_GiB": 23.63800573348999
+    },
+    {
+      "pair": 2,
+      "off_mean_seconds": 0.9958708960562944,
+      "on_mean_seconds": 0.8121991496533155,
+      "off_peak_GiB": 33.18558692932129,
+      "on_peak_GiB": 23.63800573348999
+    }
+  ]
+}

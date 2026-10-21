@@ -110,3 +110,36 @@ def test_duplicate_matrix_id_rejected(tmp_path):
     matrix,row,_=_fixture(tmp_path)
     matrix.write_text(json.dumps({'audit_profiles':[row,row]}))
     assert validate_matrix(matrix)
+
+
+def _inference_fixture(tmp_path, *, mode='inference', omit=None, accepted=1931):
+    matrix, row, artifact = _fixture(tmp_path)
+    row.update(mode=mode, updates=0 if mode=='inference' else 3,
+               verification_mode='sequential_parity', samples=64,
+               shape=dict(max_new_tokens=64, speculative_rounds=997, new_tokens=2936,
+                          draft_tokens=6507, accepted_tokens=accepted))
+    if omit:
+        del row['shape'][omit]
+    record = {k:v for k,v in row.items() if k!='artifact'}
+    artifact.write_text(json.dumps({'profile_records':[record]}))
+    row['artifact']['sha256']=hashlib.sha256(artifact.read_bytes()).hexdigest()
+    _write(matrix,row)
+    return matrix
+
+
+def test_inference_profile_uses_actual_decoding_counts(tmp_path):
+    assert validate_matrix(_inference_fixture(tmp_path)) == []
+
+
+@pytest.mark.parametrize('field', ['max_new_tokens','speculative_rounds','new_tokens','draft_tokens','accepted_tokens'])
+def test_inference_profile_cannot_omit_decoding_counts(tmp_path, field):
+    assert validate_matrix(_inference_fixture(tmp_path, omit=field))
+
+
+def test_training_profile_cannot_reuse_inference_shape_schema(tmp_path):
+    assert validate_matrix(_inference_fixture(tmp_path, mode='offline'))
+
+
+@pytest.mark.parametrize('accepted', [2937,6508,-1,True])
+def test_inference_acceptance_counts_must_be_consistent(tmp_path, accepted):
+    assert validate_matrix(_inference_fixture(tmp_path, accepted=accepted))

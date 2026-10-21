@@ -1,0 +1,148 @@
+{
+  "scope": "Sum of serialized guarded CUDA command wall time, including CPU setup inside guards and all failed/aborted attempts; no kernel-time claim",
+  "physical_gpus": [
+    1,
+    2
+  ],
+  "host": "a6000xuyang",
+  "budget_seconds": 3600,
+  "used_seconds": 2123.6153112184256,
+  "used_gpu_hours": 0.5898931420051182,
+  "remaining_seconds": 1476.3846887815744,
+  "entries": [
+    {
+      "artifact": "cuda_regression/C_export64.guard.json",
+      "wall_seconds": 457.85739253647625,
+      "sha256": "7b79b6da278c0043e1aa70425e7074df8a85518ad5c92da719722190061a409d",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/C_export64.wrong_backend.guard.json",
+      "wall_seconds": 514.2824954111129,
+      "sha256": "3b66a23f70f04ec6715255d7fc60012debb2fd9a6aa53d9041068f943c6e20bd",
+      "returncode": -15,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/C_shared_forward.guard.json",
+      "wall_seconds": 31.4830412119627,
+      "sha256": "daaae55e8de89d8321cd94888d30fd3300f248ccb2035dee8fd90aa963e67399",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/C_shared_forward_fp32.guard.json",
+      "wall_seconds": 35.95707470923662,
+      "sha256": "c578ed6ed159db43f11527372dce1ecdbcc04617c970de57c2431b5bcdc153ea",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/dflash_base_3.guard.json",
+      "wall_seconds": 44.06695639528334,
+      "sha256": "4e2f21f224f82133b2ec543f04ff36ab92b17534c66734202c860caa6916bff4",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/dflash_head_1.guard.json",
+      "wall_seconds": 41.64928070269525,
+      "sha256": "d028b32d21ff6472332b420636af4d6bae863014e38bbaf2e977f48fcacc70bb",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/dflash_head_1.probe_rounding_failure.guard.json",
+      "wall_seconds": 82.33585396409035,
+      "sha256": "6bfd82c63e9402f5c1cbfa1862652f2a918afa369a075ae4f71e767b8075d812",
+      "returncode": 1,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/dflash_head_3.guard.json",
+      "wall_seconds": 43.3564630728215,
+      "sha256": "a270cbd49b8faf10d96e7014e40357459d9d904c2b32e348cc6c998c34099e28",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/dfly_base_3.guard.json",
+      "wall_seconds": 45.270161187276244,
+      "sha256": "a6ad8d9dd3ea028bee2b787e4f3b3808dce8657d97b43950a68805fefcbbf09f",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/dfly_head_3.before_weight_report_fix.guard.json",
+      "wall_seconds": 57.43945695832372,
+      "sha256": "3068d3215bf808b1e0a2b897b8e9b661e3a55a0e43a1c6d529222b836e3bc0be",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/dfly_head_3.guard.json",
+      "wall_seconds": 42.33377174846828,
+      "sha256": "116b6adff10d32a79556a830a02c02195dcfeab440f3a57800743dc23f633866",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/domino_base_3.guard.json",
+      "wall_seconds": 51.537132013589144,
+      "sha256": "3de30958b32b7bb9fa4789198647471f98d57b38b0e8cca4b236e49b48616c4b",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/domino_head_3.guard.json",
+      "wall_seconds": 42.16705960407853,
+      "sha256": "3717f8a1cd7b47431805a22339fe21ce01b40adcb3dbf582e3e6f13aef33b9f6",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/dspark_base_3.guard.json",
+      "wall_seconds": 60.157004203647375,
+      "sha256": "5b8c61c6a2176fa63565a4284ac720be9d619a98bf80c483f0b6f9c07a43a6a1",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_regression/dspark_head_3.guard.json",
+      "wall_seconds": 52.38638500869274,
+      "sha256": "a01e29555a7598c6958036d1a891b3d86f36a132639bd36c08ff2ef359eba5a5",
+      "returncode": 0,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_A/qualification.guard.json",
+      "wall_seconds": 34.07012553885579,
+      "sha256": "7cf217c2230ed4b5ae89b0c5a54f1d1b002bb685a5b5b42fd21c3f4189a4b7f8",
+      "returncode": 1,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_A/qualification25.guard.json",
+      "wall_seconds": 27.481875151395798,
+      "sha256": "50755da18a1cac84dccd5f038fa6ccaf2e9a7dc7e1a7cfa37d354dc85c46194b",
+      "returncode": 1,
+      "physical_gpu": 1
+    },
+    {
+      "artifact": "cuda_A/gpu2_full/guard.json",
+      "wall_seconds": 141.40673161670566,
+      "sha256": "d84301f725a42861c645f04dc512a1d2814ec816b5b9e4ec2855abfdc1c749e3",
+      "returncode": 1,
+      "physical_gpu": 2
+    },
+    {
+      "artifact": "cuda_A/gpu2_expand/guard.json",
+      "wall_seconds": 318.37705018371344,
+      "sha256": "521c6956db8c8c94cd2362c07a7965dc5299f802b276397aac0501086d401d08",
+      "returncode": 0,
+      "physical_gpu": 2
+    }
+  ],
+  "all_own_gpu_workers_exited": true
+}

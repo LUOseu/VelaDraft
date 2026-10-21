@@ -28,6 +28,17 @@ A separate Codex agent reviewed the production diff and audit harnesses. This is
 
 ## Nonblocking semantics and claim limits
 
+The subsequent evidence-generator review found fail-open reporting checks,
+without finding a discrepancy in the actual stored measurements. Mutation
+tests reproduced acceptance of a wrong attention geometry, dense execution
+reported as chunked, missing pilot updates, and an incorrect compaction switch.
+The generator now checks actual execution counters, geometry, dtype, paired
+inputs/source and ordered measurement windows. It also checks DSpark's recorded
+geometry and coefficients, and DFly's 42 checkpoint tensor shapes and declared
+and observed stage coefficients. The CUDA status is declared in the matrix
+legend. The reviewer ran 41 generator/matrix tests successfully; the measured
+time/HBM values and original raw artifacts were unchanged.
+
 - `completed_attention_calls` counts completed attention-core execution. Recording occurs before the output projection, so a later output-projection exception can leave that core call counted. It must not be described as a count of successfully completed whole attention modules, model forwards, optimizer updates, or backward kernels. No further production change was made during this review, preserving the source used by the CUDA regression.
 - Shared-forward capture's first-head-call rule is valid for the reviewed trainer: the corrected student projection precedes teacher-distribution projections. The hook captures actual corrected student inputs and logits rather than only the uncorrected draft output. Cross-device numerical conclusions still require matching input/anchor/weight identities and the separate comparison artifacts.
 - B dense baselines are explicitly described as harness full-query SDPA comparators; they are not stock HF dense-mask-once throughput. All tested shapes fit. The evidence supports a memory/time tradeoff, not an observed OOM capacity boundary or speedup.

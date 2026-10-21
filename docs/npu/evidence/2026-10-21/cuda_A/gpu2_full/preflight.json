@@ -1,0 +1,13 @@
+{
+  "gpu_index": 2,
+  "gpu_uuid": "GPU-1d7c6b74-f5df-a297-6796-3986c3701ffa",
+  "lock_path": "/tmp/veladraft_gpu_locks/GPU-1d7c6b74-f5df-a297-6796-3986c3701ffa.lock",
+  "preflight_free_MiB": 48522,
+  "preflight_apps": [],
+  "allocator_cap_gib": 40,
+  "max_seconds": 600,
+  "source_sha256": {
+    "A_gpu2_child.py": "b5b7113a4aa965319a0506c072350648a747fdfc8f25b0f03b5df3c00591efb8",
+    "A_gpu2_guard.py": "084327190dd4c1c5339a6adce0669149c1d6764c3455690201bcc66d78a02bb4"
+  }
+}

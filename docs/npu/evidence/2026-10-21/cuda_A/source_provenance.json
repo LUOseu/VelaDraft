@@ -1,0 +1,14 @@
+{
+  "qualification22_source_note": "The 22GiB scripts were not snapshotted/hashed before cap editing. Files named reconstructed recover verbatim original authored tool-command text by reversing the exact cap edits; not a pre-run hash attestation.",
+  "qualification25_source_note": "Post-run byte copies of the unchanged scripts executed by the qualification25 guard.",
+  "harness_sha256": {
+    "pr30_A_child_22_reconstructed.py": "b4d267698f3855e07b5d48336bdb54547f28a9a699b13901a0140aaa01cac2e0",
+    "pr30_A_guard_22_reconstructed.py": "074f0220dfc31656e1faf4c83b890764f4978f816518285fa0c332211832b1ab",
+    "A_child_25.py": "32a51713a1f8b544409511e822e72cd2cd706055f1c823faa72b59c37f2b5c00",
+    "A_cpu_plan.py": "e2105049169b64eea14933ba00a7e779cb397fe9471804b182dd291ea9235947",
+    "A_guard_25.py": "26604e59f75ddd3c5c7cf15b0ef08822eed207cad685cfb12335ea4bd1ed7459"
+  },
+  "plan_tree_digest": "713a1dec4d24ac996de64abd0dd889851c9eba0fc0743ed4b5d216ed232226da",
+  "source_checkpoint_sha256": "5e4457729dfdc1179bdc94908958464ea4c98d3867b4e738a4a44eb7520d1539",
+  "logical_to_physical_device": "CUDA_VISIBLE_DEVICES=1; logical cuda:0 is physical GPU1"
+}

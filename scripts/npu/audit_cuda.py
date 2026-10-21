@@ -122,6 +122,14 @@ def main():
     torch.save(probes,args.output.with_suffix('.probes.pt'))
     print(json.dumps(result))
 
+def configure_export_verifier():
+    """Use the same generate-parity backend policy as production evaluation."""
+    from vlm_dflash.algorithms import get_algorithm
+    algorithm=get_algorithm('dfly')
+    algorithm.configure_verify_backend(False)
+    return algorithm
+
+
 def export64():
     """Compare native and exported weights through the real sequential decoder."""
     parser = argparse.ArgumentParser()
@@ -149,7 +157,8 @@ def export64():
     cfg['target'].update(model=str(args.target),device='cuda:0')
     contract['target']['model_path']=str(args.target)
     target,processor=load_target(cfg,contract)
-    native,meta=get_algorithm('dfly').load_decoder(args.checkpoint)
+    algorithm=configure_export_verifier()
+    native,meta=algorithm.load_decoder(args.checkpoint)
     portable,export_meta=load_export(args.export_dir)
     for field in ['model_fingerprint','processor_fingerprint']:
         assert meta['identity'][field]==contract['target'][field], field
@@ -187,7 +196,10 @@ def export64():
                 stream.write(json.dumps({'format':label,**sample})+'\n');stream.flush()
             results[label]={**summarize_samples(samples,8),'token_exact':all(s['equivalent'] for s in samples)}
             draft.cpu()
+    from vlm_dflash.dflash.draft_model import verify_sdpa_backend_switch_enabled
     report={'scope':'64 fixed natural heldout / max_new_tokens64 / sequential verification',
+            'verification':'sequential','verify_sdpa_backend':'parity',
+            'verify_sdpa_backend_switch_enabled':verify_sdpa_backend_switch_enabled(),
             'torch':torch.__version__,'transformers':transformers.__version__,'torch_npu_imported':'torch_npu' in sys.modules,'torch_npu_installed':False,
             'weight_sha256':native_digest,'target_fingerprint':contract['target']['model_fingerprint'],
             'processor_fingerprint':contract['target']['processor_fingerprint'],
@@ -219,7 +231,8 @@ def shared_forward():
     bundle=load_bundle(args.bundle)
     module,_=build_module(bundle,cfg,args.device,seed=42,checkpoint=args.checkpoint)
     module.set_training_progress(75,100)
-    batch=make_batch(bundle,[0],args.device,torch.bfloat16)
+    compute_dtype=next(module.draft_model.parameters()).dtype
+    batch=make_batch(bundle,[0],args.device,compute_dtype)
     torch.manual_seed(42)
     anchors=module._sample_anchor_positions(batch['input_ids'].shape[1],batch['loss_mask'].cpu(),torch.device('cpu'))
     batch['anchor_table']=anchors
@@ -300,11 +313,17 @@ def compare_shared_forward():
         failures=(delta>tolerance)|~torch.isfinite(delta)
         checks[key]={'passed':finite and not bool(failures.any()),'shape':list(a.shape),
                      'max_abs_error':float(delta.max()),'mean_abs_error':float(delta.mean()),
-                     'violating_elements':int(failures.sum()),'total_elements':a.numel()}
+                     'violating_elements':int(failures.sum()),'total_elements':a.numel(),
+                     'violating_fraction':float(failures.sum())/a.numel(),
+                     'relative_l2_error':float(torch.linalg.vector_norm(a-b)/torch.linalg.vector_norm(b).clamp_min(1e-12))}
     loss_error=abs(npu['loss']-cuda['loss'])
-    checks['loss']={'passed':loss_error<=.02+.02*abs(cuda['loss']),'npu':npu['loss'],'cuda':cuda['loss'],'abs_error':loss_error}
+    checks['loss']={'passed':loss_error<=.02+.02*abs(cuda['loss']),'npu':npu['loss'],'cuda':cuda['loss'],'abs_error':loss_error,'exact':npu['loss']==cuda['loss']}
     passed=all(identity.values()) and all(check['passed'] for check in checks.values())
-    report={'status':'PASS' if passed else 'FAILED','identity_checks':identity,'checks':checks,
+    metadata_keys=['device','dtype','student_logits_dtype','weights_sha256','input_sha256','source_sha256']
+    metadata={'npu':{k:npu.get(k) for k in metadata_keys},'cuda':{k:cuda.get(k) for k in metadata_keys}}
+    report={'status':'PASS' if passed else 'FAILED','metadata':metadata,
+            'scope':('FP32 precision diagnostic only; does not replace BF16 gate' if npu['dtype']=='torch.float32' else 'BF16 cross-backend forward gate'),
+            'identity_checks':identity,'checks':checks,
             'tolerance':{'rtol':.02,'atol':.02,'reference':'CUDA','source':'pre-existing scripts/npu/operator_smoke.py BF16 envelope'},
             'artifact_sha256':{'npu':hashlib.sha256(args.npu.read_bytes()).hexdigest(),'cuda':hashlib.sha256(args.cuda.read_bytes()).hexdigest()}}
     args.output.parent.mkdir(parents=True,exist_ok=True)

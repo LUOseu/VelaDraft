@@ -1,0 +1,63 @@
+{
+  "status": "FAILED",
+  "identity_checks": {
+    "weights_sha256": true,
+    "input_sha256": true,
+    "dtype": true,
+    "student_logits_dtype": true,
+    "source_sha256": true,
+    "anchors_equal": true
+  },
+  "checks": {
+    "draft_hidden": {
+      "passed": false,
+      "shape": [
+        1,
+        32,
+        2048
+      ],
+      "max_abs_error": 0.125,
+      "mean_abs_error": 0.0036107085179537535,
+      "violating_elements": 5,
+      "total_elements": 65536
+    },
+    "post_correction_hidden": {
+      "passed": false,
+      "shape": [
+        32,
+        2048
+      ],
+      "max_abs_error": 0.25,
+      "mean_abs_error": 0.005910385400056839,
+      "violating_elements": 93,
+      "total_elements": 65536
+    },
+    "student_logits": {
+      "passed": false,
+      "shape": [
+        32,
+        151936
+      ],
+      "max_abs_error": 0.125,
+      "mean_abs_error": 0.008293825201690197,
+      "violating_elements": 5356,
+      "total_elements": 4861952
+    },
+    "loss": {
+      "passed": true,
+      "npu": 0.2353515625,
+      "cuda": 0.2353515625,
+      "abs_error": 0.0
+    }
+  },
+  "tolerance": {
+    "rtol": 0.02,
+    "atol": 0.02,
+    "reference": "CUDA",
+    "source": "pre-existing scripts/npu/operator_smoke.py BF16 envelope"
+  },
+  "artifact_sha256": {
+    "npu": "b9a2b6759239dc009ef6774dd75fe877d96d2355e30015a96e500c8c51ba519d",
+    "cuda": "2d605e5617482f7b0748f193cf21fa30cc1621250539e34d59b3137161eae60e"
+  }
+}

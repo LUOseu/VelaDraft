@@ -64,6 +64,14 @@ def validate_matrix(matrix_path, expected_revision=None):
                 if not _integer(geometry.get(key)): fail(f'invalid model_geometry.{key}')
         shape=row.get('shape')
         if not isinstance(shape,dict): fail('shape must be an object')
+        elif row.get('mode') == 'inference':
+            for key in ('max_new_tokens','speculative_rounds','new_tokens'):
+                if not _integer(shape.get(key)): fail(f'invalid shape.{key}')
+            for key in ('draft_tokens','accepted_tokens'):
+                if not _integer(shape.get(key),0): fail(f'invalid shape.{key}')
+            if all(_integer(shape.get(key),0) for key in ('accepted_tokens','draft_tokens','new_tokens')):
+                if shape['accepted_tokens'] > min(shape['draft_tokens'],shape['new_tokens']):
+                    fail('accepted_tokens cannot exceed draft_tokens or new_tokens')
         else:
             for key in SHAPE[:-1]:
                 if not _integer(shape.get(key)): fail(f'invalid shape.{key}')

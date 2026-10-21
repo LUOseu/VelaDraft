@@ -1,0 +1,321 @@
+{
+  "format": "vlm-dflash-npu-cpu-suite-v1",
+  "status": "CPU_VERIFIED",
+  "evidence_level": "CPU_VERIFIED",
+  "command": [
+    "/Users/Admin/grounding-parallel/veladraft-npu/.venv/bin/python",
+    "-m",
+    "pytest",
+    "tests/test_npu_runtime.py",
+    "tests/test_npu_attention.py",
+    "tests/test_npu_cpu_suite.py",
+    "tests/test_npu_reporting.py",
+    "tests/test_npu_presets.py",
+    "tests/test_npu_support_matrix.py",
+    "tests/test_target_device_map.py",
+    "tests/test_qwen35_moe_target.py",
+    "-q",
+    "--junitxml=/var/folders/05/jh10c3wd6mz67_w64j7njy340000gp/T/tmpw59fwh85/junit.xml"
+  ],
+  "started_utc": "2026-10-21T09:58:03Z",
+  "duration_seconds": 3.73,
+  "environment": {
+    "python": "3.12.13",
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "machine": "arm64",
+    "torch": "2.10.0",
+    "torch_npu": null
+  },
+  "pytest": {
+    "tests": 137,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "time_seconds": 3.309,
+    "exit_code": 0
+  },
+  "methods_covered": [
+    "dflare",
+    "dflash",
+    "dflash2",
+    "dfly",
+    "domino",
+    "dspark",
+    "jetspec"
+  ],
+  "per_method": {
+    "dflare": {
+      "cases": 4,
+      "requires": {
+        "run_ten_real_optimizer_updates": true,
+        "specific_modules_receive_nonzero_gradients": true,
+        "six_plus_exact_resume_plus_six": true,
+        "exports_and_reloads": true
+      }
+    },
+    "dflash": {
+      "cases": 8,
+      "requires": {
+        "run_ten_real_optimizer_updates": true,
+        "specific_modules_receive_nonzero_gradients": true,
+        "six_plus_exact_resume_plus_six": true,
+        "exports_and_reloads": true
+      }
+    },
+    "dflash2": {
+      "cases": 4,
+      "requires": {
+        "run_ten_real_optimizer_updates": true,
+        "specific_modules_receive_nonzero_gradients": true,
+        "six_plus_exact_resume_plus_six": true,
+        "exports_and_reloads": true
+      }
+    },
+    "dfly": {
+      "cases": 4,
+      "requires": {
+        "run_ten_real_optimizer_updates": true,
+        "specific_modules_receive_nonzero_gradients": true,
+        "six_plus_exact_resume_plus_six": true,
+        "exports_and_reloads": true
+      }
+    },
+    "domino": {
+      "cases": 4,
+      "requires": {
+        "run_ten_real_optimizer_updates": true,
+        "specific_modules_receive_nonzero_gradients": true,
+        "six_plus_exact_resume_plus_six": true,
+        "exports_and_reloads": true
+      }
+    },
+    "dspark": {
+      "cases": 4,
+      "requires": {
+        "run_ten_real_optimizer_updates": true,
+        "specific_modules_receive_nonzero_gradients": true,
+        "six_plus_exact_resume_plus_six": true,
+        "exports_and_reloads": true
+      }
+    },
+    "jetspec": {
+      "cases": 4,
+      "requires": {
+        "run_ten_real_optimizer_updates": true,
+        "specific_modules_receive_nonzero_gradients": true,
+        "six_plus_exact_resume_plus_six": true,
+        "exports_and_reloads": true
+      }
+    }
+  },
+  "method_evidence": {
+    "status": "PASSED",
+    "expected_methods": [
+      "dflare",
+      "dflash",
+      "dflash2",
+      "dfly",
+      "domino",
+      "dspark",
+      "jetspec"
+    ],
+    "record_count": 7,
+    "per_method": {
+      "dflare": {
+        "status": "passed",
+        "steps": 12,
+        "nan_seen": false,
+        "checks": {
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        },
+        "problems": [],
+        "record": {
+          "method": "dflare",
+          "steps": 12,
+          "nan_seen": false,
+          "exit_code": 0,
+          "skipped": false,
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        }
+      },
+      "dflash": {
+        "status": "passed",
+        "steps": 12,
+        "nan_seen": false,
+        "checks": {
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        },
+        "problems": [],
+        "record": {
+          "method": "dflash",
+          "steps": 12,
+          "nan_seen": false,
+          "exit_code": 0,
+          "skipped": false,
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        }
+      },
+      "dflash2": {
+        "status": "passed",
+        "steps": 12,
+        "nan_seen": false,
+        "checks": {
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        },
+        "problems": [],
+        "record": {
+          "method": "dflash2",
+          "steps": 12,
+          "nan_seen": false,
+          "exit_code": 0,
+          "skipped": false,
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        }
+      },
+      "dfly": {
+        "status": "passed",
+        "steps": 12,
+        "nan_seen": false,
+        "checks": {
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        },
+        "problems": [],
+        "record": {
+          "method": "dfly",
+          "steps": 12,
+          "nan_seen": false,
+          "exit_code": 0,
+          "skipped": false,
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        }
+      },
+      "domino": {
+        "status": "passed",
+        "steps": 12,
+        "nan_seen": false,
+        "checks": {
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        },
+        "problems": [],
+        "record": {
+          "method": "domino",
+          "steps": 12,
+          "nan_seen": false,
+          "exit_code": 0,
+          "skipped": false,
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        }
+      },
+      "dspark": {
+        "status": "passed",
+        "steps": 12,
+        "nan_seen": false,
+        "checks": {
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        },
+        "problems": [],
+        "record": {
+          "method": "dspark",
+          "steps": 12,
+          "nan_seen": false,
+          "exit_code": 0,
+          "skipped": false,
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        }
+      },
+      "jetspec": {
+        "status": "passed",
+        "steps": 12,
+        "nan_seen": false,
+        "checks": {
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        },
+        "problems": [],
+        "record": {
+          "method": "jetspec",
+          "steps": 12,
+          "nan_seen": false,
+          "exit_code": 0,
+          "skipped": false,
+          "forward": true,
+          "backward": true,
+          "update": true,
+          "resume": true,
+          "export": true,
+          "method_specific_grad": true
+        }
+      }
+    },
+    "problems": []
+  },
+  "min_steps": 10,
+  "problems": [],
+  "pytest_stdout_tail": "........................................................................ [ 52%]\n.................................................................        [100%]\n",
+  "pytest_stderr_tail": "",
+  "note": "CPU evidence only; this does not prove any Ascend operator or device path."
+}

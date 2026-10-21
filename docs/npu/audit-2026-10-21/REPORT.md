@@ -11,11 +11,12 @@
 | 正式 DSpark / DFly objective 与阶段 | PASS：真实 teacher 分布、有效监督、专属 head 梯度；短程诊断，不是质量训练 |
 | DFly stage 边界恢复 | PASS：固定 horizon12，在已提交 step5/6 重新加载，完整最终状态逐项相等 |
 | A：NPU compaction 同工作负载对照 | PASS：8 个固定 batch 数值检查，3 对、每 leg 5 warmup +10 measured |
-| A：匹配 GPU 性能对照 | PENDING：当前无独占窗口，同正式最坏batch的CUDA限额容量资格检查尚未运行；CUDA功能回归不代替本实验 |
+| A：匹配 GPU 性能对照 | PASS：另一张空闲GPU2、相同原始workload，6个完整leg与guard退出0；allocator环境修订和此前OOM独立保留 |
 | B：attention 实测 | PASS：自然短上下文与 shape-only 分列；未发现 OOM 容量边界，不能称容量胜出 |
 | CUDA base/head 回归 | PASS：4 方法、各 3 update；同种子初始化、同数据与配置，非吞吐对比 |
 | 可控proposal接受路径 | 28个CPU fixtures：零/部分/整块接受、EOS/尾块截断、KV commit；仅控制流正确性，不证明模型质量 |
-| C：NPU continuation / export → CUDA | NPU continuation/export 已完成；CUDA forward 与64 held-out真实接受由独立原始结果确认，未完成前保持 PENDING |
+| C：NPU continuation / export → CUDA | FAILED：冻结BF16跨后端forward数值门槛未通过；NPU训练/导出已完成，64条CUDA实际使用验收独立记录 |
+| C：portable格式及CUDA实际使用（独立子项） | PASS：native/portable各64/64 token-exact、1931实际接受；不覆盖上面的BF16数值FAILED |
 
 ## 来源与复算边界
 
@@ -33,7 +34,9 @@ DFly 固定 horizon12、split6，连续历史有6个 LK/D-PACE update 和6个 CE
 
 ## A：DFly stage2 compaction（NPU）
 
-正式 microbatch8、anchors256、block8；固定8个自然 batch，实际每样本 anchors12–256，真实 context442–825。按 mask/长度预选含低无效比例和高无效比例 batch；无效 allocated row 比例4.07%–48.54%。同 checkpoint、FP32 master、optimizer、scheduler、RNG 与 anchor plan；只改变 compaction。objective progress75起、horizon100，整个窗口不跨 stage。
+数值检查：既有H1 BF16门槛8/8通过；严格逐位一致4/8。其余4个batch存在非逐位一致梯度，虽在冻结BF16门槛内，不能报告为全部bitwise parity。
+
+正式 microbatch8、requested anchors256、block8；固定8个自然 batch，各batch每样本分配12–256个anchor槽位，个体有效anchor数由keep决定，不能将分配宽度写成每个样本的有效数量。真实context442–825，batch allocated query rows768–16384，kept rows600–8432，完整逐batch计数见batches.json。按mask/长度预选含低无效比例和高无效比例batch；无效allocated row比例4.07%–48.54%。同checkpoint、FP32 master、optimizer、scheduler、RNG与anchor plan；只改变compaction。objective progress75起、horizon100，整个窗口不跨stage。
 
 | pair | off ms/update | on ms/update | off/on 时间比 | off GiB | on GiB | HBM减少 |
 |---|---:|---:|---:|---:|---:|---:|
@@ -41,11 +44,11 @@ DFly 固定 horizon12、split6，连续历史有6个 LK/D-PACE update 和6个 CE
 | 1 | 702.445 | 623.525 | 1.127 | 33.263 | 24.005 | 27.83% |
 | 2 | 703.079 | 623.382 | 1.128 | 33.263 | 24.005 | 27.83% |
 
-时间比大于1表示 NPU 此工作负载缩短 update 时间；这不是跨硬件绝对速度排名，也不是已证明 GPU/NPU 都加速。每个 leg 的前5步 warmup 不进入均值。峰值为 allocator 实测 allocated HBM，未用 memory_plan 估算替代。
+时间比大于1表示 NPU 此工作负载缩短 update 时间；这不是跨硬件绝对速度排名，GPU同workload结果另表报告，不能据绝对时间比较芯片优劣。每个 leg 的前5步 warmup 不进入均值。峰值为 allocator 实测 allocated HBM，未用 memory_plan 估算替代。
 
 初次 [parity失败](raw/compaction/parity.json) 保留：两个 batch 的 legacy loss_weight 报告标量因零填充布局改变 reduction 顺序而不严格相等。修复只令该标量在两侧按相同非零权重顺序归约；recipe loss/梯度数学未变，容差未放宽。完整8-batch gate和全部6个性能leg在新源码 binding 下重跑，见 [最终parity](raw/compaction-v2/parity.json)。CPU严格检查与既有 H1 BF16 envelope 分开记录；通过 BF16 envelope 不等同逐位相等。
 
-GPU 同配置 compaction 对照 PENDING：当前没有独占窗口，同正式最坏batch的CUDA限额容量资格检查尚未运行。NPU约33GiB峰值不能证明CUDA在22GiB限额下不可运行，两个后端的kernel和显存行为不同。保持C优先，准备相同64条features后再资格检查；若限额内可运行，并在有其他任务时完成受保护的3对实验，也只能记为有竞争环境下的描述性诊断，不能称干净的GPU性能基准。现有功能回归不能替代A。
+GPU A此前缺少独占窗口；随后同正式最坏batch在GPU1共享22/25GiB限额下均OOM，详见后面的资格检查。NPU峰值不用于推断CUDA容量。随后另一个设备GPU2出现空闲窗口，完整结果已完成，见GPU2配对表；不改写此前GPU1限额失败。
 
 ## B：attention 公平三路径与负面结果
 
@@ -72,7 +75,7 @@ GPU 同配置 compaction 对照 PENDING：当前没有独占窗口，同正式�
 | shape | 4096/512 | 4096/512 | dense_checkpoint | 1 | 333.635 | 11.687 | no |
 | shape | 4096/512 | 4096/512 | chunked_checkpoint | 32 | 550.485 | 9.085 | no |
 
-所有18个最终cell均可运行，没有 NPU OOM；因此不能声称 dense OOM而chunked可运行，也不计算不存在的容量 speedup。chunked在本表更慢（slower），通过重计算与多次dispatch换取部分大形状的显存下降；小形状峰值没有改善。
+小形状的4组数值对照均通过：natural和shape-only各比较dense_checkpoint、chunked_checkpoint与dense参考的output、loss及全部梯度，沿用H1的rtol=0.02、atol=0.02。中/大形状记录的是完整update与资源可运行性，没有逐格重新做全梯度parity；不能把18个cell全部标为大形状数值等价。所有18个最终cell均可运行，没有 NPU OOM；因此不能声称 dense OOM而chunked可运行，也不计算不存在的容量 speedup。chunked在本表更慢（slower），通过重计算与多次dispatch换取部分大形状的显存下降；小形状峰值没有改善。
 
 自然数据只选中同一个最长825-token完整样本：4096是零填充bucket，实际anchors受答案长度限制为249，requested512没有达到。不能把这几行写成4096真实上下文/512有效anchors训练；真正4096/512只能由单独shape-only行支持。NPU1专用于B，但NPU0 recipe并行工作共享主机CPU/RAM，所以时间为有仪器开销的共享主机测量。
 
@@ -93,9 +96,9 @@ requested anchors256，但实际仅4/8/17；不能称正式anchors256负载回�
 
 ## C、失败与资源边界
 
-NPU已用具有接受能力的R3 checkpoint做10步stage2 weight-only continuation，再导出portable权重；使用新optimizer，不称跨后端bitwise恢复，亦不称从头训练。CUDA导出完整验收及64条自然held-out接受结果仍需独立结果完成后更新。训练loss里的e2e_accept_len不是实际解码接受率。
+NPU已用具有接受能力的R3 checkpoint做10步stage2 weight-only continuation，再导出portable权重；使用新optimizer，不称跨后端bitwise恢复，亦不称从头训练。CUDA上64条实际使用验收独立通过，但BF16跨后端数值门槛失败，故combined C不通过。训练loss里的e2e_accept_len不是实际解码接受率。
 
-已有可计算wall：A最终全流程 312.43s；B最终cell合计 508.07s；CUDA含pilot预留窗口 562.70s。这些不是整个项目的总NPU-h/GPU-h，未包含所有准备、失败、排队和其他进程，不能冒充完整预算核算。
+已完成子项wall：NPU A最终全流程 312.43s；B最终cell合计 508.07s；CUDA base/head功能回归含pilot预留窗口 562.70s。这些不是整个项目的总NPU-h/GPU-h，未包含所有准备、失败、排队和其他进程，不能冒充完整预算核算。
 
 ## 执行路径与复现
 
@@ -141,4 +144,89 @@ C 原始运行脚本没有在结束前显式检查全部最终权重有限性。
 
 上述NPU0可核对进程wall合计723s（0.2008设备小时的预留wall），包含两次exit137和初次A失败；不是kernel忙碌时间。B最终18cell另计508.07s，旧BF16预演和capture/shared-forward缺完整进程起止，不能声称预算完整闭合。并行不同设备需按设备求和，不能仅取整体wall。
 
-本地完整CPU套件835 passed / 6 skipped（JUnit摘要与文件hash见raw/local_validation.json）。这些验证不能替代NPU/CUDA硬件证据；本生成器另有失败关闭测试。
+本地完整CPU套件873 passed / 6 skipped（JUnit摘要与文件hash见raw/local_validation.json）。这些验证不能替代NPU/CUDA硬件证据；本生成器另有失败关闭测试。
+
+## C：BF16跨后端数值门槛失败（必须保留）
+
+NPU/CUDA使用相同权重、输入、dtype、实际student logits dtype、源码与anchor计划，所有身份核对通过。相同loss不能替代全部hidden/logits逐元素检查。冻结的既有H1 BF16门槛为rtol=0.02、atol=0.02，以下三项均失败：
+
+| tensor | 违反门槛元素 / 总元素 | max abs | mean abs |
+|---|---:|---:|---:|
+| draft_hidden | 5 / 65536 | 0.125 | 0.0036107085 |
+| post_correction_hidden | 93 / 65536 | 0.25 | 0.0059103854 |
+| student_logits | 5356 / 4861952 | 0.125 | 0.0082938252 |
+
+loss在两端均为0.2353515625，但combined C profile仍为FAILED，不能宣称完整跨后端数值等价。原始记录见 [BF16 shared-forward comparison](../evidence/2026-10-21/cuda_regression/C_shared_forward_comparison.json)。
+
+后续FP32仅可作为独立诊断，不能替换这个BF16失败、改变容差或改写原始结果。portable格式与64条真实接受的可用性可以独立成功，但不能覆盖此失败；64条实际使用现已独立通过，见下表；combined C仍为FAILED。
+
+## C：portable格式与64条CUDA实际使用独立通过
+
+相同NPU continuation权重的native checkpoint与portable export在无torch_npu的CUDA环境加载。传输后的native文件SHA256和重建safetensors完整字节SHA256均匹配NPU原件；export config/target/processor/recipe身份校验通过。正式3层模型几何从SHA256验证后的export metadata读取，而非从测试名称推断。
+
+| format | samples token-exact | accepted | rounds | emitted tokens | proposed draft tokens | τ=progress/round | A=accepted/round |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| native | 64/64 | 1931 | 997 | 2936 | 6507 | 2.9448345035 | 1.9368104313 |
+| portable | 64/64 | 1931 | 997 | 2936 | 6507 | 2.9448345035 | 1.9368104313 |
+
+τ严格采用原始字段al_progress_tokens_per_round，A采用al_draft_tokens_per_round。两种格式逐样本token序列、接受事件和计数一致，显示真实非零接受路径；不据此声称质量排名或推理加速。每条最多生成64 tokens，verification=sequential，生产generate-parity配置开关为False。
+
+首次运行漏设该False开关，错误使用另一SDPA backend；116条部分结果标为INVALID_PROTOCOL并归档，不计入本表，也不作为checkpoint缺陷证据。修复harness协议后按原64个held-out ID从头重跑，没有换样本或放宽token-exact要求。combined C的BF16跨后端数值FAILED仍保留，不能被格式可用性PASS覆盖。
+
+## C：FP32补充诊断
+
+另行将相同权重转为FP32进行shared-forward诊断；两端实际hidden/student logits dtype均记录为torch.float32，权重、输入、源码和anchor身份一致。该结果不替代BF16主门槛，不修改其失败记录或容差。原始诊断见 [FP32 comparison](../evidence/2026-10-21/cuda_regression/C_shared_forward_fp32_comparison.json)。诊断通过与低精度执行路径差异一致，但不足以单独证明具体误差根因。
+
+| tensor | max abs error | relative L2 | 违规元素 |
+|---|---:|---:|---:|
+| draft_hidden | 1.1920929e-05 | 8.4409942e-07 | 0 |
+| post_correction_hidden | 3.4332275e-05 | 6.205201e-07 | 0 |
+| student_logits | 2.4795532e-05 | 5.4469837e-07 | 0 |
+
+FP32 loss差值为7.8976154e-07。此诊断沿用原comparison的0.02/0.02门槛，同时完整报告实际误差；不把它包装成另一个预注册的FP32严格门槛。
+
+## A：GPU1共享限额资格检查（保留失败）
+
+没有根据NPU峰值猜测CUDA是否能运行，而是保持同一正式microbatch8、context825、anchors256、block8及固定最坏batch1进行真实OFF完整update资格检查。CUDA plan全部字段与NPU原计划一致，tree digest与NPU binding相同。只改变资源限额；没有缩batch、模型、context、anchors或更换数据。
+
+| allocator cap GiB | outcome | guarded wall s | guard最低采样空闲MiB |
+|---|---|---:|---:|
+| 22 | OOM under cap | 34.070126 | 28798 |
+| 25 | OOM under cap | 27.481875 | 6052 |
+
+guard列仅是轮询时观测到的最低空闲值，不是连续测量的瞬时最低值；22GiB运行的快速分配峰值发生在轮询之间，以下OOM报文提供了更低的当时空闲值。这是共享设备上的显式allocator限额OOM，不是整张A6000物理容量OOM，也不是CUDA必然无法运行正式配置的证明。22GiB失败时PyTorch报物理空闲8.81GiB，25GiB失败时报5.91GiB；另一个进程约占16.69GiB。两次都在CE分配594MiB时触发限额，没有完整update时间或配对性能结果可报告。后续若另一张设备出现独占窗口，应作为独立资源条件记录，不改写这两次失败。
+
+## A：CUDA GPU2独占计算窗口的完整配对结果
+
+GPU2 preflight无其他compute进程、空闲48522MiB，持有GPU UUID advisory lock并监视外部进程；计算设备观测为独占，主机CPU仍共享。最终guard退出0、wall 318.377050s；全部6个leg均5warmup+10measured，原始NPU checkpoint权重、8-batch plan、每步有效监督/allocated/kept rows匹配。
+
+CUDA既有H1 BF16门槛8/8通过；CUDA严格逐位一致6/8，其余2个batch存在非逐位一致梯度。NPU严格检查为4/8，不能把两端都写成bitwise parity。
+
+| pair | off ms/update | on ms/update | off/on 时间比 | off GiB | on GiB | HBM减少 |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 | 999.488 | 812.756 | 1.230 | 33.186 | 23.638 | 28.77% |
+| 1 | 995.473 | 810.652 | 1.228 | 33.186 | 23.638 | 28.77% |
+| 2 | 995.871 | 812.199 | 1.226 | 33.186 | 23.638 | 28.77% |
+
+在这个固定诊断workload上，NPU和CUDA分别有compaction相对收益；只比较各设备内部off/on比值，不以两端绝对时间排名硬件，也不外推到其他shape或完整online训练。
+
+GPU2第一次default allocator完整尝试在parity和pilot通过后、首个OFF benchmark leg backward中OOM：请求4.06GiB时live allocated29.13GiB、reserved但未用7.18GiB，仍有物理空闲10.70GiB，显式cap40GiB。原始失败保留在gpu2_full。缓存碎片是根据这些读数提出的解释，未采memory snapshot，不能断言机制已被证明。
+
+随后仅做一次新进程、新输出目录的allocator环境修订：两臂均设置PYTORCH_ALLOC_CONF=expandable_segments:True，保持40GiB cap、数据、几何、seed、计划与全部5+10窗口；没有每step empty_cache。该修订在任何完整性能leg之前声明，最终全部leg在同一环境下重跑。
+
+该选项在[已安装PyTorch 2.11官方文档](https://docs.pytorch.org/docs/2.11/notes/cuda.html#optimizing-memory-usage-with-pytorch-alloc-conf)中为experimental、默认False；它可能改善变化分配大小导致的碎片。这里它是执行环境条件，不是VelaDraft算法创新，也不用于解释NPU kernel的收益来源。
+
+## CUDA累计资源账本
+
+所有已附串行guard命令累计2123.615311s（0.589893 GPU-h），含CPU加载、错误backend终止、BF16/FP32诊断、初始probe失败、22/25GiB资格OOM、GPU2默认allocator失败及完整重试；不是kernel busy time。预算3600s，已登记余量1476.384689s。原始逐项账本见 [cuda_gpu_ledger.json](../evidence/2026-10-21/cuda_gpu_ledger.json)。
+
+## A：阶段开销与实际投影工作
+
+每个backend/开关行合并3个leg的30个measured updates。阶段时间为每update均值；optimizer阶段含FP32 master梯度转移、clip、step、scheduler及权重copyback，不是单个optimizer kernel。投影rows为这30步的实际hook计数之和，来自raw steps而不是mask形状估算；forward student/teacher投影与包含backward重计算的全部投影分列。
+
+| backend | compaction | forward ms | backward ms | optimizer ms | student rows forward | teacher rows forward | all rows incl. recomputation |
+|---|---|---:|---:|---:|---:|---:|---:|
+| npu | off | 193.549 | 487.487 | 21.894 | 196800 | 172200 | 541200 |
+| npu | on | 185.259 | 416.032 | 21.926 | 156072 | 136563 | 429198 |
+| cuda | off | 265.185 | 692.033 | 39.726 | 196800 | 172200 | 541200 |
+| cuda | on | 225.809 | 546.279 | 39.781 | 156072 | 136563 | 429198 |

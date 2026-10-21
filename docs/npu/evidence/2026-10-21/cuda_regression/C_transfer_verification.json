@@ -1,0 +1,6 @@
+{
+  "native_sha256": "c1986c7475cb3c3920cacb6d7dcaa3b4af69c887f546beb9ca5952ceb361bd82",
+  "export_weights_sha256": "c8dc0c6fdf4451aefd049770648c73e5eadb55ead49d835a74cdce656540dcb0",
+  "matches_original_npu_bytes": true,
+  "reconstruction": "Same production safetensors.save_file on verified native model state, metadata format vlm-dflash-export-v1; complete binary SHA256 matches original NPU export, metadata copied verbatim."
+}
