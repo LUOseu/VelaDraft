@@ -29,6 +29,8 @@
 
 ## 最新动态
 
+- **[2026-10-21]** 新增 **Ascend NPU 训练支持**。七种 drafter 方法均已在 Ascend 910B3 上完成 BF16 离线训练、token-exact 评测与导出验证；DFlash 另有 online 和多设备放置检查。当前属于工程验证，不代表已完成生产规模的性能评测。详见 [NPU 安装与验证文档](docs/npu/README.md)。
+
 - **[2026-10-18]** 新增 **Qwen3.6-35B-A3B target adapter**，接入 partial rotary，提供回答重新生成、特征捕获与 dense drafter 训练路径（[#18](https://github.com/LUOseu/VelaDraft/pull/18)，感谢 [@khazic](https://github.com/khazic)）。验证范围见[支持矩阵](SUPPORT_MATRIX.md#targets)。
 
 ## 为什么选择 VelaDraft
