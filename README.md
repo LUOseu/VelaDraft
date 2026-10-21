@@ -38,6 +38,8 @@
 
 ## 🎉 News
 
+- **[2026-10-21]** Added **Ascend NPU training support**. All seven registered drafter methods have BF16 offline-training, token-exact evaluation and export evidence on Ascend 910B3; DFlash also has additional online and multi-device-placement checks. These are engineering validation runs, not production-scale performance claims. See the [NPU setup and validation guide](docs/npu/README.md).
+
 - **[2026-10-18]** 🔥 Added the **Qwen3.6-35B-A3B target adapter** with partial
   rotary support for regeneration, feature capture and dense drafter training
   ([#18](https://github.com/LUOseu/VelaDraft/pull/18), thanks to
