@@ -1,0 +1,86 @@
+{
+  "backend_identity": {
+    "backend": "vllm",
+    "code_commit": "abcdef123456",
+    "device_topology": {
+      "devices": [
+        {
+          "name": "NVIDIA L40S",
+          "uuid": "GPU-11111111-2222-3333-4444-555555555555"
+        }
+      ],
+      "gpu_count": 1
+    },
+    "version": "0.22.1"
+  },
+  "category": "chart_qa",
+  "correctness_status": "not_checked",
+  "draft_identity": {
+    "kind": "cpu_ngram",
+    "model": "[ngram]",
+    "precision": "not_applicable",
+    "revision": "0.22.1"
+  },
+  "error": null,
+  "group_id": "http:ngram:c4:s1",
+  "latency": {
+    "e2e_s": null,
+    "tpot_s": 0.125,
+    "total_s": 3.0,
+    "ttft_s": null
+  },
+  "measurement_scope": {
+    "concurrency": 4,
+    "mode": "ngram",
+    "queue_depth": 2,
+    "session_index": 1,
+    "stream": true,
+    "surface": "openai_chat_completions",
+    "timing_boundary": "client_request_start_to_last_nonempty_sse_content_chunk"
+  },
+  "protocol_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "raw_counts": {
+    "accepted": 30,
+    "draft_forward_calls": 0,
+    "emitted": 24,
+    "proposed": 50,
+    "target_forward_calls": null,
+    "verify_rounds": 10
+  },
+  "request_id": "serving-request-1",
+  "resource_usage": {
+    "devices": [
+      {
+        "name": "NVIDIA L40S",
+        "uuid": "GPU-11111111-2222-3333-4444-555555555555"
+      }
+    ],
+    "gpu_count": 1,
+    "gpu_hours": 0.001,
+    "peak_memory_mib": {
+      "gpu0": 1234
+    },
+    "wall_s": 3.0
+  },
+  "run_id": "serving-fixture",
+  "schema_version": "veladraft-platform-v1",
+  "target_identity": {
+    "model": "/srv/private/model",
+    "precision": "bfloat16",
+    "processor": {
+      "class": "Qwen2VLProcessor",
+      "path": "/srv/private/processor",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "revision": "cccccccccccccccccccccccccccccccccccccccc",
+    "template": {
+      "mode": "tokenizer_chat_template",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "tokenizer": {
+      "class": "Qwen2TokenizerFast",
+      "path": "/srv/private/tokenizer",
+      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  }
+}

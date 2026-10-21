@@ -1,0 +1,110 @@
+{
+  "assignment_sha256": "614b16b0028e41fe78dc6a3baa6d098e59f3046accaf8eed88697c32b0c67db9",
+  "assignment_verified": true,
+  "bootstrap_seed": 7,
+  "coverage": {
+    "buckets_insufficient": {
+      "dflash-exact:ar_R": [
+        "16-32",
+        "32-64",
+        "64-96",
+        "96-128"
+      ],
+      "dflash-exact:target_V": [
+        "1024-2048",
+        "256-512",
+        "512-1024"
+      ],
+      "dflash-exact:task": [
+        "chart_qa",
+        "general_vqa",
+        "invoice_fields"
+      ],
+      "dfly-fast-wrong:ar_R": [
+        "16-32",
+        "32-64",
+        "64-96",
+        "96-128"
+      ],
+      "dfly-fast-wrong:target_V": [
+        "1024-2048",
+        "256-512",
+        "512-1024"
+      ],
+      "dfly-fast-wrong:task": [
+        "chart_qa",
+        "general_vqa"
+      ]
+    },
+    "min_groups": 20,
+    "n_expected_requests": 24,
+    "n_groups": 24,
+    "n_sessions": 3,
+    "n_tasks": 3,
+    "task_group_counts": {
+      "chart_qa": 8,
+      "general_vqa": 8,
+      "invoice_fields": 8
+    }
+  },
+  "decision_id": "4a8b5de61c88d1fbe25a3f2e3a3077a3c53a3e50f573517f84b498c8dc3cb959",
+  "excluded_candidates": [
+    {
+      "candidate_id": "dflash-exact",
+      "reasons": [
+        {
+          "code": "synthetic_fixture",
+          "detail": "Synthetic fixtures never enter a real recommendation."
+        }
+      ]
+    },
+    {
+      "candidate_id": "dfly-fast-wrong",
+      "reasons": [
+        {
+          "code": "synthetic_fixture",
+          "detail": "Synthetic fixtures never enter a real recommendation."
+        },
+        {
+          "code": "correctness_failed",
+          "detail": "8 holdout request(s) failed exactness."
+        },
+        {
+          "code": "run_errors",
+          "detail": "8 request(s) have recorded run errors."
+        },
+        {
+          "code": "quality_failed",
+          "detail": "Task quality is below the frozen threshold."
+        },
+        {
+          "code": "insufficient_coverage",
+          "detail": "16 complete holdout group(s) < required 20."
+        }
+      ]
+    }
+  ],
+  "frozen_candidates_sha256": "90e72c4cdcc4064db8f1430daafa2a1c6984f7c7150c746eb79abadbe0c89b21",
+  "include_in_paper": false,
+  "input_integrity_status": "ok",
+  "project_scope": "platform_extension",
+  "protocol_hash": "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3",
+  "protocol_scope_hashes": [
+    "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3"
+  ],
+  "reasons": [
+    "Synthetic fixture evidence: no real recommendation is made."
+  ],
+  "recommended_action": "insufficient_evidence",
+  "recommended_method": null,
+  "records_sha256": "71ef80d87554d539dfbfb22913b8a9d92deb652232ae47e9eeb20aaa6ff1e55b",
+  "schema_version": "veladraft-platform-v1",
+  "scope": {
+    "measurement_scope": "local_client",
+    "min_groups": 20,
+    "threshold": 1.05
+  },
+  "summary_sha256": "972ad48fe1b7a51215b81c3d328564fd7efe9af67d1de32fcc169767021bb59d",
+  "synthetic": true,
+  "threshold": 1.05
+}
