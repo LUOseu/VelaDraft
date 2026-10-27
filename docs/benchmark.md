@@ -110,8 +110,12 @@ and fixed-block DSpark should retain those scope descriptions when used.
 
 The compatibility command `python scripts/vllm_bridge_check.py` now invokes this
 same protocol. It requires a draft and no longer returns failure solely because
-sampled AR/SD token outputs differ. No new GPU performance or quality numbers
-are published by changing the evaluator.
+sampled AR/SD token outputs differ. No new GPU performance or quality claim
+is made by changing the evaluator. A [functional GPU smoke receipt](validation/native_eval_smoke_20261027.json)
+records one session/repeat, five physical calls and the observed tiny-sample
+ratio, explicitly outside paper-performance evidence. It ran from source with
+vLLM0.22.1/Torch2.11/Transformers5.11; CPU regressions used the training tested
+extra (Torch2.10/Transformers5.12.1). This does not validate every dependency combination.
 
 ## HF checkpoint diagnostics (legacy workload harness)
 

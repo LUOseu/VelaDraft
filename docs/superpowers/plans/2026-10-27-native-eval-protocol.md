@@ -14,5 +14,7 @@
 - [x] Implement `vlm_dflash/eval/native_resources.py`: actual UUID mapping, shared GPU lock, periodic NVML descendant ownership; any contamination invalidates aggregation.
 - [x] Route `vlm-dflash native-eval` and `scripts/vllm_bridge_check.py` to the new executable protocol. Preserve explicit old `eval`/`benchmark` commands as HF diagnostic reports and label their preprocessed-prompt timer correctly.
 - [x] Update `docs/benchmark.md`, README EN/ZH and CLI help. State prepared exports/adapter requirements and scopes; report no new seven-method GPU or quality claim from CPU tests.
-- [ ] Run `python3 -m pytest tests/test_native_eval.py tests/test_eval_checkpoints.py tests/test_benchmark_manifests.py tests/test_cli.py`; execute a minimal GPU integration without modifying existing experiment bundles.
+- [x] Run `python3 -m pytest tests/test_native_eval.py tests/test_eval_checkpoints.py tests/test_benchmark_manifests.py tests/test_cli.py`; execute a minimal GPU integration without modifying existing experiment bundles.
 - [ ] Independent code review, fix material issues, commit the bounded change and open PR against latest `main`. Do not merge.
+
+Validation:58 targeted CPU tests passed; final wheel source/bootstrap bytes checked; independent review PASS. GPU source smoke completed five physical calls (one reference, one warm/timed per arm), all inputs equal,39 SD Flash layers,36 CPU-preserved tensors and clean sampled ownership. One session/repeat is not paper performance; prior failed attempt preserved.
