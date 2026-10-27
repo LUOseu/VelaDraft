@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Stage 3: acceptance evaluation with the token-exact equivalence gate."""
+"""Stage 3: HF checkpoint acceptance/token diagnostics.
+
+For native vLLM request E2E use `vlm-dflash native-eval`; this stage keeps
+its existing HF/NPU verification semantics and preprocessed-input timer."""
 
 from __future__ import annotations
 

@@ -1,0 +1,38 @@
+{
+  "schema": "native-eval-GPU-functional-validation-v1",
+  "status": "complete",
+  "paper_performance_claim": false,
+  "GPU": "RTX A6000",
+  "target": "Qwen2.5-VL-3B-Instruct",
+  "method": "Existing local spatial DFlash; preserved36 tensors; reviewed public-operator adapter",
+  "versions": {
+    "torch": "2.11.0",
+    "transformers": "5.11.0",
+    "vllm": "0.22.1"
+  },
+  "physical_generate_calls": 5,
+  "canonical_calls": 1,
+  "warmup_calls_per_arm": 1,
+  "timed_calls_per_arm": 1,
+  "complete_CPUpreserved_tensors": 36,
+  "CPU_all_values_bitwise_equal": true,
+  "same_inputIDs": true,
+  "actual_SD_Flash_layers": 39,
+  "resource_samples": 197,
+  "foreign_samples": 0,
+  "query_errors": 0,
+  "code_files": {
+    "vlm_dflash/eval/native.py": "c135dfb735d4e18c55486861ba1a19963350cb296a0c89bbd5d56c07c505a85f",
+    "vlm_dflash/eval/native_runtime.py": "3a2358f400c668774cb1ddb068a20908938b55fa053a7199dff279a607b45d4c",
+    "vlm_dflash/eval/native_resources.py": "85d5f6991586e2235c871e71b5ceb912d735534230df8bb4bc6a07e89c3287a1",
+    "vlm_dflash/eval/native_bootstrap/sitecustomize.py": "4ab4d05782a2f00d3cc7c974269a237cf4e94df864f732692109da4962635fe4"
+  },
+  "raw_archive_sha256": "fed2eb0f4ef16c249c15a77e15249ebe695817ecab33c7823e18bfed1a433079",
+  "raw_archive_bytes": 79445,
+  "raw_final_result_sha256": "cdcab2a7bfe7c71891d38fc997adc0a6abb1d06024b1fc21bf6631aa12cb70f6",
+  "prior_failed_attempt_preserved": true,
+  "scope": "Functional smoke only, one session/repeat; no quality/equivalence/acceleration claim",
+  "observed_smoke_ratio_not_paper_speedup": 0.9116611918292251,
+  "observed_output_tokens_per_arm": 4,
+  "validation_scope": "Executed from source in separate pinned CUDA environment; training tested-extra CPU tests use a different dependency stack."
+}

@@ -33,6 +33,16 @@
 
 - **[2026-10-18]** 新增 **Qwen3.6-35B-A3B target adapter**，接入 partial rotary，提供回答重新生成、特征捕获与 dense drafter 训练路径（[#18](https://github.com/LUOseu/VelaDraft/pull/18)，感谢 [@khazic](https://github.com/khazic)）。验证范围见[支持矩阵](SUPPORT_MATRIX.md#targets)。
 
+## 性能评测入口
+
+正式端到端计时使用 [`vlm-dflash native-eval`](docs/benchmark.md#native-vllm-e2e)：
+原生 vLLM AR 保持默认执行配置，SD 使用 Flash 线性验证，分别新建进程并预热，
+主指标为总墙钟比值，区间按 session 整簇计算。需要预先准备完整草稿导出；多模态
+MRoPE 和额外方法模块需显式提供带哈希的适配层。原 `eval` 和 `scripts/benchmark.py`
+保留为 HF checkpoint 诊断，其预处理输入后的计时不作为原生 E2E 主指标。训练与 NPU
+默认配置不变；逐 token 一致率、真实答案质量和速度分别报告，本次不发布新加速数字。
+
+
 ## 为什么选择 VelaDraft
 
 Parallel block drafter 的训练同时涉及昂贵的冻结多模态 target 和较小的可训练模型。

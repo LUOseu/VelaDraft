@@ -115,21 +115,24 @@ def _markdown(report: dict) -> str:
         f"# Benchmark report — {report['algorithm']} — {report['run_dir']}",
         "",
         f"- created: {report['created']}",
+        "- HF checkpoint diagnostics; prepared-input timing is not the native E2E headline. Use `vlm-dflash native-eval`.",
         f"- protocol: temperature={report['protocol']['temperature']}, "
         f"verification={report['protocol']['verification']}, checkpoint={report['protocol']['checkpoint']}",
         "",
-        "| workload | prompts | max_new | AL | acc rate | slot 1..k | token exact | wall/s | target-only/s | speedup |",
-        "| --- | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: |",
+        "| workload | prompts | max_new | AL_draft | AL_progress | acc rate | slot 1..k | token exact | wall/s | target-only/s | HF prepared-input ratio |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: |",
     ]
     for name, entry in report["workloads"].items():
         if entry.get("status") != "measured":
-            lines.append(f"| {name} | - | - | - | - | - | (planned) | - | - | - |")
+            lines.append(f"| {name} | - | - | - | - | - | - | (planned) | - | - | - |")
             continue
         slots = ", ".join(
             "-" if value is None else f"{value:.3f}" for value in entry["per_slot_acceptance"]
         )
+        draft_al = entry.get("al_draft_tokens_per_round")
+        draft_text = f"{draft_al:.3f}" if draft_al is not None else "unavailable"
         lines.append(
-            f"| {name} | {entry['num_prompts']} | {entry['max_new_tokens']} | {entry['al']:.3f} | "
+            f"| {name} | {entry['num_prompts']} | {entry['max_new_tokens']} | {draft_text} | {entry['al']:.3f} | "
             f"{entry['acceptance_rate']:.3f} | {slots} | {entry['token_exact']} | "
             f"{entry['wall_seconds_per_sample']:.2f} | {entry['target_only_wall_seconds_per_sample']:.2f} | "
             f"{entry['speedup_vs_target_only']:.2f} |"
@@ -216,6 +219,8 @@ def run_benchmark(
             "num_prompts": count,
             "max_new_tokens": budget,
             "al": summary["mean_al"],
+            "al_draft_tokens_per_round": summary.get("al_draft_tokens_per_round"),
+            "al_progress_tokens_per_round": summary.get("al_progress_tokens_per_round", summary["mean_al"]),
             "acceptance_rate": summary["acceptance_rate"],
             "per_slot_acceptance": summary["per_slot_acceptance"],
             "token_exact": equivalence["token_exact"],
@@ -238,6 +243,9 @@ def run_benchmark(
     }
     report = {
         "format": BENCHMARK_FORMAT,
+        "evaluation_protocol": "hf-checkpoint-diagnostic-v1",
+        "primary_e2e_eligible": False,
+        "timing_scope": "HF preprocessed-input vision/prefill/decode; excludes image/RGB/template/input preparation",
         "created": now_iso(),
         "algorithm": algorithm.name,
         "run_dir": str(run_dir),

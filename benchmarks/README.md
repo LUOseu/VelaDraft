@@ -1,5 +1,10 @@
 # Benchmark workloads
 
+These manifests drive the historical HF checkpoint-diagnostic harness. For
+paired native vLLM request E2E, use `vlm-dflash native-eval` and the
+[protocol guide](../docs/benchmark.md). Prepared-input HF ratios remain labeled
+diagnostics; they are not promoted into the native E2E headline.
+
 Fixed protocols for the canonical drafter benchmark. One manifest per
 workload; the harness refuses to guess protocol values.
 

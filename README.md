@@ -45,6 +45,18 @@
   ([#18](https://github.com/LUOseu/VelaDraft/pull/18), thanks to
   [@khazic](https://github.com/khazic)). See the [support matrix](SUPPORT_MATRIX.md#targets).
 
+## Performance evaluation
+
+Use [`vlm-dflash native-eval`](docs/benchmark.md#native-vllm-e2e) for native vLLM
+paired request E2E: unchanged native AR defaults, Flash linear SD, separate
+processes/warmup, ratio of total wall times and session-cluster intervals. It
+requires a prepared complete export and an explicit pinned adapter for spatial
+MRoPE/additional method modules. Existing `eval` and `scripts/benchmark.py` are
+HF checkpoint diagnostics; their prepared-input timing is not the native E2E
+headline. Training/NPU defaults are unchanged. Observed token agreement and real
+quality are reported separately; this update publishes no new speedup claim.
+
+
 ## Why VelaDraft
 
 Parallel block drafters combine an expensive frozen multimodal target with a
