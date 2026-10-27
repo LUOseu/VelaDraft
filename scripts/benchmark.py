@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Benchmark a trained run against fixed workload manifests.
+"""HF checkpoint diagnostics against fixed workload manifests.
+
+For native paired E2E performance use `vlm-dflash native-eval`.
 
     python scripts/benchmark.py --run-dir runs/qwen25vl3b_2k \
         --workloads benchmarks/manifests --workload caption_general

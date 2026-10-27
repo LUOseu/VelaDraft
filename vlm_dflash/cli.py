@@ -1,4 +1,4 @@
-"""Unified command line: ``vlm-dflash {doctor,demo,train-demo,train,eval,export}``.
+"""Unified command line: ``vlm-dflash {doctor,demo,train-demo,train,eval,native-eval,export}``.
 
 The five stage scripts remain the advanced interface; the CLI is the happy
 path: ``doctor`` preflights an environment/target, ``train`` runs the whole
@@ -688,6 +688,11 @@ def cmd_train(args) -> int:
 # eval / export
 # --------------------------------------------------------------------------- #
 
+def cmd_native_eval(args) -> int:
+    from .eval.native import run
+    return run(args)
+
+
 def cmd_eval(args) -> int:
     run_dir = Path(args.run_dir).resolve()
     cfg = _load_run_config(run_dir, args.config)
@@ -722,7 +727,8 @@ def cmd_eval(args) -> int:
     )
     for name, run in result["runs"].items():
         print(
-            f"{name}: AL={run['mean_al']:.3f} speedup_vs_target_only="
+            f"{name}: AL_progress={run['mean_al']:.3f} "
+            f"AL_draft={run.get('al_draft_tokens_per_round')} hf_preprocessed_input_ratio="
             f"{run.get('speedup_vs_target_only')} token_exact={result['equivalence_check']['runs'][name]['token_exact']}"
         )
     return 0
@@ -874,7 +880,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     train.set_defaults(func=cmd_train)
 
-    evaluate = sub.add_parser("eval", help="acceptance + token-exact evaluation for a finished run")
+    native_eval = sub.add_parser("native-eval", help="native vLLM paired E2E timing; prepared exports/explicit adapters")
+    from .eval.native import add_arguments
+    add_arguments(native_eval)
+    native_eval.set_defaults(func=cmd_native_eval)
+
+    evaluate = sub.add_parser("eval", help="HF checkpoint acceptance/token diagnostics; use native-eval for E2E speed")
     evaluate.add_argument("run_dir")
     evaluate.add_argument("--config", default=None)
     evaluate.add_argument("--num-prompts", type=int, default=None)

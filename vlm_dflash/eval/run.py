@@ -333,6 +333,8 @@ def run_checkpoints(
         summary["draft_candidate_selector"] = bool(hasattr(draft, "candidate_selector"))
         sample_wall = summary.get("wall_seconds_per_sample") or 0.0
         summary["speedup_vs_target_only"] = (target_only_wall / sample_wall) if sample_wall > 0 else None
+        summary["legacy_hf_speedup_vs_target_only"] = summary["speedup_vs_target_only"]
+        summary["primary_e2e_eligible"] = False
         if strict_parallel_margin is not None:
             summary["strict_parallel"] = {
                 "margin": strict_parallel_margin,
@@ -442,6 +444,10 @@ def evaluate(
 
     result = {
         "format": "vlm-dflash-eval-v1",
+        "evaluation_protocol": "hf-checkpoint-diagnostic-v1",
+        "timing_scope": "HF preprocessed-input vision/prefill/decode; excludes image loading, RGB, template and input preparation",
+        "primary_e2e_eligible": False,
+        "native_e2e_command": "vlm-dflash native-eval --help",
         "identity": identity_from_contract(contract),
         "algorithm": algorithm.name,
         # Feature source recorded by the trainer per checkpoint ("offline" for
