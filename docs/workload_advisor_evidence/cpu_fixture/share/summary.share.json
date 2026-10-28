@@ -1,0 +1,572 @@
+{
+  "assignment_sha256": "614b16b0028e41fe78dc6a3baa6d098e59f3046accaf8eed88697c32b0c67db9",
+  "assignment_verified": true,
+  "bootstrap_seed": 7,
+  "candidate_ids": [
+    "dflash-exact",
+    "dfly-fast-wrong"
+  ],
+  "candidates": {
+    "ar": {
+      "acceptance_policies": [
+        "not_applicable"
+      ],
+      "candidate_id": "ar",
+      "correctness": {
+        "denominators": {
+          "groups": 24,
+          "requests": 24,
+          "tasks": 3
+        },
+        "exact_pairs": 72,
+        "exact_records": 72,
+        "failed_request_ids": [],
+        "gate": true,
+        "n_paired_groups": 24,
+        "n_paired_requests": 24,
+        "n_paired_tasks": 3,
+        "n_records": 72,
+        "n_requests": 24,
+        "non_exact_pairs": 0,
+        "paired_coverage": {
+          "groups": 24,
+          "requests": 24,
+          "tasks": 3
+        },
+        "run_error_count": 0,
+        "run_error_rate": 0.0,
+        "run_error_request_ids": [],
+        "status_counts": {
+          "verified_greedy_exact": 72
+        }
+      },
+      "gates": {
+        "assignment_verified": true,
+        "correctness": true,
+        "coverage": true,
+        "memory": true,
+        "quality": true,
+        "real_measurement": true,
+        "run_errors": true,
+        "threshold": 1.05
+      },
+      "latency": {
+        "serial_output_tokens_per_second": 60.86684921242383
+      },
+      "measurement_scopes": [
+        "local_client"
+      ],
+      "method": "ar",
+      "n_groups": 24,
+      "n_pairs": 72,
+      "n_records": 72,
+      "n_requests": 24,
+      "n_sessions": 3,
+      "pairing_counts": {
+        "duplicate_ids": 0,
+        "failed_ar": 0,
+        "failed_candidate": 0,
+        "fallback_ar": 0,
+        "fallback_candidate": 0,
+        "missing_ar": 0,
+        "missing_candidate": 0,
+        "protocol_mismatch": 0
+      },
+      "quality": {
+        "coverage": {
+          "groups": {
+            "denominator": 24,
+            "evaluated": 24
+          },
+          "requests": {
+            "denominator": 24,
+            "evaluated": 24
+          },
+          "tasks": {
+            "denominator": 3,
+            "evaluated": 3
+          }
+        },
+        "evaluated": true,
+        "status": "pass"
+      },
+      "resources": {},
+      "speed": {
+        "bootstrap_seed": 7,
+        "ci95_high": 1.0,
+        "ci95_low": 1.0,
+        "method": "baseline",
+        "n_boot": 2000,
+        "n_groups": 24,
+        "n_pairs": 72,
+        "point_ratio": 1.0
+      },
+      "tasks": [
+        "chart_qa",
+        "general_vqa",
+        "invoice_fields"
+      ],
+      "tuning": {
+        "n_groups": 0,
+        "n_pairs": 0,
+        "n_records": 0,
+        "point_ratio": null
+      }
+    },
+    "dflash-exact": {
+      "acceptance_policies": [
+        "strict_greedy_token_exact"
+      ],
+      "buckets": {
+        "ar_R": {
+          "16-32": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 4,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "32-64": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 9,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "64-96": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 9,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "96-128": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 2,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        },
+        "target_V": {
+          "1024-2048": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 4,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "256-512": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 6,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "512-1024": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 14,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        },
+        "task": {
+          "chart_qa": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 8,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "general_vqa": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 8,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "invoice_fields": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 8,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        }
+      },
+      "candidate_id": "dflash-exact",
+      "correctness": {
+        "denominators": {
+          "groups": 24,
+          "requests": 24,
+          "tasks": 3
+        },
+        "exact_pairs": 72,
+        "exact_records": 72,
+        "failed_request_ids": [],
+        "gate": true,
+        "n_paired_groups": 24,
+        "n_paired_requests": 24,
+        "n_paired_tasks": 3,
+        "n_records": 72,
+        "n_requests": 24,
+        "non_exact_pairs": 0,
+        "paired_coverage": {
+          "groups": 24,
+          "requests": 24,
+          "tasks": 3
+        },
+        "run_error_count": 0,
+        "run_error_rate": 0.0,
+        "run_error_request_ids": [],
+        "status_counts": {
+          "verified_greedy_exact": 72
+        }
+      },
+      "gates": {
+        "assignment_verified": true,
+        "correctness": true,
+        "coverage": true,
+        "memory": true,
+        "quality": true,
+        "quality_conditional": false,
+        "quality_pass": true,
+        "real_measurement": true,
+        "run_errors": true,
+        "speed_ci_lower_above_threshold": true,
+        "threshold": 1.05
+      },
+      "latency": {
+        "serial_output_tokens_per_second": 87.01613715197998
+      },
+      "measurement_scopes": [
+        "local_client"
+      ],
+      "method": "sd",
+      "n_groups": 24,
+      "n_pairs": 72,
+      "n_records": 72,
+      "n_requests": 24,
+      "n_sessions": 3,
+      "pairing_counts": {
+        "duplicate_ids": 0,
+        "failed_ar": 0,
+        "failed_candidate": 0,
+        "fallback_ar": 0,
+        "fallback_candidate": 0,
+        "missing_ar": 0,
+        "missing_candidate": 0,
+        "protocol_mismatch": 0
+      },
+      "quality": {
+        "coverage": {
+          "groups": {
+            "denominator": 24,
+            "evaluated": 24
+          },
+          "requests": {
+            "denominator": 24,
+            "evaluated": 24
+          },
+          "tasks": {
+            "denominator": 3,
+            "evaluated": 3
+          }
+        },
+        "evaluated": true,
+        "status": "pass"
+      },
+      "resources": {},
+      "speed": {
+        "bootstrap_seed": 7,
+        "ci95_high": 1.4377532067572414,
+        "ci95_low": 1.4209996878775226,
+        "method": "paired_total_ratio",
+        "n_boot": 2000,
+        "n_groups": 24,
+        "n_pairs": 72,
+        "point_ratio": 1.4296146141604236
+      },
+      "tasks": [
+        "chart_qa",
+        "general_vqa",
+        "invoice_fields"
+      ],
+      "tuning": {
+        "n_groups": 0,
+        "n_pairs": 0,
+        "n_records": 0,
+        "point_ratio": null
+      }
+    },
+    "dfly-fast-wrong": {
+      "acceptance_policies": [
+        "strict_greedy_token_exact"
+      ],
+      "buckets": {
+        "ar_R": {
+          "16-32": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 2,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "32-64": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 7,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "64-96": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 5,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "96-128": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 2,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        },
+        "target_V": {
+          "1024-2048": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 3,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "256-512": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 4,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "512-1024": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 9,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        },
+        "task": {
+          "chart_qa": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 8,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          },
+          "general_vqa": {
+            "ci95_high": null,
+            "ci95_low": null,
+            "min_groups": 20,
+            "n_groups": 8,
+            "point_ratio": null,
+            "status": "insufficient_evidence"
+          }
+        }
+      },
+      "candidate_id": "dfly-fast-wrong",
+      "correctness": {
+        "denominators": {
+          "groups": 24,
+          "requests": 24,
+          "tasks": 3
+        },
+        "exact_pairs": 48,
+        "exact_records": 48,
+        "failed_request_ids": [
+          "req-06",
+          "req-09",
+          "req-12",
+          "req-15",
+          "req-18",
+          "req-21",
+          "req-24",
+          "req-27"
+        ],
+        "gate": false,
+        "n_paired_groups": 16,
+        "n_paired_requests": 16,
+        "n_paired_tasks": 2,
+        "n_records": 72,
+        "n_requests": 24,
+        "non_exact_pairs": 0,
+        "paired_coverage": {
+          "groups": 16,
+          "requests": 16,
+          "tasks": 2
+        },
+        "run_error_count": 8,
+        "run_error_rate": 0.3333333333333333,
+        "run_error_request_ids": [
+          "req-06",
+          "req-09",
+          "req-12",
+          "req-15",
+          "req-18",
+          "req-21",
+          "req-24",
+          "req-27"
+        ],
+        "status_counts": {
+          "failed": 24,
+          "verified_greedy_exact": 48
+        }
+      },
+      "gates": {
+        "assignment_verified": true,
+        "correctness": false,
+        "coverage": false,
+        "memory": true,
+        "quality": false,
+        "quality_conditional": false,
+        "quality_pass": false,
+        "real_measurement": true,
+        "run_errors": false,
+        "speed_ci_lower_above_threshold": true,
+        "threshold": 1.05
+      },
+      "latency": {
+        "serial_output_tokens_per_second": 126.83689136187148
+      },
+      "measurement_scopes": [
+        "local_client"
+      ],
+      "method": "sd",
+      "n_groups": 16,
+      "n_pairs": 48,
+      "n_records": 72,
+      "n_requests": 24,
+      "n_sessions": 3,
+      "pairing_counts": {
+        "duplicate_ids": 0,
+        "failed_ar": 0,
+        "failed_candidate": 24,
+        "fallback_ar": 0,
+        "fallback_candidate": 0,
+        "missing_ar": 0,
+        "missing_candidate": 0,
+        "protocol_mismatch": 0
+      },
+      "quality": {
+        "coverage": {
+          "groups": {
+            "denominator": 24,
+            "evaluated": 24
+          },
+          "requests": {
+            "denominator": 24,
+            "evaluated": 24
+          },
+          "tasks": {
+            "denominator": 3,
+            "evaluated": 3
+          }
+        },
+        "evaluated": true,
+        "status": "fail"
+      },
+      "resources": {},
+      "speed": {
+        "bootstrap_seed": 7,
+        "ci95_high": 2.1076136562667536,
+        "ci95_low": 2.0871217749962763,
+        "method": "paired_total_ratio",
+        "n_boot": 2000,
+        "n_groups": 16,
+        "n_pairs": 48,
+        "point_ratio": 2.0977546643902314
+      },
+      "tasks": [
+        "chart_qa",
+        "general_vqa",
+        "invoice_fields"
+      ],
+      "tuning": {
+        "n_groups": 0,
+        "n_pairs": 0,
+        "n_records": 0,
+        "point_ratio": null
+      }
+    }
+  },
+  "concurrency": [
+    1
+  ],
+  "duplicate_records": 0,
+  "evidence_split": "holdout",
+  "fallback_records": 0,
+  "frozen_candidates_sha256": "90e72c4cdcc4064db8f1430daafa2a1c6984f7c7150c746eb79abadbe0c89b21",
+  "include_in_paper": false,
+  "input_integrity": {
+    "issues": [],
+    "status": "ok"
+  },
+  "issues": [],
+  "min_groups": 20,
+  "n_boot": 2000,
+  "n_expected_requests": 24,
+  "n_groups": 24,
+  "n_holdout_records": 216,
+  "n_real_records": 0,
+  "n_records": 216,
+  "n_sessions": 3,
+  "n_synthetic_records": 216,
+  "n_tasks": 3,
+  "n_tuning_records": 0,
+  "overall_status": "synthetic_fixture",
+  "pairing_counts": {
+    "duplicate_ids": 0,
+    "failed_ar": 0,
+    "failed_candidate": 24,
+    "fallback_ar": 0,
+    "fallback_candidate": 0,
+    "missing_ar": 0,
+    "missing_candidate": 0,
+    "protocol_mismatch": 0
+  },
+  "project_scope": "platform_extension",
+  "protocol_mismatch": false,
+  "protocol_scope_hashes": [
+    "67db79b7bbf99fc614cba05d707b6fa25aedb4c71f497999cfb9b13c44856ba3"
+  ],
+  "records_sha256": "71ef80d87554d539dfbfb22913b8a9d92deb652232ae47e9eeb20aaa6ff1e55b",
+  "schema_version": "veladraft-platform-v1",
+  "summary_sha256": "f62dcaed10f0743b1b0f10f5ac12f3f31b095f5150183c4e214a5f0c69bd43ee",
+  "synthetic": true,
+  "task_group_counts": {
+    "chart_qa": 8,
+    "general_vqa": 8,
+    "invoice_fields": 8
+  },
+  "threshold": 1.05
+}
