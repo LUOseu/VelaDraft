@@ -29,7 +29,9 @@
 
 ## 最新动态
 
-- **[2026-10-29]** 🤗 感谢 [@khazic](https://github.com/khazic) 使用 **VelaDraft** 训练模型，并在 Hugging Face 分享 [veladraft-qwen36-400k-dflash2 checkpoint](https://huggingface.co/khazic/veladraft-qwen36-400k-dflash2)！
+- **[2026-10-29]** 🤗 感谢 [@khazic](https://github.com/khazic) 使用 **VelaDraft** 训练模型，并在 Hugging Face 分享 **Qwen3.6** 与 **Qwen3-VL-8B** 的 **14 个 checkpoint 仓库**，覆盖全部七种 drafter 方法！
+  - **Qwen3.6:** [DFlash](https://huggingface.co/khazic/veladraft-qwen36-400k-dflash) · [DFlash2](https://huggingface.co/khazic/veladraft-qwen36-400k-dflash2) · [DSpark](https://huggingface.co/khazic/veladraft-qwen36-400k-dspark) · [DFly](https://huggingface.co/khazic/veladraft-qwen36-400k-dfly) · [DFlare](https://huggingface.co/khazic/veladraft-qwen36-400k-dflare) · [Domino](https://huggingface.co/khazic/veladraft-qwen36-400k-domino) · [JetSpec](https://huggingface.co/khazic/veladraft-qwen36-400k-jetspec)
+  - **Qwen3-VL-8B:** [DFlash](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dflash) · [DFlash2](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dflash2) · [DSpark](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dspark) · [DFly](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dfly) · [DFlare](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dflare) · [Domino](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-domino) · [JetSpec](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-jetspec)
 
 - **[2026-10-21]** 新增 **Ascend NPU 训练支持**。七种 drafter 方法均已在 Ascend 910B3 上完成 BF16 离线训练、token-exact 评测与导出验证；DFlash 另有 online 和多设备放置检查。当前属于工程验证，不代表已完成生产规模的性能评测。详见 [NPU 安装与验证文档](docs/npu/README.md)。
 
