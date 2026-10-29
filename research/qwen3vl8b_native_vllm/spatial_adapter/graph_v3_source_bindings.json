@@ -1,0 +1,8 @@
+{
+  "graph_v2_adapter": {
+    "sha256": "3c66daaa63db7731de144eda1d215ab2d1623a7a4ee836d4109df583382698c8"
+  },
+  "official_base_proposer": {
+    "sha256_without_final_newlines": "b8cd732a305e48119275f786bb9043dd0e4bddd0db759d44a9e39a15f5f51a89"
+  }
+}

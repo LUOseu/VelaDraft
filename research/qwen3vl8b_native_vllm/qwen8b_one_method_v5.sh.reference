@@ -1,0 +1,25 @@
+#!/bin/bash
+set -euo pipefail
+method="$1"
+gpu="$2"
+root=/home/lyh/qwen3vl8b_eval_20261027
+harness="$root/harness_recovery_v3"
+py="$root/runtime_frozen_v1/bin/python"
+export PYTHONPATH="$harness" PYTHONDONTWRITEBYTECODE=1 VLLM_BATCH_INVARIANT=0
+cd "$harness"
+echo $$ > "$root/${method}_speed_v5.pid"
+trap 'rc=$?; echo "METHOD_QUEUE_FAILED $(date -Is) rc=$rc line=$LINENO"' ERR
+if [[ "$method" == dflash2 ]]; then draft="$root/dflash2_recovery_v2/dflash2_8b_native_adapter/hf_step75000_v1"; manifest="$root/dflash2_recovery_v2/runtime_manifest_recovery_v1.json";
+elif [[ "$method" == dfly ]]; then draft="$root/dfly_native_adapter_v1/hf_step75000_v1"; manifest="$root/dfly_runtime_manifest_v1.json";
+elif [[ "$method" == dflash ]]; then draft="$root/dflash_export_v1"; manifest="$root/dflash_runtime_manifest_v2.json";
+else exit 2; fi
+common=(--target "$root/artifacts/target" --draft "$draft" --source "$root/mmspec_formal120.jsonl" --images-dir /home/lyh/a6000_3b_v2_L300/shared/benchmarks/mmspec/images --runtime-manifest "$manifest" --method "$method" --gpu "$gpu" --gpu-memory-utilization .78)
+echo "SMOKE_START $(date -Is) $method GPU=$gpu"
+"$py" -m vlm_dflash.cli native-eval "${common[@]}" --num-prompts 1 --max-new-tokens 128 --repeats 1 --out "$root/${method}_8b_smoke_recovery_v5.json" > "$root/${method}_8b_smoke_recovery_v5.launch.log" 2>&1
+"$py" -c 'import json,sys;d=json.load(open(sys.argv[1]));assert d["status"]=="complete" and d["resources_verified"] and d["source_preservation"]["all_values_bitwise_equal"] and d["smoke"]' "$root/${method}_8b_smoke_recovery_v5.json"
+echo "SMOKE_COMPLETE $(date -Is) $method"
+echo "FORMAL_START $(date -Is) $method GPU=$gpu"
+"$py" -m vlm_dflash.cli native-eval "${common[@]}" --num-prompts 120 --max-new-tokens 1024 --repeats 3 --out "$root/${method}_8b_formal_recovery_v5.json" > "$root/${method}_8b_formal_recovery_v5.launch.log" 2>&1
+"$py" -c 'import json,sys;d=json.load(open(sys.argv[1]));assert d["status"]=="complete" and d["resources_verified"] and d["timed_pairs"]==435' "$root/${method}_8b_formal_recovery_v5.json"
+"$py" "$root/audit_native_evidence.py" "$root/${method}_8b_formal_recovery_v5.evidence" "$root/${method}_8b_formal_recovery_v5.json" "$root/${method}_8b_formal_recovery_audit_v5.json"
+echo "METHOD_QUEUE_COMPLETE $(date -Is) $method"

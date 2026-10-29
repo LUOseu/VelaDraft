@@ -72,6 +72,19 @@ All seven labels are accepted for prepared integrations; this PR does not port
 seven complete upstream systems. In particular, local shared-block JetSpec
 and fixed-block DSpark should retain those scope descriptions when used.
 
+### Qwen3-VL-8B campaign code
+
+The [Qwen3-VL-8B native-vLLM research snapshot](../research/qwen3vl8b_native_vllm/README.md)
+contains the method-specific adaptation, quality scoring, queue and audit code
+used for this campaign. It records machine-bound paths and is not a turnkey
+installation; regenerate its receipts and runtime manifests for a new machine.
+
+An optional `QWEN8B_DIGEST_CACHE=/path/to/digests.sqlite` avoids re-reading
+unchanged files by caching SHA-256 against device, inode, size, mtime and ctime.
+This is an I/O optimization, not an adversarial integrity boundary. Without the
+variable, full SHA-256 is calculated at each observation. The GPU is leased
+before expensive plan and preservation checks for non-dry runs.
+
 ### Measurement and validity
 
 - AR retains native automatic attention/graph/matrix selection. SD requests

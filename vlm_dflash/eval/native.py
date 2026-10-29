@@ -24,6 +24,10 @@ NUMERIC_OVERRIDES = ('FAIR_TORCH_PRECISION_PROFILE','TORCH_BLAS_PREFER_CUBLASLT'
 
 
 def digest(path):
+    cache=os.environ.get('QWEN8B_DIGEST_CACHE')
+    if cache:
+        from .digest_cache import cached_sha256
+        return cached_sha256(path,cache)
     h=hashlib.sha256()
     with Path(path).open('rb') as stream:
         for block in iter(lambda:stream.read(8<<20),b''):h.update(block)
@@ -179,6 +183,7 @@ def make_plan(args):
     if not 0<args.min_pixels<=args.max_pixels:raise ValueError('Invalid image pixel bounds')
     plan={k:getattr(args,k) for k in ('speculative_tokens','max_new_tokens','max_model_len','gpu_memory_utilization','min_pixels','max_pixels','repeats','method','gpu')}
     plan.update(format=FORMAT,seed=43,stop_token_ids=[151645,151643],target=str(Path(args.target).resolve()),draft=str(Path(args.draft).resolve()),adapter=None,files={})
+    plan['source_integrity_policy']='SHA256 on first observation or file metadata change; inode/size/mtime/ctime keyed cache' if os.environ.get('QWEN8B_DIGEST_CACHE') else 'full SHA256 on every observation'
     for directory in (plan['target'],plan['draft']):
         if not Path(directory).is_dir():raise ValueError('Prepared local model directory required: '+directory)
     draft=Path(plan['draft'])
@@ -202,7 +207,7 @@ def make_plan(args):
         plan['files'][str(path)]=digest(path);plan['adapter']=adapter
     elif args.method!='dflash':raise ValueError('This method requires an explicit preserved full export and runtime manifest')
     own=Path(__file__).parent
-    for name in ('native.py','native_runtime.py','native_resources.py','native_bootstrap/sitecustomize.py'):
+    for name in ('native.py','native_runtime.py','native_resources.py','native_bootstrap/sitecustomize.py','digest_cache.py'):
         path=own/name;plan['files'][str(path.resolve())]=digest(path)
     try:
         dist=importlib.metadata.distribution('vllm')
@@ -230,14 +235,19 @@ def add_arguments(parser):
 def run(args):
     out=Path(args.out).resolve();evidence=out.with_suffix('.evidence')
     if out.exists() or evidence.exists():raise FileExistsError('Existing native evidence preserved; choose a new --out')
-    plan=make_plan(args);out.parent.mkdir(parents=True,exist_ok=True);evidence.mkdir();save(evidence/'plan.json',plan)
     if args.dry_run:
+        plan=make_plan(args)
+        out.parent.mkdir(parents=True,exist_ok=True);evidence.mkdir()
+        save(evidence/'plan.json',plan)
         save(out,dict(format=FORMAT,status='planned',GPU_executed=False,paper_ready=False,plan=plan));return 0
+    out.parent.mkdir(parents=True,exist_ok=True);evidence.mkdir()
     from .native_resources import GPULease
     result=dict(format=FORMAT,status='failed',paper_ready=False,quality_evaluation_required=True,evidence=str(evidence))
     try:
-        verify_preservation(plan)
+        # Reserve before expensive hashing so coordinated jobs see the lease immediately.
         with GPULease(args.gpu,evidence/'resources.jsonl') as lease:
+            plan=make_plan(args)
+            verify_preservation(plan)
             plan['gpu_uuid']=lease.uuid;save(evidence/'plan.json',plan)
             plan_path=evidence/'plan.json';plan_sha=digest(plan_path)
             for stage in ('reference',*stage_order(args.repeats)):

@@ -1,0 +1,10 @@
+{
+  "compile_decorators": {
+    "module": "vllm.compilation.decorators",
+    "sha256": "dd7167637a478aeaea3f2410a727ddefc702bda1d9bf632831c2a8b4811ebb1e",
+    "snapshot": "source/graph_v2_decorators.py"
+  },
+  "graph_v1_adapter": {
+    "sha256": "748538d2b1e91e8c9bd69a902c7b78f7c57cec333bfb977a0b1694749be74f87"
+  }
+}

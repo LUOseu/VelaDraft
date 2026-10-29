@@ -1,0 +1,112 @@
+#!/bin/bash
+set -euo pipefail
+root=/home/lyh/qwen3vl8b_eval_20261027
+harness="$root/harness_resource_fix_v1"
+py="$root/runtime_frozen_v1/bin/python"
+export QWEN8B_DIGEST_CACHE="$root/harness_recovery_fast_v1/digest_cache.sqlite" PYTHONPATH="$harness" PYTHONDONTWRITEBYTECODE=1 VLLM_BATCH_INVARIANT=0
+cd "$harness"
+echo $$ > "$root/dflash2_quality_dynamic_v17.pid"
+trap 'rc=$?; echo "QUALITY_QUEUE_FAILED $(date -Is) rc=$rc line=$LINENO"' ERR
+select_gpu() {
+ while :; do
+  for candidate in 1 0 2 3; do
+   skip=0
+   for other in dfly_dynamic_v11 dflash2_dynamic_v14; do
+    pidfile="$root/$other.pid"; log="$root/$other.log"
+    if [[ -s "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+     active=$(awk '/SMOKE_START|FORMAL_START/ {for(i=1;i<=NF;i++) if($i ~ /^gpu=/) {split($i,a,"=");g=a[2]}} END {print g}' "$log")
+     [[ -n "$active" && "$candidate" == "$active" ]] && skip=1
+    fi
+   done
+   (( skip == 0 )) || continue
+   used=$(timeout 10 nvidia-smi -i "$candidate" --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | tr -d ' ' || true)
+   pids=$(timeout 10 nvidia-smi -i "$candidate" --query-compute-apps=pid --format=csv,noheader,nounits 2>/dev/null || true)
+   if [[ "$used" =~ ^[0-9]+$ && "$used" -lt 500 && -z "$pids" ]]; then
+    uuid=$(timeout 10 nvidia-smi -i "$candidate" --query-gpu=uuid --format=csv,noheader,nounits 2>/dev/null || true)
+    if [[ "$uuid" =~ ^GPU-[0-9a-fA-F-]+$ ]] && flock -n "/tmp/veladraft_gpu_locks/$uuid.lock" true; then gpu="$candidate"; return; fi
+   fi
+  done
+  echo "WAIT_AVAILABLE_GPU $(date -Is)";sleep 30
+ done
+}
+wait_gpu() {
+ while :; do
+  used=$(timeout 10 nvidia-smi -i "$gpu" --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | tr -d ' ' || true)
+  pids=$(timeout 10 nvidia-smi -i "$gpu" --query-compute-apps=pid --format=csv,noheader,nounits 2>/dev/null || true)
+  uuid=$(timeout 10 nvidia-smi -i "$gpu" --query-gpu=uuid --format=csv,noheader,nounits 2>/dev/null || true)
+  if [[ "$used" =~ ^[0-9]+$ && "$used" -lt 500 && -z "$pids" && "$uuid" =~ ^GPU-[0-9a-fA-F-]+$ ]] && flock -n "/tmp/veladraft_gpu_locks/$uuid.lock" true; then return;fi
+  echo "WAIT_SELECTED_GPU $(date -Is) gpu=$gpu";sleep 30
+ done
+}
+monitored_run() {
+ local resource="$1" marker="$2" log="$3";shift 3
+ setsid "$@" > "$log" 2>&1 & local job=$!
+ while kill -0 "$job" 2>/dev/null; do
+  if [[ -f "$resource" ]] && grep -Eq '"foreign_pids": *\[[0-9]|"error":' "$resource";then
+   echo "FOREIGN_RESOURCE_ABORT $(date -Is)" > "$marker"
+   kill -TERM -- "-$job" 2>/dev/null || kill -TERM "$job" 2>/dev/null || true
+   wait "$job" || true;return 75
+  fi
+  sleep 3
+ done
+ wait "$job"
+}
+common=(--target "$root/artifacts/target" --draft "$root/dflash2_recovery_v2/dflash2_8b_native_adapter/hf_step75000_v1" --source "$root/mmspec_formal120.jsonl" --images-dir /home/lyh/a6000_3b_v2_L300/shared/benchmarks/mmspec/images --runtime-manifest "$root/dflash2_recovery_v2/runtime_manifest_recovery_v1.json" --method dflash2 --gpu-memory-utilization .78)
+# Historical orphan adoption used a machine-specific PID. Do not reuse it.
+adopted=0
+if (( adopted == 0 )); then
+ # Speed has first access to any newly released GPU. Once speed acquired a
+ # card, quality may use another one; both arms remain on their own same card.
+ while [[ -s "$root/dflash2_dynamic_v14.pid" ]] && kill -0 "$(cat "$root/dflash2_dynamic_v14.pid")" 2>/dev/null; do
+  line=$(awk '/^FORMAL_START |^FORMAL_FAILED / {v=$0} END {print v}' "$root/dflash2_dynamic_v14.log")
+  if [[ "$line" == FORMAL_START* ]]; then
+   num=$(printf '%s\n' "$line" | sed -n 's/.*attempt=\([0-9][0-9]*\).*/\1/p')
+   if [[ -n "$num" && -s "$root/dflash2_8b_formal_dynamic_v14_a$num.evidence/resources.jsonl" ]]; then break; fi
+  fi
+  sleep 5
+ done
+for ((i=1;i<=100;i++)); do
+ select_gpu;tag="dflash2_8b_quality_smoke_dynamic_v17_a$i"
+ echo "SMOKE_START $(date -Is) gpu=$gpu attempt=$i"
+ if monitored_run "$root/$tag.evidence/resources.jsonl" "$root/$tag.foreign_abort" "$root/$tag.launch.log" "$py" -m vlm_dflash.cli native-eval "${common[@]}" --gpu "$gpu" --num-prompts 1 --max-new-tokens 128 --repeats 1 --out "$root/$tag.json"; then
+  "$py" -c 'import json,sys;d=json.load(open(sys.argv[1]));assert d["status"]=="complete" and d["resources_verified"] and d["source_preservation"]["all_values_bitwise_equal"] and d["smoke"]' "$root/$tag.json"
+  echo "SMOKE_COMPLETE $(date -Is) gpu=$gpu";break
+ fi
+ err=$($py -c 'import json,sys;print(json.load(open(sys.argv[1])).get("error",""))' "$root/$tag.json" 2>/dev/null || true)
+ echo "SMOKE_FAILED $(date -Is) attempt=$i error=$err"
+ if [[ -f "$root/$tag.foreign_abort" || "$err" == *"Resource temporarily unavailable"* || "$err" == *"GPU is occupied"* || "$err" == *"GPU resource evidence contaminated"* ]];then continue;fi
+ exit 1
+done
+fi
+[[ -f "$root/$tag.json" ]]
+# Give the paper speed run first access to its selected card; then pair quality on the smoke card.
+while [[ ! -s "$root/dflash2_dynamic_v14.pid" ]]; do sleep 5; done
+speed_pid=$(cat "$root/dflash2_dynamic_v14.pid")
+while kill -0 "$speed_pid" 2>/dev/null; do
+ start=$(awk '/^FORMAL_START / {line=$0} END {print line}' "$root/dflash2_dynamic_v14.log")
+ attempt=$(printf '%s\n' "$start" | sed -n 's/.*attempt=\([0-9][0-9]*\).*/\1/p')
+ if [[ -n "$attempt" ]] && [[ -s "$root/dflash2_8b_formal_dynamic_v14_a$attempt.evidence/resources.jsonl" ]]; then break; fi
+ sleep 10
+done
+plan="$root/$tag.evidence/plan.json";sha=$(sha256sum "$plan" | cut -d ' ' -f1)
+out="$root/quality_dflash2_dynamic_v17";mkdir -p "$out"
+(cd "$root" && sha256sum -c quality_dflash2_dynamic_v6/SOURCE_SHA256.txt >/dev/null)
+for arm in ar sd; do
+ if [[ "$arm" == ar ]];then label=ar;else label=dflash2;fi
+ done_arm=0
+ for ((j=1;j<=100;j++)); do
+  wait_gpu;dir="$out/${label}_attempt$j";marker="$out/${label}_attempt$j.foreign_abort"
+  echo "QUALITY_START $(date -Is) $label gpu=$gpu attempt=$j"
+  if monitored_run "$dir/resources.jsonl" "$marker" "$out/${label}_attempt$j.launch.log" env CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES="$gpu" VLLM_WORKER_MULTIPROC_METHOD=spawn VLLM_BATCH_INVARIANT=0 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 TOKENIZERS_PARALLELISM=false PYTHONDONTWRITEBYTECODE=1 VELADRAFT_NATIVE_PLAN="$plan" VELADRAFT_NATIVE_PLAN_SHA256="$sha" VELADRAFT_NATIVE_ARM="$arm" VLLM_CACHE_ROOT="$out/caches/$label" TORCHINDUCTOR_CACHE_DIR="$out/caches/$label/inductor" PYTHONPATH="$harness/vlm_dflash/eval/native_bootstrap:$harness:$root" "$py" -m quality_dflash2_dynamic_v6.runner --arm "$arm" --method dflash2 --gpu "$gpu" --directory "$dir";then
+   "$py" -c 'import json,sys;d=json.load(open(sys.argv[1]));assert d["status"]=="complete" and d["failures"]==0 and d["resource_evidence"]["status"]=="complete"' "$dir/quality.json"
+   mv "$dir" "$out/$label";done_arm=1;echo "QUALITY_COMPLETE $(date -Is) $label";break
+  fi
+  err=$($py -c 'import json,sys;print(json.load(open(sys.argv[1])).get("error",""))' "$dir/quality.json" 2>/dev/null || true)
+  echo "QUALITY_FAILED $(date -Is) $label attempt=$j error=$err"
+  if [[ -f "$marker" || "$err" == *"Resource temporarily unavailable"* || "$err" == *"GPU is occupied"* || "$err" == *"GPU resource evidence contaminated"* ]];then continue;fi
+  exit 1
+ done
+ [[ "$done_arm" == 1 ]]
+done
+PYTHONPATH="$harness:$root" "$py" -m quality_dflash2_dynamic_v6.compare_quality --root "$out" --out "$out/QUALITY_PAIRED_V1.json"
+echo "QUALITY_QUEUE_COMPLETE $(date -Is)"

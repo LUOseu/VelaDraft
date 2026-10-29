@@ -1,0 +1,60 @@
+{
+  "status": "pass",
+  "method": "domino",
+  "seed": 20261029,
+  "dtype": "bfloat16",
+  "checkpoint_sha256": "f3fdfcd68f4eeb1aab74649c71c9cdb5c117f5c5822cf54b9c0f749b1dde85f7",
+  "canonical_source_path": "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash/draft_model.py",
+  "canonical_source_sha256": "6056a90681af091261813d70fa6b30ebb635f99901f6010e2dfd0edd9d64e8c7",
+  "adapter_path": "/home/lyh/qwen3vl8b_eval_20261027/domino_8b_work_20261029/domino_8b_native_adapter/domino_logic.py",
+  "adapter_sha256": "bfb13e4da43ce67a525a971a537f51a4b06a5737d6c9937012916dc24f87c213",
+  "script_sha256": "dc9f3ebb9883e0530efa023ba44ef78f04881cff4ba1bceedf283e8d84a3e9c5",
+  "torch_version": "2.11.0+cu130",
+  "cuda_initialized": false,
+  "trained_tensor_shapes": {
+    "prefix_gru.weight_ih_l0": [
+      3072,
+      4096
+    ],
+    "prefix_gru.weight_hh_l0": [
+      3072,
+      1024
+    ],
+    "embed_proj.0.weight": [
+      256,
+      5120
+    ],
+    "embed_proj.2.weight": [
+      151936,
+      256
+    ]
+  },
+  "actual_tokens": [
+    [
+      14617,
+      397,
+      10746,
+      88861,
+      58359,
+      4830,
+      1302
+    ]
+  ],
+  "reference_tokens": [
+    [
+      14617,
+      397,
+      10746,
+      88861,
+      58359,
+      4830,
+      1302
+    ]
+  ],
+  "exact_match": true,
+  "inputs": "one deterministic synthetic hidden-state matrix, synthetic target logits and synthetic embedding; full 8B dimensions and full vocabulary",
+  "limitations": [
+    "Single synthetic CPU fixture; no target forward, GPU model loading, cache, attention kernel, target head alias or end-to-end behavior checked.",
+    "Local reference source snapshot is hashed but its identity to the original training machine source is not established."
+  ]
+}

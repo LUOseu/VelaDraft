@@ -1,0 +1,14 @@
+{
+  "versions": {
+    "vllm": "0.22.1",
+    "torch": "2.11.0",
+    "transformers": "5.11.0",
+    "safetensors": "0.8.0",
+    "torch_runtime": "2.11.0+cu130",
+    "torch_cuda_build": "13.0"
+  },
+  "cuda_visible_devices": "",
+  "cuda_initialized": false,
+  "model_construction": false,
+  "model_forward": false
+}

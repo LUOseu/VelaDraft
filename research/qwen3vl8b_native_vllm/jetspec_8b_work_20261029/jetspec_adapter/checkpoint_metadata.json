@@ -1,0 +1,133 @@
+{
+  "format": "vlm-dflash-ckpt-v1",
+  "algorithm": "jetspec",
+  "draft_config": {
+    "transformers_version": "5.12.1",
+    "architectures": [
+      "Qwen3DFlashDraftModel"
+    ],
+    "output_hidden_states": false,
+    "return_dict": true,
+    "dtype": "bfloat16",
+    "chunk_size_feed_forward": 0,
+    "is_encoder_decoder": false,
+    "id2label": {
+      "0": "LABEL_0",
+      "1": "LABEL_1"
+    },
+    "label2id": {
+      "LABEL_0": 0,
+      "LABEL_1": 1
+    },
+    "problem_type": null,
+    "vocab_size": 151936,
+    "hidden_size": 4096,
+    "intermediate_size": 12288,
+    "num_hidden_layers": 3,
+    "num_attention_heads": 32,
+    "num_key_value_heads": 8,
+    "head_dim": 128,
+    "hidden_act": "silu",
+    "max_position_embeddings": 262144,
+    "initializer_range": 0.02,
+    "rms_norm_eps": 1e-06,
+    "use_cache": true,
+    "tie_word_embeddings": false,
+    "rope_parameters": {
+      "rope_type": "default",
+      "rope_theta": 5000000.0
+    },
+    "attention_bias": false,
+    "use_sliding_window": false,
+    "sliding_window": null,
+    "max_window_layers": 3,
+    "layer_types": [
+      "full_attention",
+      "full_attention",
+      "full_attention"
+    ],
+    "attention_dropout": 0.0,
+    "pad_token_id": null,
+    "bos_token_id": 151643,
+    "eos_token_id": 151645,
+    "_name_or_path": "",
+    "model_type": "qwen3",
+    "num_target_layers": 36,
+    "target_hidden_size": 4096,
+    "block_size": 8,
+    "dflash_config": {
+      "mask_token_id": 151669,
+      "target_layer_ids": [
+        1,
+        17,
+        33
+      ],
+      "spatial_rope_enabled": true,
+      "spatial_rope_mode": "replace",
+      "spatial_rope_sections": [
+        24,
+        20,
+        20
+      ],
+      "spatial_rope_interleaved": true,
+      "visual_num_query_tokens": 0,
+      "inference_in_block_causal": true
+    },
+    "output_attentions": false
+  },
+  "attention_backend": "flex_attention",
+  "mask_token_id": 151669,
+  "block_size": 8,
+  "num_anchors": 512,
+  "loss_decay_gamma": null,
+  "target_layer_ids": [
+    1,
+    17,
+    33
+  ],
+  "jetspec": {
+    "kd_temperature": 1.0,
+    "kd_chunk_size": 1024,
+    "causal_in_block": true
+  },
+  "head": "target_lm_head",
+  "identity": {
+    "target_model_path": "/llm-align/liuchonghan/Qwen3-VL-8B-Instruct",
+    "model_fingerprint": "3925a38557fb5f5f21e0ee2b003a9bafe0ac452d8aac2e6ee702e2288b31a1ac",
+    "processor_fingerprint": "2c7327c5b8f51cf4ea8f5ec5396f9f4885996c32d59fb6cb6661c090a8a7885b",
+    "mask_token_id": 151669,
+    "spatial_rope_sections": [
+      24,
+      20,
+      20
+    ],
+    "draft_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "capture_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "image_min_pixels": 65536,
+    "image_max_pixels": 1048576,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "capture_layer_ids": [
+    1,
+    17,
+    33
+  ],
+  "feature_mode": "online",
+  "feature_source_digest": "d765b4ba7d216ff993858181521d4821726025dd6dd726d95e1cd8f9941d2715",
+  "feature_backend": "huggingface",
+  "draft_device": "cuda:0",
+  "training_plan_version": "vlm-dflash-training-plan-v1",
+  "training_plan_digest": "d167ba448584ed7e27f17c1d5f44945fb139126ec743aafbd6c4d507e6e51986",
+  "target_device": "cuda:1",
+  "step": 75000
+}

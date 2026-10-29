@@ -1,0 +1,20 @@
+import json,sqlite3,datetime,os
+from pathlib import Path
+root=Path('/home/lyh/qwen3vl8b_eval_20261027')
+plan=json.loads((root/'dflash_formal_v5.evidence/plan.json').read_text())
+events=[json.loads(x) for x in (root/'qwen_model_dedup_retry2.log').read_text().splitlines()]
+db=root/'harness_recovery_fast_v1/digest_cache.sqlite'
+rows=[]
+for e in events:
+ if e.get('event')!='deduplicated' or e.get('method')!='qwen3vl8b':continue
+ path=Path(e['canonical']);s=path.stat();timestamp=int(datetime.datetime.fromisoformat(e['time']).timestamp()*1_000_000_000)
+ assert str(path) in plan['files'] and plan['files'][str(path)]==e['sha256']
+ assert s.st_ino==e['shared_inode'] and s.st_size==e['bytes'] and s.st_mtime_ns<=timestamp and s.st_ctime_ns<=timestamp+1000000,(str(path),s.st_ctime_ns,timestamp)
+ rows.append((s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns,e['sha256']))
+assert len(rows)==4
+with sqlite3.connect(db,timeout=60) as con:
+ con.execute('CREATE TABLE IF NOT EXISTS digests (dev INTEGER, ino INTEGER, size INTEGER, mtime INTEGER, ctime INTEGER, sha TEXT NOT NULL, PRIMARY KEY(dev,ino,size,mtime,ctime))')
+ con.executemany('INSERT OR REPLACE INTO digests VALUES (?,?,?,?,?,?)',rows)
+receipt={'status':'complete','scope':'four target shards; hashes from completed whole-file dedup verification cross-checked against prior formal plan; size/inode/mtime/ctime validated since verification','target_shards':len(rows),'dedup_log':str(root/'qwen_model_dedup_retry2.log'),'original_plan':str(root/'dflash_formal_v5.evidence/plan.json'),'database':str(db)}
+(root/'TARGET_SHA_CACHE_SEED_V1.json').write_text(json.dumps(receipt,indent=2)+'\n')
+print(json.dumps(receipt))

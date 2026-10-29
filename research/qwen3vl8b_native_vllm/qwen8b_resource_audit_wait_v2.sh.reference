@@ -1,0 +1,17 @@
+#!/bin/bash
+set -u
+root=/home/lyh/qwen3vl8b_eval_20261027
+run_one() {
+ local method="$1" result pidfile pid evidence
+ if [[ "$method" == dflash2 ]];then result="$root/dflash2_8b_formal_dynamic_v14.json";pidfile="$root/dflash2_dynamic_v14.pid";else result="$root/dfly_8b_formal_dynamic_v11.json";pidfile="$root/dfly_dynamic_v11.pid";fi
+ while [[ ! -f "$result" ]]; do
+  [[ -s "$pidfile" ]] || { echo "MISSING_PID $method";return 1; }
+  pid=$(cat "$pidfile");kill -0 "$pid" 2>/dev/null || { echo "NO_VALID_RESULT $method";return 1; }
+  sleep 30
+ done
+ evidence=$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));assert d["status"]=="complete";print(d["evidence"])' "$result") || return 1
+ python3 "$root/audit_stale_resources.py" "$evidence" "$root/${method}_resource_history_audit_v1.json" || echo "RESOURCE_HISTORY_AUDIT_FAILED $method"
+}
+run_one dflash2 &
+run_one dfly &
+wait

@@ -1,0 +1,16 @@
+import json,hashlib,os,time
+from pathlib import Path
+root=Path('/home/lyh/qwen3vl8b_eval_20261027');base=root/'dfly_recovery_v2';pkg=base/'dfly_native_adapter_v1';receipt=base/'CPU_PREFLIGHT_V1.json';failed=base/'CPU_PREFLIGHT_V1_FAILED_INSTALL.json'
+while True:
+ try:os.kill(162410,0);time.sleep(10)
+ except ProcessLookupError:break
+if not receipt.is_file() or failed.exists() or 'receipt_sha256' not in (base/'cpu_preflight_v1.log').read_text():raise SystemExit('DFly CPU preflight failed; retained logs and receipt')
+d=json.loads(receipt.read_text());assert d['status']=='complete' and d['all42_values_bitwise_equal'] and d['CPU_errors']==0 and d['CPU_failures']==0 and d['CPU_skips']==0
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+files={str(pkg/k):v for k,v in d['own_source_sha256'].items()};files.update(d['export_artifacts']);files[d['checkpoint_path']]=d['checkpoint_sha256'];files[str(receipt)]=sha(receipt)
+for item in d['source_provenance'].values():files[item['remote_path']]=item['sha256']
+for item in json.loads((pkg/'OFFICIAL_SOURCE_PINS.json').read_text()).values():files[item['path']]=item['sha256']
+boot=pkg/'bootstrap/sitecustomize.py';assert str(boot) in files
+m={'method':'dfly','scope':'Qwen3-VL-8B DFly step75000, all42 tensors, original layer fusion and correction, interleaved MRoPE and stock target verifier','bootstrap':str(boot),'checkpoint':d['checkpoint_path'],'environment':{'DFLY_NATIVE_ENABLE':'1','DFLY_NATIVE_CPU_RECEIPT':str(receipt),'DFLY_NATIVE_CPU_RECEIPT_SHA256':sha(receipt)},'files':files}
+out=base/'runtime_manifest_v2.json';tmp=out.with_suffix('.tmp');tmp.write_text(json.dumps(m,indent=2)+'\n');os.replace(tmp,out)
+print('DFLY_MANIFEST_READY',out,'pins',len(files),flush=True)

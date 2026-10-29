@@ -1,0 +1,18 @@
+{
+  "qwen3_dflash": {
+    "snapshot": "upstream_vllm_0221_dflash.py",
+    "sha256_without_final_newlines": "822279152563e53f80643148b61252de230e00d3037e7fe7784045168a13b9fa"
+  },
+  "dflash_proposer": {
+    "snapshot": "spatial_adapter/source/proposer_dflash.py",
+    "sha256_without_final_newlines": "d632a8a7e6bba4fd5dd6b07cb53891d74f5d4dee272d8efae0b57265c1e14b90"
+  },
+  "llm_base_proposer": {
+    "snapshot": "spatial_adapter/source/llm_base_proposer.py",
+    "sha256_without_final_newlines": "b8cd732a305e48119275f786bb9043dd0e4bddd0db759d44a9e39a15f5f51a89"
+  },
+  "mrope": {
+    "snapshot": "spatial_adapter/source/mrope.py",
+    "sha256_without_final_newlines": "c5a7397040955daded984d66001a1445a2a0a8e90c5a35599752c9cfb59a0b80"
+  }
+}

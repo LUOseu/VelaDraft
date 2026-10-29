@@ -1,0 +1,118 @@
+{
+  "transformers_version": "5.12.1",
+  "architectures": [
+    "DFlashDraftModel"
+  ],
+  "output_hidden_states": false,
+  "return_dict": true,
+  "dtype": "bfloat16",
+  "chunk_size_feed_forward": 0,
+  "is_encoder_decoder": false,
+  "id2label": {
+    "0": "LABEL_0",
+    "1": "LABEL_1"
+  },
+  "label2id": {
+    "LABEL_0": 0,
+    "LABEL_1": 1
+  },
+  "problem_type": null,
+  "vocab_size": 151936,
+  "hidden_size": 4096,
+  "intermediate_size": 12288,
+  "num_hidden_layers": 3,
+  "num_attention_heads": 32,
+  "num_key_value_heads": 8,
+  "head_dim": 128,
+  "hidden_act": "silu",
+  "max_position_embeddings": 262144,
+  "initializer_range": 0.02,
+  "rms_norm_eps": 1e-06,
+  "use_cache": true,
+  "tie_word_embeddings": false,
+  "rope_parameters": {
+    "rope_type": "default",
+    "rope_theta": 5000000.0,
+    "mrope_section": [
+      24,
+      20,
+      20
+    ],
+    "mrope_interleaved": true
+  },
+  "attention_bias": false,
+  "use_sliding_window": false,
+  "sliding_window": null,
+  "max_window_layers": 3,
+  "layer_types": [
+    "full_attention",
+    "full_attention",
+    "full_attention"
+  ],
+  "attention_dropout": 0.0,
+  "pad_token_id": null,
+  "bos_token_id": 151643,
+  "eos_token_id": 151645,
+  "_name_or_path": "",
+  "model_type": "qwen3",
+  "num_target_layers": 36,
+  "target_hidden_size": 4096,
+  "block_size": 8,
+  "dflash_config": {
+    "mask_token_id": 151669,
+    "target_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "spatial_rope_enabled": true,
+    "spatial_rope_mode": "replace",
+    "spatial_rope_sections": [
+      24,
+      20,
+      20
+    ],
+    "spatial_rope_interleaved": true,
+    "visual_num_query_tokens": 0,
+    "inference_in_block_causal": true,
+    "official_spatial_adapter_v1": true,
+    "official_jetspec_local_block_adapter_v1": true
+  },
+  "output_attentions": false,
+  "algorithm": "jetspec",
+  "jetspec_inference_contract": {
+    "trained_block_size": 8,
+    "inference_in_block_causal": true,
+    "sample_from_anchor": false,
+    "shift_label": false,
+    "pure_draft_prefix_len": 0,
+    "projector_type": null,
+    "layer_routing_enabled": false,
+    "visual_num_query_tokens": 0,
+    "causal_in_block_training": true,
+    "head": "external_target_lm_head",
+    "capture_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "hf_capture_hidden_indices": [
+      2,
+      18,
+      34
+    ],
+    "draft_sampling": "greedy"
+  },
+  "jetspec_provenance": {
+    "source_sha256": "afb8fdb1d14df3b3d003003fa12a30d29e2d6b08fa7cc45d24728be929437391",
+    "step": 75000,
+    "scope": "local shared-block JetSpec reference; upstream parallel-tree runtime is not ported",
+    "algorithm": "jetspec",
+    "original_architectures": [
+      "Qwen3DFlashDraftModel"
+    ],
+    "source_run_config_sha256": "4f39862bb3ddec2374b8cb81730befd4e0b3b73321a5ae523f01b899eef7aacc",
+    "source_contract_sha256": "9e49ddbcab982d3b556448d3944ef2fc9e209d00a83250485a4cb6ae2c958712",
+    "registry_dispatch_disclosure": "DFlashDraftModel requires the separate JetSpec causal adapter; not native JetSpec"
+  }
+}

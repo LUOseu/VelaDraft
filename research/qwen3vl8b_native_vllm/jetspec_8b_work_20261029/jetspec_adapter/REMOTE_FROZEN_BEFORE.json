@@ -1,0 +1,20 @@
+{
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/spatial_adapter/official_spatial_adapter.py": "17c9c160ba86770238a43f0ba898d840976225cc38a374f82136f0cceb0213ff",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/spatial_adapter/official_spatial_graph_adapter.py": "748538d2b1e91e8c9bd69a902c7b78f7c57cec333bfb977a0b1694749be74f87",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/spatial_adapter/official_spatial_graph_adapter_v2.py": "3c66daaa63db7731de144eda1d215ab2d1623a7a4ee836d4109df583382698c8",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/spatial_adapter/official_spatial_graph_adapter_v3.py": "a02c0ef2bc238a729bb6e7bcad93b2dc9936a06046a90c360c5adfd5afb034f5",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/spatial_adapter/source_bindings.json": "eb4b98c92733670d52d85f2a3f883278ad06bc6f0e4c4bc69daf7d1704f378ed",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/spatial_adapter/graph_v2_source_bindings.json": "2db7c522ec376256c1d18b6872b399ddfec93c490558ba7bc3888b012e7d4865",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/spatial_adapter/graph_v3_source_bindings.json": "44b8c429d02c1fcb06e3f64b42bf562d7c2eff7ae957d6ed794147cd392d8fc2",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/bounded_lookahead/official_spatial_bounded_adapter.py": "783393a95e9ac51e439c4b48447534ebc21f1445091537b0972df88b4752ca50",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/bounded_lookahead/source_bindings.json": "b16e2e74b02fa09ef3cf47f7973ef97006c3fed7c6e9915f75bbd9c55ad7f532",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/jetspec_adapter/official_jetspec_adapter.py": "78bc514945ad32eab2f46d9afd4a783fd34a3165c62448bfc64e6042734de693",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/jetspec_adapter/export_jetspec.py": "dafccbd07ef9190072a6057961b0c7d10ed373468ba679cbd7ad973ebd09c97a",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/jetspec_adapter/test_jetspec_adapter.py": "01209811838e4dace7d243914edd5f8af077ef3560772e47bbf19f9c9575cab1",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/jetspec_adapter/checkpoint_metadata.json": "d8fa5fa89033c974cb8af6cc03ef5e1ef521435967cf242fbaa3e5beed6f015c",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/jetspec_adapter/source_run/config.json": "4f39862bb3ddec2374b8cb81730befd4e0b3b73321a5ae523f01b899eef7aacc",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/jetspec_adapter/source_run/contract.json": "9e49ddbcab982d3b556448d3944ef2fc9e209d00a83250485a4cb6ae2c958712",
+  "/home/lyh/qwen3vl8b_eval_20261027/jetspec_8b_work_20261029/jetspec_adapter/source_bindings.json": "9768de64e408a32169614f6279d2b9a68ff5f138c7af3a04d99ad6cc9e372174",
+  "/home/lyh/qwen3vl8b_eval_20261027/artifacts/target/config.json": "5cd452860dc1e9c29dd71cc3cef7f39b338b7a40793f7a260655c2d3568f3661",
+  "/home/lyh/qwen3vl8b_eval_20261027/artifacts/target/model.safetensors.index.json": "520b2e05079402e9468a8701d03d1154d14b2599593afb6effa7fb60c1bff070"
+}

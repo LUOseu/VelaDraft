@@ -1,0 +1,27 @@
+import ast,json,shutil,os,hashlib
+from pathlib import Path
+root=Path("/home/lyh/qwen3vl8b_eval_20261027")
+src=Path("/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages")
+dst=root/"runtime_frozen_v1/lib/python3.12/site-packages"
+def copy(a,b):
+ if a.endswith(".so"):os.link(a,b);return b
+ return shutil.copy2(a,b)
+for name in ("vllm","vllm-0.22.1.dist-info"):
+ shutil.copytree(src/name,dst/name,copy_function=copy,ignore=shutil.ignore_patterns("__pycache__"))
+tree=ast.parse(Path("/home/lyh/dspark_vllm_patch_apply_patch.py").read_text());edits=None
+for n in tree.body:
+ if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="EDITS" for t in n.targets):edits=ast.literal_eval(n.value)
+assert edits
+receipt=[]
+for rel,old,new,count in reversed(edits):
+ p=dst/"vllm"/rel;s=p.read_text()
+ if s.count(new)==count:s=s.replace(new,old,count);p.write_text(s);receipt.append({"path":rel,"status":"reversed"})
+ elif s.count(old)==count:receipt.append({"path":rel,"status":"already_original"})
+ else:raise ValueError((rel,"unknown source state",s.count(new),s.count(old)))
+pins=json.loads(Path("/tmp/lyh_dflash2_8b_work_20261028/dflash2_8b_native_adapter/OFFICIAL_SOURCE_PINS.json").read_text());checks={}
+for module,item in pins.items():
+ p=dst/Path(*module.split(".")).with_suffix(".py")
+ if not p.exists():p=dst/Path(*module.split("."))/"__init__.py"
+ h=hashlib.sha256(p.read_bytes()).hexdigest();assert h==item["sha256"],(module,h,item["sha256"]);checks[module]=h
+(root/"FROZEN_RUNTIME_RESTORE_V1.json").write_text(json.dumps({"status":"complete","scope":"isolated vLLM source copy; external binary dependencies inherited","reversed_edits":receipt,"verified_original_sources":checks,"shared_binary_files_read_only_policy":True},indent=2)+"\n")
+print("RESTORED",len(receipt),"edits",len(checks),"original source hashes")

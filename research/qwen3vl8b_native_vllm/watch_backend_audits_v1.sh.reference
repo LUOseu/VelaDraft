@@ -1,0 +1,22 @@
+#!/bin/bash
+set -u
+root=/home/lyh/qwen3vl8b_eval_20261027
+watch_one() {
+ local m="$1" result="$2" session="$3" output="$root/${1}_8b_attention_audit_v1.json" evidence
+ while :; do
+  if [[ -f "$root/$result" ]]; then
+   evidence=$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));assert d["status"]=="complete";print(d["evidence"])' "$root/$result") || return 1
+   [[ -f "$output" ]] || python3 "$root/audit_attention_backends_v1.py" "$evidence" --output "$output" || return 1
+   python3 "$root/build_qwen3vl8b_paper_results.py"
+   return 0
+  fi
+  if ! screen -ls | grep -q "$session";then echo "QUEUE_GONE $(date -Is) method=$m";return 1;fi
+  sleep 20
+ done
+}
+watch_one dflare dflare_8b_formal_dynamic_v11.json qwen8b_dflare_speed_v1 & a=$!
+watch_one domino domino_8b_formal_v1.json qwen8b_domino_speed_v1 & b=$!
+watch_one jetspec jetspec_8b_formal_v1.json qwen8b_jetspec_speed_v1 & c=$!
+wait "$a" || true
+wait "$b" || true
+wait "$c" || true
