@@ -38,7 +38,9 @@
 
 ## 🎉 News
 
-- **[2026-10-29]** 🤗 Thanks to [@khazic](https://github.com/khazic) for training with **VelaDraft** and sharing the [veladraft-qwen36-400k-dflash2 checkpoint](https://huggingface.co/khazic/veladraft-qwen36-400k-dflash2) on Hugging Face!
+- **[2026-10-29]** 🤗 Thanks to [@khazic](https://github.com/khazic) for training with **VelaDraft** and sharing **14 checkpoint repositories** for **Qwen3.6** and **Qwen3-VL-8B** on Hugging Face, covering all seven drafter methods!
+  - **Qwen3.6:** [DFlash](https://huggingface.co/khazic/veladraft-qwen36-400k-dflash) · [DFlash2](https://huggingface.co/khazic/veladraft-qwen36-400k-dflash2) · [DSpark](https://huggingface.co/khazic/veladraft-qwen36-400k-dspark) · [DFly](https://huggingface.co/khazic/veladraft-qwen36-400k-dfly) · [DFlare](https://huggingface.co/khazic/veladraft-qwen36-400k-dflare) · [Domino](https://huggingface.co/khazic/veladraft-qwen36-400k-domino) · [JetSpec](https://huggingface.co/khazic/veladraft-qwen36-400k-jetspec)
+  - **Qwen3-VL-8B:** [DFlash](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dflash) · [DFlash2](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dflash2) · [DSpark](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dspark) · [DFly](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dfly) · [DFlare](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dflare) · [Domino](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-domino) · [JetSpec](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-jetspec)
 
 - **[2026-10-21]** Added **Ascend NPU training support**. All seven registered drafter methods have BF16 offline-training, token-exact evaluation and export evidence on Ascend 910B3; DFlash also has additional online and multi-device-placement checks. These are engineering validation runs, not production-scale performance claims. See the [NPU setup and validation guide](docs/npu/README.md).
 
