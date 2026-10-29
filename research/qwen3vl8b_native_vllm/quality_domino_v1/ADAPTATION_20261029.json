@@ -1,0 +1,19 @@
+{
+  "original": "quality_dflare_v1",
+  "method": "domino",
+  "changed": {
+    "runner.py": {
+      "original": "76312bd6078b8e5316aa5ebc30cf691de36730960465e9fee79d48be2925b8b2",
+      "adapted": "adc5077ceb8e94254648da0f49ea0b66d52f410fedc76d461718a49492dba04a"
+    },
+    "compare_quality.py": {
+      "original": "31a77245fd66a3503f6e6c37509e1960c9c785c8d7094cecc16b005abe696021",
+      "adapted": "af58f4b3d290b7a48fe0354de5202c64dd3629428b6ed7f1fb9516f9f7a5e0d9"
+    },
+    "QUALITY_PROTOCOL_V1.md": {
+      "original": "7095ed9c02fbac1999515ee2fe9d1999e0532218b4e94e79d2951ba93de93cf2",
+      "adapted": "b6e1a3dc700789d805538f3ba45caca751851dc97c363fc6adcc40922f32198e"
+    }
+  },
+  "gold_scoring_and_data_changed": false
+}

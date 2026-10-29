@@ -1,0 +1,114 @@
+{
+  "schema": "jetspec-local-shared-block-source-bindings-v1",
+  "frozen": {
+    "spatial_adapter/official_spatial_adapter.py": "17c9c160ba86770238a43f0ba898d840976225cc38a374f82136f0cceb0213ff",
+    "spatial_adapter/official_spatial_graph_adapter.py": "748538d2b1e91e8c9bd69a902c7b78f7c57cec333bfb977a0b1694749be74f87",
+    "spatial_adapter/official_spatial_graph_adapter_v2.py": "3c66daaa63db7731de144eda1d215ab2d1623a7a4ee836d4109df583382698c8",
+    "spatial_adapter/official_spatial_graph_adapter_v3.py": "a02c0ef2bc238a729bb6e7bcad93b2dc9936a06046a90c360c5adfd5afb034f5",
+    "spatial_adapter/source_bindings.json": "eb4b98c92733670d52d85f2a3f883278ad06bc6f0e4c4bc69daf7d1704f378ed",
+    "spatial_adapter/graph_v2_source_bindings.json": "2db7c522ec376256c1d18b6872b399ddfec93c490558ba7bc3888b012e7d4865",
+    "spatial_adapter/graph_v3_source_bindings.json": "44b8c429d02c1fcb06e3f64b42bf562d7c2eff7ae957d6ed794147cd392d8fc2",
+    "bounded_lookahead/official_spatial_bounded_adapter.py": "783393a95e9ac51e439c4b48447534ebc21f1445091537b0972df88b4752ca50",
+    "bounded_lookahead/source_bindings.json": "b16e2e74b02fa09ef3cf47f7973ef97006c3fed7c6e9915f75bbd9c55ad7f532"
+  },
+  "upstream": {
+    "qwen3_dflash": {
+      "module": "vllm.model_executor.models.qwen3_dflash",
+      "sha256": "822279152563e53f80643148b61252de230e00d3037e7fe7784045168a13b9fa",
+      "strip_final_newlines": true
+    },
+    "dflash_proposer": {
+      "module": "vllm.v1.spec_decode.dflash",
+      "sha256": "d632a8a7e6bba4fd5dd6b07cb53891d74f5d4dee272d8efae0b57265c1e14b90",
+      "strip_final_newlines": true
+    },
+    "llm_base_proposer": {
+      "module": "vllm.v1.spec_decode.llm_base_proposer",
+      "sha256": "b8cd732a305e48119275f786bb9043dd0e4bddd0db759d44a9e39a15f5f51a89",
+      "strip_final_newlines": true
+    },
+    "mrope": {
+      "module": "vllm.model_executor.layers.rotary_embedding.mrope",
+      "sha256": "c5a7397040955daded984d66001a1445a2a0a8e90c5a35599752c9cfb59a0b80",
+      "strip_final_newlines": true
+    },
+    "compile_decorators": {
+      "module": "vllm.compilation.decorators",
+      "sha256": "dd7167637a478aeaea3f2410a727ddefc702bda1d9bf632831c2a8b4811ebb1e",
+      "strip_final_newlines": false
+    },
+    "cudagraph_dispatcher": {
+      "module": "vllm.v1.cudagraph_dispatcher",
+      "sha256": "2ac6454dd72c9f54d159b5a2da0fdd60a4f841970eb32dbf54129e3c6a8d0bfd",
+      "strip_final_newlines": false
+    },
+    "speculative_config": {
+      "module": "vllm.config.speculative",
+      "sha256": "536d9ed7ef910207259efdb8cf370fbfa3e6b81794c271d575fa6b9bb13d41fd",
+      "strip_final_newlines": false
+    },
+    "model_config": {
+      "module": "vllm.config.model",
+      "sha256": "183b4a3e6b7f281e8fbce498c171da725d6231c49c9a47ac105534e8afef6d6f",
+      "strip_final_newlines": false
+    },
+    "compilation_config": {
+      "module": "vllm.config.compilation",
+      "sha256": "72046911a01c6e6543ef8bacc4db592b995595b17cc0af7b5819eb70d6b6465c",
+      "strip_final_newlines": false
+    },
+    "model_registry": {
+      "module": "vllm.model_executor.models.registry",
+      "sha256": "aadb76f95f6da37b8acf83d186e4d5901736e376e52d8bc5ccadc22f7c36cdb5",
+      "strip_final_newlines": false
+    },
+    "eagle_config": {
+      "module": "vllm.transformers_utils.configs.eagle",
+      "sha256": "a150d5347cf7c7b53ce8d7e6711c2e85656df1ceeef28c921f90b52946b7203a",
+      "strip_final_newlines": false
+    },
+    "official_expansion": {
+      "module": "vllm",
+      "relative_path": "v1/spec_decode/utils.py",
+      "sha256": "129fbe9c32b6567d513463442a5c11ae3365bd38accbbd5547f3af5dbd48624d",
+      "strip_final_newlines": false
+    },
+    "runner_feature_order": {
+      "module": "vllm",
+      "relative_path": "v1/worker/gpu_model_runner.py",
+      "sha256": "690998ae7d9353ce42d7fc43f755fdbd72097c6e1f7a364dde435743408b00f2",
+      "strip_final_newlines": false
+    },
+    "official_flash_attention": {
+      "module": "vllm",
+      "relative_path": "v1/attention/backends/flash_attn.py",
+      "sha256": "5b9c2c76c00c867e5d8320a78dbcef775174ab837d03048b513ec515d8ace907",
+      "strip_final_newlines": false
+    },
+    "official_flex_attention": {
+      "module": "vllm",
+      "relative_path": "v1/attention/backends/flex_attention.py",
+      "sha256": "db5da31ca7ad3af73e169ee93c33cac47d52e4f34ee6b4d871a269c1861922a8",
+      "strip_final_newlines": false
+    },
+    "official_flash_interface": {
+      "module": "vllm",
+      "relative_path": "vllm_flash_attn/flash_attn_interface.py",
+      "sha256": "49a51585d4eec74ee752ead1ade10d077b90c6c56eac6b8a4af6850a194a5b2a",
+      "strip_final_newlines": false
+    },
+    "official_target_qwen2": {
+      "module": "vllm",
+      "relative_path": "model_executor/models/qwen2.py",
+      "sha256": "b4ba6122ae4418772117baea8140c6605d6fd0fdf3dc04e3fcceb68fa4f75d29",
+      "strip_final_newlines": false
+    },
+    "official_target_interfaces": {
+      "module": "vllm",
+      "relative_path": "model_executor/models/interfaces.py",
+      "sha256": "f263f84837dfb0c9cc5a7cfd025d489a666ac4b3899f4b764c206981d980be68",
+      "strip_final_newlines": false
+    }
+  },
+  "local_mask_sha256": "41f9f31404647fb82e1798469fd621ec6c116d91e33664a99dc1f8d8c12787d6"
+}

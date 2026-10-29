@@ -1,0 +1,57 @@
+{
+  "classification": "canonical remote is authoritative; local is not substituted",
+  "files": {
+    "dfly/model.py": {
+      "canonical_sha256": "c1b2c63d7aa73a03c27e09057ddd133a22ede188801ad81ed7900e2d0e605ed5",
+      "local_exists": true,
+      "local_sha256": "c1b2c63d7aa73a03c27e09057ddd133a22ede188801ad81ed7900e2d0e605ed5",
+      "byte_equal": true
+    },
+    "dfly/factory.py": {
+      "canonical_sha256": "015bf14b2c7f6cd419a819dd1cc6b42e38dfab178353e1660373195367de890b",
+      "local_exists": true,
+      "local_sha256": "015bf14b2c7f6cd419a819dd1cc6b42e38dfab178353e1660373195367de890b",
+      "byte_equal": true
+    },
+    "dfly/trainer.py": {
+      "canonical_sha256": "15a2679710f9afbdf51c205fb391011443165a3c7f2bc6225d282d0996dc112a",
+      "local_exists": true,
+      "local_sha256": "15a2679710f9afbdf51c205fb391011443165a3c7f2bc6225d282d0996dc112a",
+      "byte_equal": true
+    },
+    "algorithms/dfly.py": {
+      "canonical_sha256": "52b383a66309f24f0765d03249aaaf2fd45729084ffa17bcf117072d763359e0",
+      "local_exists": true,
+      "local_sha256": "52b383a66309f24f0765d03249aaaf2fd45729084ffa17bcf117072d763359e0",
+      "byte_equal": true
+    },
+    "dflare/model.py": {
+      "canonical_sha256": "ea76a1a7291a196de3e3fdc6a791fb4731dd8933610726f145a355b3fc9da958",
+      "local_exists": true,
+      "local_sha256": "ea76a1a7291a196de3e3fdc6a791fb4731dd8933610726f145a355b3fc9da958",
+      "byte_equal": true
+    },
+    "dflash/draft_model.py": {
+      "canonical_sha256": "6056a90681af091261813d70fa6b30ebb635f99901f6010e2dfd0edd9d64e8c7",
+      "local_exists": true,
+      "local_sha256": "41f9f31404647fb82e1798469fd621ec6c116d91e33664a99dc1f8d8c12787d6",
+      "byte_equal": false
+    },
+    "dflash/mask.py": {
+      "canonical_sha256": "e93a9faa8f4bc8597060c9c1c0a2ee83b77d279ee58e91efc3ab1996e878c356",
+      "local_exists": true,
+      "local_sha256": "e93a9faa8f4bc8597060c9c1c0a2ee83b77d279ee58e91efc3ab1996e878c356",
+      "byte_equal": true
+    }
+  },
+  "no_full_HF_driver_parity_claim": true,
+  "selected_base_method_AST_equal": {
+    "Qwen3DFlashAttention._context_noise_kv": true,
+    "Qwen3DFlashAttention.forward": true,
+    "Qwen3DFlashDecoderLayer.forward": true,
+    "Qwen3DFlashDraftModel._sample_draft_tokens": true,
+    "Qwen3DFlashDraftModel._inference_block_mask": true,
+    "Qwen3DFlashDraftModel.forward": true,
+    "Qwen3DFlashDraftModel.spec_generate": false
+  }
+}

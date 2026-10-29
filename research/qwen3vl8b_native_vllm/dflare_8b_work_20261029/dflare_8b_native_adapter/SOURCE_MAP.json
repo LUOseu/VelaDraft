@@ -1,0 +1,95 @@
+{
+  "schema": "dflare-native-source-map-v1",
+  "canonical_origin": "/home/lyh/VelaDraft-a6000-v2/vlm_dflash",
+  "feature_contract": {
+    "capture_layers": [
+      1,
+      17,
+      33
+    ],
+    "HF_hidden_state_indices": [
+      2,
+      18,
+      34
+    ],
+    "raw_context_width": 6144,
+    "query_hidden_size": 2048,
+    "context_feature_order": "concatenated target residual-added features in listed order"
+  },
+  "trained_path": [
+    {
+      "canonical": "dflare/model.py:176-200",
+      "owned": "context.py:build_layer_contexts",
+      "equation": "hidden_norm(einsum(softmax(live BF16 fusion)[layer].to(feature_dtype),raw.reshape(B,C,3,2048)))"
+    },
+    {
+      "canonical": "dflare/model.py:91-104",
+      "owned": "context.py:project_context; backbone.py:DFlareOwnedDecoderLayer",
+      "equation": "context uses trained target K/V; query/noise uses unchanged official QKV"
+    },
+    {
+      "canonical": "dflash/draft_model.py:393-420",
+      "owned": "spatial.py:precompute",
+      "equation": "dedicated projection -> official per-head K RMSNorm -> official MRoPE -> official do_kv_cache_update"
+    },
+    {
+      "canonical": "dflash/draft_model.py:1241-1301",
+      "owned": "official SpecDecodeBaseProposer._sample_draft_tokens",
+      "equation": "noncausal B8 query, gather slots1..7 and original target head"
+    }
+  ],
+  "raw_ABI": {
+    "entry": "proposal_logic.raw_parallel_propose",
+    "removed_stock_boundary": "llm_base_proposer.py:450-461 shared combine FC/2048 assert",
+    "replacement": "explicit [C,6144] raw payload through proposer-owned _dflare_raw_context -> model.precompute_and_store_context_kv",
+    "profile": "dedicated proposer._raw_context_profile_buffer[max_tokens,6144]",
+    "query_buffers_unchanged_width": 2048,
+    "model_sidechannel": false,
+    "new_FC": false
+  },
+  "official_operators": [
+    "DFlashQwen3Model.forward",
+    "DFlashQwen3DecoderLayer.forward",
+    "DFlashQwen3Attention.forward",
+    "QKVParallelLinear and official QKV shard loader",
+    "official MLP/gate-up packed loader",
+    "RMSNorm",
+    "MRotaryEmbedding",
+    "Attention.impl.do_kv_cache_update",
+    "DFlash copy_and_expand input kernel",
+    "SpecDecodeBaseProposer._sample_draft_tokens",
+    "standard target/rejection sampler"
+  ],
+  "owned_graph": {
+    "shared_dynamic_axis": "b",
+    "dimensions": {
+      "input_ids": {
+        "0": "b"
+      },
+      "positions": {
+        "-1": "b"
+      },
+      "input_embeds": {
+        "0": "b"
+      }
+    },
+    "query_position_backing_shape": [
+      3,
+      9
+    ],
+    "query_real_shape": [
+      3,
+      8
+    ],
+    "public_S": 7,
+    "requested_tokens": 8,
+    "padded_tokens": 8,
+    "mode": "PIECEWISE",
+    "capture_sizes": [
+      8
+    ],
+    "physical_page": 16
+  },
+  "no_installed_source_edits": true,
+  "no_handwritten_kernels": true
+}

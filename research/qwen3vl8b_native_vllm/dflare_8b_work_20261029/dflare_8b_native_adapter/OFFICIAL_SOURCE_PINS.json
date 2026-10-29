@@ -1,0 +1,94 @@
+{
+  "vllm.model_executor.models.qwen3_dflash": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/models/qwen3_dflash.py",
+    "sha256": "7c99f26d24ac1f31dc317284009d05165155d32e05b3cf1277914ad3f747d82a"
+  },
+  "vllm.v1.spec_decode.dflash": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/v1/spec_decode/dflash.py",
+    "sha256": "4a8d96af7b128ad626128d96524d7e75c0057ca31a1ffdab995df19d8f26bd69"
+  },
+  "vllm.v1.spec_decode.llm_base_proposer": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/v1/spec_decode/llm_base_proposer.py",
+    "sha256": "31c4ac72f9615aa4e2d1932ce57ca0d07da8728ac65034e4fe72bffa85c4a1ae"
+  },
+  "vllm.v1.sample.rejection_sampler": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/v1/sample/rejection_sampler.py",
+    "sha256": "0e2be02449692e8f4aea22c4637727e8d1fc296fb413e5407b1aa79419bf7b41"
+  },
+  "vllm.v1.worker.gpu_model_runner": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/v1/worker/gpu_model_runner.py",
+    "sha256": "690998ae7d9353ce42d7fc43f755fdbd72097c6e1f7a364dde435743408b00f2"
+  },
+  "vllm.model_executor.layers.rotary_embedding.mrope": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/layers/rotary_embedding/mrope.py",
+    "sha256": "d5fc5ca640bf47fdfc27447bcc6b67b2294c9ac840bbc736fe75cc6098e2a51c"
+  },
+  "vllm.config.speculative": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/config/speculative.py",
+    "sha256": "536d9ed7ef910207259efdb8cf370fbfa3e6b81794c271d575fa6b9bb13d41fd"
+  },
+  "vllm.model_executor.model_loader.weight_utils": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/model_loader/weight_utils.py",
+    "sha256": "e61c149ecc32be7afe2248bd097bea4bebf3d753e5a84fb77c302b6cabc34291"
+  },
+  "vllm.model_executor.models.utils": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/models/utils.py",
+    "sha256": "8d301f03dcd979a2f9c0a6e1fa9eddb4b8f5d1a5c29de384142dc71962152a86"
+  },
+  "vllm.model_executor.layers.logits_processor": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/layers/logits_processor.py",
+    "sha256": "d6dfec7287020d587f4a4d475ce113c383b2eb55afe5ae9b0e037df2e2d13310"
+  },
+  "vllm.model_executor.layers.vocab_parallel_embedding": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/layers/vocab_parallel_embedding.py",
+    "sha256": "48c6fdc736e89f44b13b41fb4c100403cf0e3ebaaac90c0ef5346aa3da4be5a6"
+  },
+  "vllm.model_executor.layers.linear": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/layers/linear.py",
+    "sha256": "8f45d28825195fef7f66c426c62ec59d927dffe95562c076565328ff6f49966c"
+  },
+  "vllm.model_executor.layers.layernorm": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/layers/layernorm.py",
+    "sha256": "07faa2012db829cd8615710459b5653faf374e5b716059aecd707f305bb4cb9a"
+  },
+  "vllm.model_executor.layers.activation": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/layers/activation.py",
+    "sha256": "6729e6ac4ce7282362f93cf8cec01719635cd5362830438e889e5b96cbc72116"
+  },
+  "vllm.model_executor.layers.rotary_embedding": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/layers/rotary_embedding/__init__.py",
+    "sha256": "f703d3f7ca6be6b41837d4a07a27b94d1442149554bb4f4837cd3722671a5bbd"
+  },
+  "vllm.v1.attention.backends.flash_attn": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/v1/attention/backends/flash_attn.py",
+    "sha256": "5b9c2c76c00c867e5d8320a78dbcef775174ab837d03048b513ec515d8ace907"
+  },
+  "vllm.transformers_utils.configs.eagle": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/transformers_utils/configs/eagle.py",
+    "sha256": "a150d5347cf7c7b53ce8d7e6711c2e85656df1ceeef28c921f90b52946b7203a"
+  },
+  "vllm.engine.arg_utils": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/engine/arg_utils.py",
+    "sha256": "ee107df77e59d1ca860d826feda540158bdefbdcaa3a2b786967396d83315d16"
+  },
+  "vllm.config.model": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/config/model.py",
+    "sha256": "183b4a3e6b7f281e8fbce498c171da725d6231c49c9a47ac105534e8afef6d6f"
+  },
+  "vllm.compilation.decorators": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/compilation/decorators.py",
+    "sha256": "dd7167637a478aeaea3f2410a727ddefc702bda1d9bf632831c2a8b4811ebb1e"
+  },
+  "vllm.v1.cudagraph_dispatcher": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/v1/cudagraph_dispatcher.py",
+    "sha256": "2ac6454dd72c9f54d159b5a2da0fdd60a4f841970eb32dbf54129e3c6a8d0bfd"
+  },
+  "vllm.model_executor.model_loader": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/model_loader/__init__.py",
+    "sha256": "1328bee5c1259c6f62781ae1de738d5ec58f185feee8028693204ca93d0dce5a"
+  },
+  "vllm.model_executor.model_loader.default_loader": {
+    "path": "/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/lib/python3.12/site-packages/vllm/model_executor/model_loader/default_loader.py",
+    "sha256": "981b0aa320c5c3d09bbf8dd4b3795bd75242d079b5a48d05f21bdc3602f63f9f"
+  }
+}

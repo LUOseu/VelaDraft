@@ -1,0 +1,37 @@
+{
+  "schema": "b887-cpu-oracle-erratum-v1",
+  "scope": "local shared-block JetSpec mount review; not upstream tree runtime",
+  "finding": "Old CPU stand-in fills/asserts 0..S-1; unchanged official kernel fills query rows 1..S and excludes anchor row 0.",
+  "production_change": false,
+  "frozen_files_modified": false,
+  "sources": {
+    "bounded_lookahead/test_bounded_adapter.py": {
+      "sha256": "66d2dbd2cec9eca151df71ea1f6f42ce5486ef01d1b30a17d5206231fce77df1",
+      "lines": [
+        402,
+        441
+      ],
+      "finding": "Incorrect mock sample-index fill and assertion; index-value coverage overclaim limited."
+    },
+    "bounded_lookahead/official_spatial_bounded_adapter.py": {
+      "sha256": "b887520946c0e72b0ce59df9c10bcaf909e6a24e8dd521cadced95bdcc9c84da",
+      "lines": [
+        264,
+        267,
+        273
+      ],
+      "finding": "Production calls official set_inputs_first_pass and returns indices unchanged."
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/utils.py": {
+      "sha256": "129fbe9c32b6567d513463442a5c11ae3365bd38accbbd5547f3af5dbd48624d",
+      "lines": [
+        550,
+        562
+      ],
+      "finding": "is_sample requires query_off > 0; writes query_out, which is 1..S for one request."
+    }
+  },
+  "new_test": "test_jetspec_adapter.InstalledTests.test_real_official_expansion_rejection_offsets_and_anchor_exclusion",
+  "new_oracle": "CPU stand-in writes torch.arange(1,B); new test asserts indices == [1,...,S] and 0 is absent for S1/S3/S7 and rejection counts0..7.",
+  "limits": "New CPU boundary stand-in is not a Triton execution or GPU parity test. All existing observed GPU F2 token IDs/capture records remain actual evidence; their interpretation is not replaced by this test-fixture erratum."
+}

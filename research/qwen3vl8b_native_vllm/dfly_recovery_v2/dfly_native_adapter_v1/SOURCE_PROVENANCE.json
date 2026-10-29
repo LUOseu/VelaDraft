@@ -1,0 +1,30 @@
+{
+  "dfly/model.py": {
+    "remote_path": "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dfly/model.py",
+    "sha256": "c1b2c63d7aa73a03c27e09057ddd133a22ede188801ad81ed7900e2d0e605ed5"
+  },
+  "dfly/factory.py": {
+    "remote_path": "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dfly/factory.py",
+    "sha256": "015bf14b2c7f6cd419a819dd1cc6b42e38dfab178353e1660373195367de890b"
+  },
+  "dfly/trainer.py": {
+    "remote_path": "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dfly/trainer.py",
+    "sha256": "15a2679710f9afbdf51c205fb391011443165a3c7f2bc6225d282d0996dc112a"
+  },
+  "algorithms/dfly.py": {
+    "remote_path": "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/algorithms/dfly.py",
+    "sha256": "52b383a66309f24f0765d03249aaaf2fd45729084ffa17bcf117072d763359e0"
+  },
+  "dflare/model.py": {
+    "remote_path": "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflare/model.py",
+    "sha256": "ea76a1a7291a196de3e3fdc6a791fb4731dd8933610726f145a355b3fc9da958"
+  },
+  "dflash/draft_model.py": {
+    "remote_path": "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash/draft_model.py",
+    "sha256": "6056a90681af091261813d70fa6b30ebb635f99901f6010e2dfd0edd9d64e8c7"
+  },
+  "dflash/mask.py": {
+    "remote_path": "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash/mask.py",
+    "sha256": "e93a9faa8f4bc8597060c9c1c0a2ee83b77d279ee58e91efc3ab1996e878c356"
+  }
+}

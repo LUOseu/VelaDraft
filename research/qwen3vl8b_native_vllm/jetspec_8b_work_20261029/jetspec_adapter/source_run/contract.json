@@ -1,0 +1,109 @@
+{
+  "contract_version": 1,
+  "resolved_at": "2026-10-26T10:36:36+0800",
+  "target": {
+    "model_path": "/data/Qwen3-VL-8B-Instruct",
+    "model_type": "qwen3_vl",
+    "model_fingerprint": "3925a38557fb5f5f21e0ee2b003a9bafe0ac452d8aac2e6ee702e2288b31a1ac",
+    "processor_fingerprint": "2c7327c5b8f51cf4ea8f5ec5396f9f4885996c32d59fb6cb6661c090a8a7885b",
+    "fingerprint_source": "sha256 of config/generation/index + weight shard sizes; processor files",
+    "model_files": {
+      "config.json": "5cd452860dc1e9c29dd71cc3cef7f39b338b7a40793f7a260655c2d3568f3661",
+      "generation_config.json": "8469742d1fce0de951c8909b26a2c0c0d8490837ce476efb114da9e0cefc4d44",
+      "model.safetensors.index.json": "520b2e05079402e9468a8701d03d1154d14b2599593afb6effa7fb60c1bff070"
+    },
+    "processor_files": {
+      "preprocessor_config.json": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+      "processor_config.json": null,
+      "tokenizer_config.json": "c2da771801886ad9ae98181793ffd3dfb7f1af30f6f7c6a4e15d7dbba52e2399",
+      "chat_template.json": "5c72a170d2a4a1a3bc5adad2e689ae28138a9700e5b8c96c0266331e86c0acce",
+      "tokenizer.json": "a5d85b6dcc535e6b93115a9ef287e6132fdbf30270da6218194ba742261173c7",
+      "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+      "merges.txt": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+    },
+    "weight_shards": {
+      "model-00001-of-00004.safetensors": 4902275944,
+      "model-00002-of-00004.safetensors": 4915962496,
+      "model-00003-of-00004.safetensors": 4999831048,
+      "model-00004-of-00004.safetensors": 2716270024
+    }
+  },
+  "text": {
+    "num_target_layers": 36,
+    "hidden_size": 4096,
+    "head_dim": 128,
+    "vocab_size": 151936,
+    "intermediate_size": 12288,
+    "source": "target config.text_config"
+  },
+  "mask": {
+    "token_id": 151669,
+    "token_str": null,
+    "policy": "reserved embedding row outside tokenizer vocabulary",
+    "tokenizer_vocab_size": 151643,
+    "source": "config default validated against tokenizer"
+  },
+  "rope": {
+    "type": "default",
+    "mode": "mrope",
+    "sections": [
+      24,
+      20,
+      20
+    ],
+    "interleaved": true,
+    "partial_rotary_factor": 1.0,
+    "source": "target text_config.rope_parameters.mrope_section + mrope_interleaved (absent = False) + partial_rotary_factor (absent = 1.0)"
+  },
+  "layers": {
+    "num_target_layers": 36,
+    "num_draft_layers": 3,
+    "draft_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "capture_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "capture_layer_ids_source": "default: the draft layer routing (capture == draft_layer_ids)",
+    "block_size": 8,
+    "source": "config default (start=1, end=num_target_layers-3, uniform) validated against target depth; capture_layer_ids is the ordered layer list every feature store holds"
+  },
+  "image": {
+    "min_pixels": 65536,
+    "max_pixels": 1048576,
+    "processor_min_pixels": 65536,
+    "processor_max_pixels": 16777216,
+    "processor_bounds_source": "processor.image_processor.size.shortest_edge/longest_edge",
+    "token_count_mode": "grid",
+    "patch_size": 16,
+    "merge_size": 2,
+    "tokens_per_patch": 1024,
+    "min_tokens": 64,
+    "max_tokens": 1024,
+    "sequence_length_per_tile": null,
+    "source": "config override validated against processor; processor defaults recorded"
+  },
+  "tokens": {
+    "image_token_id": 151655,
+    "vision_start_token_id": 151652,
+    "vision_end_token_id": 151653,
+    "im_start_token_id": 151644,
+    "im_end_token_id": 151645,
+    "endoftext_token_id": 151643,
+    "source": "tokenizer, cross-checked against target config"
+  },
+  "prompt": {
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "source": "config target.chat_template_kwargs (absent = {})"
+  },
+  "head": {
+    "tie_word_embeddings": false,
+    "source": "target config.json (tie_word_embeddings; absent = True)"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schema": "bounded-spatial-source-manifest-v2",
+  "revision": 2,
+  "files": {
+    "official_spatial_bounded_adapter.py": "b887520946c0e72b0ce59df9c10bcaf909e6a24e8dd521cadced95bdcc9c84da",
+    "test_bounded_adapter.py": "66d2dbd2cec9eca151df71ea1f6f42ce5486ef01d1b30a17d5206231fce77df1",
+    "bootstrap/sitecustomize.py": "3ddaa242c1e16d609f768db1299862994ef920607216be236ab5e411aad8a23a",
+    "source_bindings.json": "45135c0ba5c365e7479b823128cf9b9655336aaca8a1278e38886f7f01798d14",
+    "README.md": "026290358a0edd6ccf6e290bb869a97d7331acdb7ebc9fc14f0b8cefb08e090b"
+  },
+  "evidence_manifest": "CPU_VALIDATION.json",
+  "previous_version": {
+    "directory": "evidence_v1",
+    "identities": {
+      "official_spatial_bounded_adapter.py": "184aef2da0f68f69690bd3d08951e76559b03c851c6e68ecd9bdadd36e80174f",
+      "CPU_VALIDATION.json": "5fd299a9a735832b97e0945fce706e42bb6cd9670ab985c47b9c5f81e335b4cd",
+      "SOURCE_MANIFEST.json": "da400c8f375ef3e5fa57fa1aa34f605d9766e4a75666865b3f13a296edec687b"
+    }
+  },
+  "scope": "M1 provenance check only. Existing policy/math/graph/config hook bodies match v1. Separate validation artifacts pin evidence without a self-referential digest."
+}

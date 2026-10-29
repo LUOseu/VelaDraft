@@ -1,0 +1,18 @@
+{
+  "m4c_evaluators.py": {
+    "url": "https://raw.githubusercontent.com/facebookresearch/mmf/main/mmf/utils/m4c_evaluators.py",
+    "sha256": "e10a99e15c4658f8d0d83a05cc536c835922e701171fce0016718bec021b8c0a"
+  },
+  "MMF_LICENSE": {
+    "url": "https://raw.githubusercontent.com/facebookresearch/mmf/main/LICENSE",
+    "sha256": "dbb40c7bb9a3de99f13fe5643fbdaa0ae90a1591c232f1b316e0528a835776c9"
+  },
+  "pix2struct_metrics.py": {
+    "url": "https://raw.githubusercontent.com/google-research/pix2struct/main/pix2struct/metrics.py",
+    "sha256": "375d5970dd3c05f71b27934eabfa3e0a400c0eb459ba540a387e5c7ec6e8cecd"
+  },
+  "PIX2STRUCT_LICENSE": {
+    "url": "https://raw.githubusercontent.com/google-research/pix2struct/main/LICENSE",
+    "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd"
+  }
+}

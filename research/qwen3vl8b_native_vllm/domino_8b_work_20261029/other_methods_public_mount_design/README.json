@@ -1,0 +1,3550 @@
+{
+  "schema": "other-methods-public-operator-mount-design-v1",
+  "date": "2026-10-26",
+  "status": "SOURCE_DESIGN_ONLY_NOT_IMPLEMENTED",
+  "scope": "Four local trained parents only; canonical source/metadata mapping. No upstream algorithm-runtime equivalence, benchmark identity substitution, numerical parity or speed claim.",
+  "feasibility_order": [
+    "domino",
+    "dflare",
+    "dfly",
+    "dflash2"
+  ],
+  "ranking_basis": "Amount and coupling of new draft-only integration and decoder code; no performance prediction.",
+  "public_api_limit": "Stock operators can express math, but installed wheel has no inspected public custom-proposer registration. Full mount requires separately reviewed source-bound draft integration; documented EngineArgs and model registration alone are insufficient.",
+  "aliases": {
+    "L": "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash",
+    "R": "/home/lyh/VelaDraft-a6000-v2/vlm_dflash",
+    "O": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm",
+    "C": "/Users/Admin/grounding-parallel/research/fair_official_backend_20261025"
+  },
+  "common": {
+    "hidden_size": 2048,
+    "head_dim": 128,
+    "intermediate_size": 11008,
+    "num_hidden_layers": 3,
+    "num_attention_heads": 16,
+    "num_key_value_heads": 2,
+    "target_hidden_size": 2048,
+    "num_target_layers": 36,
+    "vocab_size": 151936,
+    "block_size": 8,
+    "attention_bias": false,
+    "rope_parameters": {
+      "rope_type": "default",
+      "rope_theta": 1000000
+    },
+    "rms_norm_eps": 1e-06,
+    "declared_target_layer_ids": [
+      1,
+      17,
+      33
+    ],
+    "captured_hf_hidden_indices": [
+      2,
+      18,
+      34
+    ],
+    "external_target_embedding_lm_head": {
+      "target_config_path": "/home/lyh/models/Qwen2.5-VL-3B-Instruct/config.json",
+      "target_config_sha256": "7ed3eed5be6924cc800e8a5e53fc405c1aab1aaf36bad65c33403b36c56827f5",
+      "target_raw_config_tie_word_embeddings": true,
+      "target_raw_config_has_text_config_block": false,
+      "target_weight_index_path": "/home/lyh/models/Qwen2.5-VL-3B-Instruct/model.safetensors.index.json",
+      "target_weight_index_sha256": "c7dd78a4c6bea60b51332f1baf37b8f8124ecab2c35395a29a29825bf2619768",
+      "target_embedding_tensor": {
+        "name": "model.embed_tokens.weight",
+        "shape": [
+          151936,
+          2048
+        ],
+        "dtype": "BF16",
+        "shard": "model-00001-of-00002.safetensors"
+      },
+      "target_lm_head_tensor_keys_present": false,
+      "configuration_only_check": {
+        "AutoConfig_class": "Qwen2_5_VLConfig",
+        "top_tie_word_embeddings": true,
+        "text_config_class": "Qwen2_5_VLTextConfig",
+        "text_tie_word_embeddings_before_vllm_normalization": "absent",
+        "cuda_initialized": false,
+        "model_constructed": false
+      },
+      "official_serving_binding_chain": [
+        {
+          "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/qwen2_5_vl.py",
+          "line": 1315,
+          "meaning": "Constructs registered Qwen2ForCausalLM inner language model."
+        },
+        {
+          "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/utils.py",
+          "line": 375,
+          "meaning": "Uses VllmConfig.with_hf_config for inner architecture override."
+        },
+        {
+          "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/config/vllm.py",
+          "line": 679,
+          "meaning": "Copies top-level multimodal tie_word_embeddings into text config under Transformers>=5."
+        },
+        {
+          "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/qwen2.py",
+          "line": 522,
+          "meaning": "True tie flag aliases lm_head to model.embed_tokens."
+        },
+        {
+          "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/llm_base_proposer.py",
+          "line": 1273,
+          "meaning": "Shares target embedding with the draft at PP1."
+        },
+        {
+          "path": "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/llm_base_proposer.py",
+          "line": 1388,
+          "meaning": "Assigns the target language model's existing lm_head to the draft."
+        }
+      ],
+      "checkpoint_states": {
+        "dflash": {
+          "draft_config_tie_word_embeddings": false,
+          "marker": "tied_embedding",
+          "saved_embedding_or_lm_head_keys": []
+        },
+        "dspark": {
+          "draft_config_tie_word_embeddings": false,
+          "marker": "tied_embedding",
+          "saved_embedding_or_lm_head_keys": []
+        },
+        "domino": {
+          "draft_config_tie_word_embeddings": false,
+          "marker": "tied_embedding",
+          "saved_embedding_or_lm_head_keys": []
+        },
+        "jetspec": {
+          "draft_config_tie_word_embeddings": false,
+          "marker": "tied_embedding",
+          "saved_embedding_or_lm_head_keys": []
+        },
+        "dflash2": {
+          "draft_config_tie_word_embeddings": false,
+          "marker": "tied_embedding",
+          "saved_embedding_or_lm_head_keys": []
+        },
+        "dflare": {
+          "draft_config_tie_word_embeddings": false,
+          "marker": "tied_embedding",
+          "saved_embedding_or_lm_head_keys": []
+        },
+        "dfly": {
+          "draft_config_tie_word_embeddings": false,
+          "marker": "tied_embedding",
+          "saved_embedding_or_lm_head_keys": []
+        }
+      },
+      "conclusion": "Valid external tied embedding/output-head convention for this actual target. Draft config tie_word_embeddings=false is not an instruction to untie the shared target head; standalone export that invents or reties a new head is not equivalent."
+    },
+    "attention_policy": "valid prefix plus all8 current query KV columns; no JetSpec causal hooks",
+    "runtime_speculative_tokens": 7,
+    "real_query_count": 8,
+    "trained_block_size": 8,
+    "physical_kv_page_size": 16,
+    "spatial_buffer_shape": [
+      3,
+      9
+    ],
+    "spatial_real_view_stride": [
+      9,
+      1
+    ],
+    "parallelism": "initial scope max_num_seqs1, TP=PP=DP1",
+    "sampling": "temperature0/full vocabulary/logit scale1; learned draft corrections before argmax; target sampler/verifier unchanged"
+  },
+  "base_state_schema": {
+    "layers.0.self_attn.q_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.self_attn.k_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.self_attn.v_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.self_attn.o_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.self_attn.q_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.self_attn.k_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.mlp.gate_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.mlp.up_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.mlp.down_proj.weight": {
+      "shape": [
+        2048,
+        11008
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.input_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.post_attention_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.q_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.k_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.v_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.o_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.q_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.k_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.mlp.gate_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.mlp.up_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.mlp.down_proj.weight": {
+      "shape": [
+        2048,
+        11008
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.input_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.post_attention_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.q_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.k_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.v_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.o_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.q_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.k_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.mlp.gate_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.mlp.up_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.mlp.down_proj.weight": {
+      "shape": [
+        2048,
+        11008
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.input_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.post_attention_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "norm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "fc.weight": {
+      "shape": [
+        2048,
+        6144
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "hidden_norm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    }
+  },
+  "methods": {
+    "domino": {
+      "rank": 1,
+      "reference_model": "Qwen3DFlashDraftModel(projector_type='domino')",
+      "attention": "noncausal valid prefix plus full query block",
+      "source_refs": [
+        [
+          "L/dflash/draft_model.py",
+          946,
+          971
+        ],
+        [
+          "L/dflash/draft_model.py",
+          1115,
+          1130
+        ],
+        [
+          "L/dflash/draft_model.py",
+          1275,
+          1334
+        ],
+        [
+          "L/domino/factory.py",
+          43,
+          80
+        ],
+        [
+          "L/domino/trainer.py",
+          84,
+          103
+        ],
+        [
+          "L/domino/trainer.py",
+          129,
+          175
+        ]
+      ],
+      "query_count": 8,
+      "proposal_count": 7,
+      "proposal_hidden_rows": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "anchor": "next_token_ids actual target-produced bonus; GRU consumes it before proposal1",
+      "needed_inference": "All36 base plus both bias-free GRU matrices and both nonlinear projector matrices. Explicit reset/update/new F.linear GRU step, reset per round; row0 pure base head, rows1..6 corrected; prior selected token conditions each step.",
+      "training_only": "lambda_base CE curriculum/schedule, eight shifted-label supervision, depth weights and teacher forcing; no extra saved tensor classified training-only.",
+      "minimal_port": "Distinct model modules + strict loader + distinct anchor-aware proposer sampler, shifted sample indices0..6, preserve eight real noncausal query rows, ordinary target head plus full-vocabulary learned correction before argmax.",
+      "unchanged": "Backbone/context FC/shared KV/attention/MLP/MRoPE/target forward/target sampler/verifier.",
+      "integration_gap": "Stock sample indices omit row0 and sampler lacks anchor IDs; current EngineArgs/model registration cannot select a custom proposer. No S8/ninth-query substitution.",
+      "runtime_policy_disclosure": "Training supervises eight shifted slots; actual local serving sampler returns seven. Proposed S7/B8 matches that narrower local serving policy; upstream eight-proposal parity not claimed.",
+      "checkpoint": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/domino_L300_s42/train/ckpt_final.pt",
+        "bytes": 585879669,
+        "contents_read": false,
+        "recorded_sha256": "ea7aa9170725ce76648b8d0eb3ebf138dcb6c59f132f680791ab9eb5e874af91",
+        "hash_basis": "small retention_record.json only; checkpoint bytes not read or rehashed this task",
+        "step": 37500
+      },
+      "tensor_schema": {
+        "basis": "prior frozen METHOD_COMPATIBILITY_INVENTORY actual CPU checkpoint extraction",
+        "state_tensor_count": 40,
+        "state_schema_sha256": "e4d70c3029f9a29cb0a3460fef05f21f37f7d24f7443aba01d37ffe229563cff",
+        "extra_vs_base": {
+          "prefix_gru.weight_ih_l0": {
+            "shape": [
+              3072,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "prefix_gru.weight_hh_l0": {
+            "shape": [
+              3072,
+              1024
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "embed_proj.0.weight": {
+            "shape": [
+              256,
+              3072
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "embed_proj.2.weight": {
+            "shape": [
+              151936,
+              256
+            ],
+            "dtype": "torch.bfloat16"
+          }
+        },
+        "missing_vs_base": []
+      },
+      "saved_draft_config": {
+        "mask_token_id": 151669,
+        "target_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "spatial_rope_enabled": true,
+        "spatial_rope_mode": "replace",
+        "spatial_rope_sections": [
+          16,
+          24,
+          24
+        ],
+        "spatial_rope_interleaved": false,
+        "visual_num_query_tokens": 0,
+        "projector_type": "domino",
+        "emb_dim": 256,
+        "gru_hidden_dim": 1024,
+        "pure_draft_prefix_len": 1,
+        "shift_label": true
+      },
+      "algorithm_config": {
+        "name": "domino",
+        "domino": {
+          "emb_dim": 256,
+          "gru_hidden_dim": 1024,
+          "pure_draft_prefix_len": 1,
+          "shift_label": true,
+          "lambda_base_start": 1,
+          "lambda_base_decay_ratio": 1,
+          "enable_correction_head": true
+        }
+      },
+      "train_recipe": null
+    },
+    "dflare": {
+      "rank": 2,
+      "reference_model": "Qwen3DFlareDraftModel",
+      "attention": "noncausal valid prefix plus full query block",
+      "source_refs": [
+        [
+          "L/dflare/model.py",
+          71,
+          104
+        ],
+        [
+          "L/dflare/model.py",
+          145,
+          200
+        ],
+        [
+          "L/dflare/factory.py",
+          75,
+          97
+        ],
+        [
+          "L/dflare/trainer.py",
+          29,
+          67
+        ]
+      ],
+      "query_count": 8,
+      "proposal_count": 7,
+      "proposal_hidden_rows": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "needed_inference": "All35 remaining base tensors (no FC), trained3x3 fusion logits and all six dedicated target K/V matrices. Context per layer = hidden_norm(einsum(softmax(live BF16 fusion logits), three ordered target features)); noise/query KV uses original draft matrices.",
+      "training_only": "Fusion initialization, requires_grad switch, nonpersistent initial-logit buffer, optimizer FP32 master references and entropy/drift metrics; saved live fusion/KV tensors remain inference-essential.",
+      "minimal_port": "Distinct raw6144-feature context transport bypasses stock2048 collapse, per-layer fusion/norm/dedicated KV projections, K norm + unchanged three-axis rotation + official per-layer cache writer. Correct dummy6144 context shape and no-write mappingNone path. Ordinary query decoder and sampler unchanged.",
+      "unchanged": "Query decoder, noise QKV/MLP, noncausal attention, ordinary rows1..7 greedy proposal sampling, target forward/sampler/verifier.",
+      "integration_gap": "Stock combine_hidden_states FC + width2048 assert loses per-layer data; fused context precompute uses shared noise KV weights. Need new draft context/proposer ABI, strict dedicated context buffer/loader binding. Existing target aux feature API suffices.",
+      "runtime_policy_disclosure": "Actual local B8 serving emits seven suffix proposals; S7/B8 preserves local query/proposal geometry.",
+      "checkpoint": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dflare_L300_s42/train/ckpt_final.pt",
+        "bytes": 468767669,
+        "contents_read": false,
+        "recorded_sha256": "66185a87886aad40dfb698e009f6d31c6a856f8a0a874cca7285419968e88937",
+        "hash_basis": "small retention_record.json only; checkpoint bytes not read or rehashed this task",
+        "step": 37500
+      },
+      "tensor_schema": {
+        "basis": "prior frozen METHOD_COMPATIBILITY_INVENTORY actual CPU checkpoint extraction",
+        "state_tensor_count": 42,
+        "state_schema_sha256": "6798d2c35677b7c8eadc2789aef1ad60d136384254641b5d72516c8274d78da2",
+        "extra_vs_base": {
+          "layer_fusion_weights": {
+            "shape": [
+              3,
+              3
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.0.self_attn.k_proj_target.weight": {
+            "shape": [
+              256,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.0.self_attn.v_proj_target.weight": {
+            "shape": [
+              256,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.1.self_attn.k_proj_target.weight": {
+            "shape": [
+              256,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.1.self_attn.v_proj_target.weight": {
+            "shape": [
+              256,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.2.self_attn.k_proj_target.weight": {
+            "shape": [
+              256,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.2.self_attn.v_proj_target.weight": {
+            "shape": [
+              256,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          }
+        },
+        "missing_vs_base": [
+          "fc.weight"
+        ]
+      },
+      "saved_draft_config": {
+        "mask_token_id": 151669,
+        "target_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "spatial_rope_enabled": true,
+        "spatial_rope_mode": "replace",
+        "spatial_rope_sections": [
+          16,
+          24,
+          24
+        ],
+        "spatial_rope_interleaved": false,
+        "visual_num_query_tokens": 0,
+        "context_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "separate_context_kv": true,
+        "fusion_trainable": true,
+        "fusion_init": "distance"
+      },
+      "algorithm_config": {
+        "name": "dflare",
+        "dflare": {
+          "context_layer_ids": [
+            1,
+            17,
+            33
+          ],
+          "separate_context_kv": true,
+          "fusion_trainable": true,
+          "fusion_init": "distance"
+        }
+      },
+      "train_recipe": null
+    },
+    "dfly": {
+      "rank": 3,
+      "reference_model": "Qwen3DFlyDraftModel",
+      "attention": "noncausal valid prefix plus full query block",
+      "source_refs": [
+        [
+          "L/dfly/model.py",
+          46,
+          95
+        ],
+        [
+          "L/dfly/model.py",
+          101,
+          156
+        ],
+        [
+          "L/dfly/model.py",
+          167,
+          209
+        ],
+        [
+          "L/dfly/factory.py",
+          102,
+          125
+        ],
+        [
+          "L/dfly/trainer.py",
+          28,
+          61
+        ]
+      ],
+      "query_count": 8,
+      "proposal_count": 7,
+      "proposal_hidden_rows": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "anchor": "actual bonus token; then actual prior proposal",
+      "needed_inference": "All36 base including FC, trained3x3 fusion, both correction norms and gate/up/down matrices. Context_l=norm(FC(concat(H))+fused_l(H)); shared query/context KV weights applied to different layer contexts. Correction h'=h+down(silu(gate(concat(norm_h(h),norm_e(embed(prev)))))*up(...)), before frozen full target LM head.",
+      "training_only": "Actual upstream_two_stage LK/D-PACE then CE/TV recipe, teacher final-hidden supervision, teacher-forced predecessor input and scalar diagnostics; no saved correction/fusion tensor is training-only.",
+      "minimal_port": "Raw6144-feature/per-layer-context model and proposer path plus seven-step anchor-aware hidden-correction sampler. Use stock RMSNorm/linears/SwiGLU or public equivalent tensor ops, exact dtype/residual order.",
+      "unchanged": "Shared query/context projection weights, ordinary query decoder/attention/MLP, MRoPE, target forward/sampler/verifier.",
+      "integration_gap": "Both single-context width2048 ABI and independent no-anchor stock sampler are insufficient. Do not use DFlare fusion-only equation or stock FC-only context.",
+      "runtime_policy_disclosure": "Actual local B8 serving emits seven suffix proposals; no learned path may be removed due to zero initialization.",
+      "checkpoint": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dfly_L300_s42/train/ckpt_final.pt",
+        "bytes": 529593845,
+        "contents_read": false,
+        "recorded_sha256": "8b8ea08e4da7e807dd7f9a9425e61ac8e6bf62afdf5771d0b71b2f6fef470bd8",
+        "hash_basis": "small retention_record.json only; checkpoint bytes not read or rehashed this task",
+        "step": 37500
+      },
+      "tensor_schema": {
+        "basis": "prior frozen METHOD_COMPATIBILITY_INVENTORY actual CPU checkpoint extraction",
+        "state_tensor_count": 42,
+        "state_schema_sha256": "a7169890f318504cfae4b20686b46fd6ea7249510f89133069b0772fe27312f4",
+        "extra_vs_base": {
+          "layer_fusion_weights": {
+            "shape": [
+              3,
+              3
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "hidden_correction.hidden_norm.weight": {
+            "shape": [
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "hidden_correction.embed_norm.weight": {
+            "shape": [
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "hidden_correction.gate_proj.weight": {
+            "shape": [
+              2048,
+              4096
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "hidden_correction.up_proj.weight": {
+            "shape": [
+              2048,
+              4096
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "hidden_correction.down_proj.weight": {
+            "shape": [
+              2048,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          }
+        },
+        "missing_vs_base": []
+      },
+      "saved_draft_config": {
+        "mask_token_id": 151669,
+        "target_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "spatial_rope_enabled": true,
+        "spatial_rope_mode": "replace",
+        "spatial_rope_sections": [
+          16,
+          24,
+          24
+        ],
+        "spatial_rope_interleaved": false,
+        "visual_num_query_tokens": 0,
+        "context_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "objective_profile": "upstream_two_stage",
+        "separate_context_kv": false,
+        "sample_from_anchor": false,
+        "fusion_trainable": true,
+        "fusion_init": "distance",
+        "enable_hidden_correction": true,
+        "hidden_correction_intermediate_size": null
+      },
+      "algorithm_config": {
+        "name": "dfly",
+        "train_recipe": {
+          "name": "upstream_two_stage",
+          "cold_start_fraction": 0.25
+        },
+        "dfly": {
+          "context_layer_ids": [
+            1,
+            17,
+            33
+          ],
+          "fusion_trainable": true,
+          "fusion_init": "distance",
+          "enable_hidden_correction": true,
+          "hidden_correction_intermediate_size": null
+        }
+      },
+      "train_recipe": {
+        "name": "upstream_two_stage",
+        "scheme": "vlm-dflash-recipe-v1",
+        "cold_start_fraction": 0.25,
+        "needs_teacher": true,
+        "stages": [
+          {
+            "name": "cold_start_lk_dpace",
+            "weighting": "dpace",
+            "ce_coef": 0,
+            "lk_coef": 1,
+            "e2e_tv_coef": 0,
+            "lk_loss_type": "hybrid",
+            "lk_eta": 3,
+            "dpace_alpha": 0.5
+          },
+          {
+            "name": "e2e_tv",
+            "weighting": "dpace",
+            "ce_coef": 1,
+            "lk_coef": 0,
+            "e2e_tv_coef": 1,
+            "lk_loss_type": "hybrid",
+            "lk_eta": 3,
+            "dpace_alpha": 0.5
+          }
+        ]
+      }
+    },
+    "dflash2": {
+      "rank": 4,
+      "reference_model": "Qwen3DFlash2DraftModel + Qwen3DFlash2DecoderLayer",
+      "attention": "noncausal attention; only local dynamic convolution taps are causal",
+      "source_refs": [
+        [
+          "L/dflash2/model.py",
+          28,
+          157
+        ],
+        [
+          "L/dflash2/model.py",
+          164,
+          201
+        ],
+        [
+          "L/dflash2/conv.py",
+          40,
+          91
+        ],
+        [
+          "L/dflash2/conv.py",
+          132,
+          157
+        ],
+        [
+          "L/dflash2/selector.py",
+          47,
+          86
+        ],
+        [
+          "L/dflash2/trainer.py",
+          47,
+          102
+        ],
+        [
+          "L/dflash2/trainer.py",
+          166,
+          198
+        ],
+        [
+          "L/dflash2/loss.py",
+          25,
+          40
+        ]
+      ],
+      "query_count": 8,
+      "proposal_count": 7,
+      "proposal_hidden_rows": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "anchor": "actual bonus token; then candidate selected at preceding slot",
+      "needed_inference": "All36 base +12 convolution tensors in six modules +3 selector tensors. Kernel2/group16 dynamic token-wise input/output convolutions wrap attention and MLP per layer. Save output delta from normalized pre-convolution input. Rank256/top16 sequential unary-candidate walk applies learned predecessor-hidden-successor edge scores before argmax.",
+      "training_only": "Unary KL/selector CE/teacher final-hidden/alpha/warmup/ramp/stop-gradient/KD chunk controls; strict training missing-target mask is not a serving candidate injection. All15 extra tensors are inference-essential.",
+      "minimal_port": "Distinct decoder modules preserving stock delayed residual/norm conventions with four learned convolution applications per layer, using F.linear/shifts/masks/multiply/sum. Context precompute unchanged. Anchor-aware sequential top16 selector proposer uses ordinary full-vocabulary target logits.",
+      "unchanged": "Base context FC/shared KV precompute, query attention operators/weights/MRoPE and target forward/sampler/verifier.",
+      "integration_gap": "Stock decoder forward has no convolution seams, constructor hardcodes layer class, sampler lacks anchor. New correct layer/cache registration once; do not construct stock Attention modules and replace them under duplicate static-context names.",
+      "runtime_policy_disclosure": "Actual local B8 serving emits seven suffix proposals. Identity initialization does not establish trained identity or permit DFlash relabeling.",
+      "checkpoint": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dflash2_L300_s42/train/ckpt_final.pt",
+        "bytes": 656958069,
+        "contents_read": false,
+        "recorded_sha256": "ad3629989034ed0fa7e58e0cbd5b57d4f64a69a9ae95843d44481e2fa54ba128",
+        "hash_basis": "small retention_record.json only; checkpoint bytes not read or rehashed this task",
+        "step": 37500
+      },
+      "tensor_schema": {
+        "basis": "prior frozen METHOD_COMPATIBILITY_INVENTORY actual CPU checkpoint extraction",
+        "state_tensor_count": 51,
+        "state_schema_sha256": "a6e0c3fc1d5e16a5350733a2d8017c725159aa0ce8d0e14a6399718646e09966",
+        "extra_vs_base": {
+          "layers.0.attention_conv.base_kernel": {
+            "shape": [
+              2,
+              2,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.0.attention_conv.kernel_projection.weight": {
+            "shape": [
+              512,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.0.mlp_conv.base_kernel": {
+            "shape": [
+              2,
+              2,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.0.mlp_conv.kernel_projection.weight": {
+            "shape": [
+              512,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.1.attention_conv.base_kernel": {
+            "shape": [
+              2,
+              2,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.1.attention_conv.kernel_projection.weight": {
+            "shape": [
+              512,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.1.mlp_conv.base_kernel": {
+            "shape": [
+              2,
+              2,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.1.mlp_conv.kernel_projection.weight": {
+            "shape": [
+              512,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.2.attention_conv.base_kernel": {
+            "shape": [
+              2,
+              2,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.2.attention_conv.kernel_projection.weight": {
+            "shape": [
+              512,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.2.mlp_conv.base_kernel": {
+            "shape": [
+              2,
+              2,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "layers.2.mlp_conv.kernel_projection.weight": {
+            "shape": [
+              512,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "candidate_selector.predecessor_codebook": {
+            "shape": [
+              151936,
+              256
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "candidate_selector.successor_codebook": {
+            "shape": [
+              151936,
+              256
+            ],
+            "dtype": "torch.bfloat16"
+          },
+          "candidate_selector.hidden_projection.weight": {
+            "shape": [
+              256,
+              2048
+            ],
+            "dtype": "torch.bfloat16"
+          }
+        },
+        "missing_vs_base": []
+      },
+      "saved_draft_config": {
+        "mask_token_id": 151669,
+        "target_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "spatial_rope_enabled": true,
+        "spatial_rope_mode": "replace",
+        "spatial_rope_sections": [
+          16,
+          24,
+          24
+        ],
+        "spatial_rope_interleaved": false,
+        "visual_num_query_tokens": 0,
+        "dflash2": {
+          "conv_kernel_size": 2,
+          "conv_group_size": 16,
+          "selector_rank": 256,
+          "selector_top_k": 16
+        }
+      },
+      "algorithm_config": {
+        "name": "dflash2",
+        "dflash2": {
+          "objective_profile": "sf_strict_unary_topk_v1",
+          "conv_kernel_size": 2,
+          "conv_group_size": 16,
+          "selector_rank": 256,
+          "selector_top_k": 16,
+          "selector_loss_alpha": 1,
+          "selector_warmup_ratio": 0.0005,
+          "selector_ramp_ratio": 0.0005,
+          "selector_stop_gradient": false,
+          "kd_chunk_size": 1024
+        }
+      },
+      "train_recipe": null
+    }
+  },
+  "api_bindings": [
+    {
+      "path": "O/model_executor/models/registry.py",
+      "lines": [
+        963,
+        1004
+      ],
+      "role": "external model registration; lazy source module supported"
+    },
+    {
+      "path": "O/transformers_utils/configs/eagle.py",
+      "lines": [
+        65,
+        86
+      ],
+      "role": "actual official EAGLEConfig DFlash architecture prefix normalization; no model_type spoof"
+    },
+    {
+      "path": "O/v1/worker/gpu_model_runner.py",
+      "lines": [
+        584,
+        586
+      ],
+      "role": "hardcoded DFlash proposer construction; no inspected public proposer registry"
+    },
+    {
+      "path": "O/v1/worker/gpu_model_runner.py",
+      "lines": [
+        5241,
+        5256
+      ],
+      "role": "ordered target feature capture IDs +1; override fields must fail closed"
+    },
+    {
+      "path": "O/v1/spec_decode/llm_base_proposer.py",
+      "lines": [
+        450,
+        461
+      ],
+      "role": "supported model type + common-context width2048 combine ABI"
+    },
+    {
+      "path": "O/v1/spec_decode/llm_base_proposer.py",
+      "lines": [
+        397,
+        422
+      ],
+      "role": "independent no-anchor sampler and local greedy shortcut"
+    },
+    {
+      "path": "O/v1/spec_decode/llm_base_proposer.py",
+      "lines": [
+        504,
+        515
+      ],
+      "role": "gather sample rows before parallel sampler"
+    },
+    {
+      "path": "O/model_executor/models/qwen3_dflash.py",
+      "lines": [
+        194,
+        213
+      ],
+      "role": "official delayed residual/norm decoder ordering"
+    },
+    {
+      "path": "O/model_executor/models/qwen3_dflash.py",
+      "lines": [
+        289,
+        305
+      ],
+      "role": "fused shared/noise KV buffer; unsuitable unchanged for DFlare/DFly per-layer contexts"
+    },
+    {
+      "path": "O/model_executor/models/qwen3_dflash.py",
+      "lines": [
+        344,
+        436
+      ],
+      "role": "stock norms/projection/rotary/current per-layer KV writer; no mapping means no cache write"
+    },
+    {
+      "path": "O/v1/attention/backends/flex_attention.py",
+      "lines": [
+        1047,
+        1068
+      ],
+      "role": "official version-bound cache writer, not documented stable public plugin ABI"
+    },
+    {
+      "path": "O/model_executor/models/qwen3_dflash.py",
+      "lines": [
+        503,
+        535
+      ],
+      "role": "full vocab default normalization, head/logit scale"
+    },
+    {
+      "path": "O/model_executor/models/qwen3_dflash.py",
+      "lines": [
+        581,
+        593
+      ],
+      "role": "shared FC combines raw target features"
+    },
+    {
+      "path": "O/model_executor/layers/logits_processor.py",
+      "lines": [
+        54,
+        104
+      ],
+      "role": "official full-vocabulary logits, scaling/gather and padding removal"
+    },
+    {
+      "path": "O/model_executor/layers/linear.py",
+      "lines": [
+        292,
+        292,
+        607,
+        607,
+        975,
+        975,
+        1392,
+        1392
+      ],
+      "role": "ReplicatedLinear/MergedColumnParallelLinear/QKVParallelLinear/RowParallelLinear"
+    },
+    {
+      "path": "O/model_executor/layers/layernorm.py",
+      "lines": [
+        36,
+        38
+      ],
+      "role": "official RMSNorm"
+    }
+  ],
+  "source_catalog": {
+    "/Users/Admin/grounding-parallel/research/fair_official_backend_20261025/METHOD_COMPATIBILITY_INVENTORY.md": {
+      "sha256": "1e18dcb46b0a5dd08ed5a75b5c7dcfda4268203363257ff07ce3155fd1c9bde2",
+      "bytes": 16305
+    },
+    "/Users/Admin/grounding-parallel/research/fair_official_backend_20261025/METHOD_COMPATIBILITY_INVENTORY.json": {
+      "sha256": "c89cb73b4ec997f4a6694a20d2a331256137a28227361aa1ba25ae244c099d5f",
+      "bytes": 66498
+    },
+    "/Users/Admin/grounding-parallel/research/fair_official_backend_20261025/bounded_lookahead/official_spatial_bounded_adapter.py": {
+      "sha256": "b887520946c0e72b0ce59df9c10bcaf909e6a24e8dd521cadced95bdcc9c84da",
+      "bytes": 17746
+    },
+    "/Users/Admin/grounding-parallel/research/fair_official_backend_20261025/jetspec_adapter/official_jetspec_adapter.py": {
+      "sha256": "e71945c614d9d72ae86bb6c441e2235e2c0600f24e52bb7b810886b2b1dcae34",
+      "bytes": 13374
+    },
+    "/Users/Admin/grounding-parallel/research/fair_official_backend_20261025/spatial_adapter/official_spatial_adapter.py": {
+      "sha256": "f26a7fee3398ab928253e3bc8f3f90ccf8eabf1fc85241119ccf43b2983414d4",
+      "bytes": 13728
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/domino/__init__.py": {
+      "sha256": "e5840e8b86b5eee328fd644e7ad95035a9d2dbd3317b63e7dcd000a917a48b81",
+      "bytes": 518
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/domino/factory.py": {
+      "sha256": "8d79ae4767238c581713197f0ec5ed2d026e05a234366e63857caef475e6769a",
+      "bytes": 3433
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/domino/trainer.py": {
+      "sha256": "dc1d602adfc1d5e64fa1b9e088d28b0e7b39e94416d218c84fc5f553bca4befe",
+      "bytes": 13347
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/algorithms/domino.py": {
+      "sha256": "1bf39993712e600c0cf63b5d9cca1cc813cc6e323d11045268e7a492417b5ca5",
+      "bytes": 7919
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflash2/selector.py": {
+      "sha256": "5809b38a1f4a628d113ffa63797a005748965b5ceba180c91f5684ce5e83bb11",
+      "bytes": 3588
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflash2/__init__.py": {
+      "sha256": "403924ef8f9a2352a5187fa427f61fa7ec0ba43e20d3c5e1e1156580d4c5fcda",
+      "bytes": 283
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflash2/factory.py": {
+      "sha256": "9fc58b489d76329aa609da61c561c54df9c9b76cd25503b84db9609e1cd3787d",
+      "bytes": 4336
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflash2/model.py": {
+      "sha256": "9468638d648738bc80aa689a68f0c86ed81c85e8c1de4871ceba697ce34de82f",
+      "bytes": 9252
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflash2/loss.py": {
+      "sha256": "3fe630496b3b31a7675b73ce3d54576cc8234b24310e61ab52b896178e4d751b",
+      "bytes": 3703
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflash2/trainer.py": {
+      "sha256": "f1bb85d3a8a14d21408496793a5254e1dfc05863a299d287053225dd1b860807",
+      "bytes": 16826
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflash2/conv.py": {
+      "sha256": "2f16e64bdfede895eb3a4d77fbfeb894f8dfa7272a01aabe58e8eab005a8daf1",
+      "bytes": 6513
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/algorithms/dflash2.py": {
+      "sha256": "a1d04ee58486349ac22f19148f685bbd5c30d99c589314b4cce970167a26c6b4",
+      "bytes": 11891
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflare/__init__.py": {
+      "sha256": "ff1fec9e7a658a7a523347e75d55805ca8721d553f01bd6db1a5c15527111500",
+      "bytes": 425
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflare/factory.py": {
+      "sha256": "eea97c64273c914fce514b144ef319c24249a4785d3edfdd747e965ff1e35e86",
+      "bytes": 4991
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflare/model.py": {
+      "sha256": "ea76a1a7291a196de3e3fdc6a791fb4731dd8933610726f145a355b3fc9da958",
+      "bytes": 9921
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflare/trainer.py": {
+      "sha256": "c92ed17f12c0571125cb05241705a2d3e1617c0bfd0d3e75e69b504d07c604ee",
+      "bytes": 3944
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/algorithms/dflare.py": {
+      "sha256": "653c5c1496eb4b6ecae01948edd12105eefe8cf2f49779ebd645169fb6cd6978",
+      "bytes": 9230
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dfly/__init__.py": {
+      "sha256": "1d8efcf71038cd5c10a1cbbf3dfe895c14a6073fe741cad17a82b35d6bb18af1",
+      "bytes": 602
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dfly/factory.py": {
+      "sha256": "015bf14b2c7f6cd419a819dd1cc6b42e38dfab178353e1660373195367de890b",
+      "bytes": 6191
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dfly/model.py": {
+      "sha256": "c1b2c63d7aa73a03c27e09057ddd133a22ede188801ad81ed7900e2d0e605ed5",
+      "bytes": 10759
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dfly/trainer.py": {
+      "sha256": "15a2679710f9afbdf51c205fb391011443165a3c7f2bc6225d282d0996dc112a",
+      "bytes": 2371
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/algorithms/dfly.py": {
+      "sha256": "52b383a66309f24f0765d03249aaaf2fd45729084ffa17bcf117072d763359e0",
+      "bytes": 11585
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflash/draft_model.py": {
+      "sha256": "41f9f31404647fb82e1798469fd621ec6c116d91e33664a99dc1f8d8c12787d6",
+      "bytes": 108505
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflash/factory.py": {
+      "sha256": "21cc265ca949229c961c025266f54dfa331344a49be416a7fa51141edf8fcc65",
+      "bytes": 7789
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflash/trainer_core.py": {
+      "sha256": "accad9e00501de7dae7657bef7cf943165b15b96957862011b403e69f207f0cb",
+      "bytes": 60195
+    },
+    "/Users/Admin/grounding-parallel/a6000-v2-work/vlm_dflash/dflash/mask.py": {
+      "sha256": "e93a9faa8f4bc8597060c9c1c0a2ee83b77d279ee58e91efc3ab1996e878c356",
+      "bytes": 11845
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash/draft_model.py": {
+      "sha256": "6056a90681af091261813d70fa6b30ebb635f99901f6010e2dfd0edd9d64e8c7",
+      "bytes": 96675,
+      "symbols": {
+        "set_verify_sdpa_backend_switch": {
+          "start": 65,
+          "end": 68
+        },
+        "verify_sdpa_backend_switch_enabled": {
+          "start": 71,
+          "end": 72
+        },
+        "verify_sdpa_backend_parity": {
+          "start": 76,
+          "end": 89
+        },
+        "_DFlashAcceptanceEvent": {
+          "start": 92,
+          "end": 97
+        },
+        "_DFlashGenerationStats": {
+          "start": 100,
+          "end": 113
+        },
+        "_min_decision_margin": {
+          "start": 116,
+          "end": 127
+        },
+        "_bounded_acceptance_counts": {
+          "start": 130,
+          "end": 150
+        },
+        "sample": {
+          "start": 153,
+          "end": 160
+        },
+        "_ablate_image_token_hidden_states": {
+          "start": 163,
+          "end": 196
+        },
+        "apply_rotary_pos_emb": {
+          "start": 199,
+          "end": 211
+        },
+        "_merge_multiaxis_rotary_embeddings": {
+          "start": 214,
+          "end": 289
+        },
+        "Qwen3DFlashAttention": {
+          "start": 292,
+          "end": 463
+        },
+        "DFlashVisualLayer": {
+          "start": 466,
+          "end": 602
+        },
+        "DFlashPooledMLPVisualLayer": {
+          "start": 605,
+          "end": 690
+        },
+        "Qwen3DFlashDecoderLayer": {
+          "start": 693,
+          "end": 786
+        },
+        "build_target_layer_ids": {
+          "start": 789,
+          "end": 795
+        },
+        "extract_context_feature": {
+          "start": 798,
+          "end": 806
+        },
+        "_prepend_text_position_ids": {
+          "start": 809,
+          "end": 837
+        },
+        "Qwen3DFlashDraftModel": {
+          "start": 840,
+          "end": 1912
+        },
+        "__init__": {
+          "start": 846,
+          "end": 940
+        },
+        "forward": {
+          "start": 1168,
+          "end": 1239
+        },
+        "_context_noise_kv": {
+          "start": 444,
+          "end": 463
+        },
+        "build_context": {
+          "start": 635,
+          "end": 662
+        },
+        "_make_decoder_layer": {
+          "start": 942,
+          "end": 944
+        },
+        "visual_conditioning_enabled": {
+          "start": 947,
+          "end": 949
+        },
+        "set_training_stage": {
+          "start": 951,
+          "end": 965
+        },
+        "visual_parameters": {
+          "start": 967,
+          "end": 973
+        },
+        "set_domino_training_stage": {
+          "start": 975,
+          "end": 988
+        },
+        "domino_parameters": {
+          "start": 990,
+          "end": 994
+        },
+        "set_layer_routing_training_stage": {
+          "start": 996,
+          "end": 1008
+        },
+        "set_spatial_rope_training_stage": {
+          "start": 1010,
+          "end": 1025
+        },
+        "layer_routing_parameters": {
+          "start": 1027,
+          "end": 1031
+        },
+        "_prepare_target_hidden": {
+          "start": 1033,
+          "end": 1042
+        },
+        "_build_layer_contexts": {
+          "start": 1044,
+          "end": 1079
+        },
+        "_domino_gru_step": {
+          "start": 1081,
+          "end": 1096
+        },
+        "backbone_parameters": {
+          "start": 1098,
+          "end": 1101
+        },
+        "build_visual_context": {
+          "start": 1103,
+          "end": 1136
+        },
+        "_apply": {
+          "start": 1138,
+          "end": 1166
+        },
+        "_sample_draft_tokens": {
+          "start": 1241,
+          "end": 1300
+        },
+        "_inference_block_mask": {
+          "start": 1303,
+          "end": 1332
+        },
+        "spec_generate": {
+          "start": 1334,
+          "end": 1912
+        },
+        "record_decision": {
+          "start": 1447,
+          "end": 1468
+        },
+        "start_timing": {
+          "start": 1478,
+          "end": 1483
+        },
+        "end_timing": {
+          "start": 1485,
+          "end": 1490
+        },
+        "target_verify_backend": {
+          "start": 1492,
+          "end": 1505
+        },
+        "_sequential_round": {
+          "start": 1589,
+          "end": 1692
+        },
+        "_parallel_round": {
+          "start": 1694,
+          "end": 1792
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash/factory.py": {
+      "sha256": "21cc265ca949229c961c025266f54dfa331344a49be416a7fa51141edf8fcc65",
+      "bytes": 7789,
+      "symbols": {
+        "build_draft_config": {
+          "start": 15,
+          "end": 58
+        },
+        "build_trainer_module": {
+          "start": 61,
+          "end": 137
+        },
+        "load_checkpoint": {
+          "start": 140,
+          "end": 161
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash/trainer_core.py": {
+      "sha256": "accad9e00501de7dae7657bef7cf943165b15b96957862011b403e69f207f0cb",
+      "bytes": 60195,
+      "symbols": {
+        "_context_doc_ids": {
+          "start": 59,
+          "end": 68
+        },
+        "_to_full_tensor": {
+          "start": 71,
+          "end": 79
+        },
+        "NoValidAnchorsError": {
+          "start": 82,
+          "end": 89
+        },
+        "DFlashStepMetrics": {
+          "start": 93,
+          "end": 121
+        },
+        "compute_accept_len": {
+          "start": 124,
+          "end": 143
+        },
+        "compute_acceptance_stats": {
+          "start": 146,
+          "end": 167
+        },
+        "DFlashTrainerModule": {
+          "start": 173,
+          "end": 1195
+        },
+        "__init__": {
+          "start": 192,
+          "end": 289
+        },
+        "consumed_layer_ids": {
+          "start": 295,
+          "end": 306
+        },
+        "configure_feature_layout": {
+          "start": 308,
+          "end": 336
+        },
+        "_select_context_layers": {
+          "start": 338,
+          "end": 352
+        },
+        "_sample_anchor_positions": {
+          "start": 354,
+          "end": 408
+        },
+        "_sample_prefix_lengths": {
+          "start": 410,
+          "end": 430
+        },
+        "_create_position_ids": {
+          "start": 432,
+          "end": 450
+        },
+        "_create_noise_embed": {
+          "start": 452,
+          "end": 473
+        },
+        "_create_vp_noise_embed": {
+          "start": 475,
+          "end": 506
+        },
+        "_build_block_targets": {
+          "start": 508,
+          "end": 542
+        },
+        "_prepare_block_inputs": {
+          "start": 544,
+          "end": 665
+        },
+        "_apply_algorithm_terms": {
+          "start": 667,
+          "end": 691
+        },
+        "_teacher_forced_prev_tokens": {
+          "start": 693,
+          "end": 708
+        },
+        "_correct_draft_hidden": {
+          "start": 710,
+          "end": 727
+        },
+        "forward": {
+          "start": 729,
+          "end": 959
+        },
+        "_recipe_active": {
+          "start": 961,
+          "end": 964
+        },
+        "_public_extra_metrics": {
+          "start": 967,
+          "end": 972
+        },
+        "_block_loss_step": {
+          "start": 974,
+          "end": 1101
+        },
+        "_variable_prefix_loss": {
+          "start": 1103,
+          "end": 1168
+        },
+        "recipe_needs_teacher": {
+          "start": 1171,
+          "end": 1173
+        },
+        "recipe_stage_index": {
+          "start": 1176,
+          "end": 1178
+        },
+        "current_recipe_stage": {
+          "start": 1180,
+          "end": 1185
+        },
+        "set_training_progress": {
+          "start": 1187,
+          "end": 1195
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash/mask.py": {
+      "sha256": "e93a9faa8f4bc8597060c9c1c0a2ee83b77d279ee58e91efc3ab1996e878c356",
+      "bytes": 11845,
+      "symbols": {
+        "_get_compiled_create_block_mask": {
+          "start": 58,
+          "end": 63
+        },
+        "create_dflash_sdpa_mask": {
+          "start": 66,
+          "end": 140
+        },
+        "build_dflash_mask_mod": {
+          "start": 143,
+          "end": 198
+        },
+        "create_dflash_block_mask": {
+          "start": 201,
+          "end": 260
+        },
+        "dflash_mask_mod": {
+          "start": 164,
+          "end": 196
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/domino/factory.py": {
+      "sha256": "8d79ae4767238c581713197f0ec5ed2d026e05a234366e63857caef475e6769a",
+      "bytes": 3433,
+      "symbols": {
+        "resolve_domino_config": {
+          "start": 31,
+          "end": 40
+        },
+        "build_draft_config": {
+          "start": 43,
+          "end": 58
+        },
+        "build_trainer_module": {
+          "start": 61,
+          "end": 82
+        },
+        "load_checkpoint": {
+          "start": 85,
+          "end": 89
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/domino/trainer.py": {
+      "sha256": "dc1d602adfc1d5e64fa1b9e088d28b0e7b39e94416d218c84fc5f553bca4befe",
+      "bytes": 13347,
+      "symbols": {
+        "get_lambda_base": {
+          "start": 31,
+          "end": 46
+        },
+        "DominoTrainerModule": {
+          "start": 49,
+          "end": 291
+        },
+        "__init__": {
+          "start": 60,
+          "end": 121
+        },
+        "set_training_progress": {
+          "start": 123,
+          "end": 127
+        },
+        "_domino_correction": {
+          "start": 129,
+          "end": 175
+        },
+        "_apply_algorithm_terms": {
+          "start": 177,
+          "end": 216
+        },
+        "_block_loss_step": {
+          "start": 218,
+          "end": 291
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/algorithms/domino.py": {
+      "sha256": "1bf39993712e600c0cf63b5d9cca1cc813cc6e323d11045268e7a492417b5ca5",
+      "bytes": 7919,
+      "symbols": {
+        "DominoAlgorithm": {
+          "start": 20,
+          "end": 176
+        },
+        "validate_config": {
+          "start": 89,
+          "end": 124
+        },
+        "build_draft_config": {
+          "start": 130,
+          "end": 133
+        },
+        "build_trainer_module": {
+          "start": 135,
+          "end": 147
+        },
+        "checkpoint_metadata": {
+          "start": 149,
+          "end": 176
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash2/factory.py": {
+      "sha256": "9fc58b489d76329aa609da61c561c54df9c9b76cd25503b84db9609e1cd3787d",
+      "bytes": 4336,
+      "symbols": {
+        "resolve_dflash2_config": {
+          "start": 26,
+          "end": 41
+        },
+        "build_draft_config": {
+          "start": 44,
+          "end": 72
+        },
+        "build_trainer_module": {
+          "start": 75,
+          "end": 100
+        },
+        "load_checkpoint": {
+          "start": 103,
+          "end": 108
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash2/model.py": {
+      "sha256": "9468638d648738bc80aa689a68f0c86ed81c85e8c1de4871ceba697ce34de82f",
+      "bytes": 9252,
+      "symbols": {
+        "Qwen3DFlash2DecoderLayer": {
+          "start": 28,
+          "end": 96
+        },
+        "Qwen3DFlash2DraftModel": {
+          "start": 99,
+          "end": 201
+        },
+        "__init__": {
+          "start": 104,
+          "end": 145
+        },
+        "reset_convolutions": {
+          "start": 49,
+          "end": 52
+        },
+        "forward": {
+          "start": 54,
+          "end": 96
+        },
+        "_make_decoder_layer": {
+          "start": 147,
+          "end": 157
+        },
+        "_sample_draft_tokens": {
+          "start": 164,
+          "end": 201
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash2/trainer.py": {
+      "sha256": "f1bb85d3a8a14d21408496793a5254e1dfc05863a299d287053225dd1b860807",
+      "bytes": 16826,
+      "symbols": {
+        "DFlash2TrainerModule": {
+          "start": 42,
+          "end": 360
+        },
+        "__init__": {
+          "start": 47,
+          "end": 102
+        },
+        "set_training_progress": {
+          "start": 104,
+          "end": 107
+        },
+        "_effective_selector_alpha": {
+          "start": 109,
+          "end": 125
+        },
+        "_teacher_index": {
+          "start": 131,
+          "end": 140
+        },
+        "_gather_rows": {
+          "start": 142,
+          "end": 143
+        },
+        "_teacher_argmax": {
+          "start": 145,
+          "end": 160
+        },
+        "_apply_algorithm_terms": {
+          "start": 166,
+          "end": 198
+        },
+        "_unary_kl_loss": {
+          "start": 204,
+          "end": 235
+        },
+        "_selector_loss": {
+          "start": 237,
+          "end": 249
+        },
+        "_block_loss_step": {
+          "start": 251,
+          "end": 360
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash2/conv.py": {
+      "sha256": "2f16e64bdfede895eb3a4d77fbfeb894f8dfa7272a01aabe58e8eab005a8daf1",
+      "bytes": 6513,
+      "symbols": {
+        "grouped_dynamic_conv": {
+          "start": 40,
+          "end": 91
+        },
+        "GroupedDynamicCausalConv": {
+          "start": 94,
+          "end": 157
+        },
+        "__init__": {
+          "start": 104,
+          "end": 123
+        },
+        "reset_parameters": {
+          "start": 125,
+          "end": 130
+        },
+        "prepare": {
+          "start": 132,
+          "end": 147
+        },
+        "finish": {
+          "start": 149,
+          "end": 157
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash2/selector.py": {
+      "sha256": "5809b38a1f4a628d113ffa63797a005748965b5ceba180c91f5684ce5e83bb11",
+      "bytes": 3588,
+      "symbols": {
+        "CandidateSelector": {
+          "start": 24,
+          "end": 86
+        },
+        "__init__": {
+          "start": 27,
+          "end": 45
+        },
+        "context": {
+          "start": 47,
+          "end": 51
+        },
+        "transition_scores": {
+          "start": 53,
+          "end": 62
+        },
+        "score_candidates": {
+          "start": 64,
+          "end": 74
+        },
+        "select": {
+          "start": 76,
+          "end": 86
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflash2/loss.py": {
+      "sha256": "3fe630496b3b31a7675b73ce3d54576cc8234b24310e61ab52b896178e4d751b",
+      "bytes": 3703,
+      "symbols": {
+        "selector_strict_candidates": {
+          "start": 25,
+          "end": 40
+        },
+        "selector_training_candidates": {
+          "start": 43,
+          "end": 65
+        },
+        "candidate_cross_entropy": {
+          "start": 68,
+          "end": 74
+        },
+        "decay_weights": {
+          "start": 77,
+          "end": 88
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/algorithms/dflash2.py": {
+      "sha256": "a1d04ee58486349ac22f19148f685bbd5c30d99c589314b4cce970167a26c6b4",
+      "bytes": 11891,
+      "symbols": {
+        "DFlash2Algorithm": {
+          "start": 19,
+          "end": 246
+        },
+        "validate_config": {
+          "start": 95,
+          "end": 171
+        },
+        "build_draft_config": {
+          "start": 177,
+          "end": 180
+        },
+        "build_trainer_module": {
+          "start": 182,
+          "end": 194
+        },
+        "checkpoint_metadata": {
+          "start": 196,
+          "end": 228
+        },
+        "load_decoder": {
+          "start": 234,
+          "end": 237
+        },
+        "build_inference_module": {
+          "start": 239,
+          "end": 246
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflare/factory.py": {
+      "sha256": "eea97c64273c914fce514b144ef319c24249a4785d3edfdd747e965ff1e35e86",
+      "bytes": 4991,
+      "symbols": {
+        "resolve_dflare_config": {
+          "start": 34,
+          "end": 54
+        },
+        "resolve_context_layer_ids": {
+          "start": 57,
+          "end": 72
+        },
+        "build_draft_config": {
+          "start": 75,
+          "end": 97
+        },
+        "build_trainer_module": {
+          "start": 100,
+          "end": 122
+        },
+        "load_checkpoint": {
+          "start": 125,
+          "end": 131
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflare/model.py": {
+      "sha256": "ea76a1a7291a196de3e3fdc6a791fb4731dd8933610726f145a355b3fc9da958",
+      "bytes": 9921,
+      "symbols": {
+        "init_fusion_weights_": {
+          "start": 46,
+          "end": 68
+        },
+        "Qwen3DFlareAttention": {
+          "start": 71,
+          "end": 104
+        },
+        "Qwen3DFlareDecoderLayer": {
+          "start": 107,
+          "end": 112
+        },
+        "Qwen3DFlareDraftModel": {
+          "start": 115,
+          "end": 200
+        },
+        "__init__": {
+          "start": 118,
+          "end": 167
+        },
+        "_context_noise_kv": {
+          "start": 91,
+          "end": 104
+        },
+        "set_master_parameters": {
+          "start": 169,
+          "end": 171
+        },
+        "_make_decoder_layer": {
+          "start": 173,
+          "end": 174
+        },
+        "_prepare_target_hidden": {
+          "start": 176,
+          "end": 187
+        },
+        "fusion_probabilities": {
+          "start": 189,
+          "end": 191
+        },
+        "_build_layer_contexts": {
+          "start": 193,
+          "end": 200
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dflare/trainer.py": {
+      "sha256": "c92ed17f12c0571125cb05241705a2d3e1617c0bfd0d3e75e69b504d07c604ee",
+      "bytes": 3944,
+      "symbols": {
+        "DFlareTrainerModule": {
+          "start": 21,
+          "end": 85
+        },
+        "fusion_metrics": {
+          "start": 29,
+          "end": 68
+        },
+        "_apply_algorithm_terms": {
+          "start": 70,
+          "end": 85
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/algorithms/dflare.py": {
+      "sha256": "653c5c1496eb4b6ecae01948edd12105eefe8cf2f49779ebd645169fb6cd6978",
+      "bytes": 9230,
+      "symbols": {
+        "DFlareAlgorithm": {
+          "start": 16,
+          "end": 204
+        },
+        "validate_config": {
+          "start": 77,
+          "end": 104
+        },
+        "build_draft_config": {
+          "start": 106,
+          "end": 109
+        },
+        "build_trainer_module": {
+          "start": 111,
+          "end": 129
+        },
+        "checkpoint_metadata": {
+          "start": 131,
+          "end": 161
+        },
+        "load_decoder": {
+          "start": 163,
+          "end": 166
+        },
+        "plan_knobs": {
+          "start": 168,
+          "end": 195
+        },
+        "build_inference_module": {
+          "start": 197,
+          "end": 204
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dfly/factory.py": {
+      "sha256": "015bf14b2c7f6cd419a819dd1cc6b42e38dfab178353e1660373195367de890b",
+      "bytes": 6191,
+      "symbols": {
+        "resolve_dfly_config": {
+          "start": 55,
+          "end": 84
+        },
+        "build_draft_config": {
+          "start": 87,
+          "end": 126
+        },
+        "build_trainer_module": {
+          "start": 129,
+          "end": 151
+        },
+        "load_checkpoint": {
+          "start": 154,
+          "end": 160
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dfly/model.py": {
+      "sha256": "c1b2c63d7aa73a03c27e09057ddd133a22ede188801ad81ed7900e2d0e605ed5",
+      "bytes": 10759,
+      "symbols": {
+        "HiddenStatesCorrection": {
+          "start": 46,
+          "end": 80
+        },
+        "build_hidden_correction": {
+          "start": 83,
+          "end": 95
+        },
+        "Qwen3DFlyDraftModel": {
+          "start": 98,
+          "end": 209
+        },
+        "__init__": {
+          "start": 101,
+          "end": 130
+        },
+        "forward": {
+          "start": 74,
+          "end": 80
+        },
+        "_make_decoder_layer": {
+          "start": 132,
+          "end": 133
+        },
+        "_project_base_context": {
+          "start": 135,
+          "end": 138
+        },
+        "_build_layer_contexts": {
+          "start": 140,
+          "end": 156
+        },
+        "context_diagnostics": {
+          "start": 158,
+          "end": 165
+        },
+        "_sample_draft_tokens": {
+          "start": 167,
+          "end": 209
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/dfly/trainer.py": {
+      "sha256": "15a2679710f9afbdf51c205fb391011443165a3c7f2bc6225d282d0996dc112a",
+      "bytes": 2371,
+      "symbols": {
+        "DFlyTrainerModule": {
+          "start": 21,
+          "end": 60
+        },
+        "__init__": {
+          "start": 24,
+          "end": 26
+        },
+        "_correct_draft_hidden": {
+          "start": 28,
+          "end": 48
+        },
+        "_apply_algorithm_terms": {
+          "start": 50,
+          "end": 60
+        }
+      }
+    },
+    "/home/lyh/VelaDraft-a6000-v2/vlm_dflash/algorithms/dfly.py": {
+      "sha256": "52b383a66309f24f0765d03249aaaf2fd45729084ffa17bcf117072d763359e0",
+      "bytes": 11585,
+      "symbols": {
+        "DFlyAlgorithm": {
+          "start": 17,
+          "end": 249
+        },
+        "validate_config": {
+          "start": 95,
+          "end": 128
+        },
+        "build_draft_config": {
+          "start": 130,
+          "end": 133
+        },
+        "build_trainer_module": {
+          "start": 135,
+          "end": 153
+        },
+        "checkpoint_metadata": {
+          "start": 155,
+          "end": 194
+        },
+        "load_decoder": {
+          "start": 196,
+          "end": 199
+        },
+        "plan_knobs": {
+          "start": 201,
+          "end": 240
+        },
+        "build_inference_module": {
+          "start": 242,
+          "end": 249
+        }
+      }
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/qwen3_dflash.py": {
+      "sha256": "7c99f26d24ac1f31dc317284009d05165155d32e05b3cf1277914ad3f747d82a",
+      "bytes": 24282
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/dflash.py": {
+      "sha256": "4a8d96af7b128ad626128d96524d7e75c0057ca31a1ffdab995df19d8f26bd69",
+      "bytes": 12017
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/llm_base_proposer.py": {
+      "sha256": "31c4ac72f9615aa4e2d1932ce57ca0d07da8728ac65034e4fe72bffa85c4a1ae",
+      "bytes": 75745
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/spec_decode/utils.py": {
+      "sha256": "129fbe9c32b6567d513463442a5c11ae3365bd38accbbd5547f3af5dbd48624d",
+      "bytes": 24506
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/worker/gpu_model_runner.py": {
+      "sha256": "690998ae7d9353ce42d7fc43f755fdbd72097c6e1f7a364dde435743408b00f2",
+      "bytes": 327746
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/config/speculative.py": {
+      "sha256": "536d9ed7ef910207259efdb8cf370fbfa3e6b81794c271d575fa6b9bb13d41fd",
+      "bytes": 47903
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/registry.py": {
+      "sha256": "aadb76f95f6da37b8acf83d186e4d5901736e376e52d8bc5ccadc22f7c36cdb5",
+      "bytes": 57633
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/layers/linear.py": {
+      "sha256": "8f45d28825195fef7f66c426c62ec59d927dffe95562c076565328ff6f49966c",
+      "bytes": 63358
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/layers/layernorm.py": {
+      "sha256": "07faa2012db829cd8615710459b5653faf374e5b716059aecd707f305bb4cb9a",
+      "bytes": 11067
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/layers/activation.py": {
+      "sha256": "6729e6ac4ce7282362f93cf8cec01719635cd5362830438e889e5b96cbc72116",
+      "bytes": 26925
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/layers/logits_processor.py": {
+      "sha256": "d6dfec7287020d587f4a4d475ce113c383b2eb55afe5ae9b0e037df2e2d13310",
+      "bytes": 6226
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/model_executor/models/qwen3.py": {
+      "sha256": "3a34a6de2856c087f454767ad3c5c221b079bd03507fff462dfedd4d07f66508",
+      "bytes": 12472
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/transformers_utils/configs/eagle.py": {
+      "sha256": "a150d5347cf7c7b53ce8d7e6711c2e85656df1ceeef28c921f90b52946b7203a",
+      "bytes": 3530
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/vllm/v1/attention/backends/flex_attention.py": {
+      "sha256": "db5da31ca7ad3af73e169ee93c33cac47d52e4f34ee6b4d871a269c1861922a8",
+      "bytes": 49236
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/torch/nn/functional.py": {
+      "sha256": "06f330c5ce12f7a7b5be938fb4fd1b78dadcc4a345c49aac58dbb923b3a3a405",
+      "bytes": 261223
+    },
+    "/home/lyh/miniforge3/envs/c1vllm/lib/python3.12/site-packages/torch/nn/modules/rnn.py": {
+      "sha256": "5be3167a71ab06e2690ca16792dfe302be2afd462f24708dc29e09a3eb3b97aa",
+      "bytes": 76749
+    }
+  },
+  "canonical_original_metadata": {
+    "domino": {
+      "config.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/domino_L300_s42/config.json",
+        "sha256": "7ea7f6028c62d1f387bda5a627ddc2f799df3e6e22b9f38bf6c2a5643629ab06",
+        "bytes": 2900,
+        "data": {
+          "algorithm": {
+            "name": "domino",
+            "domino": {
+              "emb_dim": 256,
+              "gru_hidden_dim": 1024,
+              "pure_draft_prefix_len": 1,
+              "shift_label": true,
+              "lambda_base_start": 1,
+              "lambda_base_decay_ratio": 1,
+              "enable_correction_head": true
+            }
+          },
+          "run": {
+            "name": "domino_L300_s42",
+            "dir": "/home/lyh/a6000_3b_v2_L300/runs/domino_L300_s42"
+          },
+          "dataset": {
+            "source": "jsonl",
+            "path": "/home/lyh/a6000_3b_v2_L300/shared/pool/turn665k_pool.jsonl",
+            "slice": 399556,
+            "val_size": 256,
+            "test_size": 256,
+            "seed": 42,
+            "min_answer_chars": 0,
+            "image_link_mode": "hardlink",
+            "hash_workers": 8
+          },
+          "regen": {
+            "max_new_tokens": 2048,
+            "min_response_tokens": 8,
+            "batch_size": 32,
+            "do_sample": true,
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "repetition_penalty": 1.05,
+            "seed": 42,
+            "max_prompt_tokens": 2048,
+            "multi_turn_mode": "last_turn_only"
+          },
+          "target": {
+            "model": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+            "dtype": "bfloat16",
+            "attn_implementation": "sdpa",
+            "device": "cuda:0",
+            "local_files_only": true,
+            "image_min_pixels": 200704,
+            "image_max_pixels": 1003520
+          },
+          "capture": {
+            "seq_length": 4096,
+            "shard_size": 32,
+            "dtype": "bfloat16",
+            "store_final_hidden": true,
+            "visual_path_check": true,
+            "visual_check_samples": 2
+          },
+          "drafter": {
+            "num_hidden_layers": 3,
+            "block_size": 8,
+            "num_anchors": 512,
+            "loss_decay_gamma": 7,
+            "capture_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "mask_token_id": 151669,
+            "attention_backend": "flex_attention",
+            "spatial_rope_enabled": true,
+            "spatial_rope_mode": "replace",
+            "spatial_rope_sections": [
+              16,
+              24,
+              24
+            ]
+          },
+          "train": {
+            "feature_mode": "online",
+            "online_batch_size": 1,
+            "online_feature_cache_gb": 0,
+            "micro_batch_size": 1,
+            "grad_accumulation_steps": 8,
+            "num_epochs": 1,
+            "save_every_fraction_of_epoch": 0.16666666666666666,
+            "milestone_snapshots": true,
+            "milestone_keep": 2,
+            "lr": 0.0001,
+            "betas": [
+              0.9,
+              0.95
+            ],
+            "weight_decay": 0,
+            "warmup_ratio": 0.04,
+            "min_lr_ratio": 0.1,
+            "max_grad_norm": 1,
+            "log_every_steps": 10,
+            "seed": 42,
+            "device": "cuda:0",
+            "num_workers": 0,
+            "overfit_sanity": {
+              "enabled": true,
+              "num_samples": 4,
+              "steps": 200,
+              "ce_drop": 0.6,
+              "slot0_acc": 0.9
+            },
+            "resume_state_dir": "/home/lyh/a6000_3b_v2_L300/runs/domino_L300_s42/train_state"
+          },
+          "eval": {
+            "verification": "sequential",
+            "strict_parallel_margin": 2,
+            "num_prompts": 256,
+            "max_new_tokens": 128,
+            "sequential_target_verification": true,
+            "verify_sdpa_backend": "parity",
+            "parallel_diagnostic_prompts": 32,
+            "checkpoints": [
+              "ckpt_final.pt"
+            ]
+          }
+        }
+      },
+      "contract.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/domino_L300_s42/contract.json",
+        "sha256": "b269ab8da19dd144796adb5d3c4080a7ca02a5085b1fa7400bd753b80da4a178",
+        "bytes": 3566,
+        "data": {
+          "contract_version": 1,
+          "resolved_at": "2026-10-19T23:34:11+0800",
+          "target": {
+            "model_path": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+            "model_type": "qwen2_5_vl",
+            "model_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+            "processor_fingerprint": "ed94e2fa5734073524651401de89882531084a817ed212300893591d6b35ff3e",
+            "fingerprint_source": "sha256 of config/generation/index + weight shard sizes; processor files",
+            "model_files": {
+              "config.json": "7ed3eed5be6924cc800e8a5e53fc405c1aab1aaf36bad65c33403b36c56827f5",
+              "generation_config.json": "533f191cc257b7de37a4fccd0a7a1706d75e1aa660f93efaa54e5a2a9f9aace9",
+              "model.safetensors.index.json": "c7dd78a4c6bea60b51332f1baf37b8f8124ecab2c35395a29a29825bf2619768"
+            },
+            "processor_files": {
+              "preprocessor_config.json": "f2058c716eef96ccaed1cc1e2d0c08306b62586d535b28d9d08e691b2fab7ca0",
+              "processor_config.json": null,
+              "tokenizer_config.json": "4abd3520120e266da84c0864fee064d1fb10806f02225911a47253dd38dc5f56",
+              "chat_template.json": "ad60d90252ed0b0705ba14e2d0ad0fec0beac1ea955642b54059b36052d8bc96",
+              "tokenizer.json": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+              "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+              "merges.txt": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+            },
+            "weight_shards": {
+              "model-00001-of-00002.safetensors": 3982649232,
+              "model-00002-of-00002.safetensors": 3526688744
+            }
+          },
+          "text": {
+            "num_target_layers": 36,
+            "hidden_size": 2048,
+            "head_dim": 128,
+            "vocab_size": 151936,
+            "source": "target config.text_config"
+          },
+          "mask": {
+            "token_id": 151669,
+            "token_str": null,
+            "policy": "reserved embedding row outside tokenizer vocabulary",
+            "tokenizer_vocab_size": 151643,
+            "source": "config default validated against tokenizer"
+          },
+          "rope": {
+            "type": "mrope",
+            "mode": "mrope",
+            "sections": [
+              16,
+              24,
+              24
+            ],
+            "interleaved": false,
+            "source": "target text_config.rope_parameters.mrope_section + mrope_interleaved (absent = False)"
+          },
+          "layers": {
+            "num_target_layers": 36,
+            "num_draft_layers": 3,
+            "draft_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "capture_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "capture_layer_ids_source": "explicit drafter.capture_layer_ids",
+            "block_size": 8,
+            "source": "config default (start=1, end=num_target_layers-3, uniform) validated against target depth; capture_layer_ids is the ordered layer list every feature store holds"
+          },
+          "image": {
+            "min_pixels": 200704,
+            "max_pixels": 1003520,
+            "processor_min_pixels": 3136,
+            "processor_max_pixels": 12845056,
+            "processor_bounds_source": "preprocessor_config.json.min_pixels/max_pixels",
+            "token_count_mode": "grid",
+            "patch_size": 14,
+            "merge_size": 2,
+            "tokens_per_patch": 784,
+            "min_tokens": 256,
+            "max_tokens": 1280,
+            "sequence_length_per_tile": null,
+            "source": "config override validated against processor; processor defaults recorded"
+          },
+          "tokens": {
+            "image_token_id": 151655,
+            "vision_start_token_id": 151652,
+            "vision_end_token_id": 151653,
+            "im_start_token_id": 151644,
+            "im_end_token_id": 151645,
+            "endoftext_token_id": 151643,
+            "source": "tokenizer, cross-checked against target config"
+          },
+          "head": {
+            "tie_word_embeddings": true,
+            "source": "target config.json (tie_word_embeddings; absent = True)"
+          }
+        }
+      },
+      "retention_record.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/domino_L300_s42/retention_record.json",
+        "sha256": "892b5684cb2f06e95c69d05077e7da009d3dd16ef5cc52327a06715cefa065a9",
+        "bytes": 368,
+        "data": {
+          "ckpt_final_bytes": 585879669,
+          "ckpt_final_sha256": "ea7aa9170725ce76648b8d0eb3ebf138dcb6c59f132f680791ab9eb5e874af91",
+          "freed_bytes": 5280415874,
+          "method": "domino",
+          "policy": "keep final + milestone snapshots; remove train_state and ckpt_init after verified completion",
+          "removed": [
+            "train/ckpt_init.pt",
+            "train_state"
+          ],
+          "steps": 37500
+        }
+      },
+      "checkpoint_stat_only": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/domino_L300_s42/train/ckpt_final.pt",
+        "bytes": 585879669,
+        "contents_read": false
+      },
+      "exports_found": []
+    },
+    "dflash2": {
+      "config.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dflash2_L300_s42/config.json",
+        "sha256": "f8501fb9cdf06e940dbd5da9399f8ac5a84943577dca95e4d8c241cc84cf3945",
+        "bytes": 3030,
+        "data": {
+          "algorithm": {
+            "name": "dflash2",
+            "dflash2": {
+              "objective_profile": "sf_strict_unary_topk_v1",
+              "conv_kernel_size": 2,
+              "conv_group_size": 16,
+              "selector_rank": 256,
+              "selector_top_k": 16,
+              "selector_loss_alpha": 1,
+              "selector_warmup_ratio": 0.0005,
+              "selector_ramp_ratio": 0.0005,
+              "selector_stop_gradient": false,
+              "kd_chunk_size": 1024
+            }
+          },
+          "run": {
+            "name": "dflash2_L300_s42",
+            "dir": "/home/lyh/a6000_3b_v2_L300/runs/dflash2_L300_s42"
+          },
+          "dataset": {
+            "source": "jsonl",
+            "path": "/home/lyh/a6000_3b_v2_L300/shared/pool/turn665k_pool.jsonl",
+            "slice": 399556,
+            "val_size": 256,
+            "test_size": 256,
+            "seed": 42,
+            "min_answer_chars": 0,
+            "image_link_mode": "hardlink",
+            "hash_workers": 8
+          },
+          "regen": {
+            "max_new_tokens": 2048,
+            "min_response_tokens": 8,
+            "batch_size": 32,
+            "do_sample": true,
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "repetition_penalty": 1.05,
+            "seed": 42,
+            "max_prompt_tokens": 2048,
+            "multi_turn_mode": "last_turn_only"
+          },
+          "target": {
+            "model": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+            "dtype": "bfloat16",
+            "attn_implementation": "sdpa",
+            "device": "cuda:0",
+            "local_files_only": true,
+            "image_min_pixels": 200704,
+            "image_max_pixels": 1003520
+          },
+          "capture": {
+            "seq_length": 4096,
+            "shard_size": 32,
+            "dtype": "bfloat16",
+            "store_final_hidden": true,
+            "visual_path_check": true,
+            "visual_check_samples": 2
+          },
+          "drafter": {
+            "num_hidden_layers": 3,
+            "block_size": 8,
+            "num_anchors": 512,
+            "loss_decay_gamma": 7,
+            "capture_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "mask_token_id": 151669,
+            "attention_backend": "flex_attention",
+            "spatial_rope_enabled": true,
+            "spatial_rope_mode": "replace",
+            "spatial_rope_sections": [
+              16,
+              24,
+              24
+            ]
+          },
+          "train": {
+            "feature_mode": "online",
+            "online_batch_size": 1,
+            "online_feature_cache_gb": 0,
+            "micro_batch_size": 1,
+            "grad_accumulation_steps": 8,
+            "num_epochs": 1,
+            "save_every_fraction_of_epoch": 0.16666666666666666,
+            "milestone_snapshots": true,
+            "milestone_keep": 2,
+            "lr": 0.0001,
+            "betas": [
+              0.9,
+              0.95
+            ],
+            "weight_decay": 0,
+            "warmup_ratio": 0.04,
+            "min_lr_ratio": 0.1,
+            "max_grad_norm": 1,
+            "log_every_steps": 10,
+            "seed": 42,
+            "device": "cuda:0",
+            "num_workers": 0,
+            "overfit_sanity": {
+              "enabled": true,
+              "num_samples": 4,
+              "steps": 200,
+              "ce_drop": 0.6,
+              "slot0_acc": 0.9
+            },
+            "resume_state_dir": "/home/lyh/a6000_3b_v2_L300/runs/dflash2_L300_s42/train_state"
+          },
+          "eval": {
+            "verification": "sequential",
+            "strict_parallel_margin": 2,
+            "num_prompts": 256,
+            "max_new_tokens": 128,
+            "sequential_target_verification": true,
+            "verify_sdpa_backend": "parity",
+            "parallel_diagnostic_prompts": 32,
+            "checkpoints": [
+              "ckpt_final.pt"
+            ]
+          }
+        }
+      },
+      "contract.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dflash2_L300_s42/contract.json",
+        "sha256": "d6a0e44b307adb81922b3f03e3dca1289a3f9c6bedcebd6cd1defe0219d3aad3",
+        "bytes": 3566,
+        "data": {
+          "contract_version": 1,
+          "resolved_at": "2026-10-20T00:48:20+0800",
+          "target": {
+            "model_path": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+            "model_type": "qwen2_5_vl",
+            "model_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+            "processor_fingerprint": "ed94e2fa5734073524651401de89882531084a817ed212300893591d6b35ff3e",
+            "fingerprint_source": "sha256 of config/generation/index + weight shard sizes; processor files",
+            "model_files": {
+              "config.json": "7ed3eed5be6924cc800e8a5e53fc405c1aab1aaf36bad65c33403b36c56827f5",
+              "generation_config.json": "533f191cc257b7de37a4fccd0a7a1706d75e1aa660f93efaa54e5a2a9f9aace9",
+              "model.safetensors.index.json": "c7dd78a4c6bea60b51332f1baf37b8f8124ecab2c35395a29a29825bf2619768"
+            },
+            "processor_files": {
+              "preprocessor_config.json": "f2058c716eef96ccaed1cc1e2d0c08306b62586d535b28d9d08e691b2fab7ca0",
+              "processor_config.json": null,
+              "tokenizer_config.json": "4abd3520120e266da84c0864fee064d1fb10806f02225911a47253dd38dc5f56",
+              "chat_template.json": "ad60d90252ed0b0705ba14e2d0ad0fec0beac1ea955642b54059b36052d8bc96",
+              "tokenizer.json": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+              "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+              "merges.txt": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+            },
+            "weight_shards": {
+              "model-00001-of-00002.safetensors": 3982649232,
+              "model-00002-of-00002.safetensors": 3526688744
+            }
+          },
+          "text": {
+            "num_target_layers": 36,
+            "hidden_size": 2048,
+            "head_dim": 128,
+            "vocab_size": 151936,
+            "source": "target config.text_config"
+          },
+          "mask": {
+            "token_id": 151669,
+            "token_str": null,
+            "policy": "reserved embedding row outside tokenizer vocabulary",
+            "tokenizer_vocab_size": 151643,
+            "source": "config default validated against tokenizer"
+          },
+          "rope": {
+            "type": "mrope",
+            "mode": "mrope",
+            "sections": [
+              16,
+              24,
+              24
+            ],
+            "interleaved": false,
+            "source": "target text_config.rope_parameters.mrope_section + mrope_interleaved (absent = False)"
+          },
+          "layers": {
+            "num_target_layers": 36,
+            "num_draft_layers": 3,
+            "draft_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "capture_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "capture_layer_ids_source": "explicit drafter.capture_layer_ids",
+            "block_size": 8,
+            "source": "config default (start=1, end=num_target_layers-3, uniform) validated against target depth; capture_layer_ids is the ordered layer list every feature store holds"
+          },
+          "image": {
+            "min_pixels": 200704,
+            "max_pixels": 1003520,
+            "processor_min_pixels": 3136,
+            "processor_max_pixels": 12845056,
+            "processor_bounds_source": "preprocessor_config.json.min_pixels/max_pixels",
+            "token_count_mode": "grid",
+            "patch_size": 14,
+            "merge_size": 2,
+            "tokens_per_patch": 784,
+            "min_tokens": 256,
+            "max_tokens": 1280,
+            "sequence_length_per_tile": null,
+            "source": "config override validated against processor; processor defaults recorded"
+          },
+          "tokens": {
+            "image_token_id": 151655,
+            "vision_start_token_id": 151652,
+            "vision_end_token_id": 151653,
+            "im_start_token_id": 151644,
+            "im_end_token_id": 151645,
+            "endoftext_token_id": 151643,
+            "source": "tokenizer, cross-checked against target config"
+          },
+          "head": {
+            "tie_word_embeddings": true,
+            "source": "target config.json (tie_word_embeddings; absent = True)"
+          }
+        }
+      },
+      "retention_record.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dflash2_L300_s42/retention_record.json",
+        "sha256": "3f2158dd075ab95747cc600e2120b6cea5f24c55234f17938b04f632c8828bb6",
+        "bytes": 369,
+        "data": {
+          "ckpt_final_bytes": 656958069,
+          "ckpt_final_sha256": "ad3629989034ed0fa7e58e0cbd5b57d4f64a69a9ae95843d44481e2fa54ba128",
+          "freed_bytes": 5920652548,
+          "method": "dflash2",
+          "policy": "keep final + milestone snapshots; remove train_state and ckpt_init after verified completion",
+          "removed": [
+            "train/ckpt_init.pt",
+            "train_state"
+          ],
+          "steps": 37500
+        }
+      },
+      "checkpoint_stat_only": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dflash2_L300_s42/train/ckpt_final.pt",
+        "bytes": 656958069,
+        "contents_read": false
+      },
+      "exports_found": []
+    },
+    "dflare": {
+      "config.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dflare_L300_s42/config.json",
+        "sha256": "b03364a2d03562e5e60aa4f6bc027fb1d7f040a6ee4c5440459ea6a409e3792f",
+        "bytes": 2851,
+        "data": {
+          "algorithm": {
+            "name": "dflare",
+            "dflare": {
+              "context_layer_ids": [
+                1,
+                17,
+                33
+              ],
+              "separate_context_kv": true,
+              "fusion_trainable": true,
+              "fusion_init": "distance"
+            }
+          },
+          "run": {
+            "name": "dflare_L300_s42",
+            "dir": "/home/lyh/a6000_3b_v2_L300/runs/dflare_L300_s42"
+          },
+          "dataset": {
+            "source": "jsonl",
+            "path": "/home/lyh/a6000_3b_v2_L300/shared/pool/turn665k_pool.jsonl",
+            "slice": 399556,
+            "val_size": 256,
+            "test_size": 256,
+            "seed": 42,
+            "min_answer_chars": 0,
+            "image_link_mode": "hardlink",
+            "hash_workers": 8
+          },
+          "regen": {
+            "max_new_tokens": 2048,
+            "min_response_tokens": 8,
+            "batch_size": 32,
+            "do_sample": true,
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "repetition_penalty": 1.05,
+            "seed": 42,
+            "max_prompt_tokens": 2048,
+            "multi_turn_mode": "last_turn_only"
+          },
+          "target": {
+            "model": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+            "dtype": "bfloat16",
+            "attn_implementation": "sdpa",
+            "device": "cuda:0",
+            "local_files_only": true,
+            "image_min_pixels": 200704,
+            "image_max_pixels": 1003520
+          },
+          "capture": {
+            "seq_length": 4096,
+            "shard_size": 32,
+            "dtype": "bfloat16",
+            "store_final_hidden": true,
+            "visual_path_check": true,
+            "visual_check_samples": 2
+          },
+          "drafter": {
+            "num_hidden_layers": 3,
+            "block_size": 8,
+            "num_anchors": 512,
+            "loss_decay_gamma": 7,
+            "capture_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "mask_token_id": 151669,
+            "attention_backend": "flex_attention",
+            "spatial_rope_enabled": true,
+            "spatial_rope_mode": "replace",
+            "spatial_rope_sections": [
+              16,
+              24,
+              24
+            ]
+          },
+          "train": {
+            "feature_mode": "online",
+            "online_batch_size": 1,
+            "online_feature_cache_gb": 0,
+            "micro_batch_size": 1,
+            "grad_accumulation_steps": 8,
+            "num_epochs": 1,
+            "save_every_fraction_of_epoch": 0.16666666666666666,
+            "milestone_snapshots": true,
+            "milestone_keep": 2,
+            "lr": 0.0001,
+            "betas": [
+              0.9,
+              0.95
+            ],
+            "weight_decay": 0,
+            "warmup_ratio": 0.04,
+            "min_lr_ratio": 0.1,
+            "max_grad_norm": 1,
+            "log_every_steps": 10,
+            "seed": 42,
+            "device": "cuda:0",
+            "num_workers": 0,
+            "overfit_sanity": {
+              "enabled": true,
+              "num_samples": 4,
+              "steps": 200,
+              "ce_drop": 0.6,
+              "slot0_acc": 0.9
+            },
+            "resume_state_dir": "/home/lyh/a6000_3b_v2_L300/runs/dflare_L300_s42/train_state"
+          },
+          "eval": {
+            "verification": "sequential",
+            "strict_parallel_margin": 2,
+            "num_prompts": 256,
+            "max_new_tokens": 128,
+            "sequential_target_verification": true,
+            "verify_sdpa_backend": "parity",
+            "parallel_diagnostic_prompts": 32,
+            "checkpoints": [
+              "ckpt_final.pt"
+            ]
+          }
+        }
+      },
+      "contract.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dflare_L300_s42/contract.json",
+        "sha256": "ec80b74cd73bcc785db76393c0903108b775b0272d2c3ddfce435fbf32feee08",
+        "bytes": 3566,
+        "data": {
+          "contract_version": 1,
+          "resolved_at": "2026-10-20T00:48:55+0800",
+          "target": {
+            "model_path": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+            "model_type": "qwen2_5_vl",
+            "model_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+            "processor_fingerprint": "ed94e2fa5734073524651401de89882531084a817ed212300893591d6b35ff3e",
+            "fingerprint_source": "sha256 of config/generation/index + weight shard sizes; processor files",
+            "model_files": {
+              "config.json": "7ed3eed5be6924cc800e8a5e53fc405c1aab1aaf36bad65c33403b36c56827f5",
+              "generation_config.json": "533f191cc257b7de37a4fccd0a7a1706d75e1aa660f93efaa54e5a2a9f9aace9",
+              "model.safetensors.index.json": "c7dd78a4c6bea60b51332f1baf37b8f8124ecab2c35395a29a29825bf2619768"
+            },
+            "processor_files": {
+              "preprocessor_config.json": "f2058c716eef96ccaed1cc1e2d0c08306b62586d535b28d9d08e691b2fab7ca0",
+              "processor_config.json": null,
+              "tokenizer_config.json": "4abd3520120e266da84c0864fee064d1fb10806f02225911a47253dd38dc5f56",
+              "chat_template.json": "ad60d90252ed0b0705ba14e2d0ad0fec0beac1ea955642b54059b36052d8bc96",
+              "tokenizer.json": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+              "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+              "merges.txt": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+            },
+            "weight_shards": {
+              "model-00001-of-00002.safetensors": 3982649232,
+              "model-00002-of-00002.safetensors": 3526688744
+            }
+          },
+          "text": {
+            "num_target_layers": 36,
+            "hidden_size": 2048,
+            "head_dim": 128,
+            "vocab_size": 151936,
+            "source": "target config.text_config"
+          },
+          "mask": {
+            "token_id": 151669,
+            "token_str": null,
+            "policy": "reserved embedding row outside tokenizer vocabulary",
+            "tokenizer_vocab_size": 151643,
+            "source": "config default validated against tokenizer"
+          },
+          "rope": {
+            "type": "mrope",
+            "mode": "mrope",
+            "sections": [
+              16,
+              24,
+              24
+            ],
+            "interleaved": false,
+            "source": "target text_config.rope_parameters.mrope_section + mrope_interleaved (absent = False)"
+          },
+          "layers": {
+            "num_target_layers": 36,
+            "num_draft_layers": 3,
+            "draft_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "capture_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "capture_layer_ids_source": "explicit drafter.capture_layer_ids",
+            "block_size": 8,
+            "source": "config default (start=1, end=num_target_layers-3, uniform) validated against target depth; capture_layer_ids is the ordered layer list every feature store holds"
+          },
+          "image": {
+            "min_pixels": 200704,
+            "max_pixels": 1003520,
+            "processor_min_pixels": 3136,
+            "processor_max_pixels": 12845056,
+            "processor_bounds_source": "preprocessor_config.json.min_pixels/max_pixels",
+            "token_count_mode": "grid",
+            "patch_size": 14,
+            "merge_size": 2,
+            "tokens_per_patch": 784,
+            "min_tokens": 256,
+            "max_tokens": 1280,
+            "sequence_length_per_tile": null,
+            "source": "config override validated against processor; processor defaults recorded"
+          },
+          "tokens": {
+            "image_token_id": 151655,
+            "vision_start_token_id": 151652,
+            "vision_end_token_id": 151653,
+            "im_start_token_id": 151644,
+            "im_end_token_id": 151645,
+            "endoftext_token_id": 151643,
+            "source": "tokenizer, cross-checked against target config"
+          },
+          "head": {
+            "tie_word_embeddings": true,
+            "source": "target config.json (tie_word_embeddings; absent = True)"
+          }
+        }
+      },
+      "retention_record.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dflare_L300_s42/retention_record.json",
+        "sha256": "6152dd40a230f332cbae8c88ecbeb5b6881c85d9d038f5ae57d8a00db06caf1c",
+        "bytes": 368,
+        "data": {
+          "ckpt_final_bytes": 468767669,
+          "ckpt_final_sha256": "66185a87886aad40dfb698e009f6d31c6a856f8a0a874cca7285419968e88937",
+          "freed_bytes": 4226816286,
+          "method": "dflare",
+          "policy": "keep final + milestone snapshots; remove train_state and ckpt_init after verified completion",
+          "removed": [
+            "train/ckpt_init.pt",
+            "train_state"
+          ],
+          "steps": 37500
+        }
+      },
+      "checkpoint_stat_only": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dflare_L300_s42/train/ckpt_final.pt",
+        "bytes": 468767669,
+        "contents_read": false
+      },
+      "exports_found": []
+    },
+    "dfly": {
+      "config.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dfly_L300_s42/config.json",
+        "sha256": "68818d72c2cae8ca53a499db08750552055a45533cb6605b4902ea439d0ed988",
+        "bytes": 2996,
+        "data": {
+          "algorithm": {
+            "name": "dfly",
+            "train_recipe": {
+              "name": "upstream_two_stage",
+              "cold_start_fraction": 0.25
+            },
+            "dfly": {
+              "context_layer_ids": [
+                1,
+                17,
+                33
+              ],
+              "fusion_trainable": true,
+              "fusion_init": "distance",
+              "enable_hidden_correction": true,
+              "hidden_correction_intermediate_size": null
+            }
+          },
+          "run": {
+            "name": "dfly_L300_s42",
+            "dir": "/home/lyh/a6000_3b_v2_L300/runs/dfly_L300_s42"
+          },
+          "dataset": {
+            "source": "jsonl",
+            "path": "/home/lyh/a6000_3b_v2_L300/shared/pool/turn665k_pool.jsonl",
+            "slice": 399556,
+            "val_size": 256,
+            "test_size": 256,
+            "seed": 42,
+            "min_answer_chars": 0,
+            "image_link_mode": "hardlink",
+            "hash_workers": 8
+          },
+          "regen": {
+            "max_new_tokens": 2048,
+            "min_response_tokens": 8,
+            "batch_size": 32,
+            "do_sample": true,
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "repetition_penalty": 1.05,
+            "seed": 42,
+            "max_prompt_tokens": 2048,
+            "multi_turn_mode": "last_turn_only"
+          },
+          "target": {
+            "model": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+            "dtype": "bfloat16",
+            "attn_implementation": "sdpa",
+            "device": "cuda:0",
+            "local_files_only": true,
+            "image_min_pixels": 200704,
+            "image_max_pixels": 1003520
+          },
+          "capture": {
+            "seq_length": 4096,
+            "shard_size": 32,
+            "dtype": "bfloat16",
+            "store_final_hidden": true,
+            "visual_path_check": true,
+            "visual_check_samples": 2
+          },
+          "drafter": {
+            "num_hidden_layers": 3,
+            "block_size": 8,
+            "num_anchors": 512,
+            "loss_decay_gamma": 7,
+            "capture_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "mask_token_id": 151669,
+            "attention_backend": "flex_attention",
+            "spatial_rope_enabled": true,
+            "spatial_rope_mode": "replace",
+            "spatial_rope_sections": [
+              16,
+              24,
+              24
+            ]
+          },
+          "train": {
+            "feature_mode": "online",
+            "online_batch_size": 1,
+            "online_feature_cache_gb": 0,
+            "micro_batch_size": 1,
+            "grad_accumulation_steps": 8,
+            "num_epochs": 1,
+            "save_every_fraction_of_epoch": 0.16666666666666666,
+            "milestone_snapshots": true,
+            "milestone_keep": 2,
+            "lr": 0.0001,
+            "betas": [
+              0.9,
+              0.95
+            ],
+            "weight_decay": 0,
+            "warmup_ratio": 0.04,
+            "min_lr_ratio": 0.1,
+            "max_grad_norm": 1,
+            "log_every_steps": 10,
+            "seed": 42,
+            "device": "cuda:0",
+            "num_workers": 0,
+            "overfit_sanity": {
+              "enabled": true,
+              "num_samples": 4,
+              "steps": 200,
+              "ce_drop": 0.6,
+              "slot0_acc": 0.9
+            },
+            "resume_state_dir": "/home/lyh/a6000_3b_v2_L300/runs/dfly_L300_s42/train_state"
+          },
+          "eval": {
+            "verification": "sequential",
+            "strict_parallel_margin": 2,
+            "num_prompts": 256,
+            "max_new_tokens": 128,
+            "sequential_target_verification": true,
+            "verify_sdpa_backend": "parity",
+            "parallel_diagnostic_prompts": 32,
+            "checkpoints": [
+              "ckpt_final.pt"
+            ]
+          }
+        }
+      },
+      "contract.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dfly_L300_s42/contract.json",
+        "sha256": "65ea2c625053fe81acce7b358ae2faa9b580844b4a01a14a065a1e6b57fdd103",
+        "bytes": 3566,
+        "data": {
+          "contract_version": 1,
+          "resolved_at": "2026-10-20T01:32:00+0800",
+          "target": {
+            "model_path": "/home/lyh/models/Qwen2.5-VL-3B-Instruct",
+            "model_type": "qwen2_5_vl",
+            "model_fingerprint": "e044f48898fec43dce11810610f9b11ea048cbb7e99057423b79619f67d426d5",
+            "processor_fingerprint": "ed94e2fa5734073524651401de89882531084a817ed212300893591d6b35ff3e",
+            "fingerprint_source": "sha256 of config/generation/index + weight shard sizes; processor files",
+            "model_files": {
+              "config.json": "7ed3eed5be6924cc800e8a5e53fc405c1aab1aaf36bad65c33403b36c56827f5",
+              "generation_config.json": "533f191cc257b7de37a4fccd0a7a1706d75e1aa660f93efaa54e5a2a9f9aace9",
+              "model.safetensors.index.json": "c7dd78a4c6bea60b51332f1baf37b8f8124ecab2c35395a29a29825bf2619768"
+            },
+            "processor_files": {
+              "preprocessor_config.json": "f2058c716eef96ccaed1cc1e2d0c08306b62586d535b28d9d08e691b2fab7ca0",
+              "processor_config.json": null,
+              "tokenizer_config.json": "4abd3520120e266da84c0864fee064d1fb10806f02225911a47253dd38dc5f56",
+              "chat_template.json": "ad60d90252ed0b0705ba14e2d0ad0fec0beac1ea955642b54059b36052d8bc96",
+              "tokenizer.json": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+              "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+              "merges.txt": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+            },
+            "weight_shards": {
+              "model-00001-of-00002.safetensors": 3982649232,
+              "model-00002-of-00002.safetensors": 3526688744
+            }
+          },
+          "text": {
+            "num_target_layers": 36,
+            "hidden_size": 2048,
+            "head_dim": 128,
+            "vocab_size": 151936,
+            "source": "target config.text_config"
+          },
+          "mask": {
+            "token_id": 151669,
+            "token_str": null,
+            "policy": "reserved embedding row outside tokenizer vocabulary",
+            "tokenizer_vocab_size": 151643,
+            "source": "config default validated against tokenizer"
+          },
+          "rope": {
+            "type": "mrope",
+            "mode": "mrope",
+            "sections": [
+              16,
+              24,
+              24
+            ],
+            "interleaved": false,
+            "source": "target text_config.rope_parameters.mrope_section + mrope_interleaved (absent = False)"
+          },
+          "layers": {
+            "num_target_layers": 36,
+            "num_draft_layers": 3,
+            "draft_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "capture_layer_ids": [
+              1,
+              17,
+              33
+            ],
+            "capture_layer_ids_source": "explicit drafter.capture_layer_ids",
+            "block_size": 8,
+            "source": "config default (start=1, end=num_target_layers-3, uniform) validated against target depth; capture_layer_ids is the ordered layer list every feature store holds"
+          },
+          "image": {
+            "min_pixels": 200704,
+            "max_pixels": 1003520,
+            "processor_min_pixels": 3136,
+            "processor_max_pixels": 12845056,
+            "processor_bounds_source": "preprocessor_config.json.min_pixels/max_pixels",
+            "token_count_mode": "grid",
+            "patch_size": 14,
+            "merge_size": 2,
+            "tokens_per_patch": 784,
+            "min_tokens": 256,
+            "max_tokens": 1280,
+            "sequence_length_per_tile": null,
+            "source": "config override validated against processor; processor defaults recorded"
+          },
+          "tokens": {
+            "image_token_id": 151655,
+            "vision_start_token_id": 151652,
+            "vision_end_token_id": 151653,
+            "im_start_token_id": 151644,
+            "im_end_token_id": 151645,
+            "endoftext_token_id": 151643,
+            "source": "tokenizer, cross-checked against target config"
+          },
+          "head": {
+            "tie_word_embeddings": true,
+            "source": "target config.json (tie_word_embeddings; absent = True)"
+          }
+        }
+      },
+      "retention_record.json": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dfly_L300_s42/retention_record.json",
+        "sha256": "8d5d699e148e716c5c47cd8190e621e680ecaf2722dfea1fce0a21bb56e8c37f",
+        "bytes": 366,
+        "data": {
+          "ckpt_final_bytes": 529593845,
+          "ckpt_final_sha256": "8b8ea08e4da7e807dd7f9a9425e61ac8e6bf62afdf5771d0b71b2f6fef470bd8",
+          "freed_bytes": 4778185438,
+          "method": "dfly",
+          "policy": "keep final + milestone snapshots; remove train_state and ckpt_init after verified completion",
+          "removed": [
+            "train/ckpt_init.pt",
+            "train_state"
+          ],
+          "steps": 37500
+        }
+      },
+      "checkpoint_stat_only": {
+        "path": "/home/lyh/a6000_3b_v2_L300/runs/dfly_L300_s42/train/ckpt_final.pt",
+        "bytes": 529593845,
+        "contents_read": false
+      },
+      "exports_found": []
+    }
+  },
+  "distribution_metadata": {
+    "torch": "2.11.0",
+    "vllm": "0.22.1",
+    "transformers": "5.11.0"
+  },
+  "source_version_comparison": {
+    "normalized_ast_algorithm": "AST field JSON sorted, excludes source locations and Python-version-only type_params; repr for non-JSON constants",
+    "base_helpers": {
+      "_merge_multiaxis_rotary_embeddings": {
+        "same": true,
+        "local": {
+          "normalized_ast_sha256": "956a8983a381b723dd3251e166faec7d024ad0c8e8f820455d442c8fda156a48",
+          "line": 248,
+          "end": 323
+        },
+        "remote": {
+          "normalized_ast_sha256": "956a8983a381b723dd3251e166faec7d024ad0c8e8f820455d442c8fda156a48",
+          "line": 214,
+          "end": 289
+        }
+      },
+      "extract_context_feature": {
+        "same": true,
+        "local": {
+          "normalized_ast_sha256": "5520c085cb7ccd0943df23a69ea3756f04d5557527063fd1297a863bdf7314c4",
+          "line": 832,
+          "end": 840
+        },
+        "remote": {
+          "normalized_ast_sha256": "5520c085cb7ccd0943df23a69ea3756f04d5557527063fd1297a863bdf7314c4",
+          "line": 798,
+          "end": 806
+        }
+      },
+      "_build_layer_contexts": {
+        "same": true,
+        "local": {
+          "normalized_ast_sha256": "92e85a8973f5ee303d5efe9a391a29e4cdf53159769da2b9e07bba39a714318e",
+          "line": 1078,
+          "end": 1113
+        },
+        "remote": {
+          "normalized_ast_sha256": "92e85a8973f5ee303d5efe9a391a29e4cdf53159769da2b9e07bba39a714318e",
+          "line": 1044,
+          "end": 1079
+        }
+      },
+      "_domino_gru_step": {
+        "same": true,
+        "local": {
+          "normalized_ast_sha256": "80b80d056d409225c1801330cb63940dc235cbc519b28e2f1020df16512192e7",
+          "line": 1115,
+          "end": 1130
+        },
+        "remote": {
+          "normalized_ast_sha256": "80b80d056d409225c1801330cb63940dc235cbc519b28e2f1020df16512192e7",
+          "line": 1081,
+          "end": 1096
+        }
+      },
+      "_sample_draft_tokens": {
+        "same": true,
+        "local": {
+          "normalized_ast_sha256": "00b5f97e9a56a694e35895b1dd9c470b0372af9b3915834f7f3f4a9ee6fbf6fa",
+          "line": 1275,
+          "end": 1334
+        },
+        "remote": {
+          "normalized_ast_sha256": "00b5f97e9a56a694e35895b1dd9c470b0372af9b3915834f7f3f4a9ee6fbf6fa",
+          "line": 1241,
+          "end": 1300
+        }
+      },
+      "_inference_block_mask": {
+        "same": true,
+        "local": {
+          "normalized_ast_sha256": "2da5247a782528c716342ba412a03f02c2e03c016709d7fecbd18052bd1cc777",
+          "line": 1337,
+          "end": 1366
+        },
+        "remote": {
+          "normalized_ast_sha256": "2da5247a782528c716342ba412a03f02c2e03c016709d7fecbd18052bd1cc777",
+          "line": 1303,
+          "end": 1332
+        }
+      },
+      "spec_generate": {
+        "same": false,
+        "local": {
+          "normalized_ast_sha256": "5f913cafacc81ff6543f25ccd9c066e4c72a20826053f60cc30677f540b4d0be",
+          "line": 1368,
+          "end": 2097
+        },
+        "remote": {
+          "normalized_ast_sha256": "b972ddc181d2dbbf3e96af9bdd94ab979f7d964d6d7f5fa7d84d44b7ac1ac12c",
+          "line": 1334,
+          "end": 1912
+        }
+      }
+    },
+    "method_file_matches": 21,
+    "whole_base_file_equal": false,
+    "whole_spec_generate_equal": false,
+    "canonical_parity_oracle": "R/dflash/draft_model.py SHA6056a90681af091261813d70fa6b30ebb635f99901f6010e2dfd0edd9d64e8c7; helpers map to matching L lines; whole driver must be chosen explicitly"
+  },
+  "runtime_budget": {
+    "S7_B8_source_admitted": true,
+    "geometry_matches_local_serving_for_all_four": true,
+    "Domino_training_vs_serving": "Eight shifted supervised training rows; seven-step serving walk over hidden0..6, row7 not proposed; modules/weights all retained. No upstream eight-proposal claim.",
+    "R_shared_lines": {
+      "sampler": [
+        1241,
+        1300
+      ],
+      "round_width": 1404,
+      "query_and_sampler": [
+        1801,
+        1829
+      ],
+      "draft_cache_crop": 1831
+    },
+    "S1_S3_proposed": false,
+    "trained_config_mutation_allowed": false,
+    "physical_page_assignment_to_B_allowed": false
+  },
+  "guard_and_profile_requirements": [
+    "New explicit algorithm/checkpoint/architecture markers and exact accepted state keys; never global overwrite DFlash registry or drop learned modules.",
+    "Use real EAGLEConfig and actual public S7 unchanged through constructor; reject precedence override branches, truncated vocab, changed scale/bias/spatial/head/layer selection.",
+    "New source-bound integration checks own source, pinned official wheel methods, prior installations/origins and only selected method; ordinary AR/no-marker paths unchanged.",
+    "B887 math/physical-vs-spatial/rejection semantics retained; immutableS, real8=noPadding, initializedPIECEWISE, dummy1..8 exception scopes, actual3x9 stride and compile metadata identity.",
+    "DFlare/DFly dummy profiling must construct raw three-feature payload and execute all actual layer context paths; mappingNone writes no cache.",
+    "DFlash2 creates correct decoder/Attention registrations once; convolution state is block-local and includes masked tap boundaries.",
+    "Sequential learned proposal paths run before greedy decision with actual preceding selected token; head total latency remains inside future E2E endpoint."
+  ],
+  "future_gates": [
+    "Root-authorized full checkpoint rehash + strict all-value export/reload40/51/42/42; no weight reads were done now.",
+    "Meaningful local functional parity of exact added paths/slot shifts/boundaries/dtype/order; ensure every inference tensor consumed.",
+    "Real CPU config/type/registry/proposer/aux/head/dummy/metadata/cache-call/profile/graph guard checks without model/CUDA for initial integration proof.",
+    "Separate root GPU proposal/logit/cache/rejection/page-boundary/capture/replay validation and fresh exact target input/output/text/terminal compatibility before timing.",
+    "Complete separately reviewed measurement endpoint including every learned inference path; no partial/positive speed prediction."
+  ],
+  "evidence_limits": {
+    "torch_imported": false,
+    "checkpoint_contents_read": false,
+    "checkpoint_hashes_freshly_verified": false,
+    "checkpoint_hash_source": "small retention records",
+    "tensor_schema_source": "prior immutable actual-checkpoint CPU inventory; schema equality is not value equality",
+    "model_constructed": false,
+    "forward_executed": false,
+    "gpu_queried": false,
+    "gpu_used": false,
+    "images_or_weights_rehashed": false,
+    "exports_created": false,
+    "implementation_created": false,
+    "old_frozen_files_modified": false,
+    "tests_run": "No model/Torch tests. Only stdlib source hashes/AST normalization, small metadata parsing, file stats and source-interface inspection.",
+    "numerical_or_token_parity_claim": false,
+    "performance_prediction": false
+  }
+}

@@ -1,0 +1,76 @@
+#!/bin/bash
+set -euo pipefail
+root=/home/lyh/qwen3vl8b_eval_20261027
+harness="$root/harness_resource_fix_v1"
+py="$root/runtime_frozen_v1/bin/python"
+export QWEN8B_DIGEST_CACHE="$root/harness_recovery_fast_v1/digest_cache.sqlite" PYTHONPATH="$harness" PYTHONDONTWRITEBYTECODE=1 VLLM_BATCH_INVARIANT=0
+cd "$harness"
+echo $$ > "$root/dfly_dynamic_v11.pid"
+echo "WAIT_DFLY_CPU_RECEIPT $(date -Is)"
+while [[ ! -f "$root/dfly_recovery_v2/runtime_manifest_v2.json" ]]; do
+ if ! pgrep -f "^python3 /home/lyh/qwen3vl8b_eval_20261027/dfly_recovery_v2/prepare_manifest_v2.py$" >/dev/null; then echo DFLY_PREPARATION_FAILED; exit 1; fi
+ sleep 10
+done
+trap 'rc=$?; echo "DFLY_QUEUE_FAILED $(date -Is) rc=$rc line=$LINENO"' ERR
+common=(--target "$root/artifacts/target" --draft "$root/dfly_recovery_v2/dfly_native_adapter_v1/hf_step75000_v1" --source "$root/mmspec_formal120.jsonl" --images-dir /home/lyh/a6000_3b_v2_L300/shared/benchmarks/mmspec/images --runtime-manifest "$root/dfly_recovery_v2/runtime_manifest_v2.json" --method dfly --gpu-memory-utilization .78)
+monitored_run() {
+ local tag="$1";shift
+ local res="$root/$tag.evidence/resources.jsonl" log="$root/$tag.launch.log" marker="$root/$tag.foreign_abort" job rc
+ setsid "$@" > "$log" 2>&1 & job=$!
+ while kill -0 "$job" 2>/dev/null; do
+  if [[ -f "$res" ]] && grep -Eq '"foreign_pids": *\[[0-9]|"error":' "$res"; then
+   echo "FOREIGN_RESOURCE_ABORT $(date -Is) $tag" | tee "$marker"
+   kill -TERM -- "-$job" 2>/dev/null || kill -TERM "$job" 2>/dev/null || true
+   wait "$job" || true
+   return 75
+  fi
+  sleep 3
+ done
+ wait "$job";rc=$?;return "$rc"
+}
+attempt=0
+declare -A first_free=()
+for ((round=0;round<2880;round++)); do
+ for gpu in 2 3 0 1; do
+  if [[ -s "$root/dflash2_dynamic_v14.pid" ]] && kill -0 "$(cat "$root/dflash2_dynamic_v14.pid")" 2>/dev/null; then
+   other=$(awk '/SMOKE_START|FORMAL_START/ {for(i=1;i<=NF;i++) if($i ~ /^gpu=/) {split($i,a,"=");g=a[2]}} END {print g}' "$root/dflash2_dynamic_v14.log")
+   [[ -z "$other" || "$gpu" != "$other" ]] || continue
+  fi
+  used=$(timeout 10 nvidia-smi -i "$gpu" --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | tr -d ' ' || true)
+  pids=$(timeout 10 nvidia-smi -i "$gpu" --query-compute-apps=pid --format=csv,noheader,nounits 2>/dev/null || true)
+  if ! [[ "$used" =~ ^[0-9]+$ && "$used" -lt 500 && -z "$pids" ]]; then unset "first_free[$gpu]"; continue; fi
+  now=$(date +%s);if [[ -z "${first_free[$gpu]:-}" ]]; then first_free[$gpu]=$now;continue;fi
+  minimum=20; if [[ "$gpu" == 2 || "$gpu" == 3 ]]; then minimum=2; fi
+  (( now - first_free[$gpu] >= minimum )) || continue
+  uuid=$(timeout 10 nvidia-smi -i "$gpu" --query-gpu=uuid --format=csv,noheader,nounits 2>/dev/null || true)
+  [[ "$uuid" =~ ^GPU-[0-9a-fA-F-]+$ ]] || continue
+  if ! flock -n "/tmp/veladraft_gpu_locks/$uuid.lock" true; then continue;fi
+  attempt=$((attempt+1));smoke="dfly_8b_smoke_dynamic_v11_a$attempt"
+  echo "SMOKE_START $(date -Is) gpu=$gpu attempt=$attempt"
+  if ! monitored_run "$smoke" "$py" -m vlm_dflash.cli native-eval "${common[@]}" --gpu "$gpu" --num-prompts 1 --max-new-tokens 128 --repeats 1 --out "$root/$smoke.json"; then
+   err=$($py -c 'import json,sys;print(json.load(open(sys.argv[1])).get("error",""))' "$root/$smoke.json" 2>/dev/null || true)
+   echo "SMOKE_FAILED $(date -Is) gpu=$gpu attempt=$attempt error=$err"
+   if [[ -f "$root/$smoke.foreign_abort" || "$err" == *"Resource temporarily unavailable"* || "$err" == *"GPU is occupied"* || "$err" == *"GPU resource evidence contaminated"* ]]; then unset "first_free[$gpu]";continue;fi
+   exit 1
+  fi
+  "$py" -c 'import json,sys;d=json.load(open(sys.argv[1]));assert d["status"]=="complete" and d["resources_verified"] and d["source_preservation"]["all_values_bitwise_equal"] and d["smoke"]' "$root/$smoke.json"
+  echo "SMOKE_COMPLETE $(date -Is) gpu=$gpu"
+  echo "$gpu" > "$root/dfly_dynamic_v11.gpu";echo "$smoke" > "$root/dfly_dynamic_v11.smoke"
+  formal="dfly_8b_formal_dynamic_v11_a$attempt"
+  echo "FORMAL_START $(date -Is) gpu=$gpu attempt=$attempt"
+  if ! monitored_run "$formal" "$py" -m vlm_dflash.cli native-eval "${common[@]}" --gpu "$gpu" --num-prompts 120 --max-new-tokens 1024 --repeats 3 --out "$root/$formal.json"; then
+   err=$($py -c 'import json,sys;print(json.load(open(sys.argv[1])).get("error",""))' "$root/$formal.json" 2>/dev/null || true)
+   echo "FORMAL_FAILED $(date -Is) gpu=$gpu attempt=$attempt error=$err"
+   if [[ -f "$root/$formal.foreign_abort" || "$err" == *"Resource temporarily unavailable"* || "$err" == *"GPU is occupied"* || "$err" == *"GPU resource evidence contaminated"* ]]; then unset "first_free[$gpu]";continue;fi
+   exit 1
+  fi
+  "$py" -c 'import json,sys;d=json.load(open(sys.argv[1]));assert d["status"]=="complete" and d["resources_verified"] and d["timed_pairs"]==435' "$root/$formal.json"
+  "$py" "$root/audit_native_evidence.py" "$root/$formal.evidence" "$root/$formal.json" "$root/${formal}_audit.json"
+  ln -s "$formal.json" "$root/dfly_8b_formal_dynamic_v11.json"
+  ln -s "${formal}_audit.json" "$root/dfly_8b_formal_dynamic_audit_v11.json"
+  echo "DFLY_COMPLETE $(date -Is) gpu=$gpu attempt=$attempt";exit 0
+ done
+ if (( round % 20 == 0 ));then echo "WAIT_AVAILABLE_GPU $(date -Is)";fi
+ sleep 3
+done
+exit 1

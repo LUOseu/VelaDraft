@@ -1,0 +1,58 @@
+#!/bin/bash
+set -euo pipefail
+root=/home/lyh/qwen3vl8b_eval_20261027
+pkg="$root/quality_eval_v1"
+out="$root/quality_campaign_v1"
+py=/home/lyh/miniforge3/envs/c1vllm/bin/python
+queue_pid=1252943
+mkdir -p "$out"
+trap 'rc=$?; printf "QUALITY_QUEUE_FAILED %s rc=%s\n" "$(date -Is)" "$rc"' ERR
+printf 'WAIT_FORMAL %s\n' "$(date -Is)"
+while kill -0 "$queue_pid" 2>/dev/null; do sleep 30; done
+printf 'FORMAL_EXITED %s\n' "$(date -Is)"
+(cd "$root" && sha256sum -c "$pkg/SOURCE_SHA256.txt")
+wait_gpu() {
+ local used pids available_kib
+ for ((i=0;i<4320;i++)); do
+  available_kib=$(df -Pk "$root" | awk 'NR==2 {print $4}')
+  if ! [[ "$available_kib" =~ ^[0-9]+$ ]] || (( available_kib < 20971520 )); then
+   if (( i % 15 == 0 )); then echo "WAIT_DISK_AVAILABLE_KIB $available_kib $(date -Is)"; fi
+   sleep 20
+   continue
+  fi
+  used=$(nvidia-smi -i 3 --query-gpu=memory.used --format=csv,noheader,nounits | tr -d ' ')
+  pids=$(nvidia-smi -i 3 --query-compute-apps=pid --format=csv,noheader,nounits)
+  if [[ "$used" =~ ^[0-9]+$ ]] && (( used < 500 )) && [[ -z "$pids" ]]; then return 0; fi
+  sleep 20
+ done
+ echo GPU3_OR_DISK_NOT_READY_AFTER_24H; return 1
+}
+run_arm() {
+ local label="$1" arm="$2" method="$3" smoke="$4" plan sha
+ plan="$root/${method}_smoke_v5.evidence/plan.json"
+ test -f "$plan"
+ sha=$(sha256sum "$plan" | cut -d ' ' -f1)
+ wait_gpu
+ printf 'QUALITY_START %s %s\n' "$(date -Is)" "$label"
+ extra=(); [[ "$smoke" == yes ]] && extra=(--smoke)
+ env CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=3 VLLM_WORKER_MULTIPROC_METHOD=spawn VLLM_BATCH_INVARIANT=0 \
+  HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 TOKENIZERS_PARALLELISM=false PYTHONDONTWRITEBYTECODE=1 \
+  VELADRAFT_NATIVE_PLAN="$plan" VELADRAFT_NATIVE_PLAN_SHA256="$sha" VELADRAFT_NATIVE_ARM="$arm" \
+  VLLM_CACHE_ROOT="$out/caches/$label" TORCHINDUCTOR_CACHE_DIR="$out/caches/$label/inductor" \
+  PYTHONPATH="$root/vlm_dflash/eval/native_bootstrap:$root" \
+  "$py" -m quality_eval_v1.runner --arm "$arm" --method "$method" --gpu 3 --directory "$out/$label" "${extra[@]}" \
+  > "$out/$label.launch.log" 2>&1
+ "$py" -c 'import json,sys;d=json.load(open(sys.argv[1]));assert d["status"]=="complete" and d["resource_evidence"]["status"]=="complete"' "$out/$label/quality.json"
+ (cd "$root" && sha256sum -c "$pkg/SOURCE_SHA256.txt" >/dev/null)
+ printf 'QUALITY_COMPLETE %s %s\n' "$(date -Is)" "$label"
+}
+run_arm smoke_ar ar dflash yes
+run_arm smoke_dflash sd dflash yes
+run_arm smoke_dfly sd dfly yes
+"$py" "$pkg/verify_smoke.py" "$out"
+run_arm ar ar dflash no
+run_arm dflash sd dflash no
+run_arm dfly sd dfly no
+PYTHONPATH="$root" "$py" -m quality_eval_v1.compare_quality --root "$out" --out "$out/QUALITY_PAIRED_V1.json"
+"$py" "$pkg/write_report.py" "$out"
+printf 'QUALITY_QUEUE_COMPLETE %s\n' "$(date -Is)"

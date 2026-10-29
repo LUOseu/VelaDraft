@@ -1,0 +1,9 @@
+#!/bin/bash
+set -euo pipefail
+root=/home/lyh/qwen3vl8b_eval_20261027/dflare_8b_work_20261029
+while screen -ls | grep -q qwen8b_dflare_cpu_v3_20261029; do sleep 5; done
+if [[ ! -f "$root/CPU_PREFLIGHT_8B_V3.json" ]]; then echo "CPU_PREFLIGHT_FAILED $(date -Is)"; exit 1; fi
+cd "$root"
+export CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1
+/home/lyh/qwen3vl8b_eval_20261027/runtime_frozen_v1/bin/python "$root/build_dflare_manifest.py"
+echo "MANIFEST_COMPLETE $(date -Is)"

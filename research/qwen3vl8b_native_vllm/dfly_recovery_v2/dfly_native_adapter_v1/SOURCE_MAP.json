@@ -1,0 +1,99 @@
+{
+  "schema": "dfly-native-source-map-v1",
+  "canonical_origin": "/home/lyh/VelaDraft-a6000-v2/vlm_dflash",
+  "feature_contract": {
+    "capture_layers": [
+      1,
+      17,
+      33
+    ],
+    "HF_hidden_state_indices": [
+      2,
+      18,
+      34
+    ],
+    "raw_context_width": 6144,
+    "query_hidden_size": 2048,
+    "feature_order": "ordered concatenated target residual-added features"
+  },
+  "trained_path": [
+    {
+      "canonical": "dfly/model.py:_project_base_context/_build_layer_contexts",
+      "owned": "context.py:build_layer_contexts",
+      "equation": "hidden_norm(FC(raw6144)+einsum(softmax(live_BF16_fusion)[i],H_j))",
+      "original_fc_preserved": true
+    },
+    {
+      "canonical": "dflash/draft_model.py:Qwen3DFlashAttention._context_noise_kv",
+      "owned": "context.py:project_shared_context; spatial.py:precompute",
+      "equation": "original shared query/noise QKV K/V slices project the per-layer contexts; official K norm -> MRoPE -> physical cache writer",
+      "separate_target_KV_created": false
+    },
+    {
+      "canonical": "dfly/model.py:HiddenStatesCorrection.forward",
+      "owned": "correction.py:HiddenStatesCorrection",
+      "equation": "h+down(silu(gate(cat(norm_h(h),norm_e(embed(previous))))) * up(cat(...)))",
+      "original_parameters": [
+        "hidden_norm.weight",
+        "embed_norm.weight",
+        "gate_proj.weight",
+        "up_proj.weight",
+        "down_proj.weight"
+      ]
+    },
+    {
+      "canonical": "dfly/model.py:Qwen3DFlyDraftModel._sample_draft_tokens",
+      "owned": "sampling.py:sequential_greedy; proposal_logic.py:raw_parallel_propose",
+      "equation": "suffix rows1..7; first actual predecessor is target bonus anchor; corrected hidden -> original target head -> greedy ID -> next correction"
+    }
+  ],
+  "raw_ABI": {
+    "entry": "proposal_logic.raw_parallel_propose",
+    "replacement": "explicit raw6144 through proposer-owned _dfly_raw_context to precompute; no combine_hidden_states collapse",
+    "profile": "dedicated [max_tokens,6144] buffer",
+    "query_hidden_size": 2048,
+    "model_sidechannel": false
+  },
+  "owned_graph": {
+    "shared_dynamic_axis": "b",
+    "dimensions": {
+      "input_ids": {
+        "0": "b"
+      },
+      "positions": {
+        "-1": "b"
+      },
+      "input_embeds": {
+        "0": "b"
+      }
+    },
+    "query_position_backing_shape": [
+      3,
+      9
+    ],
+    "public_S": 7,
+    "requested_tokens": 8,
+    "padded_tokens": 8,
+    "mode": "PIECEWISE",
+    "capture_sizes": [
+      8
+    ],
+    "physical_page": 16
+  },
+  "official_operators": [
+    "DFlashQwen3Model.forward",
+    "DFlashQwen3DecoderLayer",
+    "DFlashQwen3Attention",
+    "QKVParallelLinear",
+    "ReplicatedLinear",
+    "RMSNorm",
+    "MRotaryEmbedding",
+    "Attention.impl.do_kv_cache_update",
+    "DFlash copy-and-expand input kernel",
+    "original target embedding and head",
+    "unmodified standard target/rejection sampler"
+  ],
+  "no_installed_source_edits": true,
+  "no_handwritten_kernels": true,
+  "GPU_execution_deferred": true
+}

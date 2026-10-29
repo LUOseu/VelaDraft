@@ -1,0 +1,45 @@
+{
+  "schema": "native-quality-real-gold-data-v1",
+  "tasks": {
+    "textvqa": {
+      "root": "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/textvqa",
+      "count": 256,
+      "pinned_revision": "9c0699cd19768ac5ab97568f6b3cbac4c0062884",
+      "max_new_tokens": 128,
+      "files": {
+        "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/textvqa/manifest.json": "4637539d12aad3b327f93a13da4fca3cf429012988bbaff7182540cab3513d6b",
+        "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/textvqa/textvqa_v2_prompts.jsonl": "842b923c66959a5104b15095e3904bd8de08dc952fbf5a8fcc3ac8906f021aa4",
+        "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/textvqa/textvqa_v2_targets.jsonl": "62ce736e62c5dabf9ce5f4147cc56408914fb233b22184c342effe0c51b1b9bd"
+      },
+      "prompts": "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/textvqa/textvqa_v2_prompts.jsonl",
+      "targets": "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/textvqa/textvqa_v2_targets.jsonl"
+    },
+    "docvqa": {
+      "root": "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/docvqa",
+      "count": 256,
+      "pinned_revision": "539088ef8a8ada01ac8e2e6d4e372586748a265e",
+      "max_new_tokens": 128,
+      "files": {
+        "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/docvqa/manifest.json": "429f64ecd388027d85d972d0f853d6f5f9eb77b23fd7cf982aae7e6e46655754",
+        "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/docvqa/docvqa_v2_prompts.jsonl": "c6a608ce497db4f555d1fd3630a0f9f8f76635a0f95e2244d63de3cebd394cac",
+        "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/docvqa/docvqa_v2_targets.jsonl": "df47b23475986f05f0760495e856c8cc0032114bc394ae9a117fe288423488c8"
+      },
+      "prompts": "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/docvqa/docvqa_v2_prompts.jsonl",
+      "targets": "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/docvqa/docvqa_v2_targets.jsonl"
+    },
+    "chartqa": {
+      "root": "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/chartqa",
+      "count": 256,
+      "pinned_revision": "9e63b7df1592a1c2158e735cc1725454aef0d6d9",
+      "max_new_tokens": 128,
+      "files": {
+        "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/chartqa/manifest.json": "cb886ae4c9c1d189c13635c8f42290e8f34fd92e9fd70d41289a7d52c2ae6a84",
+        "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/chartqa/chartqa_v2_prompts.jsonl": "1045d5650cb3e91fb9e440721619d526112905d021103d3cd87e2ae8e590b987",
+        "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/chartqa/chartqa_v2_targets.jsonl": "373b22cb0e27731c736cd43907fbcad9c9305edfefef4ffed03878254c2d2369"
+      },
+      "prompts": "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/chartqa/chartqa_v2_prompts.jsonl",
+      "targets": "/home/lyh/a6000_3b_v2_L300/shared/benchmarks/chartqa/chartqa_v2_targets.jsonl"
+    }
+  },
+  "AR_outputs_are_ground_truth": false
+}

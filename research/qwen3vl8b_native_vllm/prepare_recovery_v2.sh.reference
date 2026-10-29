@@ -1,0 +1,29 @@
+#!/bin/bash
+set -euo pipefail
+root=/home/lyh/qwen3vl8b_eval_20261027
+py="$root/runtime_frozen_v1/bin/python"
+while [[ ! -f "$root/FROZEN_RUNTIME_RESTORE_V1.json" ]] || ! grep -q '"event": "done"' "$root/qwen_model_dedup_retry2.log"; do sleep 15; done
+mkdir -p "$root/artifacts/dflash2"
+if [[ ! -f "$root/artifacts/dflash2/ckpt_final.pt" ]]; then
+ cp /tmp/lyh_veladraft_qwen3vl8b_dflash2_20261028/ckpt_final.pt "$root/artifacts/dflash2/ckpt_final.pt.recovery_partial"
+ echo "6d393b1482700e029f4b61753890c2d43d19a4cbc43e83586fd5a62a079f4571  $root/artifacts/dflash2/ckpt_final.pt.recovery_partial" | sha256sum -c
+ mv "$root/artifacts/dflash2/ckpt_final.pt.recovery_partial" "$root/artifacts/dflash2/ckpt_final.pt"
+fi
+cp -a /tmp/lyh_dflash2_8b_work_20261028 "$root/dflash2_recovery_v2"
+"$py" - <<'PY'
+from pathlib import Path
+p=Path('/home/lyh/qwen3vl8b_eval_20261027/dflash2_recovery_v2/dflash2_8b_native_adapter/contracts.py')
+s=p.read_text().replace('/tmp/lyh_veladraft_qwen3vl8b_dflash2_20261028/ckpt_final.pt','/home/lyh/qwen3vl8b_eval_20261027/artifacts/dflash2/ckpt_final.pt')
+p.write_text(s)
+PY
+cd "$root/dflash2_recovery_v2"
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONPATH=. "$py" -m dflash2_8b_native_adapter.cpu_preflight --output "$root/dflash2_recovery_v2/CPU_PREFLIGHT_RECOVERY_V1.json" > "$root/dflash2_recovery_v2/cpu_preflight_recovery_v1.log" 2>&1
+"$py" - <<'PY'
+from pathlib import Path
+import json,hashlib
+base=Path('/home/lyh/qwen3vl8b_eval_20261027/dflash2_recovery_v2');pkg=base/'dflash2_8b_native_adapter';receipt=base/'CPU_PREFLIGHT_RECOVERY_V1.json';d=json.loads(receipt.read_text())
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+files={str(pkg/k):v for k,v in d['own_source_sha256'].items()};files.update(d['export_artifacts']);files[d['checkpoint_path']]=d['checkpoint_sha256'];files[str(receipt)]=sha(receipt)
+m={'method':'dflash2','scope':'Qwen3-VL-8B trained step75000 DFlash2, all51 tensors, interleaved 3D MRoPE, target output head, stock greedy verifier','bootstrap':str(pkg/'bootstrap/sitecustomize.py'),'checkpoint':d['checkpoint_path'],'environment':{'DFLASH2_NATIVE_ENABLE':'1','DFLASH2_NATIVE_CPU_RECEIPT':str(receipt),'DFLASH2_NATIVE_CPU_RECEIPT_SHA256':sha(receipt)},'files':files}
+(base/'runtime_manifest_recovery_v1.json').write_text(json.dumps(m,indent=2)+'\n');print('RECOVERY_PREPARED')
+PY

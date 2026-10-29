@@ -1,0 +1,2 @@
+# Preserve byte-exact source snapshots referenced by SHA-256 manifests.
+research/qwen3vl8b_native_vllm/** whitespace=-blank-at-eof

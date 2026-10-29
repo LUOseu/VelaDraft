@@ -1,0 +1,399 @@
+{
+  "keys": [
+    "format",
+    "algorithm",
+    "draft_config",
+    "objective_profile",
+    "attention_backend",
+    "mask_token_id",
+    "block_size",
+    "num_anchors",
+    "loss_decay_gamma",
+    "target_layer_ids",
+    "capture_layer_ids",
+    "dfly",
+    "train_recipe",
+    "head",
+    "identity",
+    "feature_mode",
+    "feature_source_digest",
+    "feature_backend",
+    "draft_device",
+    "training_plan_version",
+    "training_plan_digest",
+    "target_device",
+    "step",
+    "model"
+  ],
+  "metadata": {
+    "algorithm": "dfly",
+    "draft_config": {
+      "transformers_version": "5.11.0",
+      "architectures": [
+        "Qwen3DFlyDraftModel"
+      ],
+      "output_hidden_states": false,
+      "return_dict": true,
+      "dtype": "bfloat16",
+      "chunk_size_feed_forward": 0,
+      "is_encoder_decoder": false,
+      "id2label": {
+        "0": "LABEL_0",
+        "1": "LABEL_1"
+      },
+      "label2id": {
+        "LABEL_0": 0,
+        "LABEL_1": 1
+      },
+      "problem_type": null,
+      "vocab_size": 151936,
+      "hidden_size": 2048,
+      "intermediate_size": 11008,
+      "num_hidden_layers": 3,
+      "num_attention_heads": 16,
+      "num_key_value_heads": 2,
+      "head_dim": 128,
+      "hidden_act": "silu",
+      "max_position_embeddings": 128000,
+      "initializer_range": 0.02,
+      "rms_norm_eps": 1e-06,
+      "use_cache": true,
+      "tie_word_embeddings": false,
+      "rope_parameters": {
+        "rope_type": "default",
+        "rope_theta": 1000000.0
+      },
+      "attention_bias": false,
+      "use_sliding_window": false,
+      "sliding_window": null,
+      "max_window_layers": 3,
+      "layer_types": [
+        "full_attention",
+        "full_attention",
+        "full_attention"
+      ],
+      "attention_dropout": 0.0,
+      "pad_token_id": null,
+      "bos_token_id": 151643,
+      "eos_token_id": 151645,
+      "_name_or_path": "",
+      "model_type": "qwen3",
+      "num_target_layers": 36,
+      "target_hidden_size": 2048,
+      "block_size": 8,
+      "dflash_config": {
+        "mask_token_id": 151669,
+        "target_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "spatial_rope_enabled": true,
+        "spatial_rope_mode": "replace",
+        "spatial_rope_sections": [
+          16,
+          24,
+          24
+        ],
+        "spatial_rope_interleaved": false,
+        "visual_num_query_tokens": 0,
+        "context_layer_ids": [
+          1,
+          17,
+          33
+        ],
+        "objective_profile": "upstream_two_stage",
+        "separate_context_kv": false,
+        "sample_from_anchor": false,
+        "fusion_trainable": true,
+        "fusion_init": "distance",
+        "enable_hidden_correction": true,
+        "hidden_correction_intermediate_size": null
+      },
+      "output_attentions": false
+    },
+    "head": "tied_embedding",
+    "step": 37500
+  },
+  "tensors": {
+    "layer_fusion_weights": {
+      "shape": [
+        3,
+        3
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.self_attn.q_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.self_attn.k_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.self_attn.v_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.self_attn.o_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.self_attn.q_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.self_attn.k_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.mlp.gate_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.mlp.up_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.mlp.down_proj.weight": {
+      "shape": [
+        2048,
+        11008
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.input_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.0.post_attention_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.q_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.k_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.v_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.o_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.q_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.self_attn.k_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.mlp.gate_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.mlp.up_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.mlp.down_proj.weight": {
+      "shape": [
+        2048,
+        11008
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.input_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.1.post_attention_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.q_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.k_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.v_proj.weight": {
+      "shape": [
+        256,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.o_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.q_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.self_attn.k_norm.weight": {
+      "shape": [
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.mlp.gate_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.mlp.up_proj.weight": {
+      "shape": [
+        11008,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.mlp.down_proj.weight": {
+      "shape": [
+        2048,
+        11008
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.input_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "layers.2.post_attention_layernorm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "norm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "hidden_norm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "fc.weight": {
+      "shape": [
+        2048,
+        6144
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "hidden_correction.hidden_norm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "hidden_correction.embed_norm.weight": {
+      "shape": [
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "hidden_correction.gate_proj.weight": {
+      "shape": [
+        2048,
+        4096
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "hidden_correction.up_proj.weight": {
+      "shape": [
+        2048,
+        4096
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "hidden_correction.down_proj.weight": {
+      "shape": [
+        2048,
+        2048
+      ],
+      "dtype": "torch.bfloat16"
+    }
+  },
+  "cuda_initialized": false
+}

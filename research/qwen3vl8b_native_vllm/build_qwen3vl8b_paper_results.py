@@ -1,0 +1,80 @@
+"""Rebuild Qwen3-VL-8B results from on-server evidence. Missing/failed stays visible."""
+from pathlib import Path
+import argparse,json,datetime,os
+from report_validation import validate_speed,validate_quality,validate_al_pair
+from collect_al_supplement_v1 import summarize as validate_al
+R=None
+def load(p):
+ try:return json.loads(p.read_text())
+ except (FileNotFoundError,json.JSONDecodeError):return {}
+def live(pidfile):
+ try:os.kill(int(pidfile.read_text().strip()),0);return True
+ except (OSError,ValueError):return False
+def build(root):
+    global R
+    R=Path(root)
+    # Immutable HF revision inventory, not a claim about the current root's files.
+    models=[('dflash','37a5eb63b12d851fe6114f3aeb87dbc7174dec3d','快照含 final'),('dfly','24331eae8ac5dbe0f12390aa32c92f4e7efec5ab','快照含 final'),('dflash2','ef0288357fedc8313119169b31027e7cd5aaa747','快照含 final'),('dspark','5ff8a27d6354d684bf2f068845445abfe9eaebff','截至 10-29 10:51 快照未见 final'),('dflare','cbddc83e0aa38aff652102f52d0bfa6d08cc0eee','快照含 final'),('domino','e85aad00bb83e1fbdcbf89e6f7c156e4ef944439','快照含 final'),('jetspec','0163faebb15cbcc73c77c07230d06f82b9166f44','快照含 final')]
+    lines=['# Qwen3-VL-8B A6000 端到端实验结果','',f'更新于 {datetime.datetime.now().astimezone().isoformat()}；来源：服务器原始结果。','', '## 模型清单','','| 方法 | HF 修订 | 2026-10-29 Hugging Face 历史快照（非当前根目录状态） |','|---|---|---|']
+    for m,rev,st in models:lines.append(f'| [{m}](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-{m}/tree/{rev}) | `{rev[:10]}` | {st} |')
+    lines+=['','该表仅记录固定的 HF 修订，不断言当前根目录的下载、校验或任务状态。上传 final 不代表理论收敛；快照未上传 final 也不代表训练一定未完成。','','## 速度与一致性','','| 方法 | 端到端 speedup | 95% CI（session bootstrap） | AR 秒 | SD 秒 | 输出 token 完全一致 | 样本 | AL | 状态 |','|---|---:|---|---:|---:|---|---|---|---|']
+    for m,res,audit in [('dflash','dflash_formal_v5.json','dflash_formal_audit_v1.json'),('dfly','dfly_formal_retry2_20261028.json','dfly_formal_retry2_audit_20261028.json'),('dflash2','dflash2_8b_formal_v1.json','dflash2_8b_formal_audit_v1.json'),('dflare','dflare_8b_formal_dynamic_v11.json','dflare_8b_formal_dynamic_audit_v11.json'),('domino','domino_8b_formal_v1.json','domino_8b_formal_audit_v1.json'),('jetspec','jetspec_8b_formal_v1.json','jetspec_8b_formal_audit_v1.json')]:
+     if m=='dfly' and (R/'dfly_8b_formal_dynamic_v11.json').exists():res='dfly_8b_formal_dynamic_v11.json';audit='dfly_8b_formal_dynamic_audit_v11.json'
+     if m=='dflash2' and (R/'dflash2_8b_formal_dynamic_v14.json').exists():res='dflash2_8b_formal_dynamic_v14.json';audit='dflash2_8b_formal_dynamic_audit_v14.json'
+     d=load(R/res);a=load(R/audit);backend=load(R/f'{m}_8b_attention_audit_v1.json');validation_error=None
+     try:
+      d=validate_speed(R/res,a,m,backend if m in ('dflare','domino','jetspec') else None);ok=True
+     except (OSError,ValueError,TypeError,KeyError,ZeroDivisionError) as error:
+      ok=False
+      if d.get('status')=='complete' and a.get('status')=='complete':validation_error=str(error)
+     if ok:
+      aldata=load(R/f'al_supplement_v1/{m}/summary.json');al='未记录'
+      if aldata.get('status')=='complete':
+       try:
+        checked=validate_al(Path(aldata['evidence']).with_suffix('.json'))
+        primary_plan=json.loads((Path(d['evidence'])/'plan.json').read_text())
+        supplement_plan=json.loads((Path(aldata['evidence'])/'plan.json').read_text())
+        validate_al_pair(primary_plan,supplement_plan)
+        if checked==aldata and checked['method']==m:al=f"{aldata['acceptance_length']:.3f}†"
+       except (OSError,ValueError,KeyError,TypeError):pass
+      c=d['session_cluster_CI95'];row=f"| {m} | {d['speedup_sum_ar_over_sd']:.3f}× | [{c[0]:.3f}, {c[1]:.3f}] | {d['ar_seconds']:.2f} | {d['sd_seconds']:.2f} | {d['exact_output_pairs']}/{d['timed_pairs']} | 120 session / 145 turn × 3 | {al} | 已完成、独立复算通过 |"
+     else:
+      smoke=load(R/'dflash2_8b_smoke_v1.json') if m=='dflash2' else {}
+      detail=('失败：'+str(d.get('error')) if d.get('status')=='failed' else ('冒烟失败：'+str(smoke.get('error')) if smoke.get('status')=='failed' else '进行中或等待'))
+      pidfile=R/({'dfly':'dfly_dynamic_v11.pid','dflash2':'dflash2_dynamic_v14.pid','dflare':'dflare_dynamic_v1.pid','domino':'domino_dynamic_v1.pid','jetspec':'jetspec_dynamic_v1.pid'}.get(m,'no_such_pid'))
+      if live(pidfile):detail='队列运行中；旧失败记录保留'
+      if validation_error:
+       detail='结果与审计绑定未通过；查看原始记录'
+      row=f'| {m} | — | — | — | — | — | 计划 120 session / 145 turn × 3 | — | {detail} |'
+     lines.append(row)
+    lines+=['','旧 DFly 速度结果因采样发现其他进程使用同卡而判无效，未列入表。† AL 来自单独的 145 turn、启用 vLLM 官方计数器的补充运行；按 1 + accepted_draft_tokens / num_drafts 计算，包含惯例 bonus token，并非主测速运行的计数。未记录表示实际计数尚不可用，不使用训练日志替代。','','## 质量：真实标注，完整输出评分','','| 方法 | 数据集 | AR 分数 | SD 分数 | SD−AR（百分点） | 质量 token 一致 | 样本 | 状态 |','|---|---|---:|---:|---:|---|---:|---|']
+    base=load(R/'quality_campaign_v1/QUALITY_PAIRED_V1.json');other=load(R/'quality_dflash2_dynamic_v17/QUALITY_PAIRED_V1.json') or load(R/'quality_dflash2_dynamic_v9/QUALITY_PAIRED_V1.json') or load(R/'quality_dflash2_8b_recovery_v2/QUALITY_PAIRED_V1.json') or load(R/'quality_dflash2_8b_campaign_v1/QUALITY_PAIRED_V1.json')
+    for m in ('dflash','dfly','dflash2','dflare','domino','jetspec'):
+     if m=='dflash2':
+      candidates=[R/'quality_dflash2_dynamic_v17',R/'quality_dflash2_dynamic_v9',R/'quality_dflash2_8b_recovery_v2',R/'quality_dflash2_8b_campaign_v1']
+      qroot=next((p for p in candidates if (p/'QUALITY_PAIRED_V1.json').exists()),candidates[0])
+     elif m in ('dflare','domino','jetspec'):qroot=R/f'quality_{m}_campaign_v1'
+     else:qroot=R/'quality_campaign_v1'
+     source=load(qroot/'QUALITY_PAIRED_V1.json');tasks={};invalid=False
+     if source:
+      try:tasks=validate_quality(qroot,source,m)['tasks']
+      except (OSError,ValueError,KeyError,TypeError):invalid=True
+     for task in ('textvqa','docvqa','chartqa'):
+      x=tasks.get(task);f=x.get('full',{}) if x else {}
+      if f:lines.append(f"| {m} | {task} | {f['ar_score']:.3f} | {f['sd_score']:.3f} | {f['delta_percentage_points']:+.3f} | {x['exact_token_outputs']}/256 | 256 | 完成 |")
+      else:lines.append(f'| {m} | {task} | — | — | — | — | 256（计划） | {"原始配对校验未通过" if invalid else "等待"} |')
+    lines+=['','质量统计只接受同一物理 GPU 上的 AR 与 SD 配对。分数相同不能证明严格逐 token 无损或统计等价；仅声称标准 target verification 的理论性质，并单独报告实测差异。','','## 口径与限制','','A6000、Qwen3-VL-8B BF16、vLLM 0.22.1、linear verification、S7/B8、batch 1；恢复运行使用已验证 SHA-256 和 inode/大小/mtime/ctime 复用机制，文件变动会重新哈希；复用依据见 `TARGET_SHA_CACHE_SEED_V1.json` 和 `DRAFT_SHA_CACHE_SEED_V1.json`。速度为 Σ AR 请求时间 / Σ SD 请求时间，排除启动和完整预热、包含图像读入/预处理、prefill、decode 和输出。95% CI 对 120 个 session 做 2000 次 bootstrap，不覆盖多卡、多机器或独立运行的变异。共享主机 CPU/I/O 可能影响速度；质量各 256 题非完整 benchmark，训练与测评重叠未审计。','','原始证据：`dflash_formal_audit_v1.json`、`dfly_8b_formal_dynamic_audit_v11.json`、`dflash2_8b_formal_dynamic_audit_v14.json`、`quality_campaign_v1/QUALITY_PAIRED_V1.json`、`quality_dflash2_dynamic_v17/QUALITY_PAIRED_V1.json`、`dflare_8b_formal_dynamic_audit_v11.json`、`quality_dflare_campaign_v1/QUALITY_PAIRED_V1.json`，均位于指定实验根目录；缺失文件表示尚未完成。']
+    return '\n'.join(lines)+'\n'
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--root',type=Path,required=True,help='experiment root containing raw evidence')
+    parser.add_argument('--output',type=Path,required=True,help='new output file; never overwrites')
+    args=parser.parse_args()
+    report=build(args.root)
+    with args.output.open('x') as stream:stream.write(report)
+    print(args.output)
+
+
+if __name__=='__main__':main()
