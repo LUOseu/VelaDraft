@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
 from pathlib import Path
 
@@ -100,7 +101,7 @@ def _clone_tree(value):
     return value
 
 
-def _reconcile_train_log(log_path: Path, committed_step: int) -> None:
+def _reconcile_train_log(log_path: Path, committed_step: int, step_key: str = "step") -> None:
     """Trim ``train_log.jsonl`` back to the checkpoint's committed progress.
 
     Rows past ``committed_step`` were written after the last resumable
@@ -109,6 +110,7 @@ def _reconcile_train_log(log_path: Path, committed_step: int) -> None:
     Uncommitted rows are preserved as a recovery artifact
     (``train_log.uncommitted.jsonl``) instead of being deleted, and a
     truncated final line from an interrupted write counts as uncommitted too.
+    The timing logs use the same rule on their ``stop_step``.
     """
     if not log_path.exists():
         return
@@ -119,7 +121,7 @@ def _reconcile_train_log(log_path: Path, committed_step: int) -> None:
         if not raw.strip():
             continue
         try:
-            step = int(json.loads(raw)["step"])
+            step = int(json.loads(raw)[step_key])
         except Exception:
             uncommitted.append(raw if raw.endswith("\n") else raw + "\n")
             continue
@@ -132,10 +134,10 @@ def _reconcile_train_log(log_path: Path, committed_step: int) -> None:
         tmp_path.write_text(payload, encoding="utf-8")
         tmp_path.replace(log_path)
     if uncommitted:
-        recovery_path = log_path.with_name("train_log.uncommitted.jsonl")
+        recovery_path = log_path.with_name(log_path.stem + ".uncommitted.jsonl")
         recovery_path.write_text("".join(uncommitted), encoding="utf-8")
         log(
-            f"train: reconciled train log to committed step {committed_step} "
+            f"train: reconciled {log_path.name} to committed step {committed_step} "
             f"({len(uncommitted)} uncommitted rows -> {recovery_path.name})"
         )
 
@@ -150,11 +152,25 @@ def _unwrap_subset(dataset):
     return dataset
 
 
-def gather_train_state(module, master_parameters, optimizer, scheduler, *, step, micro_step, skipped_batches, history, steps_total_planned) -> dict:
+def gather_train_state(
+    module,
+    master_parameters,
+    optimizer,
+    scheduler,
+    *,
+    step,
+    micro_step,
+    skipped_batches,
+    history,
+    steps_total_planned,
+    micro_batch_size: int | None = None,
+) -> dict:
     """Self-contained resume payload: weights, fp32 masters, optimizer, schedule.
 
     All tensors are cloned (``.cpu()`` alone does not copy on CPU devices), so
     the returned payload stays valid while training continues past the save.
+    ``micro_batch_size`` also records the consumed sample count, which lets a
+    fork continue the same data stream under another micro-batch geometry.
     """
     rng_state = runtime.capture_rng_state()
     state = {
@@ -178,6 +194,9 @@ def gather_train_state(module, master_parameters, optimizer, scheduler, *, step,
         "cuda_rng_states": rng_state["cuda"],
         "npu_rng_states": rng_state["npu"],
     }
+    if micro_batch_size is not None:
+        state["micro_batch_size"] = int(micro_batch_size)
+        state["consumed_samples"] = (int(micro_step) + int(skipped_batches)) * int(micro_batch_size)
     # Recipe runs record their schedule position so a resume cannot silently
     # cross a stage boundary. The stage is computed from the *committed* step
     # (the same step the resumed run's progress hook will feed the module),
@@ -187,6 +206,25 @@ def gather_train_state(module, master_parameters, optimizer, scheduler, *, step,
     if recipe is not None:
         state["recipe_stage"] = int(recipe.stage_index(int(step), int(steps_total_planned)))
     return state
+
+
+class _ReplayIterator:
+    """Recorded micro-batches (``mb*.pt``), preloaded and served in order, cycling forever."""
+
+    def __init__(self, directory: Path):
+        files = sorted(directory.glob("mb*.pt"))
+        if not files:
+            raise FileNotFoundError(f"train.feature_replay: no recorded micro-batches in {directory}.")
+        self.batches = [torch.load(path, map_location="cpu", weights_only=False) for path in files]
+        self.position = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        batch = self.batches[self.position % len(self.batches)]
+        self.position += 1
+        return batch
 
 
 def _expected_recipe_stage(cfg: dict, algorithm_name: str, *, step: int, total_steps: int) -> int | None:
@@ -381,7 +419,18 @@ def run_training_loop(
     on_checkpoint=None,
     save_every: int | None = None,
     extra_save_steps: set[int] | None = None,
+    validation_hook=None,
 ) -> dict:
+    """Run the optimizer loop.
+
+    ``validation_hook(step, epoch_end=..., final=...)`` runs at every update
+    boundary (and once before the first update); it decides itself whether to
+    validate. ``train.stop_at_step`` ends the loop early once that many updates
+    are done (the resumable state is still written). A ``resume_state`` carrying
+    ``fork=True`` continues another run's state as a new run: its history is not
+    carried over and the data position is recomputed from the consumed sample
+    count, so the micro-batch geometry may differ (global batch unchanged).
+    """
     train_cfg = cfg.get("train", {})
     micro_batch = int(train_cfg.get("micro_batch_size", 8))
     accumulation = max(1, int(train_cfg.get("grad_accumulation_steps", 1)))
@@ -562,8 +611,31 @@ def run_training_loop(
         consumed = micro_step + skipped_batches
         history = list(resume_state.get("history", []))
         runtime.restore_rng_state(resume_state.get("rng_state") or resume_state)
+        if resume_state.get("fork"):
+            samples_done = int(
+                resume_state.get(
+                    "consumed_samples",
+                    consumed * int(resume_state.get("micro_batch_size", micro_batch)),
+                )
+            )
+            if samples_done % micro_batch:
+                raise ValueError(
+                    f"fork: {samples_done} consumed samples are not a whole number of micro-batches of {micro_batch}."
+                )
+            consumed = samples_done // micro_batch
+            history = []
+            override = resume_state.get("fork_step_override")
+            if override is not None:
+                # Layout/memory pilots only: put the schedule (and recipe stage) at
+                # ``override`` updates without replaying data or training.
+                step = int(override)
+                consumed = 0
+                scheduler.last_epoch = step - 1
+                scheduler.step()
+            micro_step = step * accumulation
+            skipped_batches = consumed - micro_step
         log(
-            f"train: resumed from step {step} "
+            f"train: {'forked' if resume_state.get('fork') else 'resumed'} from step {step} "
             f"(micro_step={micro_step}, skipped={skipped_batches}, history_rows={len(history)})"
         )
     # Let modules whose diagnostics should reflect the optimizer trajectory (not
@@ -592,6 +664,22 @@ def run_training_loop(
     # that can skip without compute (the online target source) answer with
     # cheap placeholders instead of re-extracting teacher features, so a resume
     # does not pay the target forward cost again.
+    # Drafter-only timing scope: ``record`` stores the first ``microbatches``
+    # collated micro-batches (real teacher features) under ``dir``; ``replay``
+    # preloads them into host memory and feeds them in a cycle instead of the
+    # loader, so no target forward and no data fast-forward run.
+    replay_cfg = train_cfg.get("feature_replay") or {}
+    replay_mode = replay_cfg.get("mode")
+    recorder = None
+    if replay_mode == "replay":
+        iterator = _ReplayIterator(Path(replay_cfg["dir"]))
+        consumed = 0
+        log(f"train: feature replay of {len(iterator.batches)} recorded micro-batches from {replay_cfg['dir']}")
+    elif replay_mode == "record":
+        recorder = {"dir": Path(replay_cfg["dir"]), "left": int(replay_cfg["microbatches"]), "index": 0}
+        recorder["dir"].mkdir(parents=True, exist_ok=True)
+    elif replay_mode not in (None, "", "off"):
+        raise ValueError(f"train.feature_replay.mode must be record or replay, got {replay_mode!r}.")
     fast_forward_batches = consumed
     skip_begin = getattr(base_dataset, "start_fast_forward", None)
     # Online cache planning hook: a natural epoch end (never the end-of-run
@@ -610,7 +698,35 @@ def run_training_loop(
     finally:
         if skip_begin is not None:
             base_dataset.end_fast_forward()
-    while step < total_steps:
+    from .instrument import LoopInstrument
+
+    def train_state() -> dict:
+        return gather_train_state(
+            module,
+            master_parameters,
+            optimizer,
+            scheduler,
+            step=step,
+            micro_step=micro_step,
+            skipped_batches=skipped_batches,
+            history=history,
+            steps_total_planned=total_steps,
+            micro_batch_size=micro_batch,
+        )
+
+    instrument = LoopInstrument(
+        train_cfg,
+        device,
+        source=getattr(base_dataset, "source", None),
+        out_dir=log_path.parent if log_path is not None else None,
+    )
+    stop_at_step = train_cfg.get("stop_at_step")
+    stop_at_step = None if stop_at_step is None else int(stop_at_step)
+    instrument.start(step)
+    if validation_hook is not None:
+        instrument.aux("validation", validation_hook, step, epoch_end=False, final=step >= total_steps)
+    stopping = stop_at_step is not None and step >= stop_at_step
+    while step < total_steps and not stopping:
         # Epochs may end before the accumulation window is full: with a small
         # dataset, one optimizer step can span several epochs. The stall guard
         # below therefore tracks *valid micro-batches* (a successful forward +
@@ -618,7 +734,19 @@ def run_training_loop(
         # accumulation window is progress, not a stall.
         valid_micro = 0
         epoch_started = time.time()
-        for batch in iterator:
+        epoch_complete = True
+        while True:
+            fetch_started = time.perf_counter()
+            try:
+                batch = next(iterator)
+            except StopIteration:
+                break
+            compute_started = time.perf_counter()
+            instrument.data_s += compute_started - fetch_started
+            if recorder is not None and recorder["left"] > 0:
+                torch.save(batch, recorder["dir"] / f"mb{recorder['index']:06d}.pt")
+                recorder["index"] += 1
+                recorder["left"] -= 1
             batch_lengths = batch.get("lengths")
             batch = {key: value for key, value in batch.items() if key != "lengths"}
             batch = {
@@ -653,6 +781,8 @@ def run_training_loop(
                     )
             except skippable_errors:
                 skipped_batches += 1
+                instrument.compute_s += time.perf_counter() - compute_started
+                instrument.add_workload({"skipped_microbatches": 1})
                 continue
             valid_micro += 1
             loss = metrics.loss
@@ -665,6 +795,9 @@ def run_training_loop(
                 # the reference microbatch-mean objective) and the same
                 # optimizer-step cadence / update order as the shipped path.
                 (loss / accumulation).backward()
+            instrument.compute_s += time.perf_counter() - compute_started
+            instrument.add_workload(getattr(module, "last_workload", None))
+            instrument.samples += int(batch["input_ids"].shape[0])
             micro_step += 1
             if micro_step % accumulation == 0:
                 if step == coverage_audit_step:
@@ -692,6 +825,7 @@ def run_training_loop(
                                 f"{group['trainable_params']} elements with_grad={group['params_with_grad']} "
                                 f"grad_norm={group['grad_norm']:.4g}"
                             )
+                optim_started = time.perf_counter()
                 with torch.no_grad():
                     for name, parameter in module.draft_model.named_parameters():
                         master = master_parameters[name]
@@ -704,6 +838,7 @@ def run_training_loop(
                 with torch.no_grad():
                     for name, parameter in module.draft_model.named_parameters():
                         parameter.copy_(master_parameters[name])
+                instrument.optim_s += time.perf_counter() - optim_started
                 step += 1
                 row = {
                     "step": step,
@@ -719,9 +854,19 @@ def run_training_loop(
                 if metrics.pos_correct is not None and metrics.pos_count is not None:
                     row["slot0_accuracy"] = float(metrics.pos_correct[0] / metrics.pos_count[0].clamp_min(1))
                 history.append(row)
+                measured = instrument.finish_update(step)
                 if log_path is not None:
+                    # Measurement fields go to the log only; ``history`` (carried
+                    # in every resumable state) keeps the training metrics.
+                    logged = {
+                        **row,
+                        **measured,
+                        "micro_step": micro_step,
+                        "consumed_microbatches": micro_step + skipped_batches,
+                        "recipe_stage": getattr(module, "recipe_stage_index", None),
+                    }
                     with open(log_path, "a", encoding="utf-8") as fh:
-                        fh.write(json.dumps(row) + "\n")
+                        fh.write(json.dumps(logged) + "\n")
                 if log_every and step % log_every == 0:
                     log(f"step {step}/{total_steps} loss={row['loss']:.4f} acc={row['accuracy']:.3f} "
                         f"al={row['accept_len']:.2f}")
@@ -731,28 +876,24 @@ def run_training_loop(
                     and (step % save_every == 0 or step in (extra_save_steps or ()))
                     and step < total_steps
                 ):
-                    on_checkpoint(
-                        gather_train_state(
-                            module,
-                            master_parameters,
-                            optimizer,
-                            scheduler,
-                            step=step,
-                            micro_step=micro_step,
-                            skipped_batches=skipped_batches,
-                            history=history,
-                            steps_total_planned=total_steps,
-                        )
-                    )
-                if step >= total_steps:
+                    instrument.aux("checkpoint", lambda: on_checkpoint(train_state()))
+                if validation_hook is not None:
+                    instrument.aux("validation", validation_hook, step, epoch_end=False, final=step >= total_steps)
+                instrument.boundary(step)
+                if stop_at_step is not None and step >= stop_at_step:
+                    stopping = True
+                if step >= total_steps or stopping:
                     epoch_wall_seconds.append(time.time() - epoch_started)
+                    epoch_complete = False
                     break
-        else:
+        if epoch_complete:
             # Natural epoch end (the break above skips this): the cache
             # policy's planning point for the next epoch.
             epoch_seconds = time.time() - epoch_started
             epoch_wall_seconds.append(epoch_seconds)
             log(f"train: epoch end at step {step}/{total_steps} in {epoch_seconds:.1f}s")
+            if validation_hook is not None:
+                instrument.aux("validation", validation_hook, step, epoch_end=True, final=step >= total_steps)
             if note_epoch_boundary is not None:
                 frozen_plan = note_epoch_boundary()
                 if frozen_plan:
@@ -773,31 +914,24 @@ def run_training_loop(
         else:
             stall_epochs = 0
 
-    if on_checkpoint is not None:
+    if on_checkpoint is not None and bool(train_cfg.get("save_final_state", True)):
         # Persist the completed run as the resumable state: a later exact
         # resume of a finished run has zero steps left to replay instead of
         # re-emitting the already-logged tail. (Interrupted runs keep their
         # last mid-run checkpoint; the log reconciliation in the caller keeps
         # that replay duplicate-free.)
-        on_checkpoint(
-            gather_train_state(
-                module,
-                master_parameters,
-                optimizer,
-                scheduler,
-                step=step,
-                micro_step=micro_step,
-                skipped_batches=skipped_batches,
-                history=history,
-                steps_total_planned=total_steps,
-            )
-        )
+        instrument.aux("checkpoint", lambda: on_checkpoint(train_state()))
 
     runtime.synchronize(device)
     losses = [row["loss"] for row in history]
     window = max(1, len(losses) // 10)
     summary = {
         "steps": len(losses),
+        "completed_step": int(step),
+        "stopped_at_step": int(step) if stopping and step < total_steps else None,
+        # Peaks below are since the instrument's last reset; ``instrument.run_peak``
+        # is the whole run's maximum per device.
+        "instrument": instrument.summary(),
         "first10_mean_loss": sum(losses[:window]) / window if losses else None,
         "last10_mean_loss": sum(losses[-window:]) / window if losses else None,
         "final_loss": losses[-1] if losses else None,
@@ -841,17 +975,7 @@ def run_training_loop(
             "batches": regroup["stats"]["batches"],
             "identity_batches": regroup["stats"]["identity_batches"],
         }
-    final_state = gather_train_state(
-        module,
-        master_parameters,
-        optimizer,
-        scheduler,
-        step=step,
-        micro_step=micro_step,
-        skipped_batches=skipped_batches,
-        history=history,
-        steps_total_planned=total_steps,
-    )
+    final_state = train_state()
     return {
         "summary": summary,
         "history": history,
@@ -885,8 +1009,11 @@ def run_overfit_sanity(cfg: dict, contract: dict, dataset_factory, run_dir: Path
     dataset = dataset_factory()
     subset = Subset(dataset, list(range(min(num_samples, len(dataset)))))
     run_cfg = dict(cfg)
+    # Loop controls of the real run (bounded segments, timing windows) do not
+    # apply to the sanity loop.
+    run_controls = ("stop_at_step", "timing_windows", "timing_segment_every")
     run_cfg["train"] = {
-        **cfg.get("train", {}),
+        **{key: value for key, value in cfg.get("train", {}).items() if key not in run_controls},
         "micro_batch_size": min(num_samples, len(subset)),
         "grad_accumulation_steps": 1,
         "num_epochs": 1,
@@ -1351,7 +1478,32 @@ def train_dflash(
 
         resume_state = None
         cross_backend_resume = False
-        if resume:
+        fork_path = train_cfg.get("fork_state")
+        if fork_path and resume:
+            raise ValueError("train.fork_state starts a new run from another state; it cannot be combined with --resume.")
+        if fork_path:
+            # A fork continues another run's exact state (weights, fp32 masters,
+            # optimizer, schedule, RNG, data position) as a new run: paired timing
+            # windows and batch-geometry points branch from one snapshot. The
+            # data and the schedule horizon must be the same; the plan digest may
+            # differ only in batch geometry, which the loop re-derives from the
+            # consumed sample count.
+            resume_state = torch.load(fork_path, map_location="cpu", weights_only=False)
+            for key, expected in (
+                ("algorithm", algorithm.name),
+                ("feature_source_digest", feature_source_digest),
+                ("steps_total_planned", total_steps),
+            ):
+                if resume_state.get(key) != expected:
+                    raise RuntimeError(
+                        f"train.fork_state {fork_path}: {key}={resume_state.get(key)!r} does not match this run's "
+                        f"{expected!r}."
+                    )
+            resume_state["fork"] = True
+            if train_cfg.get("fork_step_override") is not None:
+                resume_state["fork_step_override"] = int(train_cfg["fork_step_override"])
+            overfit = {"enabled": False, "forked_from": str(fork_path), "fork_step": int(resume_state["step"])}
+        elif resume:
             # Read-only gate before any write: a refused resume must leave
             # config / ckpt_init / logs / provenance byte-identical, and a legal
             # resume keeps the original ckpt_init instead of regenerating it.
@@ -1391,13 +1543,15 @@ def train_dflash(
             module.draft_model.load_state_dict(init_state)
 
         log_path = train_dir / "train_log.jsonl"
-        if resume_state is None:
+        if resume_state is None or resume_state.get("fork"):
             if log_path.exists():
                 log_path.unlink()
         else:
             # Exact-resume gate passed: make the log reflect the checkpoint's
             # committed progress before the replay appends new rows.
             _reconcile_train_log(log_path, int(resume_state["step"]))
+            for name in ("timing_windows.jsonl", "timing_segments.jsonl"):
+                _reconcile_train_log(train_dir / name, int(resume_state["step"]), step_key="stop_step")
         epochs_for_cadence = max(1, int(train_cfg.get("num_epochs", 6)))
         steps_per_epoch = max(1, total_steps // epochs_for_cadence)
         cadence_fraction = train_cfg.get("save_every_fraction_of_epoch")
@@ -1413,6 +1567,10 @@ def train_dflash(
         extra_save_steps = set()
         if boundary_step is not None and 0 < int(boundary_step) < total_steps:
             extra_save_steps.add(int(boundary_step))
+        # Full resumable-state snapshots (model, fp32 masters, optimizer,
+        # schedule, RNG, data position) that paired windows fork from.
+        snapshot_steps = {int(item) for item in train_cfg.get("snapshot_steps") or [] if 0 < int(item) < total_steps}
+        extra_save_steps |= snapshot_steps
         log(
             f"train: save cadence every {save_every} steps "
             f"(stage boundary step={boundary_step}, milestone_snapshots={milestone_snapshots})"
@@ -1431,6 +1589,12 @@ def train_dflash(
                 f"train: wrote resumable checkpoint (step {state['step']}) -> "
                 f"{resume_state_dir / 'ckpt_last.pt'}"
             )
+            if int(state["step"]) in snapshot_steps:
+                snapshot_state = resume_state_dir / f"state_step{int(state['step']):07d}.pt"
+                if not snapshot_state.exists():
+                    # A hard link keeps this inode when ckpt_last.pt is replaced later.
+                    os.link(resume_state_dir / "ckpt_last.pt", snapshot_state)
+                    log(f"train: kept full-state snapshot -> {snapshot_state.name}")
             # Milestone eval-format snapshot: the train-state above is only the
             # resume payload (the eval/export loaders reject it by design), so
             # every scheduled save ALSO drops the pure trainable weights in the
@@ -1446,6 +1610,15 @@ def train_dflash(
                 snapshot_tmp.replace(snapshot_path)
                 log(f"train: wrote eval-format milestone snapshot (step {state['step']}) -> {snapshot_path.name}")
 
+        validator = None
+        if bool((cfg.get("validation") or {}).get("enabled", False)):
+            if online_source is None:
+                raise ValueError("validation.enabled needs feature_mode=online (the live target extracts the splits).")
+            from .validation import ObjectiveValidator
+
+            validator = ObjectiveValidator(
+                cfg, contract, module, online_source, device, train_dir / "validation.jsonl", total_steps=total_steps
+            )
         output = run_training_loop(
             module,
             dataset,
@@ -1460,7 +1633,25 @@ def train_dflash(
             on_checkpoint=write_train_state,
             save_every=save_every,
             extra_save_steps=extra_save_steps,
+            validation_hook=validator,
         )
+        execution = module.execution_switches() if hasattr(module, "execution_switches") else {}
+        if output["summary"].get("stopped_at_step") is not None:
+            # train.stop_at_step: a bounded segment (init state, timing window,
+            # pilot). The resumable state is written; no final checkpoint or
+            # post-training diagnostics, and the train stage is not recorded.
+            partial = {
+                **output["summary"],
+                "partial": True,
+                "overfit_sanity": overfit,
+                "execution_switches": execution,
+                "feature_mode": mode,
+                "dtypes": dtype_report,
+                "draft_device": str(device),
+                "feature_source": online_source.summary() if online_source is not None else None,
+            }
+            write_json(train_dir / "train_summary.json", partial)
+            return partial
         torch.save({**checkpoint_common, "step": output["summary"]["steps"], "model": module.draft_model.state_dict()},
                    train_dir / "ckpt_final.pt")
 
@@ -1511,6 +1702,7 @@ def train_dflash(
             "draft_device": str(device),
             "draft_backend": device.type,
             "cross_backend_resume": cross_backend_resume,
+            "execution_switches": execution,
         }
         if online_source is not None:
             summary["feature_source"] = online_source.summary()

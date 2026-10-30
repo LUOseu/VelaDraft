@@ -945,3 +945,87 @@ def test_capture_rejects_mode_and_assistant_indices_mismatch(tmp_path):
             seq_length=256,
             store_final_hidden=False,
         )
+
+
+# --------------------------------------------------------------------------- #
+# 7. tokenizer non-roundtrip (same decoded text, different token ids)
+# --------------------------------------------------------------------------- #
+
+_TW = 510  # decode-only merged token (inside the tiny vocab): the sampler may emit it, a render never does
+
+
+class _NonRoundtripProcessor(_FakeChatProcessor):
+    """Char-level fake whose vocabulary also holds one two-character token.
+
+    Rendering always tokenizes char by char, so a stored answer that used the
+    merged ``"tw"`` token is the same text as the render, with different ids.
+    """
+
+    def decode(self, ids, skip_special_tokens=False):
+        base = super().decode
+        return "".join("tw" if int(token) == _TW else base([token]) for token in ids)
+
+
+def _with_answer_ids(row: dict, answer_ids: list[int]) -> dict:
+    """Replace the stored last answer of a last_turn_only row by ``answer_ids``."""
+    regen = row["regen"]
+    prompt_ids = regen["turns"][-1]["prompt_ids"]
+    regen["turns"][-1]["answer_ids"] = answer_ids
+    regen["full_ids"] = prompt_ids + answer_ids
+    regen["answer_spans"] = [[len(prompt_ids), len(prompt_ids) + len(answer_ids)]]
+    return row
+
+
+def _capture(model, processor, row, media_dir):
+    return build_sample_record(
+        model,
+        processor,
+        row,
+        media_dir,
+        layer_ids=[0, 1],
+        image_token_id=500,
+        merge_size=2,
+        dtype=torch.float32,
+        seq_length=256,
+        store_final_hidden=False,
+    )
+
+
+def test_capture_accepts_nonroundtrip_answer_tokens_with_identical_text(tmp_path):
+    model, _ = _tiny_qwen25_vl_model()
+    processor = _NonRoundtripProcessor()
+    # Same decoded text ("two"), different tokens: the sampler emitted "tw" + "o".
+    row = _with_answer_ids(_stored_last_turn_row(tmp_path, processor, "two"), [_TW, ord("o"), _END])
+    record = _capture(model, processor, row, tmp_path)
+    stored = row["regen"]["full_ids"]
+    assert record["input_ids"].tolist() == stored, "the target must be teacher-forced on the stored ids"
+    assert int(record["loss_mask"].sum()) == 3
+    assert bool(record["loss_mask"][-3:].all())
+    # Changed decoded text ("twx" vs the rendered "two") is real drift and must fail.
+    row = _with_answer_ids(_stored_last_turn_row(tmp_path, processor, "two"), [_TW, ord("x"), _END])
+    with pytest.raises(RuntimeError, match="Prompt token drift"):
+        _capture(model, processor, row, tmp_path)
+
+
+def test_verify_full_render_accepts_nonroundtrip_split_and_rejects_text_drift(tmp_path):
+    processor = _NonRoundtripProcessor()
+    row = _stored_last_turn_row(tmp_path, processor, "two")
+    images = [Image.open(tmp_path / name).convert("RGB") for name in row["images"]]
+    prompt_ids = row["regen"]["turns"][-1]["prompt_ids"]
+    regen_module._verify_full_render(processor, row, images, prompt_ids + [_TW, ord("o"), _END], {3: "two"})
+    with pytest.raises(RuntimeError, match="full-render drift"):
+        regen_module._verify_full_render(processor, row, images, prompt_ids + [_TW, ord("x"), _END], {3: "two"})
+
+
+def test_same_text_render_protects_multimodal_tokens():
+    from vlm_dflash.target.prompts import same_text_render
+
+    processor = _NonRoundtripProcessor()
+    rendered = [1, ord("t"), ord("w"), 3, ord("\n")]
+    assert same_text_render(processor, [1, _TW, 3], rendered)
+    assert not same_text_render(processor, [1, _TW, ord("x")], rendered)
+    # Trailing non-whitespace text after the committed ids is not the same render.
+    assert not same_text_render(processor, [1, _TW], rendered + [ord("z")])
+    # An image token after the first differing position would shift multimodal positions.
+    assert not same_text_render(processor, [1, _TW, 500, 3], [1, ord("t"), ord("w"), 500, 3], protected_ids={500})
+    assert same_text_render(processor, [500, 1, _TW, 3], [500, 1, ord("t"), ord("w"), 3], protected_ids={500})

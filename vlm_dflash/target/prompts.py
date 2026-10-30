@@ -132,6 +132,43 @@ def messages_from_row(
     return messages, image_indices
 
 
+def same_text_render(tokenizer, committed_ids: list[int], rendered_ids: list[int], *, protected_ids=()) -> bool:
+    """Whether ``committed_ids`` is ``rendered_ids`` up to a tokenizer non-roundtrip split.
+
+    A tokenizer does not guarantee encode/decode roundtrip token identity: a
+    sampled answer can be a non-canonical split of its own text, so a fresh
+    render of the same conversation tokenizes it differently. That is the same
+    text, not prompt drift. Accepted when both sequences decode (special tokens
+    kept) to the same text, up to trailing whitespace the render adds after the
+    committed ids, and no ``protected_ids`` (image tokens, whose positions the
+    multimodal inputs encode) occur from the first differing token on.
+    """
+    committed, rendered = [int(token) for token in committed_ids], [int(token) for token in rendered_ids]
+    first = next(
+        (index for index, (left, right) in enumerate(zip(committed, rendered)) if left != right),
+        min(len(committed), len(rendered)),
+    )
+    protected = {int(token) for token in protected_ids}
+    if protected & (set(committed[first:]) | set(rendered[first:])):
+        return False
+    committed_text = tokenizer.decode(committed, skip_special_tokens=False)
+    rendered_text = tokenizer.decode(rendered, skip_special_tokens=False)
+    return rendered_text.startswith(committed_text) and not rendered_text[len(committed_text) :].strip()
+
+
+def multimodal_token_ids(processor, inputs) -> set[int]:
+    """Image/video token ids of a render: the processor's own ids plus every ``mm_token_type_ids != 0`` token."""
+    ids = {
+        int(value)
+        for value in (getattr(processor, "image_token_id", None), getattr(processor, "video_token_id", None))
+        if isinstance(value, int)
+    }
+    mm_types = inputs.get("mm_token_type_ids")
+    if mm_types is not None:
+        ids.update(int(token) for token in inputs["input_ids"][mm_types != 0].tolist())
+    return ids
+
+
 def render_conversation(processor, messages: list[dict], *, add_generation_prompt: bool = False) -> str:
     """Chat-template text for a (possibly truncated) conversation."""
     return _apply_chat_template(processor, messages, add_generation_prompt=add_generation_prompt)
