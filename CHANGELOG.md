@@ -2,6 +2,20 @@
 
 ## v0.3.2 (in development)
 
+### Training: systems instrumentation and DFlash2 execution switches
+
+- DFlash2 gains opt-in execution switches (`dflash2_teacher_projection_reuse`,
+  `dflash2_scoring_row_compaction`, `dflash2_fused_teacher_kl`), all off by
+  default.
+- The training loop gains timing windows and segments, full-state snapshots,
+  `stop_at_step`, state forks (including a micro-batch change), feature record
+  and replay for a drafter-only timing scope, dev/test objective validation,
+  workload counters and an optional final-state write. An exact resume trims
+  timing records past the checkpoint like the train log.
+- Online capture accepts tokenizer non-roundtrip splits whose text is identical.
+- `scripts/q3vl8b_trainopt/` holds the Qwen3-VL-8B training-systems campaign
+  (configs, job lists, GPU-slot scheduler, numerical check, status and tables).
+
 ### Capture: multi-turn turn spans for trailing-assistant templates
 
 - Qwen3.5/3.6 chat templates give a conversation's trailing assistant turn an
