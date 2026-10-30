@@ -62,13 +62,43 @@ def classify_gpu_pids(reported, descendants_now, known_recent_own, status):
     return foreign,stale
 
 
+def ownership_mode():
+    """'pid' (default): reported GPU PIDs are resolved against this process tree.
+    'count': the container's PID namespace hides host PIDs (nvidia-smi reports host
+    PIDs, /proc only container PIDs), so ownership cannot be resolved. Then every
+    leased GPU must be empty at each stage boundary; while a stage runs the first leased
+    GPU carries at most VELADRAFT_GPU_MAX_OWN_APPS compute apps (the client context plus
+    TP rank 0) and every other leased GPU at most one (its TP worker)."""
+    mode=os.environ.get('VELADRAFT_GPU_OWNERSHIP','pid')
+    if mode not in ('pid','count'):raise ValueError('VELADRAFT_GPU_OWNERSHIP must be pid or count')
+    return mode
+
+
 class GPULease:
+    """Lease one GPU index or a list of indices (tensor parallel); all are sampled together."""
     def __init__(self,index,path):
-        self.index=index;self.path=Path(path);self.rows=[];self.stop=threading.Event();self.lock=None;self.recent_own_gpu_pids={};self.proc_complete=process_visibility_complete();self.watcher_error=None
+        self.indices=[index] if isinstance(index,int) else list(index)
+        self.index=self.indices[0];self.path=Path(path);self.rows=[];self.stop=threading.Event();self.locks=[];self.recent_own_gpu_pids={};self.proc_complete=process_visibility_complete();self.watcher_error=None
+        self.mode=ownership_mode();self.max_own_apps=int(os.environ.get('VELADRAFT_GPU_MAX_OWN_APPS','2'))
+    def app_bound(self,uuid,uuids,phase):
+        if phase in ('start','boundary'):return 0
+        return self.max_own_apps if uuid==uuids[0] else 1
+    def per_gpu_pids(self,uuids):
+        return {uuid:sorted({int(v) for v in query('-i',uuid,'--query-compute-apps=pid').splitlines() if v.strip()}) for uuid in uuids}
     def sample(self,phase):
-        row={'phase':phase,'began_wall_ns':time.time_ns(),'gpu_uuid':self.uuid}
+        uuids=getattr(self,'uuids',None) or [self.uuid]
+        row={'phase':phase,'began_wall_ns':time.time_ns(),'gpu_uuid':self.uuid,'gpu_uuids':uuids}
         try:
-            pids={int(v) for v in query('-i',self.uuid,'--query-compute-apps=pid').splitlines() if v.strip()}
+            if getattr(self,'mode','pid')=='count':
+                row['ownership']='count';row['per_gpu_pids']=self.per_gpu_pids(uuids)
+                row['per_gpu_memory_mib']={u:int(query('-i',u,'--query-gpu=memory.used')) for u in uuids}
+                row['reported_pids']=sorted({p for v in row['per_gpu_pids'].values() for p in v})
+                row['over_bound']=[u for u,v in row['per_gpu_pids'].items() if len(v)>self.app_bound(u,uuids,phase)]
+                row['foreign_pids']=[];row['stale_observed_own_pids']=[]
+                row['ended_wall_ns']=time.time_ns();self.rows.append(row)
+                with self.path.open('a') as stream:stream.write(json.dumps(row)+'\n')
+                return row
+            pids={int(v) for uuid in uuids for v in query('-i',uuid,'--query-compute-apps=pid').splitlines() if v.strip()}
             live=descendants();now=time.monotonic()
             for pid in pids & live:self.recent_own_gpu_pids[pid]=now
             recent={pid for pid,seen in self.recent_own_gpu_pids.items() if now-seen<=10}
@@ -79,14 +109,17 @@ class GPULease:
         except Exception as error:row['error']=str(error)
         row['ended_wall_ns']=time.time_ns();self.rows.append(row)
         with self.path.open('a') as stream:stream.write(json.dumps(row)+'\n')
+        return row
     def __enter__(self):
-        self.uuid=normalize_uuid(query('-i',str(self.index),'--query-gpu=uuid'))
-        root=Path('/tmp/veladraft_gpu_locks');root.mkdir(exist_ok=True)
-        self.lock=(root/(self.uuid+'.lock')).open('a')
+        self.uuids=[normalize_uuid(query('-i',str(i),'--query-gpu=uuid')) for i in self.indices]
+        self.uuid=self.uuids[0]
+        root=Path(os.environ.get('VELADRAFT_GPU_LOCK_DIR','/tmp/veladraft_gpu_locks'));root.mkdir(parents=True,exist_ok=True)
         try:
-            fcntl.flock(self.lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-            if query('-i',self.uuid,'--query-compute-apps=pid') or int(query('-i',self.uuid,'--query-gpu=memory.used'))>=500:
-                raise ValueError('GPU is occupied; no foreign process is stopped')
+            for uuid in self.uuids:
+                lock=(root/(uuid+'.lock')).open('a');self.locks.append(lock)
+                fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                if query('-i',uuid,'--query-compute-apps=pid') or int(query('-i',uuid,'--query-gpu=memory.used'))>=500:
+                    raise ValueError('GPU is occupied; no foreign process is stopped')
             self.sample('start')
             def poll():
                 try:
@@ -96,20 +129,49 @@ class GPULease:
                     self.watcher_error=f'{type(error).__name__}: {error}'
             self.thread=threading.Thread(target=poll,daemon=True);self.thread.start();return self
         except BaseException:
-            self.lock.close();raise
+            for lock in self.locks:lock.close()
+            raise
     def __exit__(self,*exc):
         try:
             self.stop.set();self.thread.join(timeout=30)
             if self.thread.is_alive():self.rows.append({'error':'GPU watcher did not finish'})
             self.sample('end')
         finally:
-            try:
-                fcntl.flock(self.lock,fcntl.LOCK_UN)
-            finally:
-                self.lock.close()
-    def validate(self):
+            for lock in self.locks:
+                try:
+                    fcntl.flock(lock,fcntl.LOCK_UN)
+                finally:
+                    lock.close()
+    def boundary(self,timeout=180):
+        """Count mode: wait for the finished stage's processes to release every leased GPU."""
+        if getattr(self,'mode','pid')!='count':return
+        deadline=time.monotonic()+timeout
+        while True:
+            row=self.sample('boundary_wait')
+            if not row.get('error') and not row['reported_pids']:break
+            if time.monotonic()>deadline:break
+            time.sleep(2)
+        self.sample('boundary')
+    def validate(self,timed_windows=None):
+        """timed_windows: [(began_wall_ns, ended_wall_ns)] of the timed phases. In count mode
+        extra apps inside a window invalidate the result; outside (startup, compile, warmup,
+        stage boundaries) they are counted and reported, e.g. a site utilisation floor
+        that starts while an engine loads."""
         if self.watcher_error is not None:raise ValueError('GPU resource watcher failed: '+self.watcher_error)
+        outside=0
+        if getattr(self,'mode','pid')=='count':
+            flagged=[row for row in self.rows if row.get('over_bound') and row['phase']!='boundary_wait']
+            def inside(row):
+                return timed_windows is None or any(row['began_wall_ns']<=end and row['ended_wall_ns']>=begin for begin,end in timed_windows)
+            if any(inside(row) for row in flagged):
+                raise ValueError('GPU carried unexpected compute apps (count ownership mode); whole result invalid')
+            outside=len(flagged)
         if not self.rows or self.rows[0]['phase']!='start' or self.rows[-1]['phase']!='end':raise ValueError('GPU resource coverage incomplete')
         if any(row.get('foreign_pids') or row.get('error') for row in self.rows):raise ValueError('GPU resource evidence contaminated; whole result invalid')
-        return dict(status='complete',samples=len(self.rows),continuous_exclusivity_claim=False,
+        memory=[row['per_gpu_memory_mib'] for row in self.rows if 'per_gpu_memory_mib' in row]
+        peak={u:max(m[u] for m in memory) for u in memory[0]} if memory else None
+        return dict(status='complete',samples=len(self.rows),continuous_exclusivity_claim=False,gpu_uuids=getattr(self,'uuids',None) or [self.uuid],
+                    peak_memory_used_mib=peak,
+                    ownership_mode=getattr(self,'mode','pid'),max_own_apps_per_gpu=({u:self.app_bound(u,self.uuids,'sample') for u in self.uuids} if getattr(self,'mode','pid')=='count' else None),
+                    extra_app_samples_outside_timed=outside,
                     began_wall_ns=self.rows[0]['began_wall_ns'],ended_wall_ns=self.rows[-1]['ended_wall_ns'])

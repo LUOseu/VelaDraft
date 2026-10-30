@@ -45,8 +45,13 @@ class WorkerMetadata:
 
 def worker_metadata(llm,arm,plan):
     values=llm.collective_rpc('native_eval_metadata',timeout=90,args=(),kwargs={})
-    if len(values)!=1:raise ValueError('TP1 requires one actual worker')
-    value=values[0]
+    if len(values)!=plan.get('tensor_parallel_size',1):raise ValueError('Actual worker count differs from tensor parallel size')
+    for value in values:check_worker(value,arm,plan)
+    if any(value!=values[0] for value in values[1:]):raise ValueError('Tensor-parallel ranks report different numeric/backend state')
+    return dict(values[0],ranks=len(values))
+
+
+def check_worker(value,arm,plan):
     if value['target_noncausal'] or value['diagnostic_hooks']:raise ValueError('Noncausal target or diagnostic sampler hooks')
     if not any(row['name'].startswith('language_model.model.layers.') for row in value['attention']):
         raise ValueError('Actual target language attention backend evidence unavailable')
@@ -57,7 +62,6 @@ def worker_metadata(llm,arm,plan):
     if arm=='sd' and (not any(row['name'].startswith('model.layers.') for row in value['attention']) or
                       any(not row['impl'].endswith('.FlashAttentionImpl') for row in value['attention'])):
         raise ValueError('Actual SD target/draft attention is not FlashAttention')
-    return value
 
 
 def metrics(llm):
@@ -81,8 +85,8 @@ def metric_delta(before,after):
                 definition='accepted draft tokens only; no synthetic +1 bonus')
 
 
-def messages_for(session,turn,reference):
-    messages=[]
+def messages_for(session,turn,reference,system_prompt=None):
+    messages=[{'role':'system','content':[{'type':'text','text':system_prompt}]}] if system_prompt else []
     for index in range(turn+1):
         content=[{'type':'text','text':session['questions'][index]}]
         if index==0:content.insert(0,{'type':'image'})
@@ -91,7 +95,7 @@ def messages_for(session,turn,reference):
     return messages
 
 
-def request(llm,processor,params,torch,Image,session,turn,reference):
+def request(llm,processor,params,torch,Image,session,turn,reference,plan):
     torch.cuda.synchronize();start=time.perf_counter_ns();wall_start=time.time_ns();image=None
     try:
         data=Path(session['image']).read_bytes()
@@ -100,8 +104,8 @@ def request(llm,processor,params,torch,Image,session,turn,reference):
         if image_sha!=session['image_sha256']:raise ValueError('Physical input image changed')
         with Image.open(io.BytesIO(data)) as original:
             image=original.convert('RGB');image.load()
-        messages=messages_for(session,turn,reference)
-        prompt=processor.apply_chat_template(messages,tokenize=False,add_generation_prompt=True)
+        messages=messages_for(session,turn,reference,plan.get('system_prompt'))
+        prompt=processor.apply_chat_template(messages,tokenize=False,add_generation_prompt=True,**plan.get('chat_template_kwargs',{}))
         image_uuid=str(uuid.uuid4())
         outputs=llm.generate([dict(prompt=prompt,multi_modal_data={'image':image},
                                   multi_modal_uuids={'image':[image_uuid]})],params,use_tqdm=False)
@@ -143,8 +147,9 @@ def main():
             min_pixels=plan['min_pixels'],max_pixels=plan['max_pixels'])
         kwargs=engine_args(plan,arm);report['engine_args']=kwargs
         llm=LLM(**copy.deepcopy(kwargs));torch.cuda.synchronize();report['GPU_executed']=True
-        report['gpu_uuid']=normalize_uuid(torch.cuda.get_device_properties(0).uuid)
-        if report['gpu_uuid']!=plan['gpu_uuid']:raise ValueError('Actual CUDA device differs from locked GPU')
+        report['gpu_uuids']=[normalize_uuid(torch.cuda.get_device_properties(i).uuid) for i in range(plan.get('tensor_parallel_size',1))]
+        report['gpu_uuid']=report['gpu_uuids'][0]
+        if report['gpu_uuids']!=plan.get('gpu_uuids',[plan['gpu_uuid']]):raise ValueError('Actual CUDA devices differ from locked GPUs')
         report['worker_before']=worker_metadata(llm,arm,plan)
         params=SamplingParams(temperature=0,max_tokens=plan['max_new_tokens'],seed=plan['seed'],
                               stop_token_ids=plan['stop_token_ids'],ignore_eos=False)
@@ -153,13 +158,18 @@ def main():
             prior=json.loads((args.directory/'reference.json').read_text())
             if prior['status']!='complete':raise ValueError('A complete native reference is required')
             reference={(r['id'],r['turn']):r for r in prior['rows']}
+        # Per-request official counters only in a separate stats-enabled supplement
+        # (disable_log_stats=False); primary timing runs never poll metrics per request.
+        per_request=arm=='sd' and kwargs.get('disable_log_stats') is False
         for phase in (('reference',) if args.stage=='reference' else ('warmup','timed')):
             before=metrics(llm) if arm=='sd' and phase=='timed' else None
             for session in plan['sessions']:
                 for turn in range(len(session['questions'])):
                     try:
-                        row=request(llm,processor,params,torch,Image,session,turn,reference)
+                        start=metrics(llm) if per_request and phase=='timed' else None
+                        row=request(llm,processor,params,torch,Image,session,turn,reference,plan)
                         row['phase']=phase
+                        if start is not None:row['official_counters']=metric_delta(start,metrics(llm))
                         if phase!='reference' and row['prompt_token_ids']!=reference[(session['id'],turn)]['prompt_token_ids']:
                             raise ValueError('Physical input tokens differ from canonical history')
                     except Exception as error:
