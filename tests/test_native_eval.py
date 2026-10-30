@@ -127,14 +127,15 @@ def test_native_flags_are_observations_not_a_lossless_certificate():
 def test_late_preservation_failure_removes_headline(tmp_path,monkeypatch):
     from types import SimpleNamespace
     from vlm_dflash.eval import native_resources
-    module=native();p,ref,stages=reports();p['method']='dflash'
+    module=native();p,ref,stages=reports();p['method']='dflash';p['gpus']=[0]
     fake_uuid='GPU-864585d7-9789-e033-7781-e773f55178c6'
     class Lease:
-        uuid=fake_uuid
+        uuid=fake_uuid;uuids=[fake_uuid]
         def __init__(self,*args):pass
         def __enter__(self):return self
         def __exit__(self,*args):pass
-        def validate(self):return {'status':'complete','began_wall_ns':0,'ended_wall_ns':10**20}
+        def boundary(self):pass
+        def validate(self,timed_windows=None):return {'status':'complete','began_wall_ns':0,'ended_wall_ns':10**20}
     monkeypatch.setattr(native_resources,'GPULease',Lease)
     monkeypatch.setattr(module,'make_plan',lambda args:p)
     monkeypatch.setattr(module,'verify_plan',lambda p:None)
@@ -156,6 +157,8 @@ def test_late_preservation_failure_removes_headline(tmp_path,monkeypatch):
     assert module.run(args)==1
     out=json.loads((tmp_path/'result.json').read_text())
     assert out['status']=='failed' and 'speedup_sum_ar_over_sd' not in out
+    # The run must get as far as the late identity check, not fail earlier.
+    assert len(calls)==2 and 'late checkpoint identity failure' in out['error']
 
 
 
@@ -200,10 +203,69 @@ def test_vllm_config_mutation_does_not_corrupt_raw_constructor_snapshot(tmp_path
     monkeypatch.setattr(runtime,'worker_metadata',lambda *a:{'CPU_fake_API_only':True})
     monkeypatch.setattr(runtime,'metrics',lambda llm:None)
     monkeypatch.setattr(runtime.importlib.metadata,'version',lambda name:'0.22.1')
-    monkeypatch.setattr(runtime,'request',lambda llm,processor,params,torch,Image,s,t,r:
+    monkeypatch.setattr(runtime,'request',lambda llm,processor,params,torch,Image,s,t,r,plan:
         dict(id=s['id'],turn=t,prompt_token_ids=r[s['id'],t]['prompt_token_ids'],tokens=[3],text='a',status='complete'))
     monkeypatch.setenv('VELADRAFT_NATIVE_PLAN_SHA256',native().digest(file));monkeypatch.setenv('VELADRAFT_NATIVE_ARM','sd')
     monkeypatch.setattr(sys,'argv',['native_runtime','--plan',str(file),'--stage','sd_r0','--directory',str(tmp_path)])
     assert runtime.main()==0
     out=json.loads((tmp_path/'sd_r0.json').read_text())
     assert out['status']=='complete' and out['engine_args']==native().engine_args(p,'sd')
+
+
+def test_tensor_parallel_lane_sets_target_and_draft_tp():
+    p=plan();p['tensor_parallel_size']=2
+    kwargs=native().engine_args(p,'sd')
+    assert kwargs['tensor_parallel_size']==2 and kwargs['speculative_config']['draft_tensor_parallel_size']==2
+    assert native().engine_args(p,'ar')['tensor_parallel_size']==2
+
+
+def test_gpu_list_resolution():
+    from types import SimpleNamespace
+    mod=native()
+    assert mod.resolve_gpus(SimpleNamespace(gpu=3))==[3]
+    assert mod.resolve_gpus(SimpleNamespace(gpu=0,gpus='4,5'))==[4,5]
+    for bad in ('1,1','0,1,2'):
+        with pytest.raises(ValueError):mod.resolve_gpus(SimpleNamespace(gpu=0,gpus=bad))
+
+
+def test_stop_ids_come_from_target_generation_config(tmp_path):
+    (tmp_path/'generation_config.json').write_text(json.dumps({'eos_token_id':[248046,248044]}))
+    assert native().target_stop_token_ids(tmp_path)==[248046,248044]
+    (tmp_path/'generation_config.json').write_text(json.dumps({'eos_token_id':151645}))
+    assert native().target_stop_token_ids(tmp_path)==[151645]
+    (tmp_path/'generation_config.json').write_text(json.dumps({}))
+    with pytest.raises(ValueError):native().target_stop_token_ids(tmp_path)
+
+
+def test_system_prompt_is_first_message_and_image_stays_on_first_user_turn():
+    from vlm_dflash.eval.native_runtime import messages_for
+    session=dict(id='a',questions=['q0','q1'])
+    reference={('a',0):dict(text='a0')}
+    messages=messages_for(session,1,reference,'sys')
+    assert [m['role'] for m in messages]==['system','user','assistant','user']
+    assert messages[1]['content'][0]=={'type':'image'} and messages[3]['content']==[{'type':'text','text':'q1'}]
+    assert [m['role'] for m in messages_for(session,0,reference)]==['user']
+
+
+def test_worker_metadata_requires_every_tensor_parallel_rank():
+    from vlm_dflash.eval import native_runtime as runtime
+    rank=dict(numeric={},attention=[dict(name='language_model.model.layers.3.self_attn.attn',impl='x.FlashAttentionImpl'),
+                                     dict(name='model.layers.40.self_attn.attn',impl='x.FlashAttentionImpl')],
+              speculative_tokens=7,draft_noncausal=True,target_noncausal=False,diagnostic_hooks=False)
+    class LLM:
+        def __init__(self,values):self.values=values
+        def collective_rpc(self,*a,**k):return self.values
+    p=plan();p.update(method='dflash',tensor_parallel_size=2)
+    assert runtime.worker_metadata(LLM([rank,copy.deepcopy(rank)]),'sd',p)['ranks']==2
+    with pytest.raises(ValueError,match='worker count'):runtime.worker_metadata(LLM([rank]),'sd',p)
+    other=copy.deepcopy(rank);other['numeric']={'bf16_reduced':True}
+    with pytest.raises(ValueError,match='different'):runtime.worker_metadata(LLM([rank,other]),'sd',p)
+
+
+def test_sd_graph_mode_defaults_to_piecewise_and_admits_native_full():
+    p=plan()
+    assert native().engine_args(p,'sd')['compilation_config']['cudagraph_mode']=='PIECEWISE'
+    p['sd_cudagraph_mode']='FULL_AND_PIECEWISE'
+    config=native().engine_args(p,'sd')['compilation_config']
+    assert config['cudagraph_mode']=='FULL_AND_PIECEWISE' and config['cudagraph_capture_sizes']==[8]
+    assert 'compilation_config' not in native().engine_args(p,'ar')

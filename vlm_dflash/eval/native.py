@@ -55,7 +55,8 @@ def stage_order(repeats):
 
 def engine_args(plan,arm):
     if arm not in ('ar','sd'):raise ValueError('Unknown native arm')
-    args=dict(model=plan['target'],dtype='bfloat16',tensor_parallel_size=1,
+    tp=plan.get('tensor_parallel_size',1)
+    args=dict(model=plan['target'],dtype='bfloat16',tensor_parallel_size=tp,
         max_model_len=plan['max_model_len'],max_num_seqs=1,max_num_batched_tokens=4096,
         gpu_memory_utilization=plan['gpu_memory_utilization'],enable_prefix_caching=False,
         mm_processor_cache_gb=0,limit_mm_per_prompt={'image':1},enforce_eager=False,
@@ -64,10 +65,13 @@ def engine_args(plan,arm):
         worker_extension_cls='vlm_dflash.eval.native_runtime.WorkerMetadata')
     if arm=='sd':
         size=plan['speculative_tokens']+1
+        # PIECEWISE (default, the Qwen3-VL-8B protocol) or the engine-native FULL_AND_PIECEWISE
+        # for targets whose split ops make piecewise replay dominate the step (hybrid MoE).
+        graph=plan.get('sd_cudagraph_mode','PIECEWISE')
         args.update(block_size=16,attention_config={'backend':'FLASH_ATTN'},
-            compilation_config=dict(mode=3,cudagraph_mode='PIECEWISE',cudagraph_capture_sizes=[size],max_cudagraph_capture_size=size),
+            compilation_config=dict(mode=3,cudagraph_mode=graph,cudagraph_capture_sizes=[size],max_cudagraph_capture_size=size),
             speculative_config=dict(model=plan['draft'],method='dflash',num_speculative_tokens=plan['speculative_tokens'],
-                draft_tensor_parallel_size=1,attention_backend='FLASH_ATTN'))
+                draft_tensor_parallel_size=tp,attention_backend='FLASH_ATTN'))
         if plan.get('method','dflash') in ('dspark','domino','dflash2','dflare','dfly'):
             args['speculative_config']['use_local_argmax_reduction']=False
     return args
@@ -92,7 +96,10 @@ def load_sessions(source,images_dir,count):
                 questions.append(question)
         if not questions:raise ValueError('No human question')
         image=(Path(images_dir)/row['images'][0]).resolve()
-        sessions.append(dict(id=sid,questions=questions,image=str(image),image_sha256=digest(image)))
+        session=dict(id=sid,questions=questions,image=str(image),image_sha256=digest(image))
+        for field in ('topic','category'):
+            if field in row:session[field]=row[field]
+        sessions.append(session)
     return sessions
 
 
@@ -181,8 +188,15 @@ def make_plan(args):
     if args.speculative_tokens<1 or args.max_new_tokens<1 or args.repeats<1:raise ValueError('Budgets/repeats must be positive')
     if args.max_model_len<args.max_new_tokens or not 0<args.gpu_memory_utilization<1:raise ValueError('Invalid context/memory budget')
     if not 0<args.min_pixels<=args.max_pixels:raise ValueError('Invalid image pixel bounds')
-    plan={k:getattr(args,k) for k in ('speculative_tokens','max_new_tokens','max_model_len','gpu_memory_utilization','min_pixels','max_pixels','repeats','method','gpu')}
-    plan.update(format=FORMAT,seed=43,stop_token_ids=[151645,151643],target=str(Path(args.target).resolve()),draft=str(Path(args.draft).resolve()),adapter=None,files={})
+    plan={k:getattr(args,k) for k in ('speculative_tokens','max_new_tokens','max_model_len','gpu_memory_utilization','min_pixels','max_pixels','repeats','method')}
+    plan['sd_cudagraph_mode']=getattr(args,'sd_cudagraph_mode','PIECEWISE')
+    gpus=resolve_gpus(args)
+    template_kwargs=json.loads(args.chat_template_kwargs)
+    if not isinstance(template_kwargs,dict):raise ValueError('--chat-template-kwargs must be a JSON object')
+    plan.update(format=FORMAT,seed=43,gpu=gpus[0],gpus=gpus,tensor_parallel_size=len(gpus),
+                target=str(Path(args.target).resolve()),draft=str(Path(args.draft).resolve()),adapter=None,files={},
+                chat_template_kwargs=template_kwargs,system_prompt=args.system_prompt)
+    plan['stop_token_ids']=target_stop_token_ids(plan['target'])
     plan['source_integrity_policy']='SHA256 on first observation or file metadata change; inode/size/mtime/ctime keyed cache' if os.environ.get('QWEN8B_DIGEST_CACHE') else 'full SHA256 on every observation'
     for directory in (plan['target'],plan['draft']):
         if not Path(directory).is_dir():raise ValueError('Prepared local model directory required: '+directory)
@@ -220,11 +234,33 @@ def make_plan(args):
     return plan
 
 
+def resolve_gpus(args):
+    value=getattr(args,'gpus',None)
+    gpus=[int(v) for v in value.split(',')] if value else [args.gpu]
+    if len(set(gpus))!=len(gpus) or any(g<0 for g in gpus):raise ValueError('GPU indices must be distinct and non-negative')
+    if len(gpus) not in (1,2,4,8):raise ValueError('Tensor parallel size must be 1, 2, 4 or 8')
+    return gpus
+
+
+def target_stop_token_ids(target):
+    """The target's own generation_config EOS ids (e.g. Qwen3-VL [151645,151643])."""
+    config=json.loads((Path(target)/'generation_config.json').read_text())
+    ids=config.get('eos_token_id')
+    ids=[ids] if isinstance(ids,int) else ids
+    if not ids or any(type(i) is not int for i in ids):raise ValueError('Target generation_config lacks integer eos_token_id')
+    return ids
+
+
 def add_arguments(parser):
     for name in ('target','draft','source','out'):parser.add_argument('--'+name,required=True)
     parser.add_argument('--images-dir');parser.add_argument('--runtime-manifest')
     parser.add_argument('--method',choices=METHODS,default='dflash')
     parser.add_argument('--gpu',type=int,default=0);parser.add_argument('--num-prompts',type=int,default=32)
+    parser.add_argument('--gpus',help='comma-separated GPU indices; tensor parallel size = count (overrides --gpu)')
+    parser.add_argument('--chat-template-kwargs',default='{}',help='JSON object passed to apply_chat_template, e.g. {"enable_thinking": false}')
+    parser.add_argument('--system-prompt',help='optional system message prepended to every request')
+    parser.add_argument('--sd-cudagraph-mode',choices=('PIECEWISE','FULL_AND_PIECEWISE'),default='PIECEWISE',
+                        help='SD engine graph mode; the draft graph policy belongs to the runtime manifest')
     parser.add_argument('--max-new-tokens',type=int,default=1024);parser.add_argument('--speculative-tokens',type=int,default=7)
     parser.add_argument('--repeats',type=int,default=3);parser.add_argument('--max-model-len',type=int,default=8192)
     parser.add_argument('--gpu-memory-utilization',type=float,default=.45)
@@ -245,13 +281,14 @@ def run(args):
     result=dict(format=FORMAT,status='failed',paper_ready=False,quality_evaluation_required=True,evidence=str(evidence))
     try:
         # Reserve before expensive hashing so coordinated jobs see the lease immediately.
-        with GPULease(args.gpu,evidence/'resources.jsonl') as lease:
+        with GPULease(resolve_gpus(args),evidence/'resources.jsonl') as lease:
             plan=make_plan(args)
             verify_preservation(plan)
-            plan['gpu_uuid']=lease.uuid;save(evidence/'plan.json',plan)
+            uuids=getattr(lease,'uuids',None) or [lease.uuid]
+            plan['gpu_uuid']=lease.uuid;plan['gpu_uuids']=uuids;save(evidence/'plan.json',plan)
             plan_path=evidence/'plan.json';plan_sha=digest(plan_path)
             for stage in ('reference',*stage_order(args.repeats)):
-                env=dict(os.environ,CUDA_DEVICE_ORDER='PCI_BUS_ID',CUDA_VISIBLE_DEVICES=str(args.gpu),
+                env=dict(os.environ,CUDA_DEVICE_ORDER='PCI_BUS_ID',CUDA_VISIBLE_DEVICES=','.join(map(str,plan['gpus'])),
                     VELADRAFT_NATIVE_PLAN=str(plan_path),VELADRAFT_NATIVE_PLAN_SHA256=plan_sha,
                     VELADRAFT_NATIVE_ARM='sd' if stage.startswith('sd') else 'ar',
                     VLLM_WORKER_MULTIPROC_METHOD='spawn',VLLM_BATCH_INVARIANT='0',HF_HUB_OFFLINE='1',TRANSFORMERS_OFFLINE='1',
@@ -263,8 +300,11 @@ def run(args):
                 with (evidence/(stage+'.log')).open('x') as log:
                     completed=subprocess.run(command,env=env,cwd=repo,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT)
                 if completed.returncode:raise ValueError('Native stage failed: '+stage+'; preserved raw/logs')
-        resources=lease.validate();verify_plan(plan)
+                if hasattr(lease,'boundary'):lease.boundary()
         reference=json.loads((evidence/'reference.json').read_text());reports=[json.loads((evidence/(s+'.json')).read_text()) for s in stage_order(args.repeats)]
+        windows=[(min(r['began_wall_ns'] for r in rows),max(r['ended_wall_ns'] for r in rows))
+                 for rows in ([r for r in report['rows'] if r.get('phase')=='timed'] for report in reports) if rows]
+        resources=lease.validate(timed_windows=windows);verify_plan(plan)
         if reference['status']!='complete':raise ValueError('Canonical creator failed')
         for report in (reference,*reports):
             for row in report['rows']:
@@ -279,7 +319,7 @@ def run(args):
                 if field=='numeric_parent':
                     if actual!=expected:raise ValueError('Numerical parent configuration differs from native AR')
                 elif actual['numeric']!=expected['numeric']:raise ValueError('Worker numerical flags differ from native AR')
-            if report['gpu_uuid']!=lease.uuid:raise ValueError('Actual CUDA GPU differs from resource lease')
+            if report.get('gpu_uuids',[report.get('gpu_uuid')])!=uuids:raise ValueError('Actual CUDA GPUs differ from resource lease')
         result=summarize(plan,reference['rows'],reports);result.update(evidence=str(evidence),resource_evidence=resources,
             scope='steady-state batch1 image/RGB/template/prefill/decode/output E2E; startup and full warmup excluded',
             method=args.method,implementation_scope=(plan.get('adapter') or {}).get('scope','prepared stock DFlash'),

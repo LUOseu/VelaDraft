@@ -81,11 +81,82 @@ def test_lease_lock_released_even_if_watcher_join_interrupted(resources, tmp_pat
             raise KeyboardInterrupt('interrupted while joining watcher')
     lock_path = tmp_path/'lease.lock'
     lease = resources.GPULease(0, tmp_path/'gpu.jsonl')
-    lease.lock = lock_path.open('a')
-    resources.fcntl.flock(lease.lock, resources.fcntl.LOCK_EX | resources.fcntl.LOCK_NB)
+    lease.locks = [lock_path.open('a')]
+    resources.fcntl.flock(lease.locks[0], resources.fcntl.LOCK_EX | resources.fcntl.LOCK_NB)
     lease.thread = InterruptedThread()
     with pytest.raises(KeyboardInterrupt):
         lease.__exit__(None, None, None)
-    assert lease.lock.closed
+    assert lease.locks[0].closed
     with lock_path.open('a') as other:
         resources.fcntl.flock(other, resources.fcntl.LOCK_EX | resources.fcntl.LOCK_NB)
+
+
+def test_count_ownership_requires_empty_boundaries_and_bounded_apps(resources, tmp_path, monkeypatch):
+    monkeypatch.setenv('VELADRAFT_GPU_OWNERSHIP', 'count')
+    monkeypatch.setenv('VELADRAFT_GPU_MAX_OWN_APPS', '2')
+    seen = {'GPU-a': '', 'GPU-b': ''}
+    monkeypatch.setattr(resources, 'query',
+                        lambda *args: '1234' if '--query-gpu=memory.used' in args else seen[args[1]])
+    lease = resources.GPULease([0, 1], tmp_path/'gpu.jsonl')
+    lease.uuids = ['GPU-a', 'GPU-b']; lease.uuid = 'GPU-a'
+    lease.sample('start')
+    seen.update({'GPU-a': '900001\n900002', 'GPU-b': '900003'})
+    lease.sample('sample')
+    seen.update({'GPU-a': '', 'GPU-b': ''})
+    lease.boundary(timeout=0)
+    lease.sample('end')
+    result = lease.validate()
+    assert result['ownership_mode'] == 'count' and result['gpu_uuids'] == ['GPU-a', 'GPU-b']
+    assert result['peak_memory_used_mib'] == {'GPU-a': 1234, 'GPU-b': 1234}
+    seen.update({'GPU-a': '900001\n900002\n900009'})
+    lease.sample('sample')
+    with pytest.raises(ValueError, match='count ownership'):
+        lease.validate()
+
+
+def test_count_ownership_bounds_non_client_gpus_to_one_worker(resources, tmp_path, monkeypatch):
+    monkeypatch.setenv('VELADRAFT_GPU_OWNERSHIP', 'count')
+    monkeypatch.setenv('VELADRAFT_GPU_MAX_OWN_APPS', '2')
+    seen = {'GPU-a': '', 'GPU-b': ''}
+    monkeypatch.setattr(resources, 'query',
+                        lambda *args: '10' if '--query-gpu=memory.used' in args else seen[args[1]])
+    lease = resources.GPULease([0, 1], tmp_path/'gpu.jsonl')
+    lease.uuids = ['GPU-a', 'GPU-b']; lease.uuid = 'GPU-a'
+    lease.sample('start')
+    # Client context + rank 0 on the first GPU, rank 1 plus a foreign app on the second.
+    seen.update({'GPU-a': '1\n2', 'GPU-b': '3\n4'})
+    assert lease.sample('sample')['over_bound'] == ['GPU-b']
+    seen.update({'GPU-a': '', 'GPU-b': ''})
+    lease.sample('end')
+    with pytest.raises(ValueError, match='count ownership'):
+        lease.validate()
+
+
+def test_count_ownership_flags_process_left_at_stage_boundary(resources, tmp_path, monkeypatch):
+    monkeypatch.setenv('VELADRAFT_GPU_OWNERSHIP', 'count')
+    monkeypatch.setattr(resources, 'query', lambda *args: '777')
+    lease = resources.GPULease(0, tmp_path/'gpu.jsonl')
+    lease.uuids = ['GPU-a']; lease.uuid = 'GPU-a'
+    lease.boundary(timeout=0)
+    assert lease.rows[-1]['phase'] == 'boundary' and lease.rows[-1]['over_bound'] == ['GPU-a']
+
+
+def test_count_ownership_tolerates_extra_apps_outside_timed_windows(resources, tmp_path, monkeypatch):
+    monkeypatch.setenv('VELADRAFT_GPU_OWNERSHIP', 'count')
+    monkeypatch.setenv('VELADRAFT_GPU_MAX_OWN_APPS', '1')
+    seen = {'GPU-a': ''}
+    monkeypatch.setattr(resources, 'query',
+                        lambda *args: '10' if '--query-gpu=memory.used' in args else seen[args[1]])
+    lease = resources.GPULease(0, tmp_path/'gpu.jsonl')
+    lease.uuids = ['GPU-a']; lease.uuid = 'GPU-a'
+    lease.sample('start')
+    seen['GPU-a'] = '1\n2'
+    loading = lease.sample('sample')
+    seen['GPU-a'] = '1'
+    timed = lease.sample('sample')
+    seen['GPU-a'] = ''
+    lease.sample('end')
+    window = [(timed['began_wall_ns'], timed['ended_wall_ns'])]
+    assert lease.validate(timed_windows=window)['extra_app_samples_outside_timed'] == 1
+    with pytest.raises(ValueError, match='count ownership'):
+        lease.validate(timed_windows=[(loading['began_wall_ns'], loading['ended_wall_ns'])])
