@@ -2,21 +2,19 @@
 
 ## v0.3.2 (in development)
 
-### Native evaluation: tensor-parallel lanes and Qwen3.6-35B-A3B methods
+### Training: systems instrumentation and DFlash2 execution switches
 
-- `native-eval` runs tensor-parallel lanes (`--gpus 0,1`), takes the target's
-  stop ids from its generation config, and records `--chat-template-kwargs`,
-  `--system-prompt` and `--sd-cudagraph-mode` in the plan. The GPU lease spans
-  every lane GPU; in a PID-namespaced container (`VELADRAFT_GPU_OWNERSHIP=count`)
-  it bounds compute apps per GPU, drains each stage boundary and invalidates a
-  run only for extra apps inside timed windows. Every TP rank's worker metadata
-  is checked, and stats-enabled runs record per-request spec-decode counters.
-- `research/qwen36_native_vllm/` mounts the trained Qwen3.6-35B-A3B DFlash,
-  DFly, DFlare, JetSpec, DFlash2, DSpark and Domino drafts on vLLM 0.22.1 with
-  CPU parity tests against the training code;
-  `research/qwen36_native_vllm/FROZEN_CONFIG.md` records the
-  MMSpec protocol and its one deviation from the Qwen3-VL-8B protocol (SD target
-  graph mode).
+- DFlash2 gains opt-in execution switches (`dflash2_teacher_projection_reuse`,
+  `dflash2_scoring_row_compaction`, `dflash2_fused_teacher_kl`), all off by
+  default.
+- The training loop gains timing windows and segments, full-state snapshots,
+  `stop_at_step`, state forks (including a micro-batch change), feature record
+  and replay for a drafter-only timing scope, dev/test objective validation,
+  workload counters and an optional final-state write. An exact resume trims
+  timing records past the checkpoint like the train log.
+- Online capture accepts tokenizer non-roundtrip splits whose text is identical.
+- `scripts/q3vl8b_trainopt/` holds the Qwen3-VL-8B training-systems campaign
+  (configs, job lists, GPU-slot scheduler, numerical check, status and tables).
 
 ### Capture: multi-turn turn spans for trailing-assistant templates
 

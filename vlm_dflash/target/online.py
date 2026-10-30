@@ -654,6 +654,24 @@ class OnlineFeatureSource:
         entry["wall_seconds"] += elapsed
         return records
 
+    def extract_rows(self, rows: list[dict], media_dir) -> list[dict]:
+        """Records for rows outside the training set (validation), one target forward per row.
+
+        Same rendering, forward and normalization as a training item at
+        ``online_batch_size=1``; the time is charged to the current phase.
+        """
+        records = []
+        for row in rows:
+            self._sync_target()
+            started = time.perf_counter()
+            prepared = prepare_sample_record(self.processor, row, Path(media_dir), seq_length=self.seq_length)
+            record = self.extract_prepared([prepared])[0]
+            entry = self._stats_entry()
+            entry["external_rows"] = int(entry.get("external_rows", 0)) + 1
+            entry["external_seconds"] = float(entry.get("external_seconds", 0.0)) + time.perf_counter() - started
+            records.append(OnlineFeatureDataset._normalize(record))
+        return records
+
     # -- bounded record cache ------------------------------------------------
     def cache_enabled(self) -> bool:
         """True when ``train.online_feature_cache_gb`` is set above zero."""

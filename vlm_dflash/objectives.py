@@ -849,7 +849,9 @@ class TeacherLogitsStream:
         *,
         first_slot: int,
         sample_index: torch.Tensor | None = None,
+        counter=None,
     ) -> None:
+        self._counter = counter
         bsz, nblocks, block_size = label_indices.shape
         slots = int(block_size) - int(first_slot)
         if slots < 1:
@@ -892,6 +894,9 @@ class TeacherLogitsStream:
         stop = max(start, min(int(row_stop), self.num_rows))
         index = self._batch[start:stop] * self.seq_len + self._positions[start:stop]
         rows = self._hidden[index]
+        if self._counter is not None:
+            # Projections replayed by an activation-checkpoint recompute count too.
+            self._counter(teacher_head_calls=1, teacher_head_rows=stop - start)
         with torch.no_grad():
             return self._lm_head(rows)
 

@@ -42,7 +42,14 @@ from ..data.sharegpt import (
 from ..provenance import identity_from_contract, record_stage
 from ..utils import ensure_dir, log, sha256_text, write_json, write_jsonl
 from .load import load_target
-from .prompts import encode_prompt, messages_from_row, render_conversation, render_prompt
+from .prompts import (
+    encode_prompt,
+    messages_from_row,
+    multimodal_token_ids,
+    render_conversation,
+    render_prompt,
+    same_text_render,
+)
 
 _HUMAN_ROLES = ("human", "user")
 _GPT_ROLES = ("gpt", "assistant", "model")
@@ -164,11 +171,13 @@ def _assistant_turn_indices(conversations: list[dict], sample_id) -> list[int]:
 
 
 def _verify_full_render(processor, row: dict, images: list, full_ids: list[int], overrides: dict[int, str]) -> None:
-    """Assert ``full_ids`` is exactly one full-conversation chat-template render.
+    """Assert ``full_ids`` is one full-conversation chat-template render.
 
-    Any prefix mismatch is chat-template drift and fails loud; non-empty
-    trailing text after ``full_ids`` is refused so a stored sequence can never
-    silently drop part of the conversation.
+    A token prefix mismatch whose decoded text is identical is a tokenizer
+    non-roundtrip split of a generated answer (see ``same_text_render``) and is
+    accepted; any other mismatch is chat-template drift and fails loud.
+    Non-empty trailing text after ``full_ids`` is refused so a stored sequence
+    can never silently drop part of the conversation.
     """
     full_messages, full_image_indices = messages_from_row(row, assistant_overrides=overrides)
     full_text = render_conversation(processor, full_messages, add_generation_prompt=False)
@@ -177,6 +186,10 @@ def _verify_full_render(processor, row: dict, images: list, full_ids: list[int],
     )
     rendered = full_inputs["input_ids"][0].tolist()
     if rendered[: len(full_ids)] != full_ids:
+        if same_text_render(
+            processor.tokenizer, full_ids, rendered, protected_ids=multimodal_token_ids(processor, full_inputs)
+        ):
+            return
         raise RuntimeError(
             f"Multi-turn full-render drift for sample {row.get('id')}: the incremental token ids do not "
             "match one apply_chat_template render of the whole conversation; refusing to store them."

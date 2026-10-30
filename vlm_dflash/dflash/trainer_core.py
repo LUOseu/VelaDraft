@@ -303,6 +303,11 @@ class DFlashTrainerModule(nn.Module):
         # the concatenation of the layers this module consumes.
         self.capture_layer_ids: list[int] | None = None
         self.capture_hidden_size: int | None = None
+        # Per-forward workload counters (rows allocated / kept / scored, head
+        # projection calls and rows). Read by the training loop after the
+        # backward, so projections recomputed under activation checkpointing
+        # are counted too.
+        self.last_workload: dict = {}
 
         # Block-wise decay-weighted CE for the fixed-anchor objective.
         # ``normalize="mean"`` gives a local per-micro-batch decay-weighted mean;
@@ -321,6 +326,22 @@ class DFlashTrainerModule(nn.Module):
 
         # Per-block offset constant (block_size,) for label gathering / position ids.
         self.register_buffer("_block_offsets", torch.arange(block_size).view(1, 1, -1), persistent=False)
+
+    def _count(self, **counts) -> None:
+        """Add to this forward's workload counters."""
+        for key, value in counts.items():
+            self.last_workload[key] = self.last_workload.get(key, 0) + int(value)
+
+    def _defer_student_head(self) -> bool:
+        """True when the algorithm projects its own (compacted) student rows."""
+        return False
+
+    def execution_switches(self) -> dict:
+        """Execution-only switches in effect (they never change the objective)."""
+        return {
+            "recipe_row_compaction": bool(self.recipe_row_compaction),
+            "recipe_compile_tv_kl": bool(self.recipe_compile_tv_kl),
+        }
 
     # ------------------------------------------------------------------ #
     # feature layout
@@ -1021,6 +1042,17 @@ class DFlashTrainerModule(nn.Module):
             block_mask = block_mask * sample_weights.to(
                 device=block_mask.device, dtype=block_mask.dtype
             ).view(-1, 1, 1)
+        blocks_per_sample = block_keep_mask.sum(dim=1)
+        self.last_workload = {
+            "microbatches": 1,
+            "samples": bsz,
+            "allocated_blocks": bsz * n,
+            "kept_blocks": int(blocks_per_sample.sum()),
+            "max_sample_blocks": int(blocks_per_sample.max()),
+            "allocated_rows": bsz * n * bs,
+            "kept_rows": int(blocks_per_sample.sum()) * bs,
+            "effective_positions": int((block_mask[:, :, self.first_supervised_slot :] > 0).sum()),
+        }
 
         output_hidden = self.draft_model(
             position_ids=full_position_ids,
@@ -1065,10 +1097,15 @@ class DFlashTrainerModule(nn.Module):
             # A tensor-parallel target's lm_head is column-parallel and returns
             # vocab-sharded (DTensor) logits; gather to a full tensor for the loss.
             logits = _to_full_tensor(self.lm_head(kept_hidden.reshape(-1, kept_hidden.size(-1))))
+            self._count(student_head_calls=1, student_head_rows=int(kept_hidden.shape[0]))
+        elif self._defer_student_head():
+            # The algorithm seam projects its own (compacted) rows.
+            logits = None
         else:
             # A tensor-parallel target's lm_head is column-parallel and returns
             # vocab-sharded (DTensor) logits; gather to a full tensor for the loss.
             logits = _to_full_tensor(self.lm_head(output_hidden))
+            self._count(student_head_calls=1, student_head_rows=bsz * n * bs)
 
         # Algorithm seam: logit correction (e.g. DSpark's Markov bias) plus any
         # auxiliary objective (e.g. the DSpark confidence BCE). The base DFlash
@@ -1163,6 +1200,7 @@ class DFlashTrainerModule(nn.Module):
         pred_logits = logits.view(bsz, n, bs, -1)[:, :, first:, :].reshape(bsz, n * slots, -1)
         pred_targets = target_ids[:, :, first:].reshape(bsz, n * slots)
         pred_mask = block_mask[:, :, first:].reshape(bsz, n * slots)
+        self._count(scored_rows=bsz * n * slots)
 
         loss_fn = self.loss_fn
         assert loss_fn is not None, "loss_fn is always constructed for loss_type='dflash'"
@@ -1227,6 +1265,7 @@ class DFlashTrainerModule(nn.Module):
                     label_indices,
                     first_slot=first,
                     sample_index=teacher_sample_index,
+                    counter=self._count,
                 ).logits
             # A confidence-head stage receives its per-slot logits from the
             # algorithm seam (DSpark's ``_apply_algorithm_terms``); the analytic

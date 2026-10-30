@@ -69,6 +69,10 @@ def build_trainer_module(draft_config, contract: dict, cfg: dict, embed_weight, 
     from .trainer import DFlash2TrainerModule
 
     dflash2 = resolve_dflash2_config(cfg)
+    # Execution-only switches live under ``drafter`` (like recipe_row_compaction),
+    # outside the training-plan digest: Reference and Optimized arms of one
+    # plan resume from the same state.
+    drafter = cfg.get("drafter") or {}
     return build_dflash_trainer_module(
         draft_config,
         contract,
@@ -83,6 +87,9 @@ def build_trainer_module(draft_config, contract: dict, cfg: dict, embed_weight, 
             "sample_from_anchor": False,
             "selector_loss_alpha": float(dflash2["selector_loss_alpha"]),
             "kd_chunk_size": int(dflash2["kd_chunk_size"]),
+            "teacher_projection_reuse": bool(drafter.get("dflash2_teacher_projection_reuse", False)),
+            "scoring_row_compaction": bool(drafter.get("dflash2_scoring_row_compaction", False)),
+            "fused_teacher_kl": bool(drafter.get("dflash2_fused_teacher_kl", False)),
         },
     )
 

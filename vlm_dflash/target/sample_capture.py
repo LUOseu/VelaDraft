@@ -23,7 +23,7 @@ import torch
 from PIL import Image
 
 from ..data.sharegpt import row_image_path, row_image_paths, row_is_multi_turn, row_question
-from .prompts import encode_conversation, encode_prompt, messages_from_row
+from .prompts import encode_conversation, encode_prompt, messages_from_row, multimodal_token_ids, same_text_render
 
 
 def storage_dtype(name: str) -> torch.dtype:
@@ -388,7 +388,12 @@ def _prepare_multi_turn(
     inputs = encode_conversation(processor, messages, [all_images[position] for position in image_indices], add_generation_prompt=False)
     stored_full_ids = [int(token) for token in regen["full_ids"]]
     fresh_prompt = inputs["input_ids"][0].tolist()
-    if fresh_prompt[: len(stored_full_ids)] != stored_full_ids:
+    # The stored ids are what the target was teacher-forced on; a fresh render
+    # may split the regenerated answer text differently (tokenizers do not
+    # roundtrip token ids). Same decoded text is accepted, changed text is drift.
+    if fresh_prompt[: len(stored_full_ids)] != stored_full_ids and not same_text_render(
+        processor.tokenizer, stored_full_ids, fresh_prompt, protected_ids=multimodal_token_ids(processor, inputs)
+    ):
         raise RuntimeError(
             f"Prompt token drift between regen and capture for sample {row.get('id')}: "
             "the chat template or processor changed between stages."
