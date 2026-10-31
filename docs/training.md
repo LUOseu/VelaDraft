@@ -133,3 +133,9 @@ writes `<run_dir>/eval/eval_result.json`; `export` writes
 `<run_dir>/export/` with weights, configs, contract, algorithm record,
 `model_card.md` and checksums. Reading the numbers: [../BENCHMARKS.md](../BENCHMARKS.md)
 and [verification-modes.md](verification-modes.md).
+
+## Scoring memory and repeated teacher work
+
+For opt-in chunked CE, frozen-head gradient precomputation, and bounded teacher
+projection reuse, see [memory-bounded scoring](training-scoring.md). These switches
+have different objective support and memory/time tradeoffs; defaults are unchanged.

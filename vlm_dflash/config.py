@@ -80,6 +80,33 @@ def validate_runtime_config(cfg: dict, *, require_devices: bool = False) -> None
     train = cfg.get("train") or {}
     target = cfg.get("target") or {}
     drafter = cfg.get("drafter") or {}
+    ce_chunk_size = int(drafter.get("ce_chunk_size", 0))
+    ce_backward = str(drafter.get("ce_backward", "checkpoint"))
+    if ce_backward not in {"checkpoint", "precompute"}:
+        raise ValueError("drafter.ce_backward must be 'checkpoint' or 'precompute'.")
+    if ce_backward == "precompute" and not ce_chunk_size:
+        raise ValueError("drafter.ce_backward=precompute requires drafter.ce_chunk_size > 0.")
+    if ce_chunk_size < 0:
+        raise ValueError("drafter.ce_chunk_size must be nonnegative (0 keeps dense scoring).")
+    if ce_chunk_size:
+        from .algorithms.registry import algorithm_name
+        from .objectives import resolve_recipe
+
+        name = algorithm_name(cfg.get("algorithm"))
+        recipe = resolve_recipe(cfg, name)
+        if name not in {"dflash", "dflare", "dfly"} or (recipe is not None and recipe.name != "controlled_ce"):
+            raise ValueError("drafter.ce_chunk_size supports only controlled CE on DFlash/DFlare/DFly.")
+    if bool(drafter.get("teacher_projection_dedup", False)):
+        from .algorithms.registry import algorithm_name
+        from .objectives import resolve_recipe
+
+        name = algorithm_name(cfg.get("algorithm"))
+        recipe = resolve_recipe(cfg, name)
+        if name not in {"dflash", "dflare", "dfly", "dspark"} or recipe is None or not recipe.needs_teacher:
+            raise ValueError(
+                "drafter.teacher_projection_dedup requires upstream_two_stage on "
+                "DFlash/DFlare/DFly or upstream_dspark on DSpark."
+            )
     train_device = train.get("device", "cuda:0")
     target_device = target.get("device")
     for label, value in (("train.device", train_device), ("target.device", target_device)):

@@ -1,0 +1,331 @@
+{
+  "scope": "synthetic_shape_full_update_probe_not_convergence_or_pipeline_E2E",
+  "measurement_context": "shared_host_and_GPU; absolute timings are provisional",
+  "config": {
+    "device": "cuda:3",
+    "dtype": "bfloat16",
+    "optimization": "ce",
+    "ce_chunk_size": 64,
+    "compile_tv_kl": false,
+    "hidden": 2048,
+    "vocab": 151936,
+    "anchors": 128,
+    "block_size": 8,
+    "sequence": 512,
+    "layers": 1,
+    "strides": [
+      1
+    ],
+    "stages": [
+      0
+    ],
+    "warmup": 2,
+    "repeats": 6,
+    "inner": 2,
+    "seed": 731,
+    "memory_fraction": 0.2,
+    "out": "results/a6000_bf16_ce.json"
+  },
+  "torch": "2.10.0+cu128",
+  "python": "3.11.16",
+  "source_sha256": {
+    "scripts/benchmark_teacher_projection.py": "133bc45f2d9103340e28c5d9b81a14319f10ed88052303507279908f267fe19b",
+    "vlm_dflash/objectives.py": "5acc17bd51652d66a6289905ab234d4af5a5a731c4ea164aec06ea5c809f0a1c",
+    "vlm_dflash/dflash/trainer_core.py": "8100c484e6ca2913532615b06597f32cc0fc278d375c3f4d7aeda4a864b232fa",
+    "vlm_dflash/dflash/chunked_ce.py": "93cbff8f3ebe1d63ecfd9eff5eddfef0305adff815a092942fdae719e95fcabc"
+  },
+  "gpu_before": "index, uuid, name, memory.used [MiB], memory.total [MiB], utilization.gpu [%]\n0, GPU-8e523700-a47f-04c3-fc33-0f06c59e7428, NVIDIA RTX A6000, 30003 MiB, 49140 MiB, 100 %\n1, GPU-864585d7-9789-e033-7781-e773f55178c6, NVIDIA RTX A6000, 39099 MiB, 49140 MiB, 100 %\n2, GPU-1d7c6b74-f5df-a297-6796-3986c3701ffa, NVIDIA RTX A6000, 33525 MiB, 49140 MiB, 4 %\n3, GPU-06d42c3b-89d2-20d5-8189-9b4564fec135, NVIDIA RTX A6000, 34933 MiB, 49140 MiB, 44 %\n",
+  "cases": [
+    {
+      "stride": 1,
+      "stage": 0,
+      "sequence": 512,
+      "parity": {
+        "reference_loss": 12.4375,
+        "repeat_loss": 12.4375,
+        "reuse_loss": 12.4375,
+        "repeat_gradient": {
+          "missing": [],
+          "extra": [],
+          "bad_shapes": [],
+          "complete_and_finite": true,
+          "parameter_count": 14,
+          "relative_l2": 4.7466368984243364e-07,
+          "max_absolute": 4.76837158203125e-07
+        },
+        "reuse_gradient": {
+          "missing": [],
+          "extra": [],
+          "bad_shapes": [],
+          "complete_and_finite": true,
+          "parameter_count": 14,
+          "relative_l2": 0.0089235907052553,
+          "max_absolute": 0.000247955322265625
+        },
+        "metric_counts_equal": true,
+        "passed": true
+      },
+      "raw": [
+        {
+          "pair": 0,
+          "reuse": false,
+          "seconds_per_update": 0.1833244413137436,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 1,
+            "student_head_rows": 1024,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 2286362624,
+          "peak_reserved_bytes": 2801795072
+        },
+        {
+          "pair": 0,
+          "reuse": true,
+          "seconds_per_update": 0.22785538155585527,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 28,
+            "student_head_rows": 1792,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 1661412352,
+          "peak_reserved_bytes": 2218786816
+        },
+        {
+          "pair": 1,
+          "reuse": true,
+          "seconds_per_update": 0.1172304805368185,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 28,
+            "student_head_rows": 1792,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 1661412352,
+          "peak_reserved_bytes": 2218786816
+        },
+        {
+          "pair": 1,
+          "reuse": false,
+          "seconds_per_update": 0.07145732920616865,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 1,
+            "student_head_rows": 1024,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 2286362624,
+          "peak_reserved_bytes": 2801795072
+        },
+        {
+          "pair": 2,
+          "reuse": false,
+          "seconds_per_update": 0.05958427581936121,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 1,
+            "student_head_rows": 1024,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 2286362624,
+          "peak_reserved_bytes": 2801795072
+        },
+        {
+          "pair": 2,
+          "reuse": true,
+          "seconds_per_update": 0.11843601427972317,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 28,
+            "student_head_rows": 1792,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 1661412352,
+          "peak_reserved_bytes": 2218786816
+        },
+        {
+          "pair": 3,
+          "reuse": true,
+          "seconds_per_update": 0.11533195525407791,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 28,
+            "student_head_rows": 1792,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 1661412352,
+          "peak_reserved_bytes": 2218786816
+        },
+        {
+          "pair": 3,
+          "reuse": false,
+          "seconds_per_update": 0.0764816077426076,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 1,
+            "student_head_rows": 1024,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 2286362624,
+          "peak_reserved_bytes": 2801795072
+        },
+        {
+          "pair": 4,
+          "reuse": false,
+          "seconds_per_update": 0.06544814351946115,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 1,
+            "student_head_rows": 1024,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 2286362624,
+          "peak_reserved_bytes": 2801795072
+        },
+        {
+          "pair": 4,
+          "reuse": true,
+          "seconds_per_update": 0.12000531610101461,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 28,
+            "student_head_rows": 1792,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 1661412352,
+          "peak_reserved_bytes": 2218786816
+        },
+        {
+          "pair": 5,
+          "reuse": true,
+          "seconds_per_update": 0.34094963502138853,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 28,
+            "student_head_rows": 1792,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 1661412352,
+          "peak_reserved_bytes": 2218786816
+        },
+        {
+          "pair": 5,
+          "reuse": false,
+          "seconds_per_update": 0.17293372470885515,
+          "loss": 12.4375,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 128,
+            "kept_blocks": 128,
+            "max_sample_blocks": 128,
+            "allocated_rows": 1024,
+            "kept_rows": 1024,
+            "effective_positions": 896,
+            "student_head_calls": 1,
+            "student_head_rows": 1024,
+            "scored_rows": 896
+          },
+          "peak_allocated_bytes": 2286362624,
+          "peak_reserved_bytes": 2801795072
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.07396946847438812,
+        "reuse": 0.11922066519036889
+      },
+      "ratio_of_medians": 0.6204416688690281
+    }
+  ],
+  "gpu_after": "index, uuid, name, memory.used [MiB], memory.total [MiB], utilization.gpu [%]\n0, GPU-8e523700-a47f-04c3-fc33-0f06c59e7428, NVIDIA RTX A6000, 29849 MiB, 49140 MiB, 100 %\n1, GPU-864585d7-9789-e033-7781-e773f55178c6, NVIDIA RTX A6000, 39099 MiB, 49140 MiB, 100 %\n2, GPU-1d7c6b74-f5df-a297-6796-3986c3701ffa, NVIDIA RTX A6000, 9397 MiB, 49140 MiB, 0 %\n3, GPU-06d42c3b-89d2-20d5-8189-9b4564fec135, NVIDIA RTX A6000, 36493 MiB, 49140 MiB, 53 %\n",
+  "complete": true
+}

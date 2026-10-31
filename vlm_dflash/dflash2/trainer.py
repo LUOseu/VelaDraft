@@ -103,6 +103,7 @@ class DFlash2TrainerModule(DFlashTrainerModule):
     """DFlash backbone trained with the experimental DFlash2 split objective."""
 
     causal_in_block = False
+    supports_chunked_ce = False
 
     def __init__(
         self,

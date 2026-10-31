@@ -50,6 +50,8 @@ class JetSpecTrainerModule(DFlashTrainerModule):
 
     causal_in_block = True
 
+    supports_chunked_ce = False
+
     def __init__(
         self,
         draft_model,

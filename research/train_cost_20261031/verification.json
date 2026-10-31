@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-31",
+  "base_commit": "9404b93",
+  "full_cpu_suite": {
+    "passed": 1008,
+    "skipped": 6,
+    "failed": 0,
+    "evidence": "full_cpu_tests.xml"
+  },
+  "focused_cpu_suite": {
+    "passed": 211,
+    "failed": 0,
+    "evidence": "cpu_tests.xml"
+  },
+  "npu_readiness_cpu_suite": {
+    "passed": 137,
+    "problems": []
+  },
+  "docs_check": {
+    "links": 241,
+    "paths": 387,
+    "cli_flags": 129,
+    "status": "passed",
+    "PYTHONPATH": "."
+  },
+  "hardware_evidence_check": {
+    "profiles": 17,
+    "raw_artifacts": 233,
+    "status": "VALID"
+  },
+  "support_matrix_check": "VALID",
+  "wheel_build": "passed",
+  "wheel_import_and_cli_parser": "passed",
+  "gpu_scope": "synthetic shape probes, shared GPU 3 and guarded-exclusive GPU 2, BF16",
+  "real_data_convergence": "not_run",
+  "fresh_dependency_wheel_install": "not_run",
+  "paused_existing_tasks": [],
+  "killed_existing_tasks": [],
+  "restoration_required": false
+}

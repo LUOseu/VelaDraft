@@ -850,8 +850,18 @@ class TeacherLogitsStream:
         first_slot: int,
         sample_index: torch.Tensor | None = None,
         counter=None,
+        projection_dedup: bool = False,
     ) -> None:
         self._counter = counter
+        self._projection_dedup = bool(projection_dedup)
+        if self._projection_dedup:
+            from torch.distributed.tensor import DTensor
+
+            # Reuse assumes a deterministic, row-local, frozen projection.
+            # TP/quantized/custom heads need their own execution validation.
+            if (type(lm_head) is not torch.nn.Linear
+                    or any(p.requires_grad or isinstance(p, DTensor) for p in lm_head.parameters())):
+                raise ValueError("teacher projection dedup requires a frozen, unsharded torch.nn.Linear head.")
         bsz, nblocks, block_size = label_indices.shape
         slots = int(block_size) - int(first_slot)
         if slots < 1:
@@ -893,12 +903,25 @@ class TeacherLogitsStream:
         start = max(0, min(int(row_start), self.num_rows))
         stop = max(start, min(int(row_stop), self.num_rows))
         index = self._batch[start:stop] * self.seq_len + self._positions[start:stop]
+        inverse = None
+        requested = stop - start
+        if self._projection_dedup and requested:
+            unique, restore = torch.unique(index, sorted=True, return_inverse=True)
+            # No expanded distribution is retained across chunks or steps.
+            # At low overlap this avoids an unnecessary gather/allocation.
+            if unique.numel() < index.numel():
+                index, inverse = unique, restore
+        projected = int(index.numel())
         rows = self._hidden[index]
         if self._counter is not None:
             # Projections replayed by an activation-checkpoint recompute count too.
-            self._counter(teacher_head_calls=1, teacher_head_rows=stop - start)
+            self._counter(
+                teacher_head_calls=1, teacher_head_rows=projected,
+                teacher_requested_rows=requested, teacher_reused_rows=requested - projected,
+            )
         with torch.no_grad():
-            return self._lm_head(rows)
+            logits = self._lm_head(rows)
+            return logits if inverse is None else logits[inverse]
 
     def full(self) -> torch.Tensor:
         """Materialize every row (``[B*n*S, V]``); for tests / small batches."""

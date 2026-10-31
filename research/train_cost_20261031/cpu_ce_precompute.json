@@ -1,0 +1,164 @@
+{
+  "scope": "synthetic_shape_full_update_probe_not_convergence_or_pipeline_E2E",
+  "measurement_context": "shared_host_and_GPU; absolute timings are provisional",
+  "config": {
+    "device": "cpu",
+    "dtype": "float32",
+    "optimization": "ce",
+    "ce_chunk_size": 7,
+    "ce_backward": "precompute",
+    "compile_tv_kl": false,
+    "hidden": 64,
+    "vocab": 256,
+    "anchors": 4,
+    "block_size": 8,
+    "sequence": 48,
+    "layers": 1,
+    "strides": [
+      1
+    ],
+    "stages": [
+      0
+    ],
+    "warmup": 1,
+    "repeats": 2,
+    "inner": 1,
+    "seed": 731,
+    "memory_fraction": 0.2,
+    "out": "research/train_cost_20261031/cpu_ce_precompute.json"
+  },
+  "torch": "2.10.0",
+  "python": "3.12.13",
+  "source_sha256": {
+    "scripts/benchmark_teacher_projection.py": "e69df5beb9ebd7249b97bf328c9225d25b787175cc3270b6093a4d9f1ace5461",
+    "vlm_dflash/objectives.py": "5acc17bd51652d66a6289905ab234d4af5a5a731c4ea164aec06ea5c809f0a1c",
+    "vlm_dflash/dflash/trainer_core.py": "1a73c2e4fcea25431a150bf5d554d46a781c7ce68f0006273642b1ad684c973b",
+    "vlm_dflash/dflash/chunked_ce.py": "6a97ee1a919cfed19e6fc3cd59c67fa294f8050694bf6b8ddd07562e628bb335"
+  },
+  "gpu_before": null,
+  "cases": [
+    {
+      "stride": 1,
+      "stage": 0,
+      "sequence": 48,
+      "parity": {
+        "reference_loss": 8.809142112731934,
+        "repeat_loss": 8.809142112731934,
+        "reuse_loss": 8.809142112731934,
+        "repeat_gradient": {
+          "missing": [],
+          "extra": [],
+          "bad_shapes": [],
+          "complete_and_finite": true,
+          "parameter_count": 14,
+          "relative_l2": 0.0,
+          "max_absolute": 0.0
+        },
+        "reuse_gradient": {
+          "missing": [],
+          "extra": [],
+          "bad_shapes": [],
+          "complete_and_finite": true,
+          "parameter_count": 14,
+          "relative_l2": 2.682153058884214e-07,
+          "max_absolute": 2.9802322387695312e-08
+        },
+        "metric_counts_equal": true,
+        "passed": true
+      },
+      "raw": [
+        {
+          "pair": 0,
+          "reuse": false,
+          "seconds_per_update": 0.0017772919964045286,
+          "loss": 8.809142112731934,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 0,
+          "reuse": true,
+          "seconds_per_update": 0.0023436670016963035,
+          "loss": 8.809142112731934,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 4,
+            "student_head_rows": 28,
+            "scored_rows": 28
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": true,
+          "seconds_per_update": 0.0024044159799814224,
+          "loss": 8.809142112731934,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 4,
+            "student_head_rows": 28,
+            "scored_rows": 28
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": false,
+          "seconds_per_update": 0.0018119999731425196,
+          "loss": 8.809142112731934,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.001794645984773524,
+        "reuse": 0.002374041490838863
+      },
+      "ratio_of_medians": 0.7559455012470694
+    }
+  ],
+  "gpu_after": null,
+  "complete": true
+}
