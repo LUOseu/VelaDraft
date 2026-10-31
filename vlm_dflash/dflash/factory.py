@@ -169,6 +169,9 @@ def build_trainer_module(
         # row-local scoring tail; an explicit false always disables.
         recipe_row_compaction=drafter.get("recipe_row_compaction"),
         recipe_compile_tv_kl=recipe_compile_tv_kl,
+        teacher_projection_dedup=bool(drafter.get("teacher_projection_dedup", False)),
+        ce_chunk_size=int(drafter.get("ce_chunk_size", 0)),
+        ce_backward=str(drafter.get("ce_backward", "checkpoint")),
         attention_chunk_size=int(drafter.get("attention_chunk_size", 128)),
         attention_memory_budget_gb=drafter.get("attention_memory_budget_gb"),
         npu_fusion_fallback=bool(drafter.get("npu_fusion_fallback", False)),

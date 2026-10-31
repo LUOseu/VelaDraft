@@ -43,6 +43,7 @@ class DSparkTrainerModule(DFlashTrainerModule):
     # training: zero overhead). Each entry is a detached CPU triple
     # ``(prob [B, S], accepted [B, S], mask [B, S])`` over supervised slots.
     calibration_sink: Optional[list] = None
+    supports_chunked_ce = False
 
     def __init__(
         self,

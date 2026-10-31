@@ -62,6 +62,8 @@ class DominoTrainerModule(DFlashTrainerModule):
             return self.draft_model._domino_gru_sequence(embeddings)
         return self.draft_model.prefix_gru(embeddings)[0]
 
+    supports_chunked_ce = False
+
     def __init__(
         self,
         draft_model,

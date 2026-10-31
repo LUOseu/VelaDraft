@@ -1,0 +1,556 @@
+{
+  "scope": "synthetic_shape_full_update_probe_not_convergence_or_pipeline_E2E",
+  "measurement_context": "shared_host_and_GPU; absolute timings are provisional",
+  "config": {
+    "device": "cpu",
+    "dtype": "float32",
+    "hidden": 64,
+    "vocab": 256,
+    "anchors": 4,
+    "block_size": 8,
+    "sequence": 48,
+    "layers": 1,
+    "strides": [
+      1,
+      8
+    ],
+    "stages": [
+      0,
+      1
+    ],
+    "warmup": 1,
+    "repeats": 2,
+    "inner": 1,
+    "seed": 731,
+    "memory_fraction": 0.2,
+    "out": "research/train_cost_20261031/cpu_probe.json"
+  },
+  "torch": "2.10.0",
+  "python": "3.12.13",
+  "source_sha256": {
+    "scripts/benchmark_teacher_projection.py": "39ead65002f5c5b7d6dc39b818d5372655028fcbf42ecd057100437b1338c5db",
+    "vlm_dflash/objectives.py": "5acc17bd51652d66a6289905ab234d4af5a5a731c4ea164aec06ea5c809f0a1c",
+    "vlm_dflash/dflash/trainer_core.py": "149fa8b9c64fa6d7da08dbf68efefc689c8bb9b6956f333fa6a92e91ed8232b3"
+  },
+  "gpu_before": null,
+  "cases": [
+    {
+      "stride": 1,
+      "stage": 0,
+      "sequence": 48,
+      "parity": {
+        "reference_loss": 3.1188831329345703,
+        "repeat_loss": 3.1188831329345703,
+        "reuse_loss": 3.1188831329345703,
+        "repeat_gradient": {
+          "relative_l2": 0.0,
+          "max_absolute": 0.0,
+          "parameter_count": 14
+        },
+        "reuse_gradient": {
+          "relative_l2": 0.0,
+          "max_absolute": 0.0,
+          "parameter_count": 14
+        },
+        "metric_counts_equal": true,
+        "passed": true
+      },
+      "raw": [
+        {
+          "pair": 0,
+          "reuse": false,
+          "seconds_per_update": 0.002449040999636054,
+          "loss": 3.1188831329345703,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 0,
+          "reuse": true,
+          "seconds_per_update": 0.002510249993065372,
+          "loss": 3.1188831329345703,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 20,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 36
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": true,
+          "seconds_per_update": 0.0024288329877890646,
+          "loss": 3.1188831329345703,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 20,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 36
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": false,
+          "seconds_per_update": 0.0024271660076919943,
+          "loss": 3.1188831329345703,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.002438103503664024,
+        "reuse": 0.0024695414904272184
+      },
+      "ratio_of_medians": 0.9872697069941694
+    },
+    {
+      "stride": 1,
+      "stage": 1,
+      "sequence": 48,
+      "parity": {
+        "reference_loss": 9.642744064331055,
+        "repeat_loss": 9.642744064331055,
+        "reuse_loss": 9.642744064331055,
+        "repeat_gradient": {
+          "relative_l2": 0.0,
+          "max_absolute": 0.0,
+          "parameter_count": 14
+        },
+        "reuse_gradient": {
+          "relative_l2": 0.0,
+          "max_absolute": 0.0,
+          "parameter_count": 14
+        },
+        "metric_counts_equal": true,
+        "passed": true
+      },
+      "raw": [
+        {
+          "pair": 0,
+          "reuse": false,
+          "seconds_per_update": 0.003053041989915073,
+          "loss": 9.642744064331055,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 0,
+          "reuse": true,
+          "seconds_per_update": 0.0023902920074760914,
+          "loss": 9.642744064331055,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 20,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 36
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": true,
+          "seconds_per_update": 0.0023817909823264927,
+          "loss": 9.642744064331055,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 20,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 36
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": false,
+          "seconds_per_update": 0.002426916005788371,
+          "loss": 9.642744064331055,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.002739978997851722,
+        "reuse": 0.002386041494901292
+      },
+      "ratio_of_medians": 1.1483366922606986
+    },
+    {
+      "stride": 8,
+      "stage": 0,
+      "sequence": 48,
+      "parity": {
+        "reference_loss": 3.1134722232818604,
+        "repeat_loss": 3.1134722232818604,
+        "reuse_loss": 3.1134722232818604,
+        "repeat_gradient": {
+          "relative_l2": 0.0,
+          "max_absolute": 0.0,
+          "parameter_count": 14
+        },
+        "reuse_gradient": {
+          "relative_l2": 0.0,
+          "max_absolute": 0.0,
+          "parameter_count": 14
+        },
+        "metric_counts_equal": true,
+        "passed": true
+      },
+      "raw": [
+        {
+          "pair": 0,
+          "reuse": false,
+          "seconds_per_update": 0.0030621249752584845,
+          "loss": 3.1134722232818604,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 0,
+          "reuse": true,
+          "seconds_per_update": 0.0031398330174852163,
+          "loss": 3.1134722232818604,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": true,
+          "seconds_per_update": 0.00307295800303109,
+          "loss": 3.1134722232818604,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": false,
+          "seconds_per_update": 0.0028131250001024455,
+          "loss": 3.1134722232818604,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.002937624987680465,
+        "reuse": 0.003106395510258153
+      },
+      "ratio_of_medians": 0.9456699824538239
+    },
+    {
+      "stride": 8,
+      "stage": 1,
+      "sequence": 48,
+      "parity": {
+        "reference_loss": 9.192925453186035,
+        "repeat_loss": 9.192925453186035,
+        "reuse_loss": 9.192925453186035,
+        "repeat_gradient": {
+          "relative_l2": 0.0,
+          "max_absolute": 0.0,
+          "parameter_count": 14
+        },
+        "reuse_gradient": {
+          "relative_l2": 0.0,
+          "max_absolute": 0.0,
+          "parameter_count": 14
+        },
+        "metric_counts_equal": true,
+        "passed": true
+      },
+      "raw": [
+        {
+          "pair": 0,
+          "reuse": false,
+          "seconds_per_update": 0.00254641700303182,
+          "loss": 9.192925453186035,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 0,
+          "reuse": true,
+          "seconds_per_update": 0.002610916009871289,
+          "loss": 9.192925453186035,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": true,
+          "seconds_per_update": 0.0025215829955413938,
+          "loss": 9.192925453186035,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": false,
+          "seconds_per_update": 0.0024600409960839897,
+          "loss": 9.192925453186035,
+          "workload": {
+            "microbatches": 1,
+            "samples": 1,
+            "allocated_blocks": 4,
+            "kept_blocks": 4,
+            "max_sample_blocks": 4,
+            "allocated_rows": 32,
+            "kept_rows": 32,
+            "effective_positions": 28,
+            "student_head_calls": 1,
+            "student_head_rows": 32,
+            "scored_rows": 28,
+            "teacher_head_calls": 2,
+            "teacher_head_rows": 56,
+            "teacher_requested_rows": 56,
+            "teacher_reused_rows": 0
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.002503228999557905,
+        "reuse": 0.0025662495027063414
+      },
+      "ratio_of_medians": 0.9754425658604217
+    }
+  ],
+  "gpu_after": null,
+  "complete": true
+}

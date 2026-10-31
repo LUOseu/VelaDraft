@@ -1,0 +1,695 @@
+[
+  {
+    "source": "a6000_bf16_pilot.json",
+    "source_sha256": "6e6123ebc5dd5ac12e4c3e5b4d1a611c99c890151037447b8f85fa1c811d0500",
+    "measurement_context": "shared_host_and_GPU; absolute timings are provisional",
+    "optimization": "teacher",
+    "ce_backward": null,
+    "chunk_size": null,
+    "compile_tv_kl": false,
+    "anchors": 32,
+    "stride": 1,
+    "stage": 0,
+    "pairs": 6,
+    "baseline_ms": 68.46756162121892,
+    "optimized_ms": 75.15574945136905,
+    "ratio_of_medians": 0.9110089663269495,
+    "paired_bootstrap_95_interval": [
+      0.16307527493441074,
+      1.0139540455558238
+    ],
+    "peak_allocated_bytes": {
+      "baseline": 2642770944,
+      "optimized": 2642770944
+    },
+    "parity": {
+      "reference_loss": 0.63671875,
+      "repeat_loss": 0.63671875,
+      "reuse_loss": 0.63671875,
+      "repeat_gradient": {
+        "relative_l2": 0.0,
+        "max_absolute": 0.0,
+        "parameter_count": 14
+      },
+      "reuse_gradient": {
+        "relative_l2": 0.0,
+        "max_absolute": 0.0,
+        "parameter_count": 14
+      },
+      "metric_counts_equal": true,
+      "passed": true
+    },
+    "last_workload": {
+      "baseline": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 32,
+        "kept_blocks": 32,
+        "max_sample_blocks": 32,
+        "allocated_rows": 256,
+        "kept_rows": 256,
+        "effective_positions": 224,
+        "student_head_calls": 1,
+        "student_head_rows": 256,
+        "scored_rows": 224,
+        "teacher_head_calls": 2,
+        "teacher_head_rows": 448,
+        "teacher_requested_rows": 448,
+        "teacher_reused_rows": 0
+      },
+      "optimized": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 32,
+        "kept_blocks": 32,
+        "max_sample_blocks": 32,
+        "allocated_rows": 256,
+        "kept_rows": 256,
+        "effective_positions": 224,
+        "student_head_calls": 1,
+        "student_head_rows": 256,
+        "scored_rows": 224,
+        "teacher_head_calls": 2,
+        "teacher_head_rows": 76,
+        "teacher_requested_rows": 448,
+        "teacher_reused_rows": 372
+      }
+    }
+  },
+  {
+    "source": "a6000_bf16_pilot.json",
+    "source_sha256": "6e6123ebc5dd5ac12e4c3e5b4d1a611c99c890151037447b8f85fa1c811d0500",
+    "measurement_context": "shared_host_and_GPU; absolute timings are provisional",
+    "optimization": "teacher",
+    "ce_backward": null,
+    "chunk_size": null,
+    "compile_tv_kl": false,
+    "anchors": 32,
+    "stride": 1,
+    "stage": 1,
+    "pairs": 6,
+    "baseline_ms": 60.6945501640439,
+    "optimized_ms": 63.92111210152507,
+    "ratio_of_medians": 0.9495227502870028,
+    "paired_bootstrap_95_interval": [
+      0.8151489383829459,
+      4.428336863026527
+    ],
+    "peak_allocated_bytes": {
+      "baseline": 2155485184,
+      "optimized": 2155485184
+    },
+    "parity": {
+      "reference_loss": 13.5,
+      "repeat_loss": 13.5,
+      "reuse_loss": 13.5,
+      "repeat_gradient": {
+        "relative_l2": 0.0,
+        "max_absolute": 0.0,
+        "parameter_count": 14
+      },
+      "reuse_gradient": {
+        "relative_l2": 0.0,
+        "max_absolute": 0.0,
+        "parameter_count": 14
+      },
+      "metric_counts_equal": true,
+      "passed": true
+    },
+    "last_workload": {
+      "baseline": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 32,
+        "kept_blocks": 32,
+        "max_sample_blocks": 32,
+        "allocated_rows": 256,
+        "kept_rows": 256,
+        "effective_positions": 224,
+        "student_head_calls": 1,
+        "student_head_rows": 256,
+        "scored_rows": 224,
+        "teacher_head_calls": 2,
+        "teacher_head_rows": 448,
+        "teacher_requested_rows": 448,
+        "teacher_reused_rows": 0
+      },
+      "optimized": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 32,
+        "kept_blocks": 32,
+        "max_sample_blocks": 32,
+        "allocated_rows": 256,
+        "kept_rows": 256,
+        "effective_positions": 224,
+        "student_head_calls": 1,
+        "student_head_rows": 256,
+        "scored_rows": 224,
+        "teacher_head_calls": 2,
+        "teacher_head_rows": 76,
+        "teacher_requested_rows": 448,
+        "teacher_reused_rows": 372
+      }
+    }
+  },
+  {
+    "source": "a6000_bf16_pilot.json",
+    "source_sha256": "6e6123ebc5dd5ac12e4c3e5b4d1a611c99c890151037447b8f85fa1c811d0500",
+    "measurement_context": "shared_host_and_GPU; absolute timings are provisional",
+    "optimization": "teacher",
+    "ce_backward": null,
+    "chunk_size": null,
+    "compile_tv_kl": false,
+    "anchors": 32,
+    "stride": 8,
+    "stage": 0,
+    "pairs": 6,
+    "baseline_ms": 67.37788254395127,
+    "optimized_ms": 77.02498184517026,
+    "ratio_of_medians": 0.8747536309633821,
+    "paired_bootstrap_95_interval": [
+      0.1946999044875283,
+      1.0120747459602377
+    ],
+    "peak_allocated_bytes": {
+      "baseline": 2644737024,
+      "optimized": 2644737024
+    },
+    "parity": {
+      "reference_loss": 0.63671875,
+      "repeat_loss": 0.63671875,
+      "reuse_loss": 0.63671875,
+      "repeat_gradient": {
+        "relative_l2": 5.276296424428374e-06,
+        "max_absolute": 5.960464477539063e-08,
+        "parameter_count": 14
+      },
+      "reuse_gradient": {
+        "relative_l2": 5.276296424428374e-06,
+        "max_absolute": 5.960464477539063e-08,
+        "parameter_count": 14
+      },
+      "metric_counts_equal": true,
+      "passed": true
+    },
+    "last_workload": {
+      "baseline": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 32,
+        "kept_blocks": 32,
+        "max_sample_blocks": 32,
+        "allocated_rows": 256,
+        "kept_rows": 256,
+        "effective_positions": 224,
+        "student_head_calls": 1,
+        "student_head_rows": 256,
+        "scored_rows": 224,
+        "teacher_head_calls": 2,
+        "teacher_head_rows": 448,
+        "teacher_requested_rows": 448,
+        "teacher_reused_rows": 0
+      },
+      "optimized": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 32,
+        "kept_blocks": 32,
+        "max_sample_blocks": 32,
+        "allocated_rows": 256,
+        "kept_rows": 256,
+        "effective_positions": 224,
+        "student_head_calls": 1,
+        "student_head_rows": 256,
+        "scored_rows": 224,
+        "teacher_head_calls": 2,
+        "teacher_head_rows": 448,
+        "teacher_requested_rows": 448,
+        "teacher_reused_rows": 0
+      }
+    }
+  },
+  {
+    "source": "a6000_bf16_pilot.json",
+    "source_sha256": "6e6123ebc5dd5ac12e4c3e5b4d1a611c99c890151037447b8f85fa1c811d0500",
+    "measurement_context": "shared_host_and_GPU; absolute timings are provisional",
+    "optimization": "teacher",
+    "ce_backward": null,
+    "chunk_size": null,
+    "compile_tv_kl": false,
+    "anchors": 32,
+    "stride": 8,
+    "stage": 1,
+    "pairs": 6,
+    "baseline_ms": 64.0265909023583,
+    "optimized_ms": 60.528574511408806,
+    "ratio_of_medians": 1.0577911576339891,
+    "paired_bootstrap_95_interval": [
+      0.5952528419625523,
+      1.2255402389483288
+    ],
+    "peak_allocated_bytes": {
+      "baseline": 2155485184,
+      "optimized": 2155485184
+    },
+    "parity": {
+      "reference_loss": 13.3125,
+      "repeat_loss": 13.3125,
+      "reuse_loss": 13.3125,
+      "repeat_gradient": {
+        "relative_l2": 3.481167840628604e-06,
+        "max_absolute": 7.62939453125e-06,
+        "parameter_count": 14
+      },
+      "reuse_gradient": {
+        "relative_l2": 7.671806980280813e-06,
+        "max_absolute": 1.52587890625e-05,
+        "parameter_count": 14
+      },
+      "metric_counts_equal": true,
+      "passed": true
+    },
+    "last_workload": {
+      "baseline": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 32,
+        "kept_blocks": 32,
+        "max_sample_blocks": 32,
+        "allocated_rows": 256,
+        "kept_rows": 256,
+        "effective_positions": 224,
+        "student_head_calls": 1,
+        "student_head_rows": 256,
+        "scored_rows": 224,
+        "teacher_head_calls": 2,
+        "teacher_head_rows": 448,
+        "teacher_requested_rows": 448,
+        "teacher_reused_rows": 0
+      },
+      "optimized": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 32,
+        "kept_blocks": 32,
+        "max_sample_blocks": 32,
+        "allocated_rows": 256,
+        "kept_rows": 256,
+        "effective_positions": 224,
+        "student_head_calls": 1,
+        "student_head_rows": 256,
+        "scored_rows": 224,
+        "teacher_head_calls": 2,
+        "teacher_head_rows": 448,
+        "teacher_requested_rows": 448,
+        "teacher_reused_rows": 0
+      }
+    }
+  },
+  {
+    "source": "a6000_bf16_ce.json",
+    "source_sha256": "621bb76ccccce8fa2eaec0fce62114a1b64646ec3ffbbd8f4d33c5bcd3ee2f61",
+    "measurement_context": "shared_host_and_GPU; absolute timings are provisional",
+    "optimization": "ce",
+    "ce_backward": null,
+    "chunk_size": 64,
+    "compile_tv_kl": false,
+    "anchors": 128,
+    "stride": 1,
+    "stage": 0,
+    "pairs": 6,
+    "baseline_ms": 73.96946847438812,
+    "optimized_ms": 119.22066519036889,
+    "ratio_of_medians": 0.6204416688690281,
+    "paired_bootstrap_95_interval": [
+      0.5243739377698212,
+      0.7817637739999296
+    ],
+    "peak_allocated_bytes": {
+      "baseline": 2286362624,
+      "optimized": 1661412352
+    },
+    "parity": {
+      "reference_loss": 12.4375,
+      "repeat_loss": 12.4375,
+      "reuse_loss": 12.4375,
+      "repeat_gradient": {
+        "missing": [],
+        "extra": [],
+        "bad_shapes": [],
+        "complete_and_finite": true,
+        "parameter_count": 14,
+        "relative_l2": 4.7466368984243364e-07,
+        "max_absolute": 4.76837158203125e-07
+      },
+      "reuse_gradient": {
+        "missing": [],
+        "extra": [],
+        "bad_shapes": [],
+        "complete_and_finite": true,
+        "parameter_count": 14,
+        "relative_l2": 0.0089235907052553,
+        "max_absolute": 0.000247955322265625
+      },
+      "metric_counts_equal": true,
+      "passed": true
+    },
+    "last_workload": {
+      "baseline": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 128,
+        "kept_blocks": 128,
+        "max_sample_blocks": 128,
+        "allocated_rows": 1024,
+        "kept_rows": 1024,
+        "effective_positions": 896,
+        "student_head_calls": 1,
+        "student_head_rows": 1024,
+        "scored_rows": 896
+      },
+      "optimized": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 128,
+        "kept_blocks": 128,
+        "max_sample_blocks": 128,
+        "allocated_rows": 1024,
+        "kept_rows": 1024,
+        "effective_positions": 896,
+        "student_head_calls": 28,
+        "student_head_rows": 1792,
+        "scored_rows": 896
+      }
+    }
+  },
+  {
+    "source": "a6000_bf16_ce_precompute.json",
+    "source_sha256": "7b3b549cd8286ca69ffc1155da856ba3effd0469a50059d96f58d78b98bc3c8e",
+    "measurement_context": "shared_host_and_GPU; absolute timings are provisional",
+    "optimization": "ce",
+    "ce_backward": "precompute",
+    "chunk_size": 64,
+    "compile_tv_kl": false,
+    "anchors": 128,
+    "stride": 1,
+    "stage": 0,
+    "pairs": 6,
+    "baseline_ms": 41.662332601845264,
+    "optimized_ms": 50.94397999346256,
+    "ratio_of_medians": 0.8178067871256157,
+    "paired_bootstrap_95_interval": [
+      0.550747361348564,
+      4.953269842229755
+    ],
+    "peak_allocated_bytes": {
+      "baseline": 2286362624,
+      "optimized": 1661412352
+    },
+    "parity": {
+      "reference_loss": 12.4375,
+      "repeat_loss": 12.4375,
+      "reuse_loss": 12.4375,
+      "repeat_gradient": {
+        "missing": [],
+        "extra": [],
+        "bad_shapes": [],
+        "complete_and_finite": true,
+        "parameter_count": 14,
+        "relative_l2": 2.5167336291898248e-08,
+        "max_absolute": 1.1920928955078125e-07
+      },
+      "reuse_gradient": {
+        "missing": [],
+        "extra": [],
+        "bad_shapes": [],
+        "complete_and_finite": true,
+        "parameter_count": 14,
+        "relative_l2": 0.009232377362504299,
+        "max_absolute": 0.000247955322265625
+      },
+      "metric_counts_equal": true,
+      "passed": true
+    },
+    "last_workload": {
+      "baseline": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 128,
+        "kept_blocks": 128,
+        "max_sample_blocks": 128,
+        "allocated_rows": 1024,
+        "kept_rows": 1024,
+        "effective_positions": 896,
+        "student_head_calls": 1,
+        "student_head_rows": 1024,
+        "scored_rows": 896
+      },
+      "optimized": {
+        "microbatches": 1,
+        "samples": 1,
+        "allocated_blocks": 128,
+        "kept_blocks": 128,
+        "max_sample_blocks": 128,
+        "allocated_rows": 1024,
+        "kept_rows": 1024,
+        "effective_positions": 896,
+        "student_head_calls": 14,
+        "student_head_rows": 896,
+        "scored_rows": 896
+      }
+    }
+  },
+  {
+    "source": "a6000_bf16_ce_padded256.json",
+    "source_sha256": "eeea6c982835638f336402975987133bbd1696ae9898d28cab20d2e29a7b5e1a",
+    "measurement_context": "shared_host_and_GPU; absolute timings are provisional",
+    "optimization": "ce",
+    "ce_backward": "precompute",
+    "chunk_size": 256,
+    "compile_tv_kl": false,
+    "anchors": 128,
+    "stride": 1,
+    "stage": 0,
+    "pairs": 10,
+    "baseline_ms": 102.19948412850499,
+    "optimized_ms": 66.97656260803342,
+    "ratio_of_medians": 1.5258992123350148,
+    "paired_bootstrap_95_interval": [
+      0.3267492296252507,
+      1.6575916808208941
+    ],
+    "peak_allocated_bytes": {
+      "baseline": 3284023808,
+      "optimized": 1899598336
+    },
+    "parity": {
+      "reference_loss": 12.4375,
+      "repeat_loss": 12.4375,
+      "reuse_loss": 12.4375,
+      "repeat_gradient": {
+        "missing": [],
+        "extra": [],
+        "bad_shapes": [],
+        "complete_and_finite": true,
+        "parameter_count": 14,
+        "relative_l2": 0.0,
+        "max_absolute": 0.0
+      },
+      "reuse_gradient": {
+        "missing": [],
+        "extra": [],
+        "bad_shapes": [],
+        "complete_and_finite": true,
+        "parameter_count": 14,
+        "relative_l2": 0.0051414681473003895,
+        "max_absolute": 0.0001220703125
+      },
+      "metric_counts_equal": true,
+      "passed": true
+    },
+    "last_workload": {
+      "baseline": {
+        "microbatches": 1,
+        "samples": 2,
+        "allocated_blocks": 256,
+        "kept_blocks": 144,
+        "max_sample_blocks": 128,
+        "allocated_rows": 2048,
+        "kept_rows": 1152,
+        "effective_positions": 1008,
+        "student_head_calls": 1,
+        "student_head_rows": 2048,
+        "scored_rows": 1792
+      },
+      "optimized": {
+        "microbatches": 1,
+        "samples": 2,
+        "allocated_blocks": 256,
+        "kept_blocks": 144,
+        "max_sample_blocks": 128,
+        "allocated_rows": 2048,
+        "kept_rows": 1152,
+        "effective_positions": 1008,
+        "student_head_calls": 4,
+        "student_head_rows": 1008,
+        "scored_rows": 1008
+      }
+    }
+  },
+  {
+    "source": "a6000_exclusive_ce_padded256.json",
+    "source_sha256": "cf6b4307efa1cc08ebaad18928d9383277924bbee77ce534381fcda2f825d22f",
+    "measurement_context": "shared_host; exclusive_GPU_checked_before_and_after_each_arm",
+    "optimization": "ce",
+    "ce_backward": "precompute",
+    "chunk_size": 256,
+    "compile_tv_kl": false,
+    "anchors": 128,
+    "stride": 1,
+    "stage": 0,
+    "pairs": 15,
+    "baseline_ms": 54.06863847747445,
+    "optimized_ms": 38.73100783675909,
+    "ratio_of_medians": 1.3960039125591412,
+    "paired_bootstrap_95_interval": [
+      1.3496628409938216,
+      1.4110343579656146
+    ],
+    "peak_allocated_bytes": {
+      "baseline": 3284023808,
+      "optimized": 1899598336
+    },
+    "parity": {
+      "reference_loss": 12.4375,
+      "repeat_loss": 12.4375,
+      "reuse_loss": 12.4375,
+      "repeat_gradient": {
+        "missing": [],
+        "extra": [],
+        "bad_shapes": [],
+        "complete_and_finite": true,
+        "parameter_count": 14,
+        "relative_l2": 1.6790784741232015e-05,
+        "max_absolute": 1.52587890625e-05
+      },
+      "reuse_gradient": {
+        "missing": [],
+        "extra": [],
+        "bad_shapes": [],
+        "complete_and_finite": true,
+        "parameter_count": 14,
+        "relative_l2": 0.005141445477391505,
+        "max_absolute": 0.0001220703125
+      },
+      "metric_counts_equal": true,
+      "passed": true
+    },
+    "last_workload": {
+      "baseline": {
+        "microbatches": 1,
+        "samples": 2,
+        "allocated_blocks": 256,
+        "kept_blocks": 144,
+        "max_sample_blocks": 128,
+        "allocated_rows": 2048,
+        "kept_rows": 1152,
+        "effective_positions": 1008,
+        "student_head_calls": 1,
+        "student_head_rows": 2048,
+        "scored_rows": 1792
+      },
+      "optimized": {
+        "microbatches": 1,
+        "samples": 2,
+        "allocated_blocks": 256,
+        "kept_blocks": 144,
+        "max_sample_blocks": 128,
+        "allocated_rows": 2048,
+        "kept_rows": 1152,
+        "effective_positions": 1008,
+        "student_head_calls": 4,
+        "student_head_rows": 1008,
+        "scored_rows": 1008
+      }
+    }
+  },
+  {
+    "source": "a6000_exclusive_ce_unpadded256.json",
+    "source_sha256": "a2cc1e97955694f0ae6f5c4d96f4804947fb49114acf4ed9b696c3aefb2daa5f",
+    "measurement_context": "shared_host; exclusive_GPU_checked_before_and_after_each_arm",
+    "optimization": "ce",
+    "ce_backward": "precompute",
+    "chunk_size": 256,
+    "compile_tv_kl": false,
+    "anchors": 128,
+    "stride": 1,
+    "stage": 0,
+    "pairs": 15,
+    "baseline_ms": 54.819312412291765,
+    "optimized_ms": 51.02679971605539,
+    "ratio_of_medians": 1.0743239379569218,
+    "paired_bootstrap_95_interval": [
+      1.0615585508552468,
+      1.0966362988506635
+    ],
+    "peak_allocated_bytes": {
+      "baseline": 3284023808,
+      "optimized": 1899604480
+    },
+    "parity": {
+      "reference_loss": 12.4375,
+      "repeat_loss": 12.4375,
+      "reuse_loss": 12.4375,
+      "repeat_gradient": {
+        "missing": [],
+        "extra": [],
+        "bad_shapes": [],
+        "complete_and_finite": true,
+        "parameter_count": 14,
+        "relative_l2": 4.680379274469562e-06,
+        "max_absolute": 7.62939453125e-06
+      },
+      "reuse_gradient": {
+        "missing": [],
+        "extra": [],
+        "bad_shapes": [],
+        "complete_and_finite": true,
+        "parameter_count": 14,
+        "relative_l2": 0.00530662622354416,
+        "max_absolute": 9.1552734375e-05
+      },
+      "metric_counts_equal": true,
+      "passed": true
+    },
+    "last_workload": {
+      "baseline": {
+        "microbatches": 1,
+        "samples": 2,
+        "allocated_blocks": 256,
+        "kept_blocks": 256,
+        "max_sample_blocks": 128,
+        "allocated_rows": 2048,
+        "kept_rows": 2048,
+        "effective_positions": 1792,
+        "student_head_calls": 1,
+        "student_head_rows": 2048,
+        "scored_rows": 1792
+      },
+      "optimized": {
+        "microbatches": 1,
+        "samples": 2,
+        "allocated_blocks": 256,
+        "kept_blocks": 256,
+        "max_sample_blocks": 128,
+        "allocated_rows": 2048,
+        "kept_rows": 2048,
+        "effective_positions": 1792,
+        "student_head_calls": 7,
+        "student_head_rows": 1792,
+        "scored_rows": 1792
+      }
+    }
+  }
+]

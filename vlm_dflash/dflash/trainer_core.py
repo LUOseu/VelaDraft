@@ -204,6 +204,7 @@ class DFlashTrainerModule(nn.Module):
     # algorithms that score logits with block structure (DSpark's Markov bias,
     # Domino's second scoring pass) must leave it False.
     supports_recipe_row_compaction: bool = False
+    supports_chunked_ce: bool = True
 
     def __init__(
         self,
@@ -221,6 +222,9 @@ class DFlashTrainerModule(nn.Module):
         train_recipe=None,
         recipe_row_compaction: Optional[bool] = None,
         recipe_compile_tv_kl: bool = False,
+        teacher_projection_dedup: bool = False,
+        ce_chunk_size: int = 0,
+        ce_backward: str = "checkpoint",
         attention_chunk_size: int = 128,
         attention_memory_budget_gb: float | None = None,
         npu_fusion_fallback: bool = False,
@@ -276,6 +280,24 @@ class DFlashTrainerModule(nn.Module):
         # ``None`` keeps the historical decayed block-CE path byte-identical;
         # a recipe swaps the objective (and its position weighting) per stage.
         self.train_recipe = train_recipe
+        self.ce_chunk_size = int(ce_chunk_size)
+        self.ce_backward = str(ce_backward)
+        if self.ce_backward not in {"checkpoint", "precompute"}:
+            raise ValueError("ce_backward must be 'checkpoint' or 'precompute'.")
+        if self.ce_backward == "precompute" and not self.ce_chunk_size:
+            raise ValueError("ce_backward='precompute' requires ce_chunk_size > 0.")
+        if self.ce_chunk_size < 0:
+            raise ValueError("ce_chunk_size must be nonnegative (0 keeps dense scoring).")
+        if self.ce_chunk_size and (
+            not self.supports_chunked_ce or self._recipe_active() or loss_type != "dflash"
+        ):
+            raise ValueError("ce_chunk_size supports only the shared fixed-anchor controlled-CE objective.")
+        self.teacher_projection_dedup = bool(teacher_projection_dedup)
+        if self.teacher_projection_dedup and not self.recipe_needs_teacher:
+            raise ValueError(
+                "teacher_projection_dedup requires a shared training recipe that consumes teacher logits. "
+                "Use upstream_two_stage (DFlash/DFlare/DFly) or upstream_dspark (DSpark)."
+            )
         self._recipe_stage_index = 0 if train_recipe is not None else None
         # Recipe runs may drop zero-masked padding blocks from the LM head and
         # the scoring step: kept rows are bitwise equivalent and padding rows
@@ -341,6 +363,9 @@ class DFlashTrainerModule(nn.Module):
         return {
             "recipe_row_compaction": bool(self.recipe_row_compaction),
             "recipe_compile_tv_kl": bool(self.recipe_compile_tv_kl),
+            "teacher_projection_dedup": bool(self.teacher_projection_dedup),
+            "ce_chunk_size": self.ce_chunk_size,
+            "ce_backward": self.ce_backward,
         }
 
     # ------------------------------------------------------------------ #
@@ -1077,6 +1102,13 @@ class DFlashTrainerModule(nn.Module):
             n=n,
             bs=bs,
         )
+        if self.ce_chunk_size:
+            _, aux_loss, aux_metrics = self._apply_algorithm_terms(
+                logits=None, output_hidden=output_hidden, input_ids=input_ids,
+                label_indices=label_indices, target_ids=target_ids, block_mask=block_mask,
+                bsz=bsz, n=n, bs=bs, seq_len=seq_len, teacher_hidden=teacher_hidden,
+            )
+            return self._chunked_ce_step(output_hidden, target_ids, block_mask, aux_loss, aux_metrics)
         # Recipe runs may compact zero-masked padding blocks out of the
         # scoring tail: the frozen LM head and every loss chunk then see kept
         # rows only. Blocks are independent units (each attends only its own
@@ -1160,6 +1192,37 @@ class DFlashTrainerModule(nn.Module):
         """True when a train recipe replaces ``loss_fn``'s decay-CE total."""
         recipe = self.train_recipe
         return recipe is not None and recipe.name != "controlled_ce"
+
+    def _chunked_ce_step(self, hidden, targets, mask, aux_loss, aux_metrics) -> DFlashStepMetrics:
+        from .chunked_ce import chunked_block_ce, precomputed_block_ce
+
+        bsz, n, bs = targets.shape
+        first = self.first_supervised_slot
+        slots = bs - first
+        target = targets[:, :, first:].reshape(bsz, -1)
+        pred_mask = mask[:, :, first:].reshape(bsz, -1)
+        predicted_hidden = hidden.view(bsz, n, bs, -1)[:, :, first:].reshape(bsz, n * slots, -1)
+        score = precomputed_block_ce if self.ce_backward == "precompute" else chunked_block_ce
+        out, pred_ids = score(
+            predicted_hidden, self.lm_head, target, pred_mask, loss_fn=self.loss_fn,
+            block_size=bs, chunk_size=self.ce_chunk_size, counter=self._count,
+        )
+        count, correct = out.draft_count_per_pos, out.draft_correct_per_pos
+        valid, right = count.sum(), correct.sum()
+        accept, accept_sum, blocks = compute_acceptance_stats(
+            pred_ids.view(bsz, n, slots), target.view(bsz, n, slots), pred_mask.view(bsz, n, slots).bool(),
+        )
+        weights = pred_mask.view(bsz, n, slots)
+        if self.loss_decay_gamma is not None:
+            weights = weights * torch.exp(-torch.arange(slots, device=weights.device, dtype=weights.dtype)
+                                          / self.loss_decay_gamma)
+        return DFlashStepMetrics(
+            loss=out.total_loss if aux_loss is None else out.total_loss + aux_loss,
+            loss_weight=weights.sum().detach(), accuracy=(right / valid.clamp_min(1)).detach(),
+            valid_tokens=valid.detach(), correct_tokens=right.detach(), accept_len=accept.detach(),
+            accept_len_sum=accept_sum.detach(), valid_blocks=blocks.detach(),
+            pos_correct=correct, pos_count=count, extra_metrics=self._public_extra_metrics(aux_metrics),
+        )
 
     @staticmethod
     def _public_extra_metrics(aux_metrics: dict | None) -> dict | None:
@@ -1266,6 +1329,7 @@ class DFlashTrainerModule(nn.Module):
                     first_slot=first,
                     sample_index=teacher_sample_index,
                     counter=self._count,
+                    projection_dedup=self.teacher_projection_dedup,
                 ).logits
             # A confidence-head stage receives its per-slot logits from the
             # algorithm seam (DSpark's ``_apply_algorithm_terms``); the analytic

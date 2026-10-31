@@ -1,0 +1,166 @@
+{
+  "scope": "synthetic_shape_full_update_probe_not_convergence_or_pipeline_E2E",
+  "measurement_context": "shared_host_and_GPU; absolute timings are provisional",
+  "config": {
+    "device": "cpu",
+    "dtype": "float32",
+    "optimization": "ce",
+    "ce_chunk_size": 7,
+    "ce_backward": "precompute",
+    "compile_tv_kl": false,
+    "hidden": 64,
+    "vocab": 256,
+    "anchors": 8,
+    "batch_size": 2,
+    "short_anchors": 2,
+    "block_size": 8,
+    "sequence": 48,
+    "layers": 1,
+    "strides": [
+      1
+    ],
+    "stages": [
+      0
+    ],
+    "warmup": 1,
+    "repeats": 2,
+    "inner": 1,
+    "seed": 731,
+    "memory_fraction": 0.2,
+    "out": "research/train_cost_20261031/cpu_ce_padded.json"
+  },
+  "torch": "2.10.0",
+  "python": "3.12.13",
+  "source_sha256": {
+    "scripts/benchmark_teacher_projection.py": "3a1a694bfc34a36da86e7b193c54f54857b3d33792d4e06bb94f002e5a91b726",
+    "vlm_dflash/objectives.py": "5acc17bd51652d66a6289905ab234d4af5a5a731c4ea164aec06ea5c809f0a1c",
+    "vlm_dflash/dflash/trainer_core.py": "1a73c2e4fcea25431a150bf5d554d46a781c7ce68f0006273642b1ad684c973b",
+    "vlm_dflash/dflash/chunked_ce.py": "6d610a2a96ffbe97349c8e508c34700f9fc23038faf5377bf4bd8945456eefce"
+  },
+  "gpu_before": null,
+  "cases": [
+    {
+      "stride": 1,
+      "stage": 0,
+      "sequence": 48,
+      "parity": {
+        "reference_loss": 8.778971672058105,
+        "repeat_loss": 8.778971672058105,
+        "reuse_loss": 8.778971672058105,
+        "repeat_gradient": {
+          "missing": [],
+          "extra": [],
+          "bad_shapes": [],
+          "complete_and_finite": true,
+          "parameter_count": 14,
+          "relative_l2": 0.0,
+          "max_absolute": 0.0
+        },
+        "reuse_gradient": {
+          "missing": [],
+          "extra": [],
+          "bad_shapes": [],
+          "complete_and_finite": true,
+          "parameter_count": 14,
+          "relative_l2": 2.1675998608025523e-07,
+          "max_absolute": 1.4901161193847656e-08
+        },
+        "metric_counts_equal": true,
+        "passed": true
+      },
+      "raw": [
+        {
+          "pair": 0,
+          "reuse": false,
+          "seconds_per_update": 0.002157499984605238,
+          "loss": 8.778971672058105,
+          "workload": {
+            "microbatches": 1,
+            "samples": 2,
+            "allocated_blocks": 16,
+            "kept_blocks": 10,
+            "max_sample_blocks": 8,
+            "allocated_rows": 128,
+            "kept_rows": 80,
+            "effective_positions": 70,
+            "student_head_calls": 1,
+            "student_head_rows": 128,
+            "scored_rows": 112
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 0,
+          "reuse": true,
+          "seconds_per_update": 0.002996166003867984,
+          "loss": 8.778971672058105,
+          "workload": {
+            "microbatches": 1,
+            "samples": 2,
+            "allocated_blocks": 16,
+            "kept_blocks": 10,
+            "max_sample_blocks": 8,
+            "allocated_rows": 128,
+            "kept_rows": 80,
+            "effective_positions": 70,
+            "student_head_calls": 10,
+            "student_head_rows": 70,
+            "scored_rows": 70
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": true,
+          "seconds_per_update": 0.003509875008603558,
+          "loss": 8.778971672058105,
+          "workload": {
+            "microbatches": 1,
+            "samples": 2,
+            "allocated_blocks": 16,
+            "kept_blocks": 10,
+            "max_sample_blocks": 8,
+            "allocated_rows": 128,
+            "kept_rows": 80,
+            "effective_positions": 70,
+            "student_head_calls": 10,
+            "student_head_rows": 70,
+            "scored_rows": 70
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        },
+        {
+          "pair": 1,
+          "reuse": false,
+          "seconds_per_update": 0.0024877500254660845,
+          "loss": 8.778971672058105,
+          "workload": {
+            "microbatches": 1,
+            "samples": 2,
+            "allocated_blocks": 16,
+            "kept_blocks": 10,
+            "max_sample_blocks": 8,
+            "allocated_rows": 128,
+            "kept_rows": 80,
+            "effective_positions": 70,
+            "student_head_calls": 1,
+            "student_head_rows": 128,
+            "scored_rows": 112
+          },
+          "peak_allocated_bytes": null,
+          "peak_reserved_bytes": null
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.002322625005035661,
+        "reuse": 0.003253020506235771
+      },
+      "ratio_of_medians": 0.7139902747564553
+    }
+  ],
+  "gpu_after": null,
+  "complete": true
+}
