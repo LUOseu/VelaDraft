@@ -1,0 +1,17 @@
+#!/bin/bash
+export Q36_ROOTCAUSE_TASK=/root/autodl-tmp/qwen36_rootcause_20261101
+export Q36_EXISTING_TASK=/root/autodl-tmp/qwen36_tp1_20261101
+export Q36_EXISTING_PLAN=$Q36_EXISTING_TASK/results/dflash_tp1_a3.evidence/plan.json
+export Q36_EXISTING_REFERENCE=$Q36_EXISTING_TASK/results/dflash_tp1_a3.evidence/reference.json
+export Q36_ROOTCAUSE_GPUS=0
+export PYTHONPATH=$Q36_ROOTCAUSE_TASK/repo
+export TMPDIR=$Q36_EXISTING_TASK/tmp PYTHONDONTWRITEBYTECODE=1
+export HF_HOME=$Q36_EXISTING_TASK/cache/hf HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+export TRITON_CACHE_DIR=$Q36_ROOTCAUSE_TASK/triton XDG_CACHE_HOME=$Q36_EXISTING_TASK/cache/xdg
+export QWEN8B_DIGEST_CACHE=$Q36_EXISTING_TASK/cache/digests.sqlite
+export VELADRAFT_GPU_LOCK_DIR=$Q36_EXISTING_TASK/gpu_locks
+export VELADRAFT_GPU_OWNERSHIP=count VELADRAFT_GPU_MAX_OWN_APPS=2
+export VLLM_BATCH_INVARIANT=0 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+export CUDA_HOME=$Q36_EXISTING_TASK/runtime/lib/python3.12/site-packages/nvidia/cu13
+export PATH=$CUDA_HOME/bin:$Q36_EXISTING_TASK/runtime/bin:$PATH
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY

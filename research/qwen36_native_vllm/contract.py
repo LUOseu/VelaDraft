@@ -7,6 +7,7 @@ login node. Values come from the finished 400K training checkpoints
 from __future__ import annotations
 
 from typing import Any
+import os
 
 MARKER = "qwen36_spatial_adapter_v1"
 TARGET_MODEL_TYPE = "qwen3_5_moe"
@@ -17,8 +18,13 @@ TARGET_CHAT_TEMPLATE_KWARGS = {"enable_thinking": False}
 IMAGE_MIN_PIXELS = 65536
 IMAGE_MAX_PIXELS = 1048576
 
-BLOCK_SIZE = 8
-SPECULATIVE_TOKENS = BLOCK_SIZE - 1
+TRAINING_BLOCK_SIZE = 8
+# Diagnostic inference-budget sweep only. Exported/trained configuration stays B8.
+# Pin this environment value in each runtime manifest and match it to engine K.
+SPECULATIVE_TOKENS = int(os.environ.get("Q36_SWEEP_K", "7"))
+if SPECULATIVE_TOKENS not in range(1, 8):
+    raise ValueError("Q36_SWEEP_K must be an integer from 1 through 7")
+BLOCK_SIZE = SPECULATIVE_TOKENS + 1
 MASK_TOKEN_ID = 248077
 TARGET_LAYER_IDS = [1, 19, 37]
 MROPE_SECTION = [11, 11, 10]
@@ -50,7 +56,7 @@ def validate_draft_config(config: Any, *, require_marker: bool = True) -> dict:
             raise ValueError(f"Frozen draft requires {field}={value}, got {cfg.get(field)!r}")
     if cfg.get("target_hidden_size", cfg["hidden_size"]) != 2048:
         raise ValueError("Frozen draft requires target_hidden_size 2048")
-    if cfg.get("block_size") != BLOCK_SIZE or cfg.get("attention_bias", False):
+    if cfg.get("block_size") != TRAINING_BLOCK_SIZE or cfg.get("attention_bias", False):
         raise ValueError("Frozen draft requires block_size=8 and attention_bias=False")
     dflash = cfg.get("dflash_config", {})
     for field, value in DFLASH_FIELDS.items():
@@ -81,7 +87,7 @@ def validate_launch(vllm_config: Any) -> None:
         raise ValueError("Qwen3.6 adapter requires a qwen3_5_moe target")
     spec = vllm_config.speculative_config
     if spec.num_speculative_tokens != SPECULATIVE_TOKENS:
-        raise ValueError("Frozen block=8 requires num_speculative_tokens=7")
+        raise ValueError(f"Runtime manifest requires num_speculative_tokens={SPECULATIVE_TOKENS}")
     if not spec.draft_model_config.uses_mrope:
         raise ValueError("Draft model config did not enable official MRoPE")
     if vllm_config.model_config.enforce_eager or spec.enforce_eager:
@@ -93,4 +99,4 @@ def validate_launch(vllm_config: Any) -> None:
         raise ValueError("Graph adapter requires a mixed graph mode enabling draft PIECEWISE graphs")
     sizes = comp.cudagraph_capture_sizes
     if sizes is not None and BLOCK_SIZE not in sizes:
-        raise ValueError("Graph adapter requires capture size eight")
+        raise ValueError(f"Graph adapter requires capture size {BLOCK_SIZE}")

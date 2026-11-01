@@ -125,7 +125,7 @@ def validate_scoped_query_batch(num_tokens: int, num_padded: int, mode_name: str
             raise ValueError(f"Unsupported dummy graph dispatch {mode_name}")
         return
     if num_tokens != block or num_padded != block:
-        raise ValueError(f"Real spatial proposals require exactly eight query tokens, got {num_tokens}->{num_padded}")
+        raise ValueError(f"Real spatial proposals require exactly {block} query tokens, got {num_tokens}->{num_padded}")
     if not keys_initialized or mode_name not in modes:
         raise ValueError(f"Real spatial proposals require initialized {modes} dispatch, got {mode_name}")
 
