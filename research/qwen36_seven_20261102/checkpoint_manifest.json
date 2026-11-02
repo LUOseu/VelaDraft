@@ -1,0 +1,51 @@
+{
+  "dflash": {
+    "repo": "khazic/veladraft-qwen36-400k-dflash",
+    "revision": "988cc722553f7508cc309039279ffb9bf5226b0f",
+    "size": 364958389,
+    "sha256": "3153e4cb38722f73929904c1383eaa847929d54897ef1f46fac92322c95018f0",
+    "url": "https://huggingface.co/khazic/veladraft-qwen36-400k-dflash/resolve/988cc722553f7508cc309039279ffb9bf5226b0f/ckpt/ckpt_final.pt"
+  },
+  "dflash2": {
+    "repo": "khazic/veladraft-qwen36-400k-dflash2",
+    "revision": "3c4442f21fd57fd815c6ae07085367af8d81c41a",
+    "size": 632973877,
+    "sha256": "2bd9a036589981ef60760b2e3b64fb392ca01e3e1d8986d8645a66109fb44c4d",
+    "url": "https://huggingface.co/khazic/veladraft-qwen36-400k-dflash2/resolve/3c4442f21fd57fd815c6ae07085367af8d81c41a/ckpt/ckpt_final.pt"
+  },
+  "dspark": {
+    "repo": "khazic/veladraft-qwen36-400k-dspark",
+    "revision": "4966dcaf9ed169861f1931b3c424bc9e9a11681f",
+    "size": 619244853,
+    "sha256": "a3c79dd1d6860dbbd7113ccc57b649a20ed71e6bc3ebb471057778d7192e8b42",
+    "url": "https://huggingface.co/khazic/veladraft-qwen36-400k-dspark/resolve/4966dcaf9ed169861f1931b3c424bc9e9a11681f/ckpt/ckpt_final.pt"
+  },
+  "domino": {
+    "repo": "khazic/veladraft-qwen36-400k-domino",
+    "revision": "a623bf8b5a15dbf3746ffaf4507aab79d567f364",
+    "size": 512547125,
+    "sha256": "923d5ffc8b8c53fbe710ff3ea092132fff2eb475ebfb9e0969540c7de70da73b",
+    "url": "https://huggingface.co/khazic/veladraft-qwen36-400k-domino/resolve/a623bf8b5a15dbf3746ffaf4507aab79d567f364/ckpt/ckpt_final.pt"
+  },
+  "jetspec": {
+    "repo": "khazic/veladraft-qwen36-400k-jetspec",
+    "revision": "39e9f21afa706e304e52dff9f29d04c2e7f183a0",
+    "size": 364958453,
+    "sha256": "87c74dd5e9abf98b738afef67a0dcf6d55a6869772bbad47deb4874cf4ff8226",
+    "url": "https://huggingface.co/khazic/veladraft-qwen36-400k-jetspec/resolve/39e9f21afa706e304e52dff9f29d04c2e7f183a0/ckpt/ckpt_final.pt"
+  },
+  "dflare": {
+    "repo": "khazic/veladraft-qwen36-400k-dflare",
+    "revision": "5e9c6935148662d94bb4d5aa23a16ac0701320d6",
+    "size": 352377973,
+    "sha256": "ba3fc317313d40d0d497a8e84a7367bb6fb6e477150cce8dadf961c7f9b1a727",
+    "url": "https://huggingface.co/khazic/veladraft-qwen36-400k-dflare/resolve/5e9c6935148662d94bb4d5aa23a16ac0701320d6/ckpt/ckpt_final.pt"
+  },
+  "dfly": {
+    "repo": "khazic/veladraft-qwen36-400k-dfly",
+    "revision": "566ec8b7f50cc38b14fe6bc597c78e39649b3cb5",
+    "size": 406912693,
+    "sha256": "2aac4b851bd576b7b5f4df78156c0845e6d9a56139ba6575424c1564e6b6330c",
+    "url": "https://huggingface.co/khazic/veladraft-qwen36-400k-dfly/resolve/566ec8b7f50cc38b14fe6bc597c78e39649b3cb5/ckpt/ckpt_final.pt"
+  }
+}

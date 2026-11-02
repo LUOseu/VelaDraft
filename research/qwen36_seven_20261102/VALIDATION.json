@@ -1,0 +1,139 @@
+{
+  "scope": "Qwen3.6-35B-A3B, A800 TP1 BF16 batch1, vLLM0.32; fixed512 development set, not task quality or held-out performance.",
+  "methods": [
+    {
+      "method": "dflash",
+      "status": "valid",
+      "requests": 48,
+      "sessions": 12,
+      "turns": 16,
+      "repeats": 3,
+      "tokens_per_request": 512,
+      "speedup_vs_stock_ar": 1.2971517811640279,
+      "ci95_vs_stock_ar": [
+        1.1928466663514903,
+        1.4183940128111308
+      ]
+    },
+    {
+      "method": "dspark",
+      "status": "valid",
+      "requests": 48,
+      "sessions": 12,
+      "turns": 16,
+      "repeats": 3,
+      "tokens_per_request": 512,
+      "speedup_vs_stock_ar": 1.3385108286162002,
+      "ci95_vs_stock_ar": [
+        1.2219970855450033,
+        1.4584114468243086
+      ]
+    },
+    {
+      "method": "domino",
+      "status": "valid",
+      "requests": 48,
+      "sessions": 12,
+      "turns": 16,
+      "repeats": 3,
+      "tokens_per_request": 512,
+      "speedup_vs_stock_ar": 1.2759368053560451,
+      "ci95_vs_stock_ar": [
+        1.1660836920825133,
+        1.4032523531767842
+      ]
+    },
+    {
+      "method": "jetspec",
+      "status": "valid",
+      "requests": 48,
+      "sessions": 12,
+      "turns": 16,
+      "repeats": 3,
+      "tokens_per_request": 512,
+      "speedup_vs_stock_ar": 1.3316170509750123,
+      "ci95_vs_stock_ar": [
+        1.2206667094249302,
+        1.4546574200780653
+      ]
+    },
+    {
+      "method": "dflash2",
+      "status": "valid",
+      "requests": 48,
+      "sessions": 12,
+      "turns": 16,
+      "repeats": 3,
+      "tokens_per_request": 512,
+      "speedup_vs_stock_ar": 1.360492343999162,
+      "ci95_vs_stock_ar": [
+        1.2380880405084682,
+        1.4950073933232535
+      ]
+    },
+    {
+      "method": "dflare",
+      "status": "valid",
+      "requests": 48,
+      "sessions": 12,
+      "turns": 16,
+      "repeats": 3,
+      "tokens_per_request": 512,
+      "speedup_vs_stock_ar": 1.3185341987640231,
+      "ci95_vs_stock_ar": [
+        1.2060976756225104,
+        1.4393991658399625
+      ]
+    },
+    {
+      "method": "dfly",
+      "status": "valid",
+      "requests": 48,
+      "sessions": 12,
+      "turns": 16,
+      "repeats": 3,
+      "tokens_per_request": 512,
+      "speedup_vs_stock_ar": 1.235470990633636,
+      "ci95_vs_stock_ar": [
+        1.1160151853329388,
+        1.3533366654702592
+      ]
+    }
+  ],
+  "token_exact_required": false,
+  "quality_evaluated": false,
+  "source_sha256": {
+    "research/qwen36_grouped_e2e_20261102/dispatch.py": "6fb15768c0dafb688566eb53fff5d5a01a5e0a3c923b07127a73ae857e19b7c9",
+    "research/qwen36_grouped_e2e_20261102/worker.py": "188d3ed431447ffb928aff4e8787ff88f508bf0f4236b396621dbe70da00803c",
+    "research/qwen36_grouped_e2e_20261102/test_dispatch.py": "b009fb05b3e4e35036ab4a33c0d4b0c37b4bd6e56a6d3146acb14cb6ea67c6ed",
+    "research/qwen36_nextopt_20261102/worker.py": "8ef6bd2fdda6e481fa9c4cc9560da1c48aeaea87741f50c9f14531345626e8d1",
+    "research/qwen36_seven_20261102/worker.py": "85ea19e0b0ca0f02237b5b85cf1e87ed4c80fe10f51d8b7c25dac841165db86a",
+    "research/qwen36_seven_20261102/context_bridge.py": "619b003a31c72f2841f51a45451f6d831f2f6f2886ef4492d0b930bf3d3674a0",
+    "research/qwen36_seven_20261102/context_worker.py": "486b358db7a92c8117e1c6d205faaa2001a6cecd9235740de1f5aea1be4d50a1",
+    "research/qwen36_seven_20261102/domino_bridge.py": "aa9a4cb39a64a71a1011a26174a9fcee49f2945a9b0a6f3bb213a9fec957b49e",
+    "research/qwen36_seven_20261102/domino_worker.py": "93adc1c35bd6c49331759e2e04f089d2f951d2de8a17e9743233f7ff9357c7c0",
+    "research/qwen36_seven_20261102/dspark_bridge.py": "20bffa735d321c464e615a12c92e786f3783397dde0eaa2a96bb8b8d96b9276f",
+    "research/qwen36_seven_20261102/dspark_worker.py": "e8c6ba9b51e8a17a7630f6c9007a527614535750c900919123f404d03de58d21",
+    "research/qwen36_seven_20261102/prepare_native.py": "e69932688b7cd1072235b2dc9dcfbcc31ab3310230248290e9d846ebcfe05caf",
+    "research/qwen36_seven_20261102/prepare_custom.py": "36adc0cd4d5e87bb8f0f4d17334af54cae32b2d69142ca2aa8400d9124ac4ae3",
+    "research/qwen36_seven_20261102/prepare_dspark.py": "4947799cd9a843a2b368773a6211a5965d15975b4f03be9871e0f2d078cec7f2",
+    "research/qwen36_seven_20261102/method_contract.py": "571ce40426ddbf2fd4c5934b1b8f5035b8769246d578e1b2110ba857ee012d4f",
+    "research/qwen36_seven_20261102/test_context_contract.py": "14633399d553ccb4fa279ba4a69712832a11922c16200583eab641399b65b5c9",
+    "research/qwen36_seven_20261102/test_domino_slots.py": "cadf3dbddcad941c8265c3d50dde5fb0349b22c23912038807abe1ad6733692e",
+    "research/qwen36_seven_20261102/test_dspark_slots.py": "1fa783be3763871d5930a24eff5a268d07182f1195df0f7109e244140bfc35c1",
+    "research/qwen36_seven_20261102/test_method_contract.py": "fb62cc60ef1ee698e9cdcc13d518f24d69ba37a2166687fbc4c323f4087f7d5f",
+    "research/qwen36_seven_20261102/gpu_context_preflight.py": "8b99bbb2a9dc1395f1fe00ec46a20ebc039207bd0bb98552a057e14cd2b39848",
+    "research/qwen36_seven_20261102/INFERENCE_SETTINGS.json": "ffe53c5063a4ae71f3eb6ff70362ef58f5e667441d75581608df56b216668507",
+    "research/qwen36_seven_20261102/checkpoint_manifest.json": "ed7fc8fe76e6313d8261071e998dc627adbab2eabd96d045a036e3dae5f2c8c4",
+    "research/qwen36_seven_20261102/REVIEW_SUMMARY.json": "e474ca828b9fa76a17e62877e0ca7ce3e5b6a02022dffc84173b3ed937478fea",
+    "research/qwen36_seven_20261102/configs/E=256,N=512,device_name=NVIDIA_A800-SXM4-80GB.json": "73f405468fc56b0647e1fd5c365031772b73d3b3fbba5bf12d5fec65007a97d5"
+  },
+  "gpu_fusion_test": {
+    "tests": 2,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device": "NVIDIA A800-SXM4-80GB",
+    "status": "complete"
+  }
+}
