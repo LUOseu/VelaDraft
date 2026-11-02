@@ -52,6 +52,8 @@ def main() -> None:
     parser.add_argument("--method", choices=sorted(METHODS), required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--sweep-k", type=int, choices=range(1, 8), default=None,
+                        help="Diagnostic runtime query budget; trained/exported block remains 8")
     args = parser.parse_args()
     if args.out.exists():
         raise FileExistsError(f"Refusing to overwrite {args.out}")
@@ -66,6 +68,10 @@ def main() -> None:
         "environment": {"Q36_DRAFT_CUDAGRAPH": "PIECEWISE"},
         "files": {str(path): sha256(path) for path in (*sources, checkpoint)},
     }
+    if args.sweep_k is not None:
+        manifest["environment"]["Q36_SWEEP_K"] = str(args.sweep_k)
+        manifest["scope"] += (f"; diagnostic inference-budget sweep K={args.sweep_k}, "
+                              f"query width={args.sweep_k + 1}, trained block=8; not the frozen S7 main result")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps(manifest, indent=2))
