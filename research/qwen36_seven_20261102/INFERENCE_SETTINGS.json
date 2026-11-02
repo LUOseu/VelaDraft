@@ -1,0 +1,96 @@
+{
+  "status": "validated_development_configuration",
+  "target": "Qwen/Qwen3.6-35B-A3B",
+  "target_revision": "995ad96eacd98c81ed38be0c5b274b04031597b0",
+  "hardware": "NVIDIA A800-SXM4-80GB",
+  "vllm": "0.32.0",
+  "dtype": "bfloat16",
+  "tensor_parallel_size": 1,
+  "draft_tensor_parallel_size": 1,
+  "max_num_seqs": 1,
+  "max_model_len": 8192,
+  "max_num_batched_tokens": 4096,
+  "attention_backend": "FLASH_ATTN",
+  "draft_attention_backend": "FLASH_ATTN",
+  "verification": "native linear greedy verification",
+  "speculative_method": "dflash",
+  "default_num_speculative_tokens": 3,
+  "environment": {
+    "Q36_V032_ARM": "sd",
+    "Q36_MOE_POLICY": "grouped",
+    "VLLM_USE_V2_MODEL_RUNNER": "1",
+    "VLLM_GDN_DECODE_KERNEL": "cuda",
+    "VLLM_BATCH_INVARIANT": "0",
+    "VLLM_TUNED_CONFIG_FOLDER": "directory containing the config file listed below"
+  },
+  "moe_config": {
+    "file": "configs/E=256,N=512,device_name=NVIDIA_A800-SXM4-80GB.json",
+    "sha256": "73f405468fc56b0647e1fd5c365031772b73d3b3fbba5bf12d5fec65007a97d5"
+  },
+  "methods": {
+    "dflash": {
+      "architecture": "DFlashDraftModel",
+      "worker": "research.qwen36_nextopt_20261102.worker.JointWorker"
+    },
+    "dflash2": {
+      "architecture": "DFlash2DraftModel",
+      "worker": "research.qwen36_seven_20261102.worker.NativeSevenWorker"
+    },
+    "jetspec": {
+      "architecture": "DFlashDraftModel",
+      "worker": "research.qwen36_seven_20261102.worker.NativeSevenWorker",
+      "scope": "VelaDraft shared-block causal reference",
+      "config_is_causal": true
+    },
+    "dspark": {
+      "architecture": "DFlashVelaDSparkModel",
+      "worker": "research.qwen36_seven_20261102.dspark_worker.DSparkWorker",
+      "install_before_engine": "research.qwen36_seven_20261102.dspark_bridge.install"
+    },
+    "domino": {
+      "architecture": "DFlashVelaDominoModel",
+      "worker": "research.qwen36_seven_20261102.domino_worker.DominoWorker",
+      "install_before_engine": "research.qwen36_seven_20261102.domino_bridge.install"
+    },
+    "dflare": {
+      "architecture": "DFlashVelaDFlareModel",
+      "worker": "research.qwen36_seven_20261102.context_worker.ContextWorker",
+      "install_before_engine": "research.qwen36_seven_20261102.context_bridge.install",
+      "environment": {
+        "Q36_SWEEP_K": "3"
+      }
+    },
+    "dfly": {
+      "architecture": "DFlashVelaDFlyModel",
+      "worker": "research.qwen36_seven_20261102.context_worker.ContextWorker",
+      "install_before_engine": "research.qwen36_seven_20261102.context_bridge.install",
+      "environment": {
+        "Q36_SWEEP_K": "3"
+      }
+    }
+  },
+  "ar_reference": {
+    "worker": "research.qwen36_v032.worker.AuditWorker",
+    "environment": {
+      "Q36_V032_ARM": "ar",
+      "VLLM_USE_V2_MODEL_RUNNER": "1",
+      "VLLM_GDN_DECODE_KERNEL": "cuda",
+      "VLLM_BATCH_INVARIANT": "0"
+    },
+    "unset_environment": [
+      "Q36_MOE_POLICY",
+      "VLLM_TUNED_CONFIG_FOLDER",
+      "Q36_DYNAMIC_SD"
+    ],
+    "speculative_config": null
+  },
+  "decisions": {
+    "dynamic_k": "Implemented and tested; do not enable by default because it did not improve paired E2E.",
+    "dflash2_k4": "Highest observed point estimate 1.373x; paired advantage over K3 is not statistically established.",
+    "token_exact": "Diagnostic only; not an acceptance gate."
+  },
+  "limits": [
+    "Hardware-specific tuning; no extrapolation of A800 tile choices to other GPUs.",
+    "Fixed512 development timing, not quality scores or held-out/natural-stop performance."
+  ]
+}
