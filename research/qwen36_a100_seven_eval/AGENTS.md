@@ -51,6 +51,14 @@
 
 `scripts/run_qwen36_a100_benchmarks.sh` 是本任务要求交付并在 PR 中验证的**最终入口合同**，不是基线 `4df140e` 已提供的脚本。执行 agent 必须先实现它，再使用下面的命令；不要向借卡同学提供一个尚不存在的命令。
 
+现在可以用下面一条命令获取已合并的七方法代码和本交接文件；这只是检出交接材料，不会启动 GPU 评测：
+
+```bash
+bash -lc 'git clone https://github.com/LUOseu/VelaDraft.git VelaDraft && cd VelaDraft && git fetch origin refs/pull/40/head && git checkout --detach FETCH_HEAD && cat research/qwen36_a100_seven_eval/AGENTS.md'
+```
+
+完整评测脚本实现、测试并进入可获取的 PR 后，执行 agent 使用对应的已审查 commit 和以下最终入口：
+
 ```bash
 git clone https://github.com/LUOseu/VelaDraft.git
 cd VelaDraft
