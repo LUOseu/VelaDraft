@@ -9,7 +9,7 @@
 - 对照：同一机器、同一 GPU、同一 target、同一输入和计时边界下的原生 vLLM AR。
 - 用户明确不要求评测 ViSpec 方法；不要把 ViSpec、Medusa、EAGLE 或 MTP 当成七方法之一，也不要把 MTP 的加速套用到这七种方法。
 - 唯一正式数据范围是 [MMSpec](https://github.com/killthefullmoon/MMSpec) 官方完整 `dataset/MMSpec/test`；不运行之前 ViSpec 论文的 benchmark。模型、方法、硬件和推理框架不同，结果不能写成对 MMSpec 原文数值的直接复现。
-- 不重新训练。可在独立开发集选择运行参数；保留原 checkpoint、导出权重和所有原始结果。
+- 七种方法统一使用 `K=3`（每轮 draft 3 个 token）；不扫描其他 K、不重新训练。保留原 checkpoint、导出权重和所有原始结果。
 
 先完成七方法和主要数据集的真实评测；数据准备、正式计时、质量评分和上传可以形成队列。短检查必须自动接入正式队列，不能长时间停留在冒烟阶段。单个数据集或评分器不可用时记录原因，并继续其他可运行项。
 
@@ -65,10 +65,15 @@ cd VelaDraft
 # 将 <REVIEWED_COMMIT> 替换为已合并 main 或公开 PR 的实际 commit SHA。
 git checkout --detach <REVIEWED_COMMIT>
 test -f scripts/run_qwen36_a100_benchmarks.sh
-bash scripts/run_qwen36_a100_benchmarks.sh --config configs/eval/qwen36_a100_seven.yaml --suite mmspec-full --publish --resume
+bash scripts/run_qwen36_a100_benchmarks.sh \
+  --config configs/eval/qwen36_a100_seven.yaml \
+  --suite mmspec-full \
+  --methods dflash,dspark,domino,jetspec,dflash2,dflare,dfly \
+  --draft-length 3 \
+  --publish --resume
 ```
 
-入口需支持 `--help`、`--preflight`、`--suite`、`--config`、`--publish`、`--resume`；从空 checkout 按文档完成依赖安装、数据准备和模型下载后，一条 `bash` 命令即可开始或安全续跑。若前置数据或凭据需要人工申请，`--preflight` 要清晰列出，而不是在运行数小时后才失败。命令与配置示例必须由实际 CLI 测试验证。
+入口需支持 `--help`、`--preflight`、`--suite`、`--config`、`--methods`、`--draft-length`、`--publish`、`--resume`；从空 checkout 按文档完成依赖安装、数据准备和模型下载后，一条 `bash` 命令即可开始或安全续跑。若前置数据或凭据需要人工申请，`--preflight` 要清晰列出，而不是在运行数小时后才失败。命令与配置示例必须由实际 CLI 测试验证。
 
 ## 3. MMSpec 全量数据
 
@@ -95,9 +100,9 @@ bash scripts/run_qwen36_a100_benchmarks.sh --config configs/eval/qwen36_a100_sev
 
 此前 A800 TP1 的七方法在 K=3、固定 512 token、12 个开发 session / 48 次请求上均有正点估计：vLLM 0.32、V2 model runner、BF16、FlashAttention、CUDA GDN，query 宽度 3–8 使用现有 MoE 分组并配合已测的全局 tile 配置。它属于**已测起点**，不是 A100 或本数据集的正式结果。不要把训练面板的 AL 当成推理接受长度，也不要把 MTP 的词表裁剪结果记到七方法上。
 
-每个方法需要在独立开发集重新比较 `K=1..7` 中该方法真实支持的值，必要时连同可用的 GDN、MoE 分组和 CUDA Graph 配置一起调优。每个方法使用相同的搜索预算和开发数据；冻结方法级配置后再跑测试集。记录方法、K、draft block 约束、target/draft TP、实际 attention、GDN、MoE config 和 fallback。对不支持的 K 记录原因，不伪造有效测量。
+七种方法均固定 `K=3`（每轮提议 3 个 draft token），不运行其他 K 的扫描；若底层以 block size 包含 anchor 表示，则按该方法实际接口正确映射，并在日志中同时记录 K 和 block size。运行前确认每种方法真实支持该配置；不支持则标记 blocked 并修复，不能静默替换 K。使用已有优化后端，检查 A100 上兼容性并记录实际 attention、GDN、MoE 配置、target/draft TP 和 fallback。
 
-保留 AR 的高效配置，并在适用时提供相同的公共后端优化；主结果同时列出原生默认 AR 和测得更快的有效 AR，避免通过改变 AR 制造加速。A800 的 MoE 配置文件以 GPU 名称匹配，不能改名冒充 A100 最优；在 A100 上重新验证或调参，保存实际选择值。历史 MMSpec 小集曾用于调参；核对其图像/样本与本轮测试的重叠，无法排除时如实披露，不能声称完全独立 held-out。
+保留 AR 的高效配置，并在适用时提供相同的公共后端优化；主结果同时列出原生默认 AR 和测得更快的有效 AR，避免通过改变 AR 制造加速。A800 的 MoE 配置文件以 GPU 名称匹配，不能改名冒充 A100 最优；在 A100 上重新验证，保存实际选择值；不因此启动 K 扫描。历史 MMSpec 小集曾用于调参；核对其图像/样本与本轮测试的重叠，无法排除时如实披露，不能声称完全独立 held-out。
 
 若有多张 A100，可在资源充足时使用独立 GPU lane 加速；每个 AR/SD 配对使用相同硬件布局。限制 CPU 线程与磁盘读取，避免其他 lane 的模型加载或训练干扰计时。采集实际 GPU UUID、拓扑、驱动、显存、进程和干扰日志。必要时同步预热或缩小并发；不终止其他人的任务。
 
@@ -153,7 +158,7 @@ eval/qwen36_a100_seven_v1/
 
 1. 读取本说明及仓库现有适配；在干净分支补齐可移植入口、数据映射、评分和发布器，运行 CPU 单测、CLI / resume / 上传冲突测试并提交 PR。
 2. A100 预检：确认驱动、CUDA / PyTorch / vLLM 版本兼容、完整 BF16 权重、七个 checkpoint、显存与磁盘、HF 写权限。缺少依赖时记录并解决；未经环境所有者授权不升级宿主机驱动。
-3. 每方法完成一次真实加载和少量功能检查，包含验证拒绝和回滚；检查成功后自动开始独立开发集调参，冻结七个配置与数据 hash。
+3. 每方法完成一次真实加载和少量功能检查，包含验证拒绝和回滚；检查成功后固定七方法 K=3，冻结实际后端配置与数据 hash，并自动开始正式评测。
 4. 运行 MMSpec 完整 `test`：AR 和七方法的自然停止计时、固定 512 对照，完成可运行的质量评分；分 shard 持续上传 `main`。
 5. 在全量 MMSpec 完成后，仅按需要处理已验证的温度 1 扩展；缺失项列出原因。不要为了补表降低原模型配置或虚构结果。
 6. 从原始日志独立重算样本覆盖、时间之和、指标、配对 CI 和质量差值，核对权重、方法模块、GPU 资源及 HF 上传 hash；写出最终汇总 CSV/JSON、失败清单和复现命令。
