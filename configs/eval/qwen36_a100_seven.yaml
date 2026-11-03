@@ -40,7 +40,7 @@ protocol:
 
 engine:
   vllm: 0.32.0
-  gpu_memory_utilization: 0.85
+  gpu_memory_utilization: 0.92   # same allocation fraction as the measured A800 TP1 runs
   max_num_batched_tokens: 4096
   gdn_decode_kernel: cuda       # target Gated DeltaNet: native CUDA decode kernel
   moe_policy: grouped           # existing vLLM grouping for query widths 3..8 (no new kernels)

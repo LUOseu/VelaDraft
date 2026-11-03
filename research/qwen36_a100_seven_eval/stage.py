@@ -276,12 +276,16 @@ def run_stage(args) -> int:
         meta["gpu_name"] = torch.cuda.get_device_name(0)
         try:
             meta["worker"] = llm.collective_rpc("backend_metadata", timeout=180)[0]
-            if arm == "sd":
-                meta["method_metadata"] = llm.collective_rpc(
-                    "method_metadata", timeout=180
-                )[0]
         except Exception as error:  # noqa: BLE001 - stock AR has no audit worker
+            if args.method != "ar_default":
+                raise
             meta["worker"] = {"unavailable": str(error)[:300]}
+        # DFlash uses the validated JointWorker, which only exposes backend_metadata.
+        # Other methods extend it with mandatory method-specific audit evidence.
+        if arm == "sd" and args.method != "dflash":
+            meta["method_metadata"] = llm.collective_rpc(
+                "method_metadata", timeout=180
+            )[0]
         if arm == "sd":
             got = meta.get("worker", {}).get("speculative_tokens")
             if got != manifest["protocol"]["draft_length"]:
