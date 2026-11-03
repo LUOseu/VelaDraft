@@ -28,9 +28,10 @@ CATEGORIES = (
     "multi-turn conversation",
 )
 SUITES = ("mmspec-full", "mmspec-smoke")
-# vLLM 0.32 speculative method per draft architecture (DSpark mounts the public DSpark speculator,
-# every other method the DFlash one with its own registered draft model).
-SPEC_METHOD = {m: ("dspark" if m == "dspark" else "dflash") for m in METHODS}
+# All seven validated A800 paths use DFlash's K+1 query layout. DSpark's
+# bridge installs its native Markov sampler on that proposer; selecting the
+# standalone DSpark proposer bypasses the trained slot and spatial adapters.
+SPEC_METHOD = {m: "dflash" for m in METHODS}
 
 
 def stage_names(repeats: int) -> list[str]:

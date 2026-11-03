@@ -841,3 +841,39 @@ def test_hooked_method_and_shutdown_failure(tmp_path, monkeypatch):
     )
     assert stage.run_stage(args(run, "dfly", "sd_r1")) == 1
     assert not list((run / "raw/mmspec/dfly").glob("*sd_r1*.jsonl"))
+
+
+def test_dflash_joint_worker_needs_only_backend_metadata(tmp_path, monkeypatch):
+    """The validated JointWorker does not implement NativeSevenWorker.method_metadata."""
+    run = setup(tmp_path)
+    install_fakes(monkeypatch)
+    assert stage.run_stage(args(run, "ar", "reference")) == 0
+    original = FakeLLM.collective_rpc
+
+    def joint_worker_rpc(self, name, timeout=None):
+        if name == "method_metadata":
+            raise AttributeError("JointWorker has no method_metadata")
+        return original(self, name, timeout)
+
+    monkeypatch.setattr(FakeLLM, "collective_rpc", joint_worker_rpc)
+    assert stage.run_stage(args(run, "dflash", "sd_r0")) == 0
+    meta = settings.read_json(run / "stages/dflash/natural__sd_r0.json")
+    assert meta["worker"]["speculative_tokens"] == 3
+
+
+def test_other_sd_methods_cannot_hide_method_metadata_failure(tmp_path, monkeypatch):
+    run = setup(tmp_path, ("dflash2",))
+    install_fakes(monkeypatch)
+    assert stage.run_stage(args(run, "ar", "reference")) == 0
+    original = FakeLLM.collective_rpc
+
+    def broken_rpc(self, name, timeout=None):
+        if name == "method_metadata":
+            raise AttributeError("method audit failed")
+        return original(self, name, timeout)
+
+    monkeypatch.setattr(FakeLLM, "collective_rpc", broken_rpc)
+    assert stage.run_stage(args(run, "dflash2", "sd_r0")) == 1
+    meta = settings.read_json(run / "stages/dflash2/natural__sd_r0.json")
+    assert "method audit failed" in meta["error"]
+    assert meta["worker"]["speculative_tokens"] == 3

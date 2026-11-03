@@ -172,7 +172,7 @@ def test_engine_kwargs_per_arm():
     m = manifest_for(None, ("dspark", "dfly"))
     sd = stage.engine_kwargs(m, "dspark", "sd")
     assert (
-        sd["speculative_config"]["method"] == "dspark"
+        sd["speculative_config"]["method"] == "dflash"
         and sd["speculative_config"]["num_speculative_tokens"] == 3
     )
     assert sd["compilation_config"]["cudagraph_capture_sizes"] == [4]

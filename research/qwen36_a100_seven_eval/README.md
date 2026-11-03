@@ -1,6 +1,6 @@
 # Qwen3.6 seven-method MMSpec runner
 
-This PR implements the MMSpec portion of the broader [benchmark handoff](AGENTS.md).
+This implements the [eight-A100 MMSpec execution handoff](AGENTS.md).
 It runs native vLLM 0.32 AR and seven draft methods at fixed K=3, TP1, BF16 and batch 1.
 The full MMSpec test contains 600 sessions and 723 turns; smoke selects 12 sessions.
 
@@ -13,12 +13,18 @@ Implemented: pinned checkpoints, CPU export, input hashes, reference histories, 
 max1024 and fixed512 protocols, three alternating AR/SD repeats, per-topic resume,
 GPU resource sampling, paired bootstrap summaries and incremental HF publication.
 
-The handoff's ScienceQA, MM-Vet, MME, TextVQA, COCO, VizWiz, GQA, SEED-Bench and DOCCI
-suites are not implemented here. Neither are official task scorers, development-set
-K=1..7 selection, A100 MoE tile search, temperature-1 evaluation or automatic promotion
-from smoke to full evaluation. MMSpec is an additional benchmark, not a replacement
-for those suites. The configured AR settings are inherited from earlier development
-work; they have not been established as the fastest AR settings on A100.
+The only requested benchmark is MMSpec. There is no ViSpec-method evaluation, no other
+benchmark suite, no K sweep and no retraining. Use one 8×A100 80GB node with one TP1
+engine per lane. The A800 TP1 K3 backend already has measured development speedups
+around 1.3×; this runner extends that execution path to the full MMSpec test on A100.
+Hardware-specific A800 tile files are not silently renamed as A100 measurements.
+
+The paired AR uses the same native vLLM V2 / CUDA GDN / FlashAttention configuration
+as the A800 comparison, without a drafter or SD-only grouping override. An additional
+stock-default AR job is reported separately. It is not measured as a same-card pair
+against every SD job, and neither AR configuration is claimed globally fastest.
+Official task scores remain pending until references or a specified scorer are supplied.
+See AGENTS.md for the smoke-then-full Bash command and operational handoff.
 
 ## Environment and inputs
 
