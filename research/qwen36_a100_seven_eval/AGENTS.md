@@ -28,6 +28,18 @@
 | 请求计时和 GPU 资源工具 | `vlm_dflash/eval/native_runtime.py`、`vlm_dflash/eval/native_resources.py` |
 | 原生评测与已有质量评分实现 | `vlm_dflash/eval/`、`docs/benchmark.md` |
 
+七个公开 checkpoint 仓库均可通过 `khazic/veladraft-qwen36-400k-{method}` 查找。仓库内 `research/qwen36_seven_20261102/checkpoint_manifest.json` 已记录七个 `ckpt/ckpt_final.pt` 的 revision、大小和 SHA-256；以它作为检查起点，并核对实际使用的文件。目标模型此前使用的 revision 是 `995ad96eacd98c81ed38be0c5b274b04031597b0`，本次实际 revision 必须在运行前复核并冻结。
+
+| 方法 | 需要保留并核对的机制 |
+| --- | --- |
+| DFlash | 并行 block 草稿与 target 特征 / 位置 |
+| DSpark | 前驱 token 条件下的 Markov 修正；记录实际启用的 head |
+| Domino | prefix GRU 状态与修正 |
+| JetSpec | 本仓库已验证的单路径、block-causal 语义；不可称为已运行上游树实现 |
+| DFlash2 | block 内卷积、unary 和 top-16 候选选择器 |
+| DFlare | 分层特征融合及独立 context K/V |
+| DFly | 特征融合及前驱条件 hidden 修正 |
+
 已合并的适配代码是起点，不代表完整新数据集入口已经可用。现有部分研究脚本绑定 A800、本机绝对路径和 12 个开发 session；不得把它们直接称作本任务的完整数据集 runner。`vlm_dflash/eval/native.py` 的旧版本约束也不能默认等同于本轮 vLLM 0.32 运行路径。
 
 **借卡同学开始正式运行之前，执行 agent 必须：**
@@ -79,7 +91,7 @@ Caption 扩展至少加入 **DOCCI** 的官方 test；它提供较长的人工�
 
 启用 native vLLM、CUDA Graph、target full-attention 的 FlashAttention 和兼容的 draft attention；目标的 Gated DeltaNet / recurrent state 使用其原生实现，不强行替换为 FlashAttention。保持线性 block verification 和 causal/MRoPE 语义，不打开树形验证。拒绝后检查 target 的 KV 与 GDN 状态回滚；至少包含真实接受和拒绝案例。使用现有官方算子和最小适配，不重写 CUDA/Triton 内核。
 
-此前 A800 TP1 的七方法在 K=3、固定 512 token、12 个开发 session / 48 次请求上均有正点估计，属于**已测起点**，不是 A100 或本数据集的正式结果。不要把训练面板的 AL 当成推理接受长度，也不要把 MTP 的词表裁剪结果记到七方法上。
+此前 A800 TP1 的七方法在 K=3、固定 512 token、12 个开发 session / 48 次请求上均有正点估计：vLLM 0.32、V2 model runner、BF16、FlashAttention、CUDA GDN，query 宽度 3–8 使用现有 MoE 分组并配合已测的全局 tile 配置。它属于**已测起点**，不是 A100 或本数据集的正式结果。不要把训练面板的 AL 当成推理接受长度，也不要把 MTP 的词表裁剪结果记到七方法上。
 
 每个方法需要在独立开发集重新比较 `K=1..7` 中该方法真实支持的值，必要时连同可用的 GDN、MoE 分组和 CUDA Graph 配置一起调优。每个方法使用相同的搜索预算和开发数据；冻结方法级配置后再跑测试集。记录方法、K、draft block 约束、target/draft TP、实际 attention、GDN、MoE config 和 fallback。对不支持的 K 记录原因，不伪造有效测量。
 
