@@ -38,6 +38,8 @@ class FakeLLM:
             return [
                 {"speculative_tokens": spec["num_speculative_tokens"] if spec else None}
             ]
+        if self.kwargs.get("worker_extension_cls", "").endswith(".JointWorker"):
+            raise NotImplementedError("Method 'method_metadata' is not implemented.")
         return [{"method": "meta"}]
 
 
@@ -199,6 +201,30 @@ def test_prompt_drift_and_wrong_k_fail_the_stage(tmp_path, monkeypatch):
             "error"
         ]
     )
+
+
+@pytest.mark.parametrize("rpc", ["backend_metadata", "method_metadata"])
+def test_sd_audit_failure_preserves_diagnostics(tmp_path, monkeypatch, rpc):
+    run = setup(tmp_path)
+    install_fakes(monkeypatch)
+    assert stage.run_stage(args(run, "ar", "reference")) == 0
+    original = FakeLLM.collective_rpc
+
+    def fail_audit(self, name, timeout=None):
+        if name == rpc:
+            raise RuntimeError(f"{name} unavailable")
+        return original(self, name, timeout)
+
+    monkeypatch.setattr(FakeLLM, "collective_rpc", fail_audit)
+    assert stage.run_stage(args(run, "dflash", "sd_r0")) == 1
+    meta = settings.read_json(run / "stages/dflash/natural__sd_r0.json")
+    assert meta["error"] == f"RuntimeError: {rpc} unavailable"
+    if rpc == "method_metadata":
+        assert meta["worker"]["speculative_tokens"] == 3
+    assert stage.missing_topics(
+        run, sessions_two_topics(), "dflash", "natural", "sd_r0"
+    ) == [settings.CATEGORIES[0], settings.CATEGORIES[5]]
+    assert FakeLLM.instances[-1].shutdowns == 1
 
 
 def test_contaminated_resources_withdraw_shards(tmp_path, monkeypatch):

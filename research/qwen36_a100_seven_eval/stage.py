@@ -276,13 +276,15 @@ def run_stage(args) -> int:
         meta["gpu_name"] = torch.cuda.get_device_name(0)
         try:
             meta["worker"] = llm.collective_rpc("backend_metadata", timeout=180)[0]
-            if arm == "sd":
-                meta["method_metadata"] = llm.collective_rpc(
-                    "method_metadata", timeout=180
-                )[0]
-        except Exception as error:  # noqa: BLE001 - stock AR has no audit worker
+        except Exception as error:
+            # Only stock AR intentionally has no audit worker.
+            if args.method != "ar_default":
+                raise
             meta["worker"] = {"unavailable": str(error)[:300]}
         if arm == "sd":
+            meta["method_metadata"] = llm.collective_rpc(
+                "method_metadata", timeout=180
+            )[0]
             got = meta.get("worker", {}).get("speculative_tokens")
             if got != manifest["protocol"]["draft_length"]:
                 raise ValueError(

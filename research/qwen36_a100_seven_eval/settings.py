@@ -28,9 +28,9 @@ CATEGORIES = (
     "multi-turn conversation",
 )
 SUITES = ("mmspec-full", "mmspec-smoke")
-# vLLM 0.32 speculative method per draft architecture (DSpark mounts the public DSpark speculator,
-# every other method the DFlash one with its own registered draft model).
-SPEC_METHOD = {m: ("dspark" if m == "dspark" else "dflash") for m in METHODS}
+# The anchor-slot DSpark bridge patches DFlashSpeculator and reuses the native
+# DSpark sampler. Selecting "dspark" rewrites its custom architecture to DeepSeek.
+SPEC_METHOD = dict.fromkeys(METHODS, "dflash")
 
 
 def stage_names(repeats: int) -> list[str]:

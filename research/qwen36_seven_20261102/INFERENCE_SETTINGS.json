@@ -30,7 +30,7 @@
   "methods": {
     "dflash": {
       "architecture": "DFlashDraftModel",
-      "worker": "research.qwen36_nextopt_20261102.worker.JointWorker"
+      "worker": "research.qwen36_seven_20261102.worker.NativeSevenWorker"
     },
     "dflash2": {
       "architecture": "DFlash2DraftModel",
