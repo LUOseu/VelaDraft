@@ -1,84 +1,121 @@
-# Qwen3.6-35B-A3B seven-method MMSpec benchmark (A100)
+# Qwen3.6 seven-method MMSpec runner
 
-Runner for the contract in [`AGENTS.md`](AGENTS.md): native vLLM 0.32 AR versus DFlash, DSpark, Domino,
-JetSpec, DFlash2, DFlare and DFly at K=3 on the complete MMSpec `test` (600 sessions, 723 turns),
-TP1 batch 1, BF16, results mirrored to Hugging Face while it runs.
+This PR implements the MMSpec portion of the broader [benchmark handoff](AGENTS.md).
+It runs native vLLM 0.32 AR and seven draft methods at fixed K=3, TP1, BF16 and batch 1.
+The full MMSpec test contains 600 sessions and 723 turns; smoke selects 12 sessions.
 
-Status: code and CPU tests are in this branch; **A100 hardware acceptance is pending** until a
-real run has loaded the model, passed the per-method checks, read the data, written to HF and
-resumed. Nothing here is an A100 result yet.
+**A100 hardware acceptance is pending.** CPU tests use fake engines. There are no new
+hardware results, quality scores or verified acceleration claims in this change.
 
-## Setup (once per machine)
+## Scope and remaining work
+
+Implemented: pinned checkpoints, CPU export, input hashes, reference histories, natural
+max1024 and fixed512 protocols, three alternating AR/SD repeats, per-topic resume,
+GPU resource sampling, paired bootstrap summaries and incremental HF publication.
+
+The handoff's ScienceQA, MM-Vet, MME, TextVQA, COCO, VizWiz, GQA, SEED-Bench and DOCCI
+suites are not implemented here. Neither are official task scorers, development-set
+K=1..7 selection, A100 MoE tile search, temperature-1 evaluation or automatic promotion
+from smoke to full evaluation. MMSpec is an additional benchmark, not a replacement
+for those suites. The configured AR settings are inherited from earlier development
+work; they have not been established as the fastest AR settings on A100.
+
+## Environment and inputs
+
+Use a server environment containing vLLM 0.32.0, its compatible PyTorch/Transformers,
+PyYAML and huggingface_hub. FlashInfer JIT needs the matching CUDA toolkit. Installations
+and model downloads belong on the GPU server. Set `Q36_PYTHON` to that environment's Python.
+
+Edit [the configuration](../../configs/eval/qwen36_a100_seven.yaml), or set these variables
+to directories allowed by your server policy before running:
+
+| Variable | Purpose |
+| --- | --- |
+| `Q36_A100_ROOT` | Run outputs and manifests |
+| `Q36_A100_EXPORTS` | Content-addressed draft exports |
+| `Q36_TARGET_PATH` | Complete local target snapshot at the configured revision |
+| `Q36_MMSPEC_CLONE` | Dedicated MMSpec clone at the pinned commit |
+| `VELADRAFT_GPU_LOCK_DIR` | Shared advisory GPU locks |
+| `CUDA_HOME` | Compatible CUDA toolkit |
+| `HF_HOME`, `TMPDIR`, `TRITON_CACHE_DIR` | Server cache and scratch locations |
+
+Optional: `Q36_LOCAL_CHECKPOINTS` reuses local checkpoints only when their hashes match
+[the pinned manifest](../qwen36_seven_20261102/checkpoint_manifest.json).
+`Q36_MOE_TUNED_DIR` selects a measured A100 MoE table. `Q36_PRE_STAGE_HOOK` is an optional
+site command receiving the GPU index; hook failure stops that stage. No hook is enabled
+by default. All selected GPUs must be free at preflight.
+
+GPU ownership defaults to PID checks. Sites with container PID namespaces can explicitly
+set `VELADRAFT_GPU_OWNERSHIP=count`, which checks process-count bounds. Sampling cannot
+prove continuous exclusivity; resource evidence records this limitation.
+
+HF authentication uses the existing credential store or `HF_TOKEN`. Preflight checks
+identity and token role; fine-grained write permissions are only confirmed by the first
+successful upload. Never place tokens in the YAML or command line.
+
+## Run and resume
 
 ```bash
-# 1. Runtime: vLLM 0.32.0 brings torch 2.13 (cu130); a complete CUDA 13.0 toolkit is needed for FlashInfer JIT.
-uv venv -p 3.12 .venv-q36 && VIRTUAL_ENV=.venv-q36 uv pip install "vllm==0.32.0" huggingface_hub pyyaml pytest
-export Q36_PYTHON=$PWD/.venv-q36/bin/python CUDA_HOME=/usr/local/cuda-13.0
-
-# 2. Target weights at the pinned revision (re-check the revision before a run).
-hf download Qwen/Qwen3.6-35B-A3B --revision 995ad96eacd98c81ed38be0c5b274b04031597b0 --local-dir /data/models/Qwen3.6-35B-A3B
-export Q36_TARGET_PATH=/data/models/Qwen3.6-35B-A3B
-
-# 3. Work locations (all on the server disk; nothing in a client cache).
-export Q36_A100_ROOT=/data/qwen36_a100_seven Q36_MMSPEC_CLONE=/data/MMSpec
-export VELADRAFT_GPU_LOCK_DIR=/dev/shm/q36_gpu_locks
-
-# 4. HF write access to the results repository (preflight checks it).
-hf auth login
+bash scripts/run_qwen36_a100_benchmarks.sh --config configs/eval/qwen36_a100_seven.yaml --preflight --publish
 ```
-
-Optional variables: `Q36_A100_EXPORTS` (draft exports, default under the root),
-`Q36_LOCAL_CHECKPOINTS` (an existing `<root>/<method>/train/ckpt_final.pt` tree; used only when the
-SHA-256 matches the pin), `Q36_MOE_TUNED_DIR` (an A100 MoE tile table; empty keeps vLLM defaults),
-`Q36_PRE_STAGE_HOOK` (a site command called with the GPU index before each stage, e.g. to release
-idle placeholders on that card).
-
-## Run
 
 ```bash
-bash scripts/run_qwen36_a100_benchmarks.sh --preflight --config configs/eval/qwen36_a100_seven.yaml --publish
-bash scripts/run_qwen36_a100_benchmarks.sh --config configs/eval/qwen36_a100_seven.yaml --suite mmspec-full \
-  --methods dflash,dspark,domino,jetspec,dflash2,dflare,dfly --draft-length 3 --publish --resume
+bash scripts/run_qwen36_a100_benchmarks.sh --config configs/eval/qwen36_a100_seven.yaml --suite mmspec-smoke --publish
 ```
 
-`--preflight` lists every item that needs a person (GPUs, toolkit, target, data, HF access, disk)
-and exits. The first run downloads the seven checkpoints at their pinned revisions
-(`research/qwen36_seven_20261102/checkpoint_manifest.json`), exports them for vLLM, clones MMSpec at
-`290486861e`, verifies the paper scope (600 / 723 / 100 per topic) and freezes all hashes into
-`manifest.json`. `--resume` continues the latest run of the suite after any interruption; finished
-shards are never recomputed and a changed code commit is refused. `--suite mmspec-smoke` (12
-sessions) is a functional check only and is never a formal table.
+Inspect smoke results for every method before explicitly starting full evaluation:
 
-## What a run measures
-
-- Jobs: every method under `natural` (greedy, natural stop, max 1024 new tokens) and `fixed512`
-  (exactly 512 tokens, EOS ignored, explicit stop ids removed). A job owns one GPU and alternates
-  AR and SD stages on it (AR0 SD0 SD1 AR1 AR2 SD2), each a fresh engine with an untimed warmup.
-  Stock-default AR (`ar_default`) is timed in its own lane alongside the tuned native AR.
-- Multi-turn history is the untimed native AR `reference` (fixed AR history for every arm); every
-  timed request must reproduce the reference prompt token ids.
-- Timing per request: image read and decode, template, processing, vision, prefill, decode and
-  detokenization; engine load, compile and warmup are excluded. GPU processes are sampled every
-  2 s; a foreign process inside a timed window withdraws that stage's shards and reruns it.
-- `natural` SD jobs end with an untimed stats-enabled pass for native acceptance counters.
-
-`summary.json` / `summary.csv` are recomputed from raw shards: request-level speedup
-`sum(AR wall) / sum(SD wall)` with a session-clustered paired bootstrap 95% CI, the per-token time
-ratio (a separate metric), acceptance (accepted draft tokens per round; the bonus-inclusive length is
-labelled separately), token-exact rate, finish reasons and latency percentiles, per topic, pooled and
-as a labelled macro mean. Task quality is `pending`: MMSpec `test` ships no references or scorer;
-all generations are kept for later scoring.
-
-## Layout
-
-```
-<root>/runs/<run_id>/            mirrored to khazic/veladraft-qwen36-400k-dflash@main:eval/qwen36_a100_seven_v1/runs/<run_id>/
-  manifest.json  status.json  summary.json  summary.csv  sessions.json
-  raw/mmspec/<method>/<protocol>__<stage>__<topic>.jsonl     immutable once written
-  raw/mmspec/_reference/natural__reference__<topic>.jsonl
-  stages/<owner>/<protocol>__<stage>.json                    engine args, versions, worker metadata, resources
-  resources/  logs/  claims/  done/  failed/  publish_state.json
+```bash
+bash scripts/run_qwen36_a100_benchmarks.sh --config configs/eval/qwen36_a100_seven.yaml --suite mmspec-full --publish
 ```
 
-Not implemented yet: the temperature-1 extension (contract step 5, only after the greedy table) and
-an A100 MoE tile search (set `Q36_MOE_TUNED_DIR` if one is measured).
+```bash
+bash scripts/run_qwen36_a100_benchmarks.sh --config configs/eval/qwen36_a100_seven.yaml --suite mmspec-full --publish --resume
+```
+
+`--gpus 0,1` selects lanes. `--methods dflash,dspark` selects methods. `--run-id` selects
+an existing run with `--resume`. A run requires a clean checkout and freezes its code
+commit and configuration. Resume checks the commit and input hashes, retries failed
+jobs, and keeps completed shards. YAML changes do not modify an existing run's settings.
+Each job must resume on its original GPU index and physical GPU. Use a new run to change
+hardware or settings. A launcher lock prevents concurrent resumes of the same run.
+
+## Measurement and output
+
+Each method/protocol job alternates AR0, SD0, SD1, AR1, AR2, SD2 on one card. Every stage
+starts a fresh engine and warms it up outside measurement. Multi-turn input uses frozen
+untimed AR history; timed prompt token IDs must match the reference. Request timing
+includes image reading, RGB decoding, templating, processing, prefill, generation and
+detokenization. Engine startup and compilation are excluded.
+
+The stock-default AR job runs independently and is reported separately without a paired
+speedup claim. Natural SD also runs an untimed acceptance-counter pass. Accepted draft
+tokens per verification round excludes the bonus token. The additional bonus-inclusive
+number is only an upper bound because bonus emission is not measured.
+
+Results become visible only after the stage succeeds and GPU resource checks pass.
+A run is complete only when every expected session, turn and repeat, stock AR job and
+requested acceptance pass is present. Partial pairs cannot be reported as a complete
+benchmark. Quality remains pending because this MMSpec input supplies no reference answers
+or task scorer; generated answers are retained for later evaluation.
+
+`summary.json` and `summary.csv` report paired request-time ratios, session-clustered
+bootstrap 95% intervals, per-token ratios, token equality, lengths, stop reasons and
+latency percentiles. Topic summaries and macro topic speedups are separate from pooled
+request totals. A complete timing run does not mean task-quality acceptance is complete.
+
+Run files live under `<root>/runs/<run_id>/`. Raw rows are under `raw/mmspec/`; full local
+stage diagnostics are under `stages/`, with resource samples and logs kept separately.
+`--publish` mirrors selected evidence fields below the configured HF `eval/` directory.
+Site environments, local paths, GPU UUIDs and diagnostic tracebacks stay local. Uploads
+use immutable byte snapshots, preserve other runs in `INDEX.json`, retry moved repository
+heads, and verify downloaded bytes at the resulting commit. Publication errors leave
+local results intact; resume retries the outstanding upload.
+
+## CPU validation
+
+```bash
+python -m pytest research/qwen36_a100_seven_eval -q
+```
+
+The repository CI runs these tests alongside its existing CPU, packaging and documentation checks.
