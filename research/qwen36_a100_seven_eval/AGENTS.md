@@ -8,7 +8,7 @@
 - 方法：`dflash`、`dspark`、`domino`、`jetspec`、`dflash2`、`dflare`、`dfly`。每种方法必须加载自己的真实最终 checkpoint 和全部对应模块。
 - 对照：同一机器、同一 GPU、同一 target、同一输入和计时边界下的原生 vLLM AR。
 - 用户明确不要求评测 ViSpec 方法；不要把 ViSpec、Medusa、EAGLE 或 MTP 当成七方法之一，也不要把 MTP 的加速套用到这七种方法。
-- 论文 [arXiv:2509.15235](https://arxiv.org/pdf/2509.15235) 只用作数据集和任务的参考。模型、方法、硬件和推理框架不同，结果不能写成对原文数值的直接复现。
+- 唯一正式数据范围是 [MMSpec](https://github.com/killthefullmoon/MMSpec) 官方完整 `dataset/MMSpec/test`；不运行之前 ViSpec 论文的 benchmark。模型、方法、硬件和推理框架不同，结果不能写成对 MMSpec 原文数值的直接复现。
 - 不重新训练。可在独立开发集选择运行参数；保留原 checkpoint、导出权重和所有原始结果。
 
 先完成七方法和主要数据集的真实评测；数据准备、正式计时、质量评分和上传可以形成队列。短检查必须自动接入正式队列，不能长时间停留在冒烟阶段。单个数据集或评分器不可用时记录原因，并继续其他可运行项。
@@ -65,33 +65,27 @@ cd VelaDraft
 # 将 <REVIEWED_COMMIT> 替换为已合并 main 或公开 PR 的实际 commit SHA。
 git checkout --detach <REVIEWED_COMMIT>
 test -f scripts/run_qwen36_a100_benchmarks.sh
-bash scripts/run_qwen36_a100_benchmarks.sh --config configs/eval/qwen36_a100_seven.yaml --suite paper-core-and-caption --publish --resume
+bash scripts/run_qwen36_a100_benchmarks.sh --config configs/eval/qwen36_a100_seven.yaml --suite mmspec-full --publish --resume
 ```
 
 入口需支持 `--help`、`--preflight`、`--suite`、`--config`、`--publish`、`--resume`；从空 checkout 按文档完成依赖安装、数据准备和模型下载后，一条 `bash` 命令即可开始或安全续跑。若前置数据或凭据需要人工申请，`--preflight` 要清晰列出，而不是在运行数小时后才失败。命令与配置示例必须由实际 CLI 测试验证。
 
-## 3. 数据集与 caption 任务
+## 3. MMSpec 全量数据
 
-论文主实验包含以下八类任务；评测的是本项目的七种方法，任务名不代表要运行论文方法。
+正式评测使用 [MMSpec 官方仓库](https://github.com/killthefullmoon/MMSpec) 的 `dataset/MMSpec/test`，不是 `testmini`；其论文报告 600 条样本、六类各 100 条。固定仓库 commit，获取完整 `mmspec.jsonl` 和 `images/`，核验文件、图片、类别计数、ID 与 turns。若实际下载数量或定义与论文不一致，记录差异并检查来源，不擅自补样或将子集称为全量。
 
-| 数据集 | 类型 | 本任务最低要求 |
-| --- | --- | --- |
-| ScienceQA | 科学推理 / 多选 | 官方测试划分；保留带图及无图样本，分别统计；对齐官方问题、选项和答案格式 |
-| MM-Vet | 综合视觉问答 | 官方测试样本；记录 judge 版本、提示和评分状态 |
-| MME | 多模态问答 | 官方测试样本；保留同一图像的关联问题和原始类别 |
-| TextVQA | 文字识别问答 | 官方可评分划分和规范化评分 |
-| COCO Captions | 图像描述 | 官方可评分测试划分；短描述与详细描述两个 prompt 配置分开记录 |
-| VizWiz | 真实场景视觉问答 | 官方可评分划分与原有答案规范化 |
-| GQA | 场景关系问答 | 官方可获取的标准测试划分；记录实际配置和样本数 |
-| SEED-Bench | 多模态多选 | 记录版本、任务类别和图像子集；视频题如有，按实际视频支持单独统计 |
+| MMSpec 类别 | 论文报告样本数 | 数据来源 |
+| --- | ---: | --- |
+| General VQA | 100 | GQA |
+| Text VQA | 100 | TextVQA |
+| Image Captioning | 100 | COCO |
+| Chart VQA | 100 | CharXiv |
+| Complex Reasoning | 100 | MMMU-Pro |
+| Multi-turn Conversation | 100 | ConvBench、MM-MT-Bench |
 
-Caption 扩展至少加入 **DOCCI** 的官方 test；它提供较长的人工图像描述，适合观察长输出场景。COCO 的标准 caption 与详细 caption 分别作为独立配置，不能把改变 prompt 后的分数与标准 caption 分数直接比较。TextCaps 或 NoCaps 可作为进一步的文字密集 / 域外 caption 扩展，只有数据与官方评分可用时才标为完成。
+保留官方 prompt、图像和多轮顺序；先检查官方数据和评测代码，固定多轮历史构造、停止规则、生成长度及计时口径，报告任何适配差异。多轮计时和质量分别说明使用固定历史还是各方法自身生成历史；不能混算。按 sample 和 turn 记录覆盖、失败原因，AR 和七方法均完整跑完六类。`testmini` 只允许用于冒烟，不作为正式表；`caption_marker_test` 不代替正式 `test`。不额外运行此前 ViSpec 论文的数据集或其他 caption 扩展。
 
-论文附录还涉及高分辨率和视频任务。若要覆盖这些扩展，分别使用 HR-Bench 4K、MME-RealWorld、MSVD-QA、MVBench 的官方版本；确认多图/视频输入、帧数、MRoPE、视觉特征和拒绝回滚都支持七方法。不要把视频偷偷替换为单帧后称作原视频评测。视频或数据许可不具备时标记 `blocked`，主表八项和 caption 任务继续推进。
-
-使用官方数据/许可和公开评测工具。每个数据集保存：数据集名称、官方来源、revision、config、split、实际样本数、样本 ID、图像 ID、原始图片 SHA-256、问题、选项、参考答案/参考 caption、prompt 模板版本。所有七方法和 AR 使用同一批样本及其输入顺序或可追溯映射。不能静默跳过坏图、无图问题、短回答、超时或低接受率请求；逐项记失败及原因。
-
-论文使用面向详细回答的任务提示及 ScienceQA 的 QCM→ALE 格式。实现时从 [官方实现](https://github.com/KangJialiang/ViSpec) 核对并固定 prompt 模板和代码 revision；记录实际执行的 prompt，不需要运行该方法。标准质量 prompt 与详细回答速度 prompt 分开命名、分别测 AR 和 SD。
+记录官方数据 commit、各图片 hash、样本 ID、类别、turn、prompt 模板和输入映射。核查官方样本是否附有可评分答案和评分脚本；能复现的质量指标按原方法报告，缺少参考答案或评分器标记 `pending`，保存生成结果供后续评分，不将生成内容或代理指标冒充官方分数。
 
 ## 4. A100 配置与方法优化
 
@@ -111,7 +105,7 @@ Caption 扩展至少加入 **DOCCI** 的官方 test；它提供较长的人工�
 
 主口径为 `temperature=0` 的 greedy，自然停止，`max_new_tokens=1024`，batch1、关闭 prefix caching 和多模态处理缓存；每项至少三次技术重复。具体 `max_model_len`、像素范围和视频帧策略在预检后统一冻结，AR 和 SD 一致。另做固定 512 token 对照：`ignore_eos=true` 且清空显式 stop token，真实生成满 512 个 token；标记可能包含 EOS 后内容，不用它计算自然回答质量。
 
-论文同时报告温度 1。先完成七方法的 greedy 主表，再验证每个方法在目标温度下的 native sampling / rejection 是否正确；仅对通过验证的方法扩展温度 1，并记录多个独立 seed。不可用的组合显式标 `blocked`，不得借用 greedy 数据填表。不同采样路径的随机数消耗不同，不要求同 seed 的 AR/SD 逐 token 相同。
+如需温度 1 扩展，先完成七方法的 greedy 主表，再验证每个方法在目标温度下的 native sampling / rejection 是否正确；仅对通过验证的方法扩展温度 1，并记录多个独立 seed。不可用的组合显式标 `blocked`，不得借用 greedy 数据填表。不同采样路径的随机数消耗不同，不要求同 seed 的 AR/SD 逐 token 相同。
 
 计时从图像读取和 prompt 构造开始，经过 vision encoder、prefill、decode 和 detokenization，结束于请求完成；加载模型、编译和预热不计入。记录原始单请求单调时钟、输出 token 数、结束原因、错误、GPU 环境和源代码 hash。SD 的特征捕获、草稿推理、验证、重算及适配开销均计入 SD。
 
@@ -124,14 +118,14 @@ Caption 扩展至少加入 **DOCCI** 的官方 test；它提供较长的人工�
 每个数据集、方法、配置和温度至少输出：
 
 1. 请求级 E2E 加速比：`sum(AR_wall_seconds) / sum(SD_wall_seconds)`；报告 AR/SD 原始总时间、每请求延迟分布、样本数与失败数。
-2. 每 token 耗时对照：分别计算 `sum(time)/sum(output_tokens)`，再计算 AR/SD 比值。论文表使用每 token 时间口径；查阅其官方计算脚本后单列对应结果。两种口径不能混称或挑较大值充当同一个指标。
+2. 每 token 耗时对照：分别计算 `sum(time)/sum(output_tokens)`，再计算 AR/SD 比值。参考 MMSpec 官方论文和代码核实其指标定义，按实际实现单独复算并标注差异。两种口径不能混称或挑较大值充当同一个指标。
 3. 原生接受统计：接受的 draft token 数、提议数、验证轮数及每轮平均接受长度；额外输出包含 bonus token 的有效产出时须标注定义。不能把训练 AL、总输出 token/轮数或缺失值冒充原生接受长度。
-4. 任务质量：AR 与每种 SD 的官方分数、差值、有效配对数及失败记录；按数据集保留原始尺度和评分版本。Caption 报告适用的 CIDEr / BLEU 等官方指标，并说明详细 caption 与标准短 caption 的差别。
+4. 任务质量：AR 与每种 SD 的官方分数、差值、有效配对数及失败记录；按数据集保留原始尺度和评分版本。Caption 仅在参考标注及对应评分器可用时报告适用指标，说明限制。
 5. 输出一致率、输出长度、EOS/length/timeout 比例，以及资源干扰和方法有效性状态。速度、质量和 token-exact 分开报告。
 
 对相同样本做配对 bootstrap，按原始图像或 session 聚类；相关问题、turn、重复和 seed 保留在同一簇。报告 95% CI、聚类单位、样本数、重采样次数和随机种子。多数据集同时提供逐数据集结果、明确标记的宏平均与全量请求池化结果；不要把逐请求 speedup 的简单平均当成主表。
 
-MM-Vet 或其他任务若需外部 judge / 密钥，先准备可复现的答案与评分输入；无凭据时质量项标 `pending` 并说明，不能填 0 或宣称已评分。持续完成已授权的速度任务和可用评分，不因 token 差异分析或单一评分器阻塞全部任务。只有真实运行、覆盖与资源检查通过的行才能进入正式表；失败重试保留旧记录，不能用历史开发集数字补缺。
+MMSpec 质量评估若需外部 judge / 密钥，先准备可复现的答案与评分输入；无凭据时质量项标 `pending` 并说明，不能填 0 或宣称已评分。持续完成已授权的速度任务和可用评分，不因 token 差异分析或单一评分器阻塞全部任务。只有真实运行、覆盖与资源检查通过的行才能进入正式表；失败重试保留旧记录，不能用历史开发集数字补缺。
 
 ## 7. 持续更新 Hugging Face `main`
 
@@ -160,8 +154,8 @@ eval/qwen36_a100_seven_v1/
 1. 读取本说明及仓库现有适配；在干净分支补齐可移植入口、数据映射、评分和发布器，运行 CPU 单测、CLI / resume / 上传冲突测试并提交 PR。
 2. A100 预检：确认驱动、CUDA / PyTorch / vLLM 版本兼容、完整 BF16 权重、七个 checkpoint、显存与磁盘、HF 写权限。缺少依赖时记录并解决；未经环境所有者授权不升级宿主机驱动。
 3. 每方法完成一次真实加载和少量功能检查，包含验证拒绝和回滚；检查成功后自动开始独立开发集调参，冻结七个配置与数据 hash。
-4. 运行完整主数据集：AR 和七方法的自然停止计时、固定 512 对照，完成可运行的质量评分；分 shard 持续上传 `main`。
-5. 处理 caption 扩展、已验证的温度 1 和可用的高分辨率/视频任务；缺失项列出原因。不要为了补表降低原模型配置或虚构结果。
+4. 运行 MMSpec 完整 `test`：AR 和七方法的自然停止计时、固定 512 对照，完成可运行的质量评分；分 shard 持续上传 `main`。
+5. 在全量 MMSpec 完成后，仅按需要处理已验证的温度 1 扩展；缺失项列出原因。不要为了补表降低原模型配置或虚构结果。
 6. 从原始日志独立重算样本覆盖、时间之和、指标、配对 CI 和质量差值，核对权重、方法模块、GPU 资源及 HF 上传 hash；写出最终汇总 CSV/JSON、失败清单和复现命令。
 
 交付时给出：GitHub PR 与合入状态、可拉取的 commit、真实存在的一键命令、HF `main` 结果目录、实际表格、原始文件及覆盖/失败项。若某项尚未实现或 A100 尚未验证，准确列为未完成，不能把计划中的脚本或 A800 数据说成 A100 正式结果。
