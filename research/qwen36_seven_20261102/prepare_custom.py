@@ -6,9 +6,10 @@ from pathlib import Path
 import sys
 
 
-def prepare(method):
+def prepare(method,src=None,dst=None):
+    # Default paths are the original development layout; callers may pass explicit directories.
     root=Path('/root/autodl-tmp/qwen36_seven_20261102')
-    src=root/'exports_raw'/method;dst=root/'exports'/method
+    src=Path(src) if src else root/'exports_raw'/method;dst=Path(dst) if dst else root/'exports'/method
     config=json.loads((src/'config.json').read_text())
     before=json.loads(json.dumps(config))
     names=dict(domino='DFlashVelaDominoModel',dflare='DFlashVelaDFlareModel',dfly='DFlashVelaDFlyModel')

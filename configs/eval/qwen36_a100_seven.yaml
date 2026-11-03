@@ -1,0 +1,62 @@
+# Qwen3.6-35B-A3B seven-method speculative decoding on MMSpec test, A100 80GB, vLLM 0.32, K=3.
+# Contract: research/qwen36_a100_seven_eval/AGENTS.md. Site paths come from the environment
+# (${NAME:-default}); see research/qwen36_a100_seven_eval/README.md for the variables.
+
+run:
+  root: ${Q36_A100_ROOT:-./work/qwen36_a100_seven}   # runs/<run_id>/, sha256 cache, latest_<suite> links
+  gpus: [0, 1, 2, 3, 4, 5, 6, 7]                      # one lane per GPU, TP1 batch1
+  gpu_name_contains: A100
+
+target:
+  repo: Qwen/Qwen3.6-35B-A3B
+  revision: 995ad96eacd98c81ed38be0c5b274b04031597b0  # re-check before a run; frozen into manifest.json
+  path: ${Q36_TARGET_PATH:-./work/models/Qwen3.6-35B-A3B}
+
+checkpoints:
+  # Revisions and SHA-256 are pinned in research/qwen36_seven_20261102/checkpoint_manifest.json.
+  work_dir: ${Q36_A100_EXPORTS:-./work/qwen36_a100_seven/exports}
+  local_root: ${Q36_LOCAL_CHECKPOINTS:-}               # optional <root>/<method>/train/ckpt_final.pt, used only on SHA match
+
+data:
+  repo: https://github.com/killthefullmoon/MMSpec
+  commit: 290486861eabd746075ca776adb66175636c1fc0
+  clone: ${Q36_MMSPEC_CLONE:-./work/MMSpec}
+
+protocol:
+  protocols: [natural, fixed512]
+  draft_length: 3
+  repeats: 3
+  max_new_tokens: 1024          # natural stop (MMSpec reference length)
+  fixed_tokens: 512             # ignore_eos, explicit stop ids removed; never scored for quality
+  max_model_len: 8192
+  min_pixels: 65536
+  max_pixels: 1048576
+  seed: 43
+  system_prompt: "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions."
+  chat_template_kwargs: {enable_thinking: false}
+  warmup_sessions_per_topic: 2  # untimed, on every fresh engine
+  acceptance_stats: true        # one untimed stats-enabled SD pass per method (natural)
+  ar_default: true              # also time stock-default AR in its own lane
+
+engine:
+  vllm: 0.32.0
+  gpu_memory_utilization: 0.85
+  max_num_batched_tokens: 4096
+  gdn_decode_kernel: cuda       # target Gated DeltaNet: native CUDA decode kernel
+  moe_policy: grouped           # existing vLLM grouping for query widths 3..8 (no new kernels)
+  tuned_config_folder: ${Q36_MOE_TUNED_DIR:-}   # A100 tile table if measured; empty = vLLM defaults
+  cuda_home: ${CUDA_HOME:-/usr/local/cuda-13.0}  # complete CUDA 13.0 toolkit for FlashInfer JIT
+
+publish:
+  repo: khazic/veladraft-qwen36-400k-dflash
+  path: eval/qwen36_a100_seven_v1
+
+site:
+  publish_interval: 300
+  pre_stage_hook: ${Q36_PRE_STAGE_HOOK:-}       # optional command run with the GPU index before each stage
+  environment:
+    VELADRAFT_GPU_LOCK_DIR: ${VELADRAFT_GPU_LOCK_DIR:-./work/gpu_locks}
+    HF_HUB_OFFLINE: "1"
+    TRANSFORMERS_OFFLINE: "1"
+    OMP_NUM_THREADS: "4"
+    VLLM_BATCH_INVARIANT: "0"
