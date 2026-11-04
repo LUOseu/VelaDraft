@@ -1,0 +1,14 @@
+{
+  "dflash2": {
+    "repo": "khazic/veladraft-qwen3vl8b-200k-dflash2",
+    "revision": "38e4da1893ce47fa4f8acdbf2afccfb49b15b9c8",
+    "path": "run/config.json",
+    "sha256": "0f71876ad9a32d17b9b08dff78cba30af491a99199a0f749d6084fde3315e5e9"
+  },
+  "dfly": {
+    "repo": "khazic/veladraft-qwen3vl8b-200k-dfly",
+    "revision": "24331eae8ac5dbe0f12390aa32c92f4e7efec5ab",
+    "path": "run/config.json",
+    "sha256": "d22b407dca2cf79c896339cd7c26603791ac0307ce0867c1fe26982898fe3133"
+  }
+}
