@@ -6,14 +6,14 @@
 
 **代码位置与状态。** 代码库为 [LUOseu/VelaDraft 的实验准备分支](https://github.com/LUOseu/VelaDraft/tree/codex/q3vl8b-main-campaign-20261104)，上游代码基线是 `56fde8c563222ec3196a053cafb6f6e213bd97ac`；本次准备包在 `research/q3vl8b_main_campaign/`。克隆该分支后记录实际 `git rev-parse HEAD`，若合并了新补丁，同时冻结 commit、dirty diff、依赖版本和验证结果。服务器上现存的准备副本是基线归档加准备包，不是 Git worktree；正式运行请使用上述 Git 分支的新 worktree。
 
-**当前尚未完成正式实验代码。** `prepare_configs.py` 仅生成以原始 8B 配方为依据的八个候选配置，标记为 `DRAFT_NOT_LAUNCH_READY`；`monitor.sh` 仅导出和同步部分进度，不会启动训练。真实 200K 数据及 dev/test 路径和血缘、同 seed 配对初态和 anchor 流、八臂调度与精确恢复、A/B/C/D 采集与重算尚待实现及端到端验证。不得把旧 seed 42 的四臂调度器或草稿配置当成已就绪的本次完整矩阵。当前准备节点是 4×RTX 3090 24 GB，只用于基础验证；正式 A100 硬件、训练成本和部署性能必须在目标 8×A100 80 GB 节点上实测。已有测试范围见本目录 `VALIDATION.md`。
+**当前尚未完成正式实验代码。** `prepare_configs.py` 仅生成以原始 8B 配方为依据的四个 B 实验候选配置（默认两个方法各 ref/opt，一个 seed），标记为 `DRAFT_NOT_LAUNCH_READY`；`monitor.sh` 仅导出和同步部分进度，不会启动训练。真实 200K 数据及 dev/test 路径和血缘、同 seed 配对初态和 anchor 流、四臂调度与精确恢复、A/B/C/D 采集与重算尚待实现及端到端验证。不得把旧 seed 42 的四臂调度器或草稿配置当成已就绪的本次完整矩阵。当前准备节点是 4×RTX 3090 24 GB，只用于基础验证；正式 A100 硬件、训练成本和部署性能必须在目标 8×A100 80 GB 节点上实测。已有测试范围见本目录 `VALIDATION.md`。
 
 **代码入口。**
 
-- `research/q3vl8b_main_campaign/prepare_configs.py`：由 `original_configs/dflash2.json`、`dfly.json` 派生 seed 17/29 × ref/opt 共八份草稿；`original_configs/PROVENANCE.json` 记录公开源版本与 hash。原始路径仅供溯源，须按实际节点重绑数据、target 和 dev/test。
+- `research/q3vl8b_main_campaign/prepare_configs.py`：由 `original_configs/dflash2.json`、`dfly.json` 派生一个 seed（默认 17）× 两个已选方法（DFlash2、DFly）× ref/opt 共四份草稿；`original_configs/PROVENANCE.json` 记录公开源版本与 hash。原始路径仅供溯源，须按实际节点重绑数据、target 和 dev/test。
 - `research/q3vl8b_main_campaign/progress.py`：从 `work/<run>/train/` 的指定训练、验证和计时记录导出到 `raw/updates/<run>/`。当前不自动导出任意 stdout、模型、optimizer、图片或其他全部原始资料；A/C/D 的采集脚本必须另行实现。
 - `research/q3vl8b_main_campaign/monitor.sh` 与 `hf_sync_safe.py`：前者循环调用进度导出和同步，默认 300 秒一次；后者按白名单增量上传，记录 `.hf_sync_state.json` 的成功时间、文件 hash 和 commit，失败后重试，不删除远端其他文件。同步状态不是实验完成凭证。
-- `scripts/q3vl8b_trainopt/launch_run.sh` 是已有的单臂训练入口；`launch_campaign.sh`、`make_configs.py`、`jobs.py`、`scheduler.py` 是旧实验接口和实现参考，其现有 seed 42 配置与调度行为不能直接当作本次八臂正式实现。`vlm_dflash/target/sample_capture.py` 负责图文特征捕获，`research/qwen3vl8b_native_vllm/` 提供 native adapter 与质量评测相关入口；具体能力以节点代码和测试为准。
+- `scripts/q3vl8b_trainopt/launch_run.sh` 是已有的单臂训练入口；`launch_campaign.sh`、`make_configs.py`、`jobs.py`、`scheduler.py` 是旧实验接口和实现参考，其现有 seed 42 配置与调度行为不能直接当作本次四臂正式实现。`vlm_dflash/target/sample_capture.py` 负责图文特征捕获，`research/qwen3vl8b_native_vllm/` 提供 native adapter 与质量评测相关入口；具体能力以节点代码和测试为准。
 
 **Bash 环境示例。** 以下路径是占位符，必须由节点负责人替换成实际可读的原始数据和模型；新建唯一运行目录，勿覆盖现有实验。训练器的 `launch_run.sh` 需要节点本地 `TRAINOPT_ENV`，该文件应设置 `VELA_CORPUS`（含 `data/` 和 `regen/`）、`VELA_TARGET`、`VELA_LOCAL`、`HF_CACHE_HOME`、`TP`；如使用旧 `launch_campaign.sh configs`，还须提供 `VELA_OLD_TASK` 和 `VELA_DEVTEST`。用 `export` 定义这些变量，`TP` 为训练 Python 可执行文件路径。训练入口会使用 `HF_HUB_OFFLINE=1`，因此所需模型和数据应事先准备好。**旧 `launch_campaign.sh configs` 会把 `TRAINOPT_ENV` 复制到运行目录 `scripts/node_env.sh`，不得把它或凭据上传。**
 
@@ -103,13 +103,15 @@ A、B、D 是平台主张的核心。C 的按问题选区方法依赖视觉证�
 
 ## B | 配对训练直到收敛，并拆出每项收益
 
+**本节点的 seed 与方法范围。** 本实验 B 只使用一个预先冻结的训练 seed（默认 17），固定选择前期效果较好的两个方法 DFlash2 与 DFly，共四个训练终点。这里的“一个 seed”是训练随机性设置，不是把同一条路径重复计作多个 seed。
+
 **主比较。** DFlash2、DFly 各做 Reference / VelaDraft 两条生产训练路径；每种方法内部保持模型、全图特征、原生 loss、训练数据、学习率、optimizer、初始权重、随机数据/anchor 流和有效 batch 相同。参考保留方法正确的 selector 或前缀依赖；为接收图像所需的 adapter 两边共享。按配置执行每种方法实际支持的优化，DFlash 的联合分组另测。将这个基线标为“同配方的直接移植参考实现”。独立框架（如 SpecForge）只有在真实 8B 图文输入、相同输出语义和数据路径通过验证后才有单独的具名一行。
 
-**规模。** 每臂从初始化训练 200K × 3 epochs，75,000 optimizer updates，原 8B 正式配方的有效 batch 8、BF16、序列上限 4,096、block size 8。以正式解析配置锁定 anchor 上限及 DFly 阶段切换步数。不要套用 256 行 reduced 配置。现有一对 75k 长程终点作历史复验；本节点做 **2 方法 × 2 路径 × 2 个新 seed = 8 个完整训练**（建议新 seeds 17、29，先确认与旧 seed 不同）。同 seed 的两臂共享初始化，跨 seed 轮换卡位。历史 seed 的配置、数据和真实初态若完全匹配，可并列成三组种子质量结果；本节点的全程 wall 和 GPU-h 始终从新运行取得。保存 0/25k/50k/75k 的训练及验证轨迹、最终导出、实际成功更新及中断恢复位置。新旧真实性无法对齐时，明确列出两组新配对和单列的历史结果。
+**规模。** 每臂从初始化训练 200K × 3 epochs，75,000 optimizer updates，原 8B 正式配方的有效 batch 8、BF16、序列上限 4,096、block size 8。以正式解析配置锁定 anchor 上限及 DFly 阶段切换步数。不要套用 256 行 reduced 配置。实验 B 使用一个预先冻结的新 seed，默认 **seed 17**；固定跑前期结果较好的 DFlash2、DFly 两个方法的 Reference / VelaDraft 四条路径。一个 seed 下同方法的 ref/opt 必须共享初始化、数据顺序、optimizer、有效 batch 和 anchor 流；不能把单 seed 结果写成跨 seed 稳健性结论。现有历史 seed 仅作单列历史复验，不增加本次 B 的训练重复数。本节点的全程 wall 和 GPU-h 始终从新运行取得。保存 0/25k/50k/75k 的训练及验证轨迹、最终导出、实际成功更新及中断恢复位置。
 
 **训练质量与训练效率分别报告。** 每方法、每 seed、每路径至少单列：training loss trajectory（实际成功更新步数及记录频率）、固定 dev objective 曲线与终点、最终 checkpoint 在预先冻结的共同任务/样本上的自由解码实际接受草稿 token/验证轮、全程实际训练 wall、活跃 GPU-hours 和 peak GPU memory；保留最终 test objective、各 seed 数值和 ref/opt 配对差。明确 wall 是否含预处理、验证、checkpoint、恢复及排队，GPU-hours 按实测设备占用时段并注明统计方法。test objective 不能单独充当训练质量或接受长度的替代指标，质量与成本的变化也不能合成一个无定义的结论。
 
-**接受长度的预注册非劣检验。** 在查看确认集结果之前，冻结同任务/请求/权重评估协议、配对单位、统计方法和显著性水平，保留有时间戳的注册记录。主量明确为实际自由解码中每次真实验证轮接受的草稿 token 数；target 首词、校正与 bonus 不算草稿接受数。对同方法同 seed，预注册相对差 \((\mu_{opt}-\mu_{ref})/\mu_{ref}\)，非劣界固定为 **−1%（−0.01，相对参考值）**，单侧显著性水平 0.05；只有按预注册方法得到的单侧 95% 下置信界严格高于 −0.01 才能声称非劣。参考值为零、覆盖不足或区间无法可靠估计时，报告不可判定。结果出来后不得修改界值、分母、分析集或单侧方向来获得通过；偏离须透明记录并另列为探索性分析。报告逐 seed 接受量、配对相对差与区间，并区分按图/会话重采样的请求不确定性和独立 seed 的训练随机性；两个新 seed 不得通过增加图片或 token 伪装成更多独立训练重复，证据不足时如实报告。
+**接受长度的预注册非劣检验。** 在查看确认集结果之前，冻结同任务/请求/权重评估协议、配对单位、统计方法和显著性水平，保留有时间戳的注册记录。主量明确为实际自由解码中每次真实验证轮接受的草稿 token 数；target 首词、校正与 bonus 不算草稿接受数。对同方法同 seed，预注册相对差 \((\mu_{opt}-\mu_{ref})/\mu_{ref}\)，非劣界固定为 **−1%（−0.01，相对参考值）**，单侧显著性水平 0.05；只有按预注册方法得到的单侧 95% 下置信界严格高于 −0.01 才能声称非劣。参考值为零、覆盖不足或区间无法可靠估计时，报告不可判定。结果出来后不得修改界值、分母、分析集或单侧方向来获得通过；偏离须透明记录并另列为探索性分析。报告该单一 seed 的接受量、配对相对差与区间，并区分按图/会话重采样的不确定性；单 seed 不能估计跨 seed 训练随机性，也不能写成跨 seed 稳健性结论。若后续增加第二个 seed，必须在查看结果前登记为新的实验条件，不能事后补充以改变非劣结论。
 
 **解释收益的开关。** 同一卡的相同快照、AdamW 状态、方法阶段、逻辑 batch 及 anchor 流上交替执行，三个独立窗口，AB/BA 轮换。在线窗口 50 次预热 + 500 次完整计时更新；固定特征重放 20 + 200 次。断开 sampler/profiler 重新计总 wall。逐层、逐项输出以下对照。
 
@@ -138,14 +140,14 @@ A、B、D 是平台主张的核心。C 的按问题选区方法依赖视觉证�
 - 主性能面板用 MMSpec 六个任务，每项 100 个会话，共 600 sessions。所有方法共享图像、提示和固定的多轮历史，历史用本次 8B target 生成。同一 GPU 上做各条请求的 AR/SD 配对，8 卡按 session 分片，每片跑 AR 和所有方法并轮换顺序。统一 native vLLM 版本、TP1、batch 1、BF16 greedy、Flash 配置、像素、自然 EOS、生成上限 1,024，3 次重复。使用经复验的原版 8B 推测长度设置，记录真实 K（DSpark 的 anchor 约定单列）。关闭跨请求 prefix / 图像缓存，模型预热从主计时剔除，图像读取到答案输出的整个请求进入 wall。旧 A6000 和 35B/A800 表保留各自硬件标签。
 - 主表按任务计算 ΣAR wall / ΣSD wall，另有中位、p95、输出长度、TTFT、实际接受草稿/轮、接受/提出、验证轮数、完整会话数。完整序列一致率、首分歧和共同前缀覆盖配合官方任务质量。逐真实会话聚类，重复和多轮一起重采样给 95% CI。功耗或通信训练指标不作这张表的目标。
 - 质量面板沿用可复算的原生评分器，TextVQA、DocVQA、ChartQA 各 256 条，冻结源版本、gold、去重和输出正规化；分别给 soft VQA accuracy、ANLS、relaxed accuracy 和 AR 配对差。按样本返回原始答案及停止原因。另在固定任务子集上用 target-only AR、同一个成熟 DFlash2 的 K=1/K=3/原 K，拆 prefill/draft/verify、按输出长度分层，说明收益来自哪些串行轮数。若有对该 target 和 runner 确已兼容的自回归 drafter，可另列；K=1 不作为另一种算法的替身。
-- 用**B 表新训练的最终导出**闭环：对 8 个新终点均跑相同的 120 个 MMSpec 会话（各 20）和配对质量面板，报告同 seed 两种训练路径的真实部署差。成熟七方法的 600 会话表用于外部生态比较，不能冒充新终点。每方法首批 8–12 例核对 target/adapter hash、提议来源、active-KV 和实际 backend，再进入整表。
+- 用**B 表新训练的最终导出**闭环：对 B 实验的 4 个新终点均跑相同的 120 个 MMSpec 会话（各 20）和配对质量面板，报告同 seed 两种训练路径的真实部署差。成熟七方法的 600 会话表用于外部生态比较，不能冒充新终点。每方法首批 8–12 例核对 target/adapter hash、提议来源、active-KV 和实际 backend，再进入整表。
 
 ## 排卡与交付
 
 | 阶段 | GPU 0–1 | GPU 2–3 | GPU 4–5 | GPU 6–7 |
 |---|---|---|---|---|
 | 首批 | A 的数据与四格校准 | B 的一致性、窗口和显存 | C 的轨迹/区域对齐 | D 的新节点 adapter、AR 校准 |
-| 主训练 | DFlash2 seed 17：ref / opt | DFlash2 seed 29：opt / ref | DFly seed 17：ref / opt | DFly seed 29：opt / ref |
+| 主训练 | DFlash2 seed 17：ref / opt | DFly seed 17：ref / opt | 预留：验证/重排 | 预留：验证/重排 |
 | 训练前后空档及结束后 | B 的独占窗口/缓存 | C 的确认集 | D 的逐会话切片 | D 的其余切片和新终点 |
 
 GPU 对是两个单卡作业。每个短计时对在同一物理卡上完成；每个阶段结束做释放与重排。CPU 准备转写、gold、hash、子集及评分可以与主训练并行。不得用其他卡的 AR 时间作分母。按旧实测在线约 2.55–3.18 s/update，8 × 75k 的纯更新约 **425–530 A100 GPU-h**，单轮并行训练约 **53–67 h**。初始给 A/C/缓存/原生性能及质量额外预留 **100–200 GPU-h**；正式预算按 20 条请求的输出长度和计时外推（600 × 8 路径 × 3 重复 = 14,400 次会话执行，未含新终点）。数据就绪、独占整节点时估计 **4–6 天**，数据转写或 adapter 移植另排。可选 6 × 10k 续训以 replay 1.26–1.53 s/update 估约 **21–26 GPU-h**，另计选区提取和评测。记录分配、实际活跃 GPU-h、墙钟与重试，容量不足先保四张主表。

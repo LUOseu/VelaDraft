@@ -2,18 +2,19 @@
 
 完整执行说明和 A/B/C/D 实验要求见 [新版实验 AGENTS.md](VelaDraft_Qwen3VL8B_8xA100_Main_Experiments_AGENTS.md)。
 
-本目录为 `56fde8c563222ec3196a053cafb6f6e213bd97ac` 的准备工作，**不是可提交四张主表的一键训练实现**。八臂配置仅为草稿，不得直接启动。已有源配置来自公开原始 8B 训练归档，见 `original_configs/PROVENANCE.json`；原配方的路径只供溯源，必须在正式节点重新绑定并核验。
+本目录为 `56fde8c563222ec3196a053cafb6f6e213bd97ac` 的准备工作，**不是可提交四张主表的一键训练实现**。B 实验四臂配置仅为草稿，不得直接启动；正式方法固定为 DFlash2 和 DFly。已有源配置来自公开原始 8B 训练归档，见 `original_configs/PROVENANCE.json`；原配方的路径只供溯源，必须在正式节点重新绑定并核验。
 
-## 生成八臂草稿
+## 生成 B 实验草稿（单 seed，1–2 个方法）
 
 ```bash
 python3 research/q3vl8b_main_campaign/prepare_configs.py \
   --dflash2 research/q3vl8b_main_campaign/original_configs/dflash2.json \
   --dfly research/q3vl8b_main_campaign/original_configs/dfly.json \
-  --out /path/to/new-campaign/configs
+  --out /path/to/new-campaign/configs \
+  --seed 17
 ```
 
-该命令拒绝 256-anchor 简化版、非 BF16 / 4096 / block 8 / batch 8 / 3 epochs 配方，保留数据集 seed 42 并更改训练 seed 17/29。输出标为 `DRAFT_NOT_LAUNCH_READY`。当前末次 75k 必须以最终 checkpoint 验证；25k/50k 为中间快照。
+该命令拒绝 256-anchor 简化版、非 BF16 / 4096 / block 8 / batch 8 / 3 epochs 配方，保留数据集 seed 42，并为实验 B 使用一个训练 seed（默认 17）。固定生成已选的两个方法 DFlash2 和 DFly 的 ref/opt 四臂。输出标为 `DRAFT_NOT_LAUNCH_READY`。当前末次 75k 必须以最终 checkpoint 验证；25k/50k 为中间快照。
 
 ## 上传进度
 

@@ -14,16 +14,24 @@ def base(method):
                       'grad_accumulation_steps': 4, 'online_feature_cache_gb': 0}}
 
 
-def test_eight_paired_arms_preserve_recipe_and_vary_only_execution_switches():
+def test_one_seed_and_two_methods_preserve_recipe_and_vary_only_execution_switches():
     configs = module.derive({'dflash2': base('dflash2'), 'dfly': base('dfly')})
-    assert len(configs) == 8
+    assert len(configs) == 4
     assert configs['dfly_s17_ref']['train']['seed'] == 17
     assert configs['dfly_s17_opt']['train']['seed'] == 17
-    assert configs['dfly_s29_opt']['drafter']['num_anchors'] == 512
     assert configs['dflash2_s17_ref']['dataset']['seed'] == 42
     assert configs['dflash2_s17_opt']['target']['device'] == 'cuda:0'
     assert configs['dflash2_s17_ref']['drafter']['dflash2_teacher_projection_reuse'] is False
     assert configs['dflash2_s17_opt']['drafter']['dflash2_teacher_projection_reuse'] is True
+
+
+def test_experiment_b_rejects_single_method_selection():
+    try:
+        module.derive({'dflash2': base('dflash2'), 'dfly': base('dfly')}, ('dflash2',), 17)
+    except ValueError as exc:
+        assert 'two selected methods' in str(exc)
+    else:
+        raise AssertionError('Experiment B must retain both selected methods')
 
 
 def test_reduced_or_wrong_recipe_fails_closed():
