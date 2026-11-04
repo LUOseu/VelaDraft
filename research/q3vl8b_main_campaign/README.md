@@ -1,5 +1,7 @@
 # Qwen3-VL-8B 主实验：准备包（未完成）
 
+完整执行说明和 A/B/C/D 实验要求见 [新版实验 AGENTS.md](VelaDraft_Qwen3VL8B_8xA100_Main_Experiments_AGENTS.md)。
+
 本目录为 `56fde8c563222ec3196a053cafb6f6e213bd97ac` 的准备工作，**不是可提交四张主表的一键训练实现**。八臂配置仅为草稿，不得直接启动。已有源配置来自公开原始 8B 训练归档，见 `original_configs/PROVENANCE.json`；原配方的路径只供溯源，必须在正式节点重新绑定并核验。
 
 ## 生成八臂草稿
