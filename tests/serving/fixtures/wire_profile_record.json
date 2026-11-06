@@ -1,0 +1,100 @@
+{
+  "schema_version": "veladraft-platform-v1",
+  "project_scope": "platform_extension",
+  "include_in_paper": false,
+  "run_id": "fixture-serve-run",
+  "request_id": "ar-c1-s1-nat-ocr-00",
+  "group_id": "http:ar:c1:s1",
+  "target_identity": {
+    "model": "/models/Qwen2.5-VL-3B-Instruct",
+    "revision": "index-sha256",
+    "weight_content_sha256": "weights-sha256",
+    "snapshot": {
+      "snapshot_commit": null,
+      "weight_files": [],
+      "content_sha256": "weights-sha256",
+      "content_verified": true,
+      "missing_reasons": []
+    },
+    "tokenizer": {"path": "/models/tokenizer.json", "sha256": "tokenizer-sha256", "class": "Qwen2TokenizerFast"},
+    "processor": {"path": "/models/preprocessor_config.json", "sha256": "processor-sha256", "class": "qwen2_5_vl"},
+    "template": {
+      "path": "/models/chat_template.json",
+      "sha256": "template-sha256",
+      "mode": "standalone_chat_template_json",
+      "effective_source": "chat_template.json"
+    },
+    "precision": "bfloat16",
+    "config_sha256": "config-sha256",
+    "architecture": "Qwen2_5_VLForConditionalGeneration",
+    "identity_complete": true,
+    "missing_reasons": []
+  },
+  "draft_identity": null,
+  "backend_identity": {
+    "backend": "vllm",
+    "version": "0.22.1",
+    "code_commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+    "device_topology": {
+      "gpu_count": 1,
+      "devices": [{"index": 0, "name": "NVIDIA RTX A6000", "uuid": "GPU-fixture", "compute_capability": "8.6"}],
+      "tensor_parallel_size": 1,
+      "pipeline_parallel_size": 1
+    },
+    "attention_backend": "FLASH_ATTN",
+    "cudagraph_mode": "FULL_AND_PIECEWISE",
+    "labels_source": "engine_object",
+    "applied_evidence": true,
+    "missing_reasons": []
+  },
+  "protocol_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "correctness_status": "not_checked",
+  "measurement_scope": {
+    "surface": "openai_chat_completions",
+    "mode": "ar",
+    "concurrency": 1,
+    "session_index": 1,
+    "stream": true,
+    "prefix_caching": false,
+    "max_new_tokens": 128,
+    "fixture_category": "ocr",
+    "timing_boundary": "client_request_start_to_last_nonempty_sse_content_chunk",
+    "spec_counter_attribution": "per_request_c1"
+  },
+  "raw_counts": {
+    "emitted": 12,
+    "proposed": 0,
+    "accepted": 0,
+    "verify_rounds": 0,
+    "target_forward_calls": null,
+    "draft_forward_calls": 0,
+    "unavailable": {
+      "target_forward_calls": "AR baseline does not expose target-forward calls"
+    },
+    "structural_zero_note": "AR has no speculative path"
+  },
+  "latency": {
+    "ttft_s": 0.08,
+    "e2e_s": 1.2,
+    "tpot_s": null,
+    "tpot_unavailable_reason": "SSE exposes chunk timestamps, not per-token timestamps; exact TPOT/ITL is unavailable",
+    "client_visible_token_tpot_proxy_s": 0.02,
+    "client_chunk_gap_mean_s": 0.019,
+    "cancel_requested_s": null
+  },
+  "resource_usage": {
+    "gpu_hours": null,
+    "gpu_hours_scope": "request_exposure",
+    "additive": false,
+    "gpu_hours_reason": "request wall-time exposure is not an additive GPU allocation; concurrent requests share the same device interval",
+    "gpu_count": 1,
+    "devices": [{"index": 0, "name": "NVIDIA RTX A6000", "uuid": "GPU-fixture", "compute_capability": "8.6"}],
+    "peak_memory_mib": {"process_sampler": 36000},
+    "peak_memory_scope": "process_sampler_not_request",
+    "wall_s": 1.2
+  },
+  "missing_reasons": {
+    "draft_identity": "AR baseline has no draft model or proposal path",
+    "raw_counts.target_forward_calls": "AR baseline does not expose target-forward calls"
+  }
+}

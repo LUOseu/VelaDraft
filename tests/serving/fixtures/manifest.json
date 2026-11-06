@@ -1,0 +1,517 @@
+{
+  "schema_version": "veladraft-serving-fixtures-v1",
+  "created": "2026-10-17",
+  "frozen": true,
+  "source_notes": {
+    "ocr": "TextVQA 600-row regen set at /home/lyh/vrm/vlmdata/data/regen/textvqa, rows 0-7",
+    "chart_doc": "ScienceQA test split cached at /home/lyh/.cache/huggingface/datasets/derek-thomas___science_qa, rows 1,5,9,10,13,15,16,19",
+    "vqa": "LLaVA/COCO val rows 0-7 from /home/lyh/vlm-dflash-dflare/runs/qwen25vl3b_dfly_2k_recipe/data/val.jsonl",
+    "caption": "LLaVA/COCO val rows 8-15, caption prompt",
+    "diagnostic": "8 repetition prompts with TextVQA images; excluded from natural speedup stats",
+    "boundary": "8 API/engineering boundary requests"
+  },
+  "pixel_bounds": {
+    "min_pixels": 200704,
+    "max_pixels": 1003520
+  },
+  "counts": {
+    "ocr": 8,
+    "chart_doc": 8,
+    "vqa": 8,
+    "caption": 8,
+    "diagnostic": 8,
+    "boundary": 8
+  },
+  "requests": [
+    {
+      "request_id": "nat-ocr-00",
+      "category": "ocr",
+      "prompt": "what is one of the brands being advertised? Perform an OCR task on the provided image. Please extract the text accurately and provide a detailed explanation of the process. Ensure the response is comprehensive and well-structured.",
+      "prompt_sha256": "99bbdec0d39d9bf242dc7f39ecc79e42fc16693d7e50a9a85adef57b22d7e8b2",
+      "max_tokens": 128,
+      "notes": "TextVQA data.jsonl row 0",
+      "image": "images/nat-ocr-00.jpg",
+      "image_sha256": "47b37fc2a63510c6de7a001bfdb7d5da332585a005c6e98d312b908abd7fac5a"
+    },
+    {
+      "request_id": "nat-ocr-01",
+      "category": "ocr",
+      "prompt": "what year was this taken? Perform an OCR task on the provided image. Please extract the text accurately and provide a detailed explanation of the process. Ensure the response is comprehensive and well-structured.",
+      "prompt_sha256": "c0e451d9125e076108925320a182c7bfbc3ca0ae40f779a2b5f593093181cd8f",
+      "max_tokens": 128,
+      "notes": "TextVQA data.jsonl row 1",
+      "image": "images/nat-ocr-01.jpg",
+      "image_sha256": "654db8416fd6461484b5f891665085fbc31b6600876e8b1f5791a97d229cc176"
+    },
+    {
+      "request_id": "nat-ocr-02",
+      "category": "ocr",
+      "prompt": "what kind of comupter is this? Perform an OCR task on the provided image. Please extract the text accurately and provide a detailed explanation of the process. Ensure the response is comprehensive and well-structured.",
+      "prompt_sha256": "64fbb7c6562293b8d430fa769440abcee91defd3d4059ff6a4fc1956034b8202",
+      "max_tokens": 128,
+      "notes": "TextVQA data.jsonl row 2",
+      "image": "images/nat-ocr-02.jpg",
+      "image_sha256": "01fc61bec47858b7ed9035baa089ab916fe73211e2da80092ecaa0578e56f232"
+    },
+    {
+      "request_id": "nat-ocr-03",
+      "category": "ocr",
+      "prompt": "what does the screen say to do? Perform an OCR task on the provided image. Please extract the text accurately and provide a detailed explanation of the process. Ensure the response is comprehensive and well-structured.",
+      "prompt_sha256": "c931cfe0bb0f0b7a6645a8efaf981087574bdf35be11251b245cffdc104d7b82",
+      "max_tokens": 128,
+      "notes": "TextVQA data.jsonl row 3",
+      "image": "images/nat-ocr-03.jpg",
+      "image_sha256": "01fc61bec47858b7ed9035baa089ab916fe73211e2da80092ecaa0578e56f232"
+    },
+    {
+      "request_id": "nat-ocr-04",
+      "category": "ocr",
+      "prompt": "what is written at the top of the yellow sticker on the fridge? Perform an OCR task on the provided image. Please extract the text accurately and provide a detailed explanation of the process. Ensure the response is comprehensive and well-structured.",
+      "prompt_sha256": "ac6e842eaf8b333202ddf989bbadef864715241c8a4d5354fa6d6a367da0f6ed",
+      "max_tokens": 128,
+      "notes": "TextVQA data.jsonl row 4",
+      "image": "images/nat-ocr-04.jpg",
+      "image_sha256": "b4d0599463e8fbdf31349e6e12ba7374fcc4b1fd10ac4861f8d3f5b8897ca56e"
+    },
+    {
+      "request_id": "nat-ocr-05",
+      "category": "ocr",
+      "prompt": "what is the year on the calender? Perform an OCR task on the provided image. Please extract the text accurately and provide a detailed explanation of the process. Ensure the response is comprehensive and well-structured.",
+      "prompt_sha256": "c14d15f63b3d70786e63ebe77dd0bfc1071af74d7c56dee07e6f56e2af292e32",
+      "max_tokens": 128,
+      "notes": "TextVQA data.jsonl row 5",
+      "image": "images/nat-ocr-05.jpg",
+      "image_sha256": "b4d0599463e8fbdf31349e6e12ba7374fcc4b1fd10ac4861f8d3f5b8897ca56e"
+    },
+    {
+      "request_id": "nat-ocr-06",
+      "category": "ocr",
+      "prompt": "what is the name of the runner on the left? Perform an OCR task on the provided image. Please extract the text accurately and provide a detailed explanation of the process. Ensure the response is comprehensive and well-structured.",
+      "prompt_sha256": "51a2153da6a0887fffb86afe29bf03a5ac5f4ec578d0078d11226063e45808a4",
+      "max_tokens": 128,
+      "notes": "TextVQA data.jsonl row 6",
+      "image": "images/nat-ocr-06.jpg",
+      "image_sha256": "83bdf623beab527f2bf3b4cf7f410fea1859b93151e956ea13396c10024090fe"
+    },
+    {
+      "request_id": "nat-ocr-07",
+      "category": "ocr",
+      "prompt": "what event is this from? Perform an OCR task on the provided image. Please extract the text accurately and provide a detailed explanation of the process. Ensure the response is comprehensive and well-structured.",
+      "prompt_sha256": "2ce75830139ae6eabddec8decd41119ab36415ddacf6b63d2a2206f61a42aa98",
+      "max_tokens": 128,
+      "notes": "TextVQA data.jsonl row 7",
+      "image": "images/nat-ocr-07.jpg",
+      "image_sha256": "83bdf623beab527f2bf3b4cf7f410fea1859b93151e956ea13396c10024090fe"
+    },
+    {
+      "request_id": "nat-chart_doc-00",
+      "category": "chart_doc",
+      "prompt": "Question: What is the expected ratio of offspring with a woolly fleece to offspring with a hairy fleece? Choose the most likely ratio.\nChoices:\nA. 0:4\nB. 4:0\nC. 2:2\nD. 1:3\nE. 3:1\nAnswer with the option letter only.",
+      "prompt_sha256": "086c107b122fad377d7152d0ff4d65634103dea7072141f21a48a325dcab9e57",
+      "max_tokens": 128,
+      "notes": "ScienceQA test row 9; subject=natural science",
+      "image": "images/nat-chart_doc-00.png",
+      "image_sha256": "63b14577ed38791ed8f8b27b3dec1696cbf7d9d5909c4bf3e744001bc355fcb1"
+    },
+    {
+      "request_id": "nat-chart_doc-01",
+      "category": "chart_doc",
+      "prompt": "Question: Is the following statement about our solar system true or false?\nThe largest planet is made mainly of ice.\nChoices:\nA. true\nB. false\nAnswer with the option letter only.",
+      "prompt_sha256": "d6c516666146acfa8048ae023e70e17c0650207b16498b4e85248576e243d2f6",
+      "max_tokens": 128,
+      "notes": "ScienceQA test row 15; subject=natural science",
+      "image": "images/nat-chart_doc-01.png",
+      "image_sha256": "bbca743fc38fa4e1bf36b6d12f36c735aac9f7277e7261dc9ad8fe202456ff4e"
+    },
+    {
+      "request_id": "nat-chart_doc-02",
+      "category": "chart_doc",
+      "prompt": "Question: Which of these states is farthest north?\nChoices:\nA. Maine\nB. South Carolina\nC. Kansas\nD. Delaware\nAnswer with the option letter only.",
+      "prompt_sha256": "01d4ba80bfa0f41ff6eda41924a37fb01aab7753c01194df079b661c983b454b",
+      "max_tokens": 128,
+      "notes": "ScienceQA test row 21; subject=social science",
+      "image": "images/nat-chart_doc-02.png",
+      "image_sha256": "434225cf75b8a81878140635868d25fb1b1623d98bcc22d5ad72c8aae0e3603e"
+    },
+    {
+      "request_id": "nat-chart_doc-03",
+      "category": "chart_doc",
+      "prompt": "Question: Look at the models of molecules below. Select the elementary substance.\nChoices:\nA. carbon tetrachloride\nB. acetaldehyde\nC. bromine\nAnswer with the option letter only.",
+      "prompt_sha256": "cd02ce53488481b4eafd2a9f993970221d7c854a37d07755f6a3729e3be30e80",
+      "max_tokens": 128,
+      "notes": "ScienceQA test row 67; subject=natural science",
+      "image": "images/nat-chart_doc-03.png",
+      "image_sha256": "bbc5f9b51dcbd98bee2fdc51b2ec71a290ecdf9b7c89132dbfd3aef83b39bce0"
+    },
+    {
+      "request_id": "nat-chart_doc-04",
+      "category": "chart_doc",
+      "prompt": "Question: Which of these states is farthest north?\nChoices:\nA. Florida\nB. Illinois\nC. Ohio\nD. New Hampshire\nAnswer with the option letter only.",
+      "prompt_sha256": "aa242c531f63124d6562e2a0165df569a85dfa111ae23ef864560caf54efd4da",
+      "max_tokens": 128,
+      "notes": "ScienceQA test row 109; subject=social science",
+      "image": "images/nat-chart_doc-04.png",
+      "image_sha256": "3577fd5f259e3309c5efe7807380b822c967ab79e9a531cbcfc164acb2c109ac"
+    },
+    {
+      "request_id": "nat-chart_doc-05",
+      "category": "chart_doc",
+      "prompt": "Question: What is the probability that an American curl cat produced by this cross will be homozygous dominant for the ear type gene?\nChoices:\nA. 0/4\nB. 2/4\nC. 4/4\nD. 3/4\nE. 1/4\nAnswer with the option letter only.",
+      "prompt_sha256": "1e8a7607ef5d9d11ff5fd0846b3793265c32dccbe4d6df6fea8b405b938720c7",
+      "max_tokens": 128,
+      "notes": "ScienceQA test row 128; subject=natural science",
+      "image": "images/nat-chart_doc-05.png",
+      "image_sha256": "2129288487dbd8535c754682d4eb9c5d4643c71134fc24987fd53abfc782147a"
+    },
+    {
+      "request_id": "nat-chart_doc-06",
+      "category": "chart_doc",
+      "prompt": "Question: Compare the average kinetic energies of the particles in each sample. Which sample has the higher temperature?\nChoices:\nA. neither; the samples have the same temperature\nB. sample A\nC. sample B\nAnswer with the option letter only.",
+      "prompt_sha256": "ea9a70de558e01f0c3e15ce5aaac1508e586bad68f9ebfa4b6c9aa3734e98ad8",
+      "max_tokens": 128,
+      "notes": "ScienceQA test row 180; subject=natural science",
+      "image": "images/nat-chart_doc-06.png",
+      "image_sha256": "848f6198ed8f5cace8c49e3da54e929248047152b9ed5453c9ab33e10a2a7c2e"
+    },
+    {
+      "request_id": "nat-chart_doc-07",
+      "category": "chart_doc",
+      "prompt": "Question: In this food chain, the yucca moth is a consumer. Why?\nChoices:\nA. It makes its own food.\nB. It eats another living thing.\nAnswer with the option letter only.",
+      "prompt_sha256": "f9ec8726a407abab94d633b052d5eb1c6bef57bba0c61010872f6bd95215aece",
+      "max_tokens": 128,
+      "notes": "ScienceQA test row 214; subject=natural science",
+      "image": "images/nat-chart_doc-07.png",
+      "image_sha256": "f474968baad94aa4bca04aebdc12b6fd58f2fc01530f3b0b0d35197ab02b4c1f"
+    },
+    {
+      "request_id": "nat-vqa-00",
+      "category": "vqa",
+      "prompt": "What might be the relationship between the man and the boy, and what values could this activity teach the child?",
+      "prompt_sha256": "658b55002ce3c1d34372eca68ed541fa7b03adc494cf6e3dc209e3fd81351199",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 0, id=000000208145",
+      "image": "images/nat-vqa-00.jpg",
+      "image_sha256": "7787952c7399663bb8defa6ace7325dbe63313a7adfa806d9e2ff1ffe3349afb"
+    },
+    {
+      "request_id": "nat-vqa-01",
+      "category": "vqa",
+      "prompt": "Why might the toilet's tank lid and parts be placed on the seat?",
+      "prompt_sha256": "d96bad64b69ffaf48f71b2f1978b936dea5f1c984b4f06ce5b0a50b57fcc8090",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 1, id=000000026368",
+      "image": "images/nat-vqa-01.jpg",
+      "image_sha256": "02b377d16ec3fdd45d7d05a89cfb35d5521f24cba0e6d540ba9b2be05ffac0f8"
+    },
+    {
+      "request_id": "nat-vqa-02",
+      "category": "vqa",
+      "prompt": "What benefits could one expect from shopping at this market?",
+      "prompt_sha256": "7a64ed96a23c2db121226e51ff0d26349434ce1eb640a5c381e4dcd679ed5b32",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 2, id=000000420750",
+      "image": "images/nat-vqa-02.jpg",
+      "image_sha256": "5f50fa67c5f5a724da86ad628d14537760978ea5c74d7a69656e5b2da0b2ac6c"
+    },
+    {
+      "request_id": "nat-vqa-03",
+      "category": "vqa",
+      "prompt": "What strategy does the person holding the cricket bat need to employ to successfully strike the approaching sports ball?",
+      "prompt_sha256": "a9fcdfb73f283060dadab5598d348f2528b47f9bbe0699604c3c60110b052436",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 3, id=000000376912",
+      "image": "images/nat-vqa-03.jpg",
+      "image_sha256": "560d5c795036317d97f0939c1191e5589827f7cc0e7c3c3d1d4a25b1a63daec1"
+    },
+    {
+      "request_id": "nat-vqa-04",
+      "category": "vqa",
+      "prompt": "What could be the reason behind the cat's disapproving look?",
+      "prompt_sha256": "64de34b83ee0d2a6c9d31c93e93838869661b529b0ce6ce24f0ace93248ad8fd",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 4, id=000000349573",
+      "image": "images/nat-vqa-04.jpg",
+      "image_sha256": "190382d75f8ebfa0f79f382d7ddc9052e145f04cfd5d5209c3c7ebb3f8774c14"
+    },
+    {
+      "request_id": "nat-vqa-05",
+      "category": "vqa",
+      "prompt": "Why might someone need to use multiple laptops on a dining table?",
+      "prompt_sha256": "071ac8cffe5a70bc729eff71b94a141435757216c902b07d80bf00a522ac52d9",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 5, id=000000228155",
+      "image": "images/nat-vqa-05.jpg",
+      "image_sha256": "1fd84be237527c4fd7717492c614f127d9f74957ee755b2b4f5ed6ec7ddf622b"
+    },
+    {
+      "request_id": "nat-vqa-06",
+      "category": "vqa",
+      "prompt": "What additional considerations the skier might have to take into account during his adventure?",
+      "prompt_sha256": "6f6bb958411d29387c07b1acc6e76410c9050d200c683db78b7bbd6eb0b3e12b",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 6, id=000000098260",
+      "image": "images/nat-vqa-06.jpg",
+      "image_sha256": "0f33f2786d15e8da66a4274c0377351419583e196ef180c97975cab146423636"
+    },
+    {
+      "request_id": "nat-vqa-07",
+      "category": "vqa",
+      "prompt": "What safety precautions should surfers consider when participating in a large group surfing event like the one in the image?",
+      "prompt_sha256": "8e3fec1dec4df98f3c2a6cfd3ea2178ac847a6a897b891aab2154e325b76e491",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 7, id=000000160647",
+      "image": "images/nat-vqa-07.jpg",
+      "image_sha256": "af04f0c235e2d4f1e5c0f6bc07adce72cd9411af293bd9499f0855ea5bd97978"
+    },
+    {
+      "request_id": "nat-caption-00",
+      "category": "caption",
+      "prompt": "Describe this image in one sentence.",
+      "prompt_sha256": "2a3b206e55ca482dee92db568217070a220ec32515acd31b0097c0d61a171c37",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 8, id=000000546575",
+      "image": "images/nat-caption-00.jpg",
+      "image_sha256": "90e723191e9af87bdaba8f75a5b706cc1949cb6beda647ade559e478a59eed79"
+    },
+    {
+      "request_id": "nat-caption-01",
+      "category": "caption",
+      "prompt": "Describe this image in one sentence.",
+      "prompt_sha256": "2a3b206e55ca482dee92db568217070a220ec32515acd31b0097c0d61a171c37",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 9, id=000000548548",
+      "image": "images/nat-caption-01.jpg",
+      "image_sha256": "fe9fd887c48e2182bfe397b2c02ad28d2a8d25672cf4abd00aadaaf0308323b7"
+    },
+    {
+      "request_id": "nat-caption-02",
+      "category": "caption",
+      "prompt": "Describe this image in one sentence.",
+      "prompt_sha256": "2a3b206e55ca482dee92db568217070a220ec32515acd31b0097c0d61a171c37",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 10, id=000000350690",
+      "image": "images/nat-caption-02.jpg",
+      "image_sha256": "a9c076ed352ab1bf1aca643a6adfb05237e74bb6900108ce09cfe82e2ad388f5"
+    },
+    {
+      "request_id": "nat-caption-03",
+      "category": "caption",
+      "prompt": "Describe this image in one sentence.",
+      "prompt_sha256": "2a3b206e55ca482dee92db568217070a220ec32515acd31b0097c0d61a171c37",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 11, id=000000450894",
+      "image": "images/nat-caption-03.jpg",
+      "image_sha256": "aab9ee7bafe251b04c8c06ae282ce9cef5cdf723d2bb8df86a9b22a30c850909"
+    },
+    {
+      "request_id": "nat-caption-04",
+      "category": "caption",
+      "prompt": "Describe this image in one sentence.",
+      "prompt_sha256": "2a3b206e55ca482dee92db568217070a220ec32515acd31b0097c0d61a171c37",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 12, id=000000177387",
+      "image": "images/nat-caption-04.jpg",
+      "image_sha256": "f9af92d621ee474e97ba5e0df4ab8a79cbb491996f3e2c842da43b9f437581c1"
+    },
+    {
+      "request_id": "nat-caption-05",
+      "category": "caption",
+      "prompt": "Describe this image in one sentence.",
+      "prompt_sha256": "2a3b206e55ca482dee92db568217070a220ec32515acd31b0097c0d61a171c37",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 13, id=000000068689",
+      "image": "images/nat-caption-05.jpg",
+      "image_sha256": "e2004e6e730a4ec2e61c514baf3e230837525ca6d2d7399c152e340190446724"
+    },
+    {
+      "request_id": "nat-caption-06",
+      "category": "caption",
+      "prompt": "Describe this image in one sentence.",
+      "prompt_sha256": "2a3b206e55ca482dee92db568217070a220ec32515acd31b0097c0d61a171c37",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 14, id=000000229530",
+      "image": "images/nat-caption-06.jpg",
+      "image_sha256": "4180f963427e2988fe22d33ecd75e5cf3d440d14f485d3f704359d56570466b9"
+    },
+    {
+      "request_id": "nat-caption-07",
+      "category": "caption",
+      "prompt": "Describe this image in one sentence.",
+      "prompt_sha256": "2a3b206e55ca482dee92db568217070a220ec32515acd31b0097c0d61a171c37",
+      "max_tokens": 128,
+      "notes": "LLaVA/COCO val row 15, id=000000048944",
+      "image": "images/nat-caption-07.jpg",
+      "image_sha256": "a9b523376acfa0885d4cee063c8518c8a1e01fb439b91ca8bd58109d5ba7a594"
+    }
+  ],
+  "boundary": [
+    {
+      "request_id": "bound-two-turn",
+      "category": "boundary",
+      "prompt": "Describe the image in one sentence.",
+      "prompt_sha256": "8c3077b614108a6322c18690ac615e3851c5cb7b388b6f46ad40361e68ca0fc5",
+      "max_tokens": 32,
+      "notes": "two-turn conversation",
+      "image": "images/nat-vqa-00.jpg",
+      "image_sha256": "7787952c7399663bb8defa6ace7325dbe63313a7adfa806d9e2ff1ffe3349afb",
+      "variant": "two_turn"
+    },
+    {
+      "request_id": "bound-different-resolution",
+      "category": "boundary",
+      "prompt": "Describe the image in one sentence.",
+      "prompt_sha256": "8c3077b614108a6322c18690ac615e3851c5cb7b388b6f46ad40361e68ca0fc5",
+      "max_tokens": 32,
+      "notes": "downscaled to <=320px",
+      "image": "images/nat-vqa-01.jpg",
+      "image_sha256": "02b377d16ec3fdd45d7d05a89cfb35d5521f24cba0e6d540ba9b2be05ffac0f8",
+      "variant": "different_resolution"
+    },
+    {
+      "request_id": "bound-empty-text",
+      "category": "boundary",
+      "prompt": "",
+      "prompt_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "max_tokens": 32,
+      "notes": "image-only message with empty text",
+      "image": "images/nat-vqa-02.jpg",
+      "image_sha256": "5f50fa67c5f5a724da86ad628d14537760978ea5c74d7a69656e5b2da0b2ac6c",
+      "variant": "empty_text"
+    },
+    {
+      "request_id": "bound-no-image",
+      "category": "boundary",
+      "prompt": "Say hello in one sentence.",
+      "prompt_sha256": "e507d257b764505f8afd50c0947bfe0f61cf0e29e9e8eb16be7ef4ba796a5b9a",
+      "max_tokens": 32,
+      "notes": "text-only request",
+      "variant": "no_image"
+    },
+    {
+      "request_id": "bound-invalid-media",
+      "category": "boundary",
+      "prompt": "Describe the image.",
+      "prompt_sha256": "8ed58dccb6c7bc00b5337d27d84a529ba932581bb4d12dde30ac93cb585a9c1d",
+      "max_tokens": 32,
+      "notes": "invalid base64 data URI",
+      "expect": "error",
+      "variant": "invalid_media"
+    },
+    {
+      "request_id": "bound-long-prompt",
+      "category": "boundary",
+      "prompt": "x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x ",
+      "prompt_sha256": "26b7ca6ba594d0e17a4c897beb389c7d9f8bd7bd86cd33ad76575619ab17d897",
+      "max_tokens": 32,
+      "notes": "prompt longer than max_model_len",
+      "image": "images/nat-vqa-03.jpg",
+      "image_sha256": "560d5c795036317d97f0939c1191e5589827f7cc0e7c3c3d1d4a25b1a63daec1",
+      "expect": "error",
+      "variant": "long_prompt"
+    },
+    {
+      "request_id": "bound-bad-structure",
+      "category": "boundary",
+      "prompt": "Describe the image.",
+      "prompt_sha256": "8ed58dccb6c7bc00b5337d27d84a529ba932581bb4d12dde30ac93cb585a9c1d",
+      "max_tokens": 32,
+      "notes": "content is an object",
+      "expect": "error",
+      "variant": "bad_structure"
+    },
+    {
+      "request_id": "bound-two-images",
+      "category": "boundary",
+      "prompt": "Describe the image.",
+      "prompt_sha256": "8ed58dccb6c7bc00b5337d27d84a529ba932581bb4d12dde30ac93cb585a9c1d",
+      "max_tokens": 32,
+      "notes": "two images with limit_mm_per_prompt=1",
+      "image": "images/nat-vqa-04.jpg",
+      "image_sha256": "190382d75f8ebfa0f79f382d7ddc9052e145f04cfd5d5209c3c7ebb3f8774c14",
+      "expect": "error",
+      "variant": "two_images"
+    }
+  ],
+  "diagnostic": [
+    {
+      "request_id": "diag-rep-00",
+      "category": "diagnostic",
+      "prompt": "Ignore the image. Continue the token sequence exactly as shown, with no explanation: alpha-0 beta-0 gamma-0 delta-0. alpha-0 beta-0 gamma-0 delta-0. alpha-0 beta-0",
+      "prompt_sha256": "44f46110539ec1245285b10e63aaefa96d1404991fa00cef312f43a6941ce496",
+      "max_tokens": 32,
+      "notes": "Repetition probe for native N-Gram proposal/verification; not part of natural speedup stats",
+      "image": "images/nat-ocr-00.jpg",
+      "image_sha256": "47b37fc2a63510c6de7a001bfdb7d5da332585a005c6e98d312b908abd7fac5a"
+    },
+    {
+      "request_id": "diag-rep-01",
+      "category": "diagnostic",
+      "prompt": "Ignore the image. Continue the token sequence exactly as shown, with no explanation: alpha-1 beta-1 gamma-1 delta-1. alpha-1 beta-1 gamma-1 delta-1. alpha-1 beta-1",
+      "prompt_sha256": "343242d4eb33fe0d61ea53784ae3347d09fe9ef6bd4a8ef60af9c2a55d1719df",
+      "max_tokens": 32,
+      "notes": "Repetition probe for native N-Gram proposal/verification; not part of natural speedup stats",
+      "image": "images/nat-ocr-01.jpg",
+      "image_sha256": "654db8416fd6461484b5f891665085fbc31b6600876e8b1f5791a97d229cc176"
+    },
+    {
+      "request_id": "diag-rep-02",
+      "category": "diagnostic",
+      "prompt": "Ignore the image. Continue the token sequence exactly as shown, with no explanation: alpha-2 beta-2 gamma-2 delta-2. alpha-2 beta-2 gamma-2 delta-2. alpha-2 beta-2",
+      "prompt_sha256": "1235b34699fcd19c48e96ba6b19827a376aeb81f0488daa7662bcc2e43c86beb",
+      "max_tokens": 32,
+      "notes": "Repetition probe for native N-Gram proposal/verification; not part of natural speedup stats",
+      "image": "images/nat-ocr-02.jpg",
+      "image_sha256": "01fc61bec47858b7ed9035baa089ab916fe73211e2da80092ecaa0578e56f232"
+    },
+    {
+      "request_id": "diag-rep-03",
+      "category": "diagnostic",
+      "prompt": "Ignore the image. Continue the token sequence exactly as shown, with no explanation: alpha-3 beta-3 gamma-3 delta-3. alpha-3 beta-3 gamma-3 delta-3. alpha-3 beta-3",
+      "prompt_sha256": "01f5c86483a3d406249a9e58fa9cb251935c6a9b940ece28836b940d7d5ae830",
+      "max_tokens": 32,
+      "notes": "Repetition probe for native N-Gram proposal/verification; not part of natural speedup stats",
+      "image": "images/nat-ocr-03.jpg",
+      "image_sha256": "01fc61bec47858b7ed9035baa089ab916fe73211e2da80092ecaa0578e56f232"
+    },
+    {
+      "request_id": "diag-rep-04",
+      "category": "diagnostic",
+      "prompt": "Ignore the image. Continue the token sequence exactly as shown, with no explanation: alpha-4 beta-4 gamma-4 delta-4. alpha-4 beta-4 gamma-4 delta-4. alpha-4 beta-4",
+      "prompt_sha256": "0625feb62da6839f709314f25c9f906510c4bd565c551634f73c885cd8ade0b1",
+      "max_tokens": 32,
+      "notes": "Repetition probe for native N-Gram proposal/verification; not part of natural speedup stats",
+      "image": "images/nat-ocr-04.jpg",
+      "image_sha256": "b4d0599463e8fbdf31349e6e12ba7374fcc4b1fd10ac4861f8d3f5b8897ca56e"
+    },
+    {
+      "request_id": "diag-rep-05",
+      "category": "diagnostic",
+      "prompt": "Ignore the image. Continue the token sequence exactly as shown, with no explanation: alpha-5 beta-5 gamma-5 delta-5. alpha-5 beta-5 gamma-5 delta-5. alpha-5 beta-5",
+      "prompt_sha256": "92a243ca23648ef1cd29711b3e40afb4011a3cdf7b3e81b1935bc5ea6ad9b5fa",
+      "max_tokens": 32,
+      "notes": "Repetition probe for native N-Gram proposal/verification; not part of natural speedup stats",
+      "image": "images/nat-ocr-05.jpg",
+      "image_sha256": "b4d0599463e8fbdf31349e6e12ba7374fcc4b1fd10ac4861f8d3f5b8897ca56e"
+    },
+    {
+      "request_id": "diag-rep-06",
+      "category": "diagnostic",
+      "prompt": "Ignore the image. Continue the token sequence exactly as shown, with no explanation: alpha-6 beta-6 gamma-6 delta-6. alpha-6 beta-6 gamma-6 delta-6. alpha-6 beta-6",
+      "prompt_sha256": "47159c5044f90de6b2035863d28e7df7373ba9184624f808d35c7d7c1d203091",
+      "max_tokens": 32,
+      "notes": "Repetition probe for native N-Gram proposal/verification; not part of natural speedup stats",
+      "image": "images/nat-ocr-06.jpg",
+      "image_sha256": "83bdf623beab527f2bf3b4cf7f410fea1859b93151e956ea13396c10024090fe"
+    },
+    {
+      "request_id": "diag-rep-07",
+      "category": "diagnostic",
+      "prompt": "Ignore the image. Continue the token sequence exactly as shown, with no explanation: alpha-7 beta-7 gamma-7 delta-7. alpha-7 beta-7 gamma-7 delta-7. alpha-7 beta-7",
+      "prompt_sha256": "9c2cf4ef9e5d3d254aead93b0479905fdae1255acb7e88a93b64ea61227899d1",
+      "max_tokens": 32,
+      "notes": "Repetition probe for native N-Gram proposal/verification; not part of natural speedup stats",
+      "image": "images/nat-ocr-07.jpg",
+      "image_sha256": "83bdf623beab527f2bf3b4cf7f410fea1859b93151e956ea13396c10024090fe"
+    }
+  ]
+}
