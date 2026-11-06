@@ -1,0 +1,24 @@
+{
+  "decision_id": "4a8b5de61c88d1fbe25a3f2e3a3077a3c53a3e50f573517f84b498c8dc3cb959",
+  "files": [
+    "records.share.jsonl",
+    "summary.share.json",
+    "decision.share.json",
+    "report.share.md"
+  ],
+  "records_sha256": "8868a11826d45a13c2edd5ac861b0bafa1b5ec54d1da0ba3ca65508bf38dd498",
+  "redaction_policy": "structural_allowlist_v1",
+  "removed": [
+    "prompts",
+    "images",
+    "answers",
+    "predictions",
+    "quality_references",
+    "raw_error_messages",
+    "free_text_reasons",
+    "absolute_and_local_paths",
+    "artifacts_local_paths"
+  ],
+  "schema_version": "veladraft-platform-v1",
+  "share_package": true
+}

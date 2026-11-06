@@ -1,0 +1,24 @@
+{
+  "algorithm": "dflash",
+  "created": "2026-01-01T00:00:00Z",
+  "format": "vlm-dflash-benchmark-v1",
+  "protocol": {
+    "checkpoint": "ckpt_final.pt",
+    "temperature": 0.0,
+    "verification": "sequential"
+  },
+  "run_dir": "legacy/run",
+  "workloads": {
+    "textvqa": {
+      "acceptance_rate": 0.09,
+      "al": 1.62,
+      "max_new_tokens": 128,
+      "num_prompts": 128,
+      "speedup_vs_target_only": 1.29,
+      "status": "measured",
+      "target_only_wall_seconds_per_sample": 1.55,
+      "token_exact": true,
+      "wall_seconds_per_sample": 1.2
+    }
+  }
+}
