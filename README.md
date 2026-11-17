@@ -24,15 +24,15 @@ deployment infrastructure are not included.
 
 | Component | Implementation |
 | --- | --- |
-| Target adapters and drafter plugins | [`vlm_dflash/adapters`](https://anonymous.4open.science/r/VelaDraft-38BF/vlm_dflash/adapters/__init__.py), [`vlm_dflash/algorithms`](https://anonymous.4open.science/r/VelaDraft-38BF/vlm_dflash/algorithms/registry.py) |
-| Visual-aware feature reuse | [`target/capture.py`](https://anonymous.4open.science/r/VelaDraft-38BF/vlm_dflash/target/capture.py), [`target/online.py`](https://anonymous.4open.science/r/VelaDraft-38BF/vlm_dflash/target/online.py) |
-| Batch splitting and regrouping | [`dflash/train.py`](https://anonymous.4open.science/r/VelaDraft-38BF/vlm_dflash/dflash/train.py), [`dflash/regroup.py`](https://anonymous.4open.science/r/VelaDraft-38BF/vlm_dflash/dflash/regroup.py) |
-| Objective-aware scoring | [`dflash/chunked_ce.py`](https://anonymous.4open.science/r/VelaDraft-38BF/vlm_dflash/dflash/chunked_ce.py), [`dflash2/trainer.py`](https://anonymous.4open.science/r/VelaDraft-38BF/vlm_dflash/dflash2/trainer.py), [`dfly/trainer.py`](https://anonymous.4open.science/r/VelaDraft-38BF/vlm_dflash/dfly/trainer.py) |
-| Short-query expert grouping | [`dispatch.py`](https://anonymous.4open.science/r/VelaDraft-38BF/research/qwen36_grouped_e2e_20261102/dispatch.py) |
-| Native evaluation | [`eval/native.py`](https://anonymous.4open.science/r/VelaDraft-38BF/vlm_dflash/eval/native.py), [dense target](https://anonymous.4open.science/r/VelaDraft-38BF/research/qwen3vl8b_cont_mmspec/README.md), [MoE target](https://anonymous.4open.science/r/VelaDraft-38BF/research/qwen36_a100_seven_eval/README.md) |
+| Target adapters and drafter plugins | [`vlm_dflash/adapters`](https://anonymous.4open.science/r/VelaDraft-57C5/vlm_dflash/adapters/__init__.py), [`vlm_dflash/algorithms`](https://anonymous.4open.science/r/VelaDraft-57C5/vlm_dflash/algorithms/registry.py) |
+| Visual-aware feature reuse | [`target/capture.py`](https://anonymous.4open.science/r/VelaDraft-57C5/vlm_dflash/target/capture.py), [`target/online.py`](https://anonymous.4open.science/r/VelaDraft-57C5/vlm_dflash/target/online.py) |
+| Batch splitting and regrouping | [`dflash/train.py`](https://anonymous.4open.science/r/VelaDraft-57C5/vlm_dflash/dflash/train.py), [`dflash/regroup.py`](https://anonymous.4open.science/r/VelaDraft-57C5/vlm_dflash/dflash/regroup.py) |
+| Objective-aware scoring | [`dflash/chunked_ce.py`](https://anonymous.4open.science/r/VelaDraft-57C5/vlm_dflash/dflash/chunked_ce.py), [`dflash2/trainer.py`](https://anonymous.4open.science/r/VelaDraft-57C5/vlm_dflash/dflash2/trainer.py), [`dfly/trainer.py`](https://anonymous.4open.science/r/VelaDraft-57C5/vlm_dflash/dfly/trainer.py) |
+| Short-query expert grouping | [`dispatch.py`](https://anonymous.4open.science/r/VelaDraft-57C5/research/qwen36_grouped_e2e_20261102/dispatch.py) |
+| Native evaluation | [`eval/native.py`](https://anonymous.4open.science/r/VelaDraft-57C5/vlm_dflash/eval/native.py), [dense target](https://anonymous.4open.science/r/VelaDraft-57C5/research/qwen3vl8b_cont_mmspec/README.md), [MoE target](https://anonymous.4open.science/r/VelaDraft-57C5/research/qwen36_a100_seven_eval/README.md) |
 
-[Paper-to-code and execution guide](https://anonymous.4open.science/r/VelaDraft-38BF/docs/PAPER_GUIDE.md) ·
-[Training configurations](https://anonymous.4open.science/r/VelaDraft-38BF/configs/paper/README.md) · [Tests](https://anonymous.4open.science/r/VelaDraft-38BF/tests/README.md) · [Third-party notices](https://anonymous.4open.science/r/VelaDraft-38BF/NOTICE)
+[Paper-to-code and execution guide](https://anonymous.4open.science/r/VelaDraft-57C5/docs/PAPER_GUIDE.md) ·
+[Training configurations](https://anonymous.4open.science/r/VelaDraft-57C5/configs/paper/README.md) · [Tests](https://anonymous.4open.science/r/VelaDraft-57C5/tests/README.md) · [Third-party notices](https://anonymous.4open.science/r/VelaDraft-57C5/NOTICE)
 
 ## Installation
 
@@ -97,10 +97,10 @@ python -m pytest tests
 
 These tests check algorithms, feature contracts, batch execution, scoring,
 exports, and evaluation bookkeeping. They do not reproduce GPU performance
-measurements. See [validation](https://anonymous.4open.science/r/VelaDraft-38BF/docs/VALIDATION.md) for checks performed on this
+measurements. See [validation](https://anonymous.4open.science/r/VelaDraft-57C5/docs/VALIDATION.md) for checks performed on this
 snapshot.
 
 ## License
 
 Apache-2.0, with the third-party licenses and attribution retained in
-[`LICENSE`](https://anonymous.4open.science/r/VelaDraft-38BF/LICENSE), [`NOTICE`](https://anonymous.4open.science/r/VelaDraft-38BF/NOTICE), and the relevant source headers.
+[`LICENSE`](https://anonymous.4open.science/r/VelaDraft-57C5/LICENSE), [`NOTICE`](https://anonymous.4open.science/r/VelaDraft-57C5/NOTICE), and the relevant source headers.

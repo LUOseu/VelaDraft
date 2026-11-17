@@ -13,6 +13,6 @@ The reference repository is not a runtime dependency.
 
 VelaDraft adds target contracts, multimodal position handling, feature reuse,
 batch execution, objective-specific scoring, and native deployment adapters.
-See [the implementation guide](https://anonymous.4open.science/r/VelaDraft-38BF/docs/PAPER_GUIDE.md) for the current code and
-[NOTICE](https://anonymous.4open.science/r/VelaDraft-38BF/NOTICE) for third-party attribution. Notes under `upstream/` record
+See [the implementation guide](https://anonymous.4open.science/r/VelaDraft-57C5/docs/PAPER_GUIDE.md) for the current code and
+[NOTICE](https://anonymous.4open.science/r/VelaDraft-57C5/NOTICE) for third-party attribution. Notes under `upstream/` record
 architecture-port audits; the current source and selected recipe define behavior.
