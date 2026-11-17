@@ -10,8 +10,10 @@ https://github.com/jacky566/Automodel_lao (commit d21fb5aa, Apache-2.0):
   * vlm_dflash/dflash/mask.py         (adapted from attention/dflash_mask.py)
   * vlm_dflash/dflash/decay_loss.py   (adapted from loss/dllm_loss.py)
 
-Local modifications are limited to import paths and additive per-position
-metrics; see docs/REFERENCE.md for the port notes.
+Local modifications include multimodal position handling, training execution,
+objective-specific scoring, and evaluation instrumentation. See
+docs/REFERENCE.md for the original port and docs/PAPER_GUIDE.md for the
+review snapshot implementation map.
 
 Licensed under the Apache License, Version 2.0 (see LICENSE).
 
@@ -78,7 +80,7 @@ Additional notice for the DFlare / DFly ports (v0.3-dev, experimental):
   block-mask reuse), the fusion attention keeps the shared-KV ablation behind
   ``separate_context_kv=false``, and the correction is routed through the shared
   pre-head hook. The ported model math (distance fusion prior, softmax fusion,
-  shared-FC context, TreeFlash correction formula) is unchanged. DFly runs here
-  train the shared block-CE profile (``objective_profile=controlled_ce``);
-  upstream's two-stage LK/D-PACE -> end-to-end TV recipe is not implemented --
-  see docs/upstream/dfly.md.
+  shared-FC context, TreeFlash correction formula) is unchanged. The current
+  implementation supports controlled CE and the configurable upstream
+  two-stage recipe; see vlm_dflash/objectives.py and vlm_dflash/dfly/trainer.py.
+  docs/upstream/dfly.md records the original architecture-port audit.

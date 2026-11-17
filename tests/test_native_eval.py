@@ -112,7 +112,7 @@ def test_source_loader_keeps_all_turns_and_excludes_gold_assistants(tmp_path):
 
 def test_wrong_uuid_remains_rejected():
     module=importlib.import_module('vlm_dflash.eval.native_resources')
-    actual='864585d7-9789-e033-7781-e773f55178c6'
+    actual='00000000-0000-4000-8000-000000000001'
     assert module.normalize_uuid(actual)=='GPU-'+actual
     for bad in ('MIG-'+actual, ' '+actual,actual.replace('-','')):
         with pytest.raises(ValueError):module.normalize_uuid(bad)
@@ -128,7 +128,7 @@ def test_late_preservation_failure_removes_headline(tmp_path,monkeypatch):
     from types import SimpleNamespace
     from vlm_dflash.eval import native_resources
     module=native();p,ref,stages=reports();p['method']='dflash';p['gpus']=[0]
-    fake_uuid='GPU-864585d7-9789-e033-7781-e773f55178c6'
+    fake_uuid='GPU-00000000-0000-4000-8000-000000000001'
     class Lease:
         uuid=fake_uuid;uuids=[fake_uuid]
         def __init__(self,*args):pass
@@ -185,7 +185,7 @@ def test_vllm_config_mutation_does_not_corrupt_raw_constructor_snapshot(tmp_path
     import sys
     from types import SimpleNamespace
     from vlm_dflash.eval import native_runtime as runtime
-    p,refs,_=reports();p.update(method='dflash',gpu_uuid='GPU-864585d7-9789-e033-7781-e773f55178c6')
+    p,refs,_=reports();p.update(method='dflash',gpu_uuid='GPU-00000000-0000-4000-8000-000000000001')
     file=tmp_path/'plan.json';file.write_text(json.dumps(p))
     (tmp_path/'reference.json').write_text(json.dumps({'status':'complete','rows':refs}))
     class LLM:

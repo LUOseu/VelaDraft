@@ -74,7 +74,6 @@ def load_config(path: Path) -> dict:
         "protocol",
         "engine",
         "run",
-        "publish",
     ):
         if key not in config:
             raise ValueError(f"config is missing the {key!r} section")

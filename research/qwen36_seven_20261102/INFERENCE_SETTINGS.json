@@ -1,5 +1,5 @@
 {
-  "status": "validated_development_configuration",
+  "status": "reference_configuration",
   "target": "Qwen/Qwen3.6-35B-A3B",
   "target_revision": "995ad96eacd98c81ed38be0c5b274b04031597b0",
   "hardware": "NVIDIA A800-SXM4-80GB",
@@ -83,11 +83,6 @@
       "Q36_DYNAMIC_SD"
     ],
     "speculative_config": null
-  },
-  "decisions": {
-    "dynamic_k": "Implemented and tested; do not enable by default because it did not improve paired E2E.",
-    "dflash2_k4": "Highest observed point estimate 1.373x; paired advantage over K3 is not statistically established.",
-    "token_exact": "Diagnostic only; not an acceptance gate."
   },
   "limits": [
     "Hardware-specific tuning; no extrapolation of A800 tile choices to other GPUs.",

@@ -1,9 +1,9 @@
 """Entry point behind scripts/run_qwen36_a100_benchmarks.sh.
 
-  run_qwen36_a100_benchmarks.sh --config configs/eval/qwen36_a100_seven.yaml --suite mmspec-full --methods dflash,dspark,domino,jetspec,dflash2,dflare,dfly --draft-length 3 --publish
+  run_qwen36_a100_benchmarks.sh --config configs/eval/qwen36_a100_seven.yaml --suite mmspec-full --methods dflash,dspark,domino,jetspec,dflash2,dflare,dfly --draft-length 3
 
 ``--preflight`` only checks the environment and lists anything that needs a person (data, weights,
-HF write access, GPUs) without starting an engine. A new run freezes the target, checkpoints, data and
+GPUs) without starting an engine. A new run freezes the target, checkpoints, data and
 code into ``manifest.json`` first; ``--resume`` continues the latest run of the same suite (or
 ``--run-id``) and refuses if the code commit changed.
 """
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import importlib.metadata
 import os
 import shutil
@@ -35,7 +36,24 @@ from research.qwen36_a100_seven_eval.settings import (
 
 
 def git(*args) -> str:
-    return subprocess.check_output(["git", "-C", str(REPO), *args], text=True).strip()
+    """Use a commit when available; source archives receive a reproducible content digest."""
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(REPO), *args], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        if args == ("status", "--porcelain", "--untracked-files=no"):
+            return ""
+        if args != ("rev-parse", "HEAD"):
+            raise
+        digest = hashlib.sha256()
+        for folder in ("vlm_dflash", "research", "configs"):
+            for path in sorted((REPO / folder).rglob("*")):
+                if path.is_file() and path.suffix in (".py", ".json", ".yaml", ".sh"):
+                    digest.update(path.relative_to(REPO).as_posix().encode())
+                    digest.update(path.read_bytes())
+        return "archive-" + digest.hexdigest()
+
 
 
 def gpus_info(indices) -> list[dict]:
@@ -130,6 +148,16 @@ def preflight(config: dict, suite: str, publish: bool) -> dict:
         target,
         f"download {config['target']['repo']}@{config['target']['revision']} to target.path",
     )
+    local_root = Path(config["checkpoints"].get("local_root") or "")
+    missing_weights = [
+        method for method in config.get("methods", METHODS)
+        if not (local_root / method / "train" / "ckpt_final.pt").is_file()
+    ]
+    check(
+        "local_checkpoints", not missing_weights,
+        "missing: " + ", ".join(missing_weights) if missing_weights else "all local files present",
+        "set Q36_LOCAL_CHECKPOINTS to <root>/<method>/train/ckpt_final.pt",
+    )
     repo = Path(config["data"]["clone"])
     check(
         "mmspec",
@@ -138,23 +166,7 @@ def preflight(config: dict, suite: str, publish: bool) -> dict:
         "git clone is attempted automatically at run start",
     )
     if publish:
-        try:
-            from research.qwen36_a100_seven_eval.publish import check_write_access
-
-            access = check_write_access(config["publish"]["repo"])
-            check(
-                "hf_write",
-                access["ok"],
-                access,
-                "log in with a token that can write the results repo",
-            )
-        except Exception as error:  # noqa: BLE001 - preflight records SDK failures for the operator
-            check(
-                "hf_write",
-                False,
-                error,
-                "hf auth login with write access to " + config["publish"]["repo"],
-            )
+        raise ValueError("Result publishing is disabled in the anonymous release; results remain local.")
     free = shutil.disk_usage(
         Path(config["run"]["root"]).parent
         if Path(config["run"]["root"]).parent.exists()
@@ -216,10 +228,6 @@ def create_run(config: dict, suite: str) -> Path:
         "engine": config["engine"],
         "site": config.get("site", {}),
         "gpus": gpus_info(config["run"]["gpus"]),
-        "publish": {
-            "repo": config["publish"]["repo"],
-            "path": config["publish"]["path"],
-        },
     }
     save_json(run / "sessions.json", sessions)
     save_json(run / "manifest.json", manifest)
@@ -342,36 +350,6 @@ def _run_all(
             )
         lanes[gpu] = process
         children.append(process)
-    publisher = None
-    if publish:
-        online = {
-            k: v
-            for k, v in env.items()
-            if k not in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE")
-        }
-        with (run / "logs" / "publish.out").open("a") as log:
-            publisher = subprocess.Popen(
-                [
-                    sys.executable,
-                    "-u",
-                    "-m",
-                    "research.qwen36_a100_seven_eval.publish",
-                    "--run-dir",
-                    str(run),
-                    "--repo",
-                    manifest["publish"]["repo"],
-                    "--path",
-                    manifest["publish"]["path"],
-                    "--interval",
-                    str(manifest["site"].get("publish_interval", 300)),
-                ],
-                env=online,
-                cwd=REPO,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-            )
-        children.append(publisher)
     last_summary = 0.0
     while any(p.poll() is None for p in lanes.values()):
         write_status(run, lanes, "running")
@@ -388,8 +366,6 @@ def _run_all(
         else "partial"
     )
     write_status(run, lanes, final)
-    if publisher is not None and publisher.wait() != 0:
-        return 4
     return 0 if final == "complete" else 3
 
 
@@ -414,7 +390,7 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--publish",
         action="store_true",
-        help="mirror results to Hugging Face while running",
+        help="unsupported in the anonymous release (results are local)",
     )
     parser.add_argument(
         "--resume", action="store_true", help="continue the latest run of this suite"
@@ -426,6 +402,8 @@ def main(argv=None) -> int:
         "--preflight", action="store_true", help="check the environment and exit"
     )
     args = parser.parse_args(argv)
+    if args.publish:
+        parser.error("--publish is disabled in the anonymous release; results remain local")
     if args.run_id and (
         not args.resume
         or Path(args.run_id).name != args.run_id

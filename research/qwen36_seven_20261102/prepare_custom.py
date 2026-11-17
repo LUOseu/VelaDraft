@@ -7,9 +7,9 @@ import sys
 
 
 def prepare(method,src=None,dst=None):
-    # Default paths are the original development layout; callers may pass explicit directories.
-    root=Path('/root/autodl-tmp/qwen36_seven_20261102')
-    src=Path(src) if src else root/'exports_raw'/method;dst=Path(dst) if dst else root/'exports'/method
+    if src is None or dst is None:
+        raise ValueError("Provide explicit source and destination export directories")
+    src,dst=Path(src),Path(dst)
     config=json.loads((src/'config.json').read_text())
     before=json.loads(json.dumps(config))
     names=dict(domino='DFlashVelaDominoModel',dflare='DFlashVelaDFlareModel',dfly='DFlashVelaDFlyModel')
@@ -28,4 +28,11 @@ def prepare(method,src=None,dst=None):
     print('CUSTOM_CONFIG_PREPARED',method,flush=True)
 
 
-if __name__=='__main__':prepare(sys.argv[1])
+if __name__=='__main__':
+    import argparse
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('method',choices=('domino','dflare','dfly'))
+    parser.add_argument('source',type=Path)
+    parser.add_argument('destination',type=Path)
+    args=parser.parse_args()
+    prepare(args.method,args.source,args.destination)

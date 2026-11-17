@@ -1,51 +1,24 @@
-# Qwen3-VL-8B CONT seven-method MMSpec evaluation (portable runner)
+# Native evaluation: Qwen3-VL-8B
 
-[AGENTS.md](AGENTS.md) is the task handoff written for the A6000 evaluation machine. That machine's
-native exports, runtime manifests and frozen runtime are not part of the repository, so this
-directory rebuilds them from the CONT checkpoints and runs the same `vlm-dflash native-eval`
-protocol on the seven CONT finals (75,000 original + 50,000 continuation updates, step 125,000).
+The `native/` adapters support all seven methods: DFlash, DFlash2, DSpark, Domino, JetSpec, DFlare, and DFly. They retain the trained method-specific heads and use vLLM's native linear greedy verifier with spatial MRoPE.
 
-## Contents
-
-| Path | Purpose |
-| --- | --- |
-| `native/` | Method adapters bound to the frozen Qwen3-VL-8B draft. Ported from `research/qwen36_native_vllm` (itself a port of `research/qwen3vl8b_native_vllm`), with the target contract in `native/contract.py`. |
-| `native/export_checkpoint.py` | CPU export of one CONT final to the native layout; every trained tensor bitwise equal, receipt written next to it. |
-| `native/make_runtime_manifest.py` | Runtime manifest pinning one method's bootstrap, adapter sources and checkpoint by SHA256. |
-| `native/test_method_parity.py`, `native/test_mrope_parity.py` | CPU parity against the training implementation with the real CONT weights and target head. |
-| `scripts/prepare_exports.sh` | Exports and manifests for all seven methods. |
-| `scripts/run_qwen3vl8b_cont_mmspec.sh` | Campaign launcher from the handoff: per-GPU method queues, smoke then formal, summary CSV, optional HF publication. |
-
-## Run
-
-Machine paths live in a site env file outside the repository (`Q3VL8B_SITE`): `Q3VL8B_ROOT`
-(holding `exports/`), `TARGET`, `SOURCE`, `IMAGES`, `PYTHON`, `RESULT_ROOT`, optionally `SHM`,
-`HF_HOME` and `Q3VL8B_PRELAUNCH`.
+Use a separate **vLLM 0.22.1** environment. This runner expects the continuation checkpoints (125,000 total updates), a local target snapshot, and MMSpec ShareGPT-format requests and images. Weights and image datasets are not bundled.
 
 ```bash
-PYTHON=<eval python> bash research/qwen3vl8b_cont_mmspec/scripts/prepare_exports.sh <cont>/runs <root>/exports
+export PYTHON=/path/to/vllm0221/bin/python
+export Q3VL8B_ROOT=/path/to/evaluation
+export TARGET=/path/to/Qwen3-VL-8B-Instruct
+export SOURCE=/path/to/mmspec_sharegpt_600.jsonl
+export IMAGES=/path/to/mmspec/images
+export RESULT_ROOT=/path/to/results
+bash research/qwen3vl8b_cont_mmspec/scripts/prepare_exports.sh \
+  /path/to/checkpoints "$Q3VL8B_ROOT/exports"
+bash research/qwen3vl8b_cont_mmspec/scripts/run_qwen3vl8b_cont_mmspec.sh --preflight
+bash research/qwen3vl8b_cont_mmspec/scripts/run_qwen3vl8b_cont_mmspec.sh --gpus 0 --suite smoke
 ```
 
-```bash
-Q3VL8B_SITE=<site.env> bash research/qwen3vl8b_cont_mmspec/scripts/run_qwen3vl8b_cont_mmspec.sh --preflight --methods all
-```
+Checkpoint layout is `<checkpoints>/<method>/train/ckpt_final.pt`. The export script creates local exports and fresh per-method runtime manifests from the current source and checkpoint bytes. For a complete run, use `--suite all`; `--methods` selects a subset and `--resume` preserves validated completed stages. Results remain local; `--publish` is explicitly disabled.
 
-```bash
-Q3VL8B_SITE=<site.env> bash research/qwen3vl8b_cont_mmspec/scripts/run_qwen3vl8b_cont_mmspec.sh --gpus 0,1,2,3 --methods all --suite all
-```
+This supplied continuation protocol uses K=7, BF16, TP1, batch size 1, three repeats, 600 sessions / 723 turns, natural stopping, and at most 1,024 generated tokens. It should not be conflated with a different checkpoint or session-count protocol in the paper. `vlm-dflash native-eval --help` exposes the underlying evaluation interface.
 
-## Differences from the A6000 handoff
-
-| Item | Handoff | Here |
-| --- | --- | --- |
-| Hardware | A6000 | site GPU, recorded as `gpu_name` in `run_manifest.json`; speeds are only comparable within one GPU type |
-| Runtime | `runtime_frozen_v1` (vLLM 0.22.1) | a separately installed vLLM 0.22.1 environment; the adapter checks the four reviewed vLLM source files by SHA256 |
-| Exports and manifests | prepared on the A6000 machine | rebuilt from the CONT `ckpt_final.pt` by `prepare_exports.sh` |
-| DSpark | K=8 in a dedicated environment | K=7: the adapter verifies the trained block of 8 (anchor + 7 draft queries) through the official DFlash proposer, as for the other six methods |
-| Domino | blocked (no reviewed manifest) | runs through `native/head_adapters.py` (anchor-slot drafting, prefix GRU, correction head) |
-| GPU ownership | PID mode | count mode by default, for container PID namespaces where nvidia-smi reports host PIDs: each card may hold the client context plus one engine core (`VELADRAFT_GPU_OWNERSHIP=pid` restores PID mode) |
-
-Everything else follows the handoff: batch 1, greedy, `max_new_tokens` 1024 with natural EOS,
-three repeats, `gpu_memory_utilization` 0.78 for AR and SD, PIECEWISE SD graphs, MMSpec full test
-(600 sessions, 723 turns, 2169 paired turns), headline `sum(AR wall) / sum(SD wall)`.
-Quality is `N/A`: this MMSpec input has no gold answers or scorer.
+`native/export_checkpoint.py` performs CPU export; `native/make_runtime_manifest.py` records the current source hashes; `native/bootstrap_*.py` installs the selected method; `native/spatial_adapter.py` handles multimodal positions. The two shell scripts orchestrate export and evaluation without embedding machine paths or remote author accounts.

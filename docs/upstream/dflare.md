@@ -112,4 +112,4 @@ Parity level:  architecture/semantics level (ported module-by-module against the
 Local code: `vlm_dflash/dflare/model.py` (attention + fusion model),
 `vlm_dflash/dflare/factory.py` (config plumbing), `vlm_dflash/dflare/trainer.py`
 (fusion metrics), `vlm_dflash/algorithms/dflare.py` (registry plugin).
-Tests: `tests/test_dflare.py`. User doc: `docs/algorithms/dflare.md`.
+Tests: `tests/test_dflare.py`.

@@ -51,7 +51,7 @@ def test_transient_watcher_log_write_failure_invalidates_lease(resources, tmp_pa
     monkeypatch.setattr(resources, 'descendants', lambda: {resources.os.getpid()})
     def fake_query(*args):
         if '--query-gpu=uuid' in args:
-            return 'GPU-864585d7-9789-e033-7781-e773f55178c6'
+            return 'GPU-00000000-0000-4000-8000-000000000001'
         if '--query-gpu=memory.used' in args:
             return '0'
         return ''

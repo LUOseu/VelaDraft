@@ -73,5 +73,4 @@ Parity level:   Maintainer implementation (ported semantics + same defaults;
 
 Local code: `vlm_dflash/domino/trainer.py` (dual-logit loss + curriculum),
 `vlm_dflash/domino/factory.py` (config plumbing), `vlm_dflash/algorithms/domino.py`
-(registry plugin). Tests: `tests/test_domino.py`. User doc:
-`docs/algorithms/domino.md`.
+(registry plugin). Tests: `tests/test_domino.py`.

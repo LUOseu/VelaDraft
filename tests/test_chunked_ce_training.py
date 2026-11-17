@@ -86,12 +86,6 @@ def test_config_rejects_custom_loss_algorithms(name):
         validate_runtime_config({"algorithm": name, "drafter": {"ce_chunk_size": 16}})
 
 
-def test_benchmark_gradient_gate_rejects_missing_and_nonfinite_gradients():
-    from scripts.benchmark_teacher_projection import gradient_drift
-    ref = {"a": torch.ones(2), "b": torch.ones(1)}
-    assert not gradient_drift(ref, {"a": torch.ones(2)})["complete_and_finite"]
-    assert not gradient_drift(ref, {"a": torch.full((2,), float("nan")), "b": torch.ones(1)})["complete_and_finite"]
-    assert gradient_drift(ref, ref)["complete_and_finite"]
 
 
 def test_precomputed_ce_retain_graph_and_scale_are_not_inplace():

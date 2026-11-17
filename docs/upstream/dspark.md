@@ -125,4 +125,4 @@ gradients vs a direct full-vocab reference, chunk invariance, detached analytic
 target, gradient coverage of both heads) is recorded in the CPU tests
 (`tests/test_objectives.py`, `tests/test_dspark.py`); a real-target GPU
 comparison is pending (see the GPU_PENDING list in
-`docs/plan/REVIEW_REMEDIATION.md`).
+the original implementation audit).

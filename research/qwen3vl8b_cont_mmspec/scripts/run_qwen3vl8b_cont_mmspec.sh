@@ -12,7 +12,7 @@ Options:
   --methods LIST          Comma list or all (default: all).
   --suite smoke|formal|all (default: all).
   --resume                Skip an already valid report; archive invalid old runs.
-  --publish               Upload method directories, summary and manifest to HF.
+  --publish               Unsupported in the anonymous release (results stay local).
   --campaign-id ID        Reuse a campaign id instead of generating one.
   --help                  Show this help.
 USAGE
@@ -23,7 +23,6 @@ GPUS="0"
 METHODS="all"
 SUITE="all"
 RESUME=0
-PUBLISH=0
 CAMPAIGN_ID=""
 
 while (($#)); do
@@ -33,7 +32,7 @@ while (($#)); do
     --methods) METHODS="$2"; shift 2 ;;
     --suite) SUITE="$2"; shift 2 ;;
     --resume) RESUME=1; shift ;;
-    --publish) PUBLISH=1; shift ;;
+    --publish) echo "--publish is disabled in the anonymous release; results remain local" >&2; exit 2 ;;
     --campaign-id) CAMPAIGN_ID="$2"; shift 2 ;;
     --help|-h) usage; exit 0 ;;
     *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -56,8 +55,6 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 : "${TARGET:?set TARGET}" "${SOURCE:?set SOURCE}" "${IMAGES:?set IMAGES}" "${PYTHON:?set PYTHON}"
 : "${RESULT_ROOT:?set RESULT_ROOT}"
 SHM="${SHM:-/dev/shm/${USER:-root}_q3vl8b_cont}"
-HF_REPO_ID="${HF_REPO_ID:-khazic/veladraft-qwen3vl8b-200k-cont-dspark}"
-HF_PREFIX="${HF_PREFIX:-eval/qwen3vl8b_mmspec600}"
 
 if [[ -z "$CAMPAIGN_ID" ]] && ((RESUME)); then
   # Resume the most recent campaign (ids start with a UTC timestamp) unless one is named.
@@ -78,7 +75,7 @@ ALL_METHODS=(dflash dspark domino jetspec dflash2 dflare dfly)
 draft_of() { echo "$Q3VL8B_ROOT/exports/$1"; }
 manifest_of() { echo "$Q3VL8B_ROOT/exports/$1_runtime.json"; }
 
-# Frozen protocol (AGENTS.md section 2). K must equal native/contract.py SPECULATIVE_TOKENS.
+# Frozen protocol. K must equal native/contract.py SPECULATIVE_TOKENS.
 K=7
 SESSIONS=600
 TURNS=723
@@ -139,7 +136,6 @@ done
 [[ -f "$SOURCE" ]] || die "MMSpec source missing: $SOURCE"
 [[ -d "$IMAGES" ]] || die "MMSpec images directory missing: $IMAGES"
 [[ -x "$PYTHON" ]] || die "Python runtime missing/executable bit absent: $PYTHON"
-if ((PUBLISH)); then command -v hf >/dev/null 2>&1 || die "--publish requires the hf CLI"; fi
 "$PYTHON" - <<'PY'
 import importlib.util
 for name in ("torch", "vllm"):
@@ -194,8 +190,6 @@ cat > "$CAMPAIGN_DIR/run_manifest.json" <<EOF_MANIFEST
   "exports_and_manifests": "${Q3VL8B_ROOT}/exports (export_receipt.json per method)",
   "file_sha256": "<method>/<stage>/report.evidence/plan.json",
   "protocol_notes": "research/qwen3vl8b_cont_mmspec/README.md",
-  "hf_repo_id": "${HF_REPO_ID}",
-  "hf_prefix": "${HF_PREFIX}/${CAMPAIGN_ID}"
 }
 EOF_MANIFEST
 fi
@@ -219,18 +213,6 @@ archive_invalid() {
     mv "$dir" "${dir}.invalid.$(date -u +%Y%m%dT%H%M%SZ)"
   fi
   mkdir -p "$dir"
-}
-
-# hf_put <local path> <name under the campaign prefix> <commit message>; no-op without --publish.
-hf_put() {
-  ((PUBLISH)) || return 0
-  hf upload "$HF_REPO_ID" "$1" "$HF_PREFIX/$CAMPAIGN_ID/$2" --repo-type model --commit-message "$3"
-}
-
-# A failed upload is logged and retried by a later --resume --publish; it never stops a worker.
-upload_method() {
-  hf_put "$CAMPAIGN_DIR/$1" "$1" "eval: Qwen3-VL-8B CONT $1 MMSpec ${CAMPAIGN_ID}" ||
-    log "UPLOAD_FAILED method=$1"
 }
 
 run_stage() {
@@ -314,15 +296,15 @@ run_method() {
   log "START method=$method gpu=$gpu K=$K"
   if [[ "$SUITE" == smoke || "$SUITE" == all ]] &&
       ! run_suite "$method" "$gpu" smoke --num-prompts 2 --max-new-tokens 128 --repeats 1; then
-    upload_method "$method"
+
     return 0
   fi
   if [[ "$SUITE" == formal || "$SUITE" == all ]] &&
       ! run_suite "$method" "$gpu" formal --num-prompts "$SESSIONS" --max-new-tokens "$MAX_NEW_TOKENS" --repeats "$REPEATS"; then
-    upload_method "$method"
+
     return 0
   fi
-  upload_method "$method"
+
   log "COMPLETE method=$method gpu=$gpu"
 }
 
@@ -340,7 +322,7 @@ done
 wait
 
 # Only reports that pass the formal validity check enter the table as complete; anything else
-# is listed with its failure reason (AGENTS.md section 5).
+# is listed with its failure reason.
 "$PYTHON" - "$CAMPAIGN_DIR" "$TIMED_PAIRS" "${ALL_METHODS[@]}" > "$CAMPAIGN_DIR/summary.csv" <<'PY'
 import csv,json,os,sys
 root,pairs,methods=sys.argv[1],int(sys.argv[2]),sys.argv[3:]
@@ -370,7 +352,4 @@ for method in methods:
 w=csv.DictWriter(sys.stdout,fieldnames=fields); w.writeheader(); w.writerows(rows)
 PY
 
-hf_put "$CAMPAIGN_DIR/summary.csv" summary.csv "eval: summary ${CAMPAIGN_ID}" || log "UPLOAD_FAILED summary.csv"
-hf_put "$CAMPAIGN_DIR/run_manifest.json" run_manifest.json "eval: manifest ${CAMPAIGN_ID}" ||
-  log "UPLOAD_FAILED run_manifest.json"
 log "CAMPAIGN_COMPLETE id=$CAMPAIGN_ID results=$CAMPAIGN_DIR"

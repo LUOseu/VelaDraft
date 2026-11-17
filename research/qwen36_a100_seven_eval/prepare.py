@@ -1,7 +1,7 @@
 """Freeze the inputs of a run: target snapshot, the seven final checkpoints, and their vLLM exports.
 
-Checkpoints come from the revisions pinned in ``research/qwen36_seven_20261102/checkpoint_manifest.json``
-(never from a moving ``main``); a local copy is used only when its SHA-256 matches. Each checkpoint is
+Checkpoints are supplied locally; their size and SHA-256 must match the configured manifest.
+This anonymous release does not download author-hosted draft checkpoints. Each checkpoint is
 exported once with the repository's CPU exporter and then given its vLLM 0.32 dispatch config:
 DFlash as exported, DFlash2/JetSpec via ``prepare_native``, DSpark via ``prepare_dspark``,
 Domino/DFlare/DFly via ``prepare_custom``. All weight bytes stay unchanged (hard links).
@@ -66,21 +66,11 @@ def fetch_checkpoint(
             and hashed(candidate, cache) == entry["sha256"]
         ):
             return candidate
-    from huggingface_hub import hf_hub_download
-
-    path = Path(
-        hf_hub_download(
-            entry["repo"],
-            "ckpt/ckpt_final.pt",
-            revision=entry["revision"],
-            local_dir=dest / method,
-        )
+    raise FileNotFoundError(
+        f"{method}: no local checkpoint matches the configured size and SHA-256. "
+        "Set checkpoints.local_root (Q36_LOCAL_CHECKPOINTS) to a directory containing "
+        "<method>/train/ckpt_final.pt; use checkpoints.manifest for a different local release."
     )
-    if hashed(path, cache) != entry["sha256"]:
-        raise ValueError(
-            f"{method}: downloaded checkpoint SHA-256 differs from the pinned manifest"
-        )
-    return path
 
 
 def export(method: str, checkpoint: Path, root: Path) -> Path:
@@ -141,7 +131,8 @@ def export(method: str, checkpoint: Path, root: Path) -> Path:
 
 
 def freeze_checkpoints(methods, config: dict, cache: Path) -> dict:
-    pinned = checkpoint_manifest()
+    manifest_path = config["checkpoints"].get("manifest")
+    pinned = read_json(Path(manifest_path)) if manifest_path else checkpoint_manifest()
     root = Path(config["checkpoints"]["work_dir"]).resolve()
     local_root = config["checkpoints"].get("local_root")
     out = {}
@@ -157,8 +148,7 @@ def freeze_checkpoints(methods, config: dict, cache: Path) -> dict:
         )
         final = export(method, checkpoint, root / entry["sha256"])
         out[method] = {
-            "repo": entry["repo"],
-            "revision": entry["revision"],
+            "source": "local_checkpoint",
             "checkpoint": str(checkpoint),
             "checkpoint_sha256": entry["sha256"],
             "path": str(final),
