@@ -1,4 +1,4 @@
-"""Regressions for research/convergence/a100/run_matrix.py (PR #9 review fixes).
+"""Regressions for research/archive/training/convergence/a100/run_matrix.py (PR #9 review fixes).
 
 Covers: per-drafter effective configs (controlled track must not run dflash for
 every algorithm), data binding, per-workload benchmark completion, and the
@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-RUNNER_DIR = REPO / "research" / "convergence" / "a100"
+RUNNER_DIR = REPO / "research" / "archive" / "training" / "convergence" / "a100"
 
 
 def load_runner():

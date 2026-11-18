@@ -13,8 +13,9 @@ Checks, in order:
    their renderers (``--check`` semantics of the render scripts).
 
 Usage: ``python scripts/check_docs.py [--include-internal]``. Internal
-research ledgers (``research/``, ``docs/plan/``) are skipped by default; pass
-``--include-internal`` to scan them too.
+research ledgers and planning notes are skipped by default. The research
+indexes are checked with the other public docs. Pass ``--include-internal``
+to scan historical notes as well.
 """
 
 from __future__ import annotations
@@ -28,7 +29,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 SKIP_DIRS = {".git", ".venv", "__pycache__", "runs", "assets", ".pytest_cache", "dist", "build"}
-INTERNAL_DIRS = {"research", "plan"}  # plan == docs/plan
 
 LINK_RE = re.compile(r"\[[^\]]*\]\(\s*(<[^>]*>|\S+?)(?:\s+[\"'][^\"']*[\"'])?\s*\)")
 HTML_RE = re.compile(r'(?:src|href)\s*=\s*"([^"]+)"')
@@ -51,7 +51,9 @@ def iter_markdown(include_internal: bool):
             continue
         if not include_internal:
             rel = path.relative_to(ROOT)
-            if rel.parts[0] == "research" or (len(rel.parts) > 1 and rel.parts[0] == "docs" and rel.parts[1] == "plan"):
+            if rel.parts[0] == "research" and rel.as_posix() not in {"research/README.md", "research/archive/README.md"}:
+                continue
+            if rel.parts[:2] == ("docs", "plan"):
                 continue
         yield path
 

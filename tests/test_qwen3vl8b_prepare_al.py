@@ -2,7 +2,7 @@ import importlib.util
 from pathlib import Path
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'research' / 'qwen3vl8b_native_vllm' / 'prepare_al_harness.py'
+SCRIPT = Path(__file__).resolve().parents[1] / 'research' / 'archive' / 'qwen3vl8b_native_vllm' / 'prepare_al_harness.py'
 
 
 def test_prepare_copies_package_and_only_changes_stats(tmp_path):

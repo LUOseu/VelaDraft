@@ -128,7 +128,7 @@ Note on the machine-readable results
 ablation runs and the two reduced 8B runs recorded at extraction time. It does
 **not** contain the DFly upstream recipe run (`R-20261014-11`), the DFlash2
 conv/selector ablation, or the DSpark/Domino ablations; for those, the records
-are this page's rows and `docs/plan/RUN_LOG.md` / `STATE.md`.
+are this page's rows and `docs/plan/RUN_LOG.md` / `docs/maintenance/STATE.md`.
 
 - DSpark decomposition: at the frozen DFlash round width the Markov head alone
   lifts AL 1.630 -> 1.719 (+0.089, deep slots roughly doubled); drafting the

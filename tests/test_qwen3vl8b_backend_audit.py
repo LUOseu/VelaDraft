@@ -1,6 +1,6 @@
 import importlib.util,json,tempfile,unittest
 from pathlib import Path
-p=Path(__file__).resolve().parents[1]/'research'/'qwen3vl8b_native_vllm'/'audit_attention_backends_v1.py';spec=importlib.util.spec_from_file_location('audit_attention_backends',p)
+p=Path(__file__).resolve().parents[1]/'research'/'archive'/'qwen3vl8b_native_vllm'/'audit_attention_backends_v1.py';spec=importlib.util.spec_from_file_location('audit_attention_backends',p)
 class AuditTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.d=Path(self.tmp.name)

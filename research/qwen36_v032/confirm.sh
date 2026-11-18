@@ -9,7 +9,7 @@ for arm in "${arms[@]}"; do
   export Q36_V032_REUSE_CACHE="$TASK/v032_${arm}_a2"
   bash "$TASK/repo/research/qwen36_v032/run.sh" --gpu "$gpu" --arm "$arm" --full --out "$out/$arm"
 done
-source "$TASK/repo/research/qwen36_rootcause/a800_site.sh"
+source "$TASK/repo/research/archive/qwen36/rootcause/a800_site.sh"
 export PYTHONPATH="$TASK/repo"
 cd "$TASK/repo"
 exec python -u -m research.qwen36_v032.summarize "$out"

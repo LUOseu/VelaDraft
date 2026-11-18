@@ -12,7 +12,7 @@ Task-first entry points. New here? Start with the first line below.
 - [online-training.md](online-training.md) - live feature extraction, batching, optional RAM cache, device/limits.
 
 ## Choose a method / recipe
-Per-method details: [TRAINING_SIGNALS.md](TRAINING_SIGNALS.md) (generated requirements), [algorithms/](algorithms/) (one page per drafter), [SUPPORT_MATRIX.md](../SUPPORT_MATRIX.md) (recorded evidence; generated), [../ALGORITHM_MATRIX.md](../ALGORITHM_MATRIX.md) (implementation progress).
+See the [training signals](TRAINING_SIGNALS.md), [method guides](algorithms/), [support matrix](../SUPPORT_MATRIX.md) and [implementation matrix](algorithms/ALGORITHM_MATRIX.md).
 
 | Method | Default objective | Selectable recipe | Config entry | Extra teacher signal | Recorded scope (highest) | Released weights |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -30,6 +30,7 @@ set your target/data paths first. Download commands and per-archive checks live
 in [model-zoo.md](model-zoo.md).
 
 ## Evaluate and export
+- [MMSpec runners](../research/README.md) by target and [archived studies](../research/archive/README.md) by experiment.
 - [benchmark.md](benchmark.md) - benchmark harness usage; results live in [../BENCHMARKS.md](../BENCHMARKS.md).
 - [verification-modes.md](verification-modes.md) - what token-exact verification means and which modes are diagnostics.
 - [serving-bridge.md](serving-bridge.md) - export -> serving runtime status, current gates and what must not be claimed.
@@ -44,3 +45,7 @@ in [model-zoo.md](model-zoo.md).
 - [plan/](plan/) - experiment plans, run logs, claim-evidence tables (development history).
 - [../research/](../research/) - research workspace (optimization lanes, negative results).
 - [../CHANGELOG.md](../CHANGELOG.md) - release history.
+
+## Project maintenance
+
+[Release checklist](maintenance/RELEASE_CHECKLIST.md) · [Historical project status](maintenance/STATE.md) · [Upstream audits](upstream/UPSTREAM_AUDIT.md)

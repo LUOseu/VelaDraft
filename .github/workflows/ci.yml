@@ -27,10 +27,10 @@ jobs:
         env:
           CUDA_VISIBLE_DEVICES: ""
         run: pytest tests/ -q
-      - name: MMSpec runner CPU regression tests
+      - name: MMSpec runner and archived verification replay
         env:
           CUDA_VISIBLE_DEVICES: ""
-        run: python -m pytest research/qwen36_a100_seven_eval -q
+        run: python -m pytest research/qwen36_a100_seven_eval research/archive/qwen36/verifylen/test_recover.py -q
       - name: NPU-readiness CPU suite (fail-closed aggregate)
         env:
           CUDA_VISIBLE_DEVICES: ""

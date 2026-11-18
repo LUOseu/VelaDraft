@@ -221,7 +221,7 @@ levers that matter are `A` and `d`, and the fidelity question in §3 is the gate
 ## 5. Official harness cross-check (`scripts/scale/speed_paired.py`)
 
 The same measurement taken by the pre-existing harness (the one the training round used), which is
-the number quoted in `reports/REPORT_R3R5_NEXT_ROUND.md` §7.3:
+the number quoted in `research/archive/training/r3r5/REPORT_R3R5_NEXT_ROUND.md` §7.3:
 
 | | R3 | R5 |
 |---|---|---|

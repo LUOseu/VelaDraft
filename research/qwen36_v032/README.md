@@ -60,7 +60,7 @@ requests, runtime metadata, source hashes and sampled GPU resource records.
 It uses native FlashAttention for target full-attention layers and the draft;
 GDN is the target's separate linear-attention/state-update component.
 
-`research/qwen36_fixedlength` implements the separate fixed-output comparison:
+`research/archive/qwen36/fixedlength` implements the separate fixed-output comparison:
 `SamplingParams(temperature=0, max_tokens=512, ignore_eos=True)`, with explicit
 stop-token lists removed. It asserts that every timed output has exactly 512
 tokens and ends by length. Tokens after EOS, if any, are included. This uses the

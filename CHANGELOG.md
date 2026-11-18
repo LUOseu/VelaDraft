@@ -279,7 +279,7 @@
 - Tests: 31 new CPU tests across `tests/test_dflare.py`,
   `tests/test_dfly.py`, `tests/test_feature_contract.py`; docs:
   `docs/upstream/{dflare,dfly}.md`, `docs/algorithms/{dflare,dfly}.md`,
-  `ROADMAP.md`, `ALGORITHM_MATRIX.md`, `UPSTREAM_AUDIT.md`.
+  `ROADMAP.md`, `docs/algorithms/ALGORITHM_MATRIX.md`, `docs/upstream/UPSTREAM_AUDIT.md`.
 - Recorded evidence: COCO 64-row smokes on Qwen2.5-VL-3B (both token-exact,
   exports verified; DFlare AL 1.123, DFly AL 1.438); canonical 2K runs +
   ablations on Qwen2.5-VL-3B (DFlare 1.637 — its dedicated context K/V is
@@ -656,7 +656,7 @@ Four algorithm-zoo stages land in this release: DSpark (stage 2), Domino
   pre-zoo baselines (3B-2K AL 1.630, 3B-5K 1.817, 8B-512 1.322, 8B-2K 1.665),
   checkpoint/feature semantics and the regression gates; post-stage
   re-measurements after DSpark..DFlash2 land are recorded there and in
-  `STATE.md` (8-prompt registry path reproduced bit-identically at 1.6096).
+  `docs/maintenance/STATE.md` (8-prompt registry path reproduced bit-identically at 1.6096).
 
 ### Stage 4: JetSpec (causal block-parallel drafting + forward-KL distillation)
 
@@ -731,7 +731,7 @@ Added
   alongside the legacy string form; export loading now dispatches on the
   recorded algorithm instead of refusing non-DFlash exports.
 - Upstream audit docs for all five algorithms (`docs/upstream/*.md`) plus
-  `UPSTREAM_AUDIT.md` / `ALGORITHM_MATRIX.md` governance indexes.
+  `docs/upstream/UPSTREAM_AUDIT.md` / `docs/algorithms/ALGORITHM_MATRIX.md` governance indexes.
 - `configs/dspark/` (2K canonical + COCO smoke).
 
 Changed
@@ -783,7 +783,7 @@ Added
   eval/export refuse mismatched checkpoints. No DFlash semantics changed.
 - **Benchmark harness skeleton** (`scripts/benchmark.py`,
   `benchmarks/manifests/`): fixed-protocol per-workload reports (JSON + MD).
-- Governance docs: `STATE.md`, `SUPPORT_MATRIX.md`, `BENCHMARKS.md`,
+- Governance docs: `docs/maintenance/STATE.md`, `SUPPORT_MATRIX.md`, `BENCHMARKS.md`,
   `docs/adding_an_algorithm.md`, `docs/algorithms/dflash.md`,
   `docs/benchmark.md`.
 - `pyproject.toml` version aligned with the README (`0.2.0`).

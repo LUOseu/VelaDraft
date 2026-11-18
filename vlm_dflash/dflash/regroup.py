@@ -1,6 +1,6 @@
 """Within-logical-batch physical regrouping with preserved weights (D1 port).
 
-Integrated port of ``research/rsi/d1/d1_bucketing.py`` (branch ``research/rsi-d1``
+Integrated port of ``research/archive/training/rsi/d1/d1_bucketing.py`` (branch ``research/rsi-d1``
 @ ``4135691``). Used by the opt-in ``train.regroup`` path; default off, so the
 shipped training path stays byte-identical.
 

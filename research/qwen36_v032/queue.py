@@ -20,7 +20,7 @@ def main():
         if status=='complete':break
         if status not in ('running','resolving') or time.monotonic()>deadline:raise RuntimeError('Isolated installation did not finish: '+status)
         time.sleep(10)
-    from research.qwen36_k_sweep.queue import gpu_state,gpu_lock_free
+    from research.archive.qwen36.k_sweep.queue import gpu_state,gpu_lock_free
     from vlm_dflash.eval.native_resources import GPULease
     lockroot=Path(os.environ['VELADRAFT_GPU_LOCK_DIR'])
     while True:

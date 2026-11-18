@@ -1,6 +1,6 @@
 import importlib.util,json,tempfile,unittest,hashlib
 from pathlib import Path
-p=Path(__file__).resolve().parents[1]/'research'/'qwen3vl8b_native_vllm'/'collect_al_supplement_v1.py';spec=importlib.util.spec_from_file_location('al',p);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+p=Path(__file__).resolve().parents[1]/'research'/'archive'/'qwen3vl8b_native_vllm'/'collect_al_supplement_v1.py';spec=importlib.util.spec_from_file_location('al',p);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 class ALTest(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.r=Path(self.tmp.name);self.e=self.r/'ev';self.e.mkdir();self.rp=self.r/'result.json';self.sp=self.e/'sd_r0.json'
