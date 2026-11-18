@@ -117,4 +117,4 @@ recipe baseline (`--compile-tv-kl`) where applicable. Do not transfer timings
 between hosts or label these probes as time-to-quality results.
 
 Measured artifacts and reviewer-driven next experiments:
-[2026-10-31 report](../research/train_cost_20261031/REPORT.md).
+[2026-10-31 report](../research/archive/training/train_cost_20261031/REPORT.md).

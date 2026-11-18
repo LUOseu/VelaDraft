@@ -363,7 +363,7 @@ variation. A fixed epoch order restores full bit-identity (end-to-end
 `ckpt_final.pt` sha256 match) — measured with a lane-only diagnostic patch
 that pins the loader order (not part of this change). The cache itself is
 value-exact either way: hits return the stored tensors bitwise. See
-`research/system_optimization/REPORT.md` §4.3-§4.6.
+`research/archive/training/system_optimization/REPORT.md` §4.3-§4.6.
 
 ## Exact resume
 

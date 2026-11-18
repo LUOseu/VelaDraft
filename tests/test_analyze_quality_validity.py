@@ -1,4 +1,4 @@
-"""Validity-gate regressions for research/convergence/analyze_quality.py.
+"""Validity-gate regressions for research/archive/training/convergence/analyze_quality.py.
 
 The frozen prereg (PREREGISTRATION.md section 5) requires leg validity checks
 before any statistic: a construction with four seeds, one prompt each,
@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-ANALYZER = REPO / "research" / "convergence" / "analyze_quality.py"
+ANALYZER = REPO / "research" / "archive" / "training" / "convergence" / "analyze_quality.py"
 
 
 def _write_leg(root: Path, name: str, per_prompt_al: dict[str, float], *,

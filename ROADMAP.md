@@ -88,4 +88,4 @@ Rules
 - No support checkbox without a run: implemented / tested / validated /
   experimental / planned are distinct states.
 - Every algorithm lands with its `docs/algorithms/<name>.md` audit.
-- Re-check scope weekly against STATE.md "next highest-value tasks".
+- Re-check scope weekly against docs/maintenance/STATE.md "next highest-value tasks".

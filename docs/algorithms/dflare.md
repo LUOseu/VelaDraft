@@ -35,7 +35,7 @@ reading: the dedicated context K/V projections are worth **+0.058** at this
 budget, while the learned fusion stays close to its distance prior
 (fp32-master drift 0.011; freezing it changes AL by 0.0005). Quote the 2K
 numbers as "dedicated context K/V + distance prior", not "learned fusion".
-Full rows in `BENCHMARKS.md`; stage matrix in `ALGORITHM_MATRIX.md` /
+Full rows in `BENCHMARKS.md`; stage matrix in `docs/algorithms/ALGORITHM_MATRIX.md` /
 `SUPPORT_MATRIX.md`.
 
 ## Config

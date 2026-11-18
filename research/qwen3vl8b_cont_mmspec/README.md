@@ -9,7 +9,7 @@ protocol on the seven CONT finals (75,000 original + 50,000 continuation updates
 
 | Path | Purpose |
 | --- | --- |
-| `native/` | Method adapters bound to the frozen Qwen3-VL-8B draft. Ported from `research/qwen36_native_vllm` (itself a port of `research/qwen3vl8b_native_vllm`), with the target contract in `native/contract.py`. |
+| `native/` | Method adapters bound to the frozen Qwen3-VL-8B draft. Ported from `research/qwen36_native_vllm` (itself a port of `research/archive/qwen3vl8b_native_vllm`), with the target contract in `native/contract.py`. |
 | `native/export_checkpoint.py` | CPU export of one CONT final to the native layout; every trained tensor bitwise equal, receipt written next to it. |
 | `native/make_runtime_manifest.py` | Runtime manifest pinning one method's bootstrap, adapter sources and checkpoint by SHA256. |
 | `native/test_method_parity.py`, `native/test_mrope_parity.py` | CPU parity against the training implementation with the real CONT weights and target head. |

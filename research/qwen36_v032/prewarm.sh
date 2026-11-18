@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 TASK=/root/autodl-tmp/qwen36_backend_20261101
-source "$TASK/repo/research/qwen36_rootcause/a800_site.sh"
+source "$TASK/repo/research/archive/qwen36/rootcause/a800_site.sh"
 export PYTHONPATH="$TASK/repo"
 export CUDA_PATH="$CUDA_HOME"
 export CUDACXX="$CUDA_HOME/bin/nvcc"

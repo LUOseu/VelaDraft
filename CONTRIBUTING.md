@@ -6,12 +6,17 @@ changes that carry recorded evidence.
 
 What is accepted today: bug fixes, documentation, packaging, release tooling,
 benchmark adapters, reduced validation, CI, and license/security cleanup — and
-new algorithms or targets that meet the acceptance bar below. Multi-image /
-multi-turn (schema v2) is implemented with a recorded GPU smoke; video and
-serving runtimes remain out of scope until the gates in `docs/serving-bridge.md`
-are met. (The earlier "v0.3.1 not yet released, freeze everything else" policy
-applied while that release was in flight; it is kept in the CHANGELOG history,
-not as current guidance.)
+new algorithms or targets that meet the acceptance bar below. For native
+evaluation, start with the [vLLM protocol](docs/benchmark.md) and the
+[target-specific runners](research/README.md).
+
+## Where changes belong
+
+Reusable training and evaluation code lives in [vlm_dflash/](vlm_dflash/).
+Workload definitions belong in [benchmarks/](benchmarks/). The [research
+index](research/README.md) lists runnable campaigns and their dependencies.
+Completed studies, profiling sweeps and their evidence are grouped by topic in
+the [research archive](research/archive/README.md).
 
 ## Development setup
 
@@ -39,7 +44,7 @@ v0.3) is:
 4. real VLM smoke on Qwen2.5-VL-3B: prepare -> regen -> capture -> train ->
    visual-path check -> eval (token-exact gate) -> export -> reload;
 5. an algorithm user doc (`docs/algorithms/<name>.md`) and matrix entries
-   (`ALGORITHM_MATRIX.md`, `SUPPORT_MATRIX.md`).
+   (`docs/algorithms/ALGORITHM_MATRIX.md`, `SUPPORT_MATRIX.md`).
 
 If upstream does not publish the training objective, the algorithm ships as
 **Experimental** with the objective explicitly labelled a reconstruction

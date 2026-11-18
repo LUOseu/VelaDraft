@@ -97,7 +97,7 @@ what is experimental:  the TRAINING objective. The public DFlash2 sources
 ```
 
 Our port keeps that split objective exactly and therefore ships as
-**Experimental** in `ALGORITHM_MATRIX.md` / `SUPPORT_MATRIX.md`.
+**Experimental** in `docs/algorithms/ALGORITHM_MATRIX.md` / `SUPPORT_MATRIX.md`.
 
 ## What we port
 

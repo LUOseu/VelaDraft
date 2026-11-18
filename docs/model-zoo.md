@@ -56,3 +56,17 @@ archive contains a `checksums.json` for its files (see
 - Serving integration is separate roadmap work; see
   [`serving-bridge.md`](serving-bridge.md). These archives are for
   evaluation/training interop with this repo's tooling.
+
+## Community checkpoints
+
+[@khazic](https://github.com/khazic) trained all seven drafter methods with VelaDraft and shared these checkpoints on Hugging Face. The release checks above apply to the GitHub archives.
+
+| Drafter | Qwen3.6 (400K) | Qwen3-VL-8B (200K) |
+| --- | --- | --- |
+| DFlash | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen36-400k-dflash) | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dflash) |
+| DFlash2 | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen36-400k-dflash2) | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dflash2) |
+| DSpark | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen36-400k-dspark) | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dspark) |
+| DFly | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen36-400k-dfly) | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dfly) |
+| DFlare | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen36-400k-dflare) | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-dflare) |
+| Domino | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen36-400k-domino) | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-domino) |
+| JetSpec | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen36-400k-jetspec) | [Checkpoint](https://huggingface.co/khazic/veladraft-qwen3vl8b-200k-jetspec) |

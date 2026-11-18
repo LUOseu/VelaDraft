@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-MODULE = Path(__file__).resolve().parents[1] / 'research' / 'qwen3vl8b_native_vllm' / 'report_validation.py'
+MODULE = Path(__file__).resolve().parents[1] / 'research' / 'archive' / 'qwen3vl8b_native_vllm' / 'report_validation.py'
 
 
 def module():

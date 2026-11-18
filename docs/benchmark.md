@@ -74,7 +74,7 @@ and fixed-block DSpark should retain those scope descriptions when used.
 
 ### Qwen3-VL-8B campaign code
 
-The [Qwen3-VL-8B native-vLLM research snapshot](../research/qwen3vl8b_native_vllm/README.md)
+The [Qwen3-VL-8B native-vLLM research snapshot](../research/archive/qwen3vl8b_native_vllm/README.md)
 contains the method-specific adaptation, quality scoring, queue and audit code
 used for this campaign. It records machine-bound paths and is not a turnkey
 installation; regenerate its receipts and runtime manifests for a new machine.
